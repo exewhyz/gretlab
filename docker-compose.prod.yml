@@ -1,0 +1,68 @@
+# The stateless tier: load balancer, web replicas and connection pooling.
+# Runners deploy separately, on their own machines: see docker-compose.runner.yml.
+# Point DB_HOST at managed Postgres. Full guide: docs/scaling.md
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [web]
+    ports:
+      - "${HTTP_PORT:-80}:${HTTP_PORT:-80}"
+      - "443:443"
+    environment:
+      # A real domain gets HTTPS automatically. ":8080" serves plain HTTP, for testing.
+      SITE_ADDRESS: ${SITE_ADDRESS:?set to your domain}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+  web:
+    image: gretlab/web:${TAG:-local}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on: [pgbouncer]
+    deploy:
+      replicas: ${WEB_REPLICAS:-3}
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-gretlab}:${DB_PASSWORD:?}@pgbouncer:5432/${DB_NAME:-gretlab}
+      DATABASE_PREPARE: "false"
+      DATABASE_POOL: ${WEB_DB_POOL:-10}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+
+  # Web replicas share a small number of real database connections through this.
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.24.1-p1
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${DB_HOST:?}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-gretlab}
+      DB_PASSWORD: ${DB_PASSWORD:?}
+      DB_NAME: ${DB_NAME:-gretlab}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "2000"
+      DEFAULT_POOL_SIZE: ${DB_POOL_SIZE:-40}
+      LISTEN_PORT: "5432"
+
+  # One-shot: docker compose -f docker-compose.prod.yml run --rm migrate
+  migrate:
+    profiles: [tools]
+    image: gretlab/runner:${TAG:-local}
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    working_dir: /repo/packages/db
+    entrypoint: ["sh", "-c", "pnpm exec tsx src/migrate.ts && pnpm exec tsx src/seed.ts"]
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-gretlab}:${DB_PASSWORD:?}@${DB_HOST:?}:${DB_PORT:-5432}/${DB_NAME:-gretlab}
+
+volumes:
+  caddy-data:

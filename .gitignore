@@ -43,3 +43,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Keep the env template in git
+!.env.example
+
+# Copied from node_modules by apps/web/scripts/copy-vendor.mjs
+apps/web/public/vendor

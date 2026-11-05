@@ -7,11 +7,19 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "db:generate": "pnpm --filter @workspace/db db:generate",
+    "db:migrate": "pnpm --filter @workspace/db db:migrate",
+    "db:seed": "pnpm --filter @workspace/db db:seed",
+    "test:sandbox": "pnpm --filter runner test:sandbox",
+    "test": "pnpm --filter @workspace/judge test",
+    "test:e2e": "e2e/run.sh",
+    "sandbox:images": "docker/sandbox/build.sh"
   },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
+    "playwright": "^1.64.1",
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "turbo": "^2.11.10",

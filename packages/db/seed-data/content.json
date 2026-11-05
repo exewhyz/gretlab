@@ -1,0 +1,1585 @@
+{
+ "title": "Python Practice Lab",
+ "subtitle": "B.Tech CSE · First Year · Python Programming",
+ "units": [
+  {
+   "name": "Basics, Input/Output & Operators",
+   "questions": [
+    {
+     "id": "p1",
+     "title": "Simple Interest",
+     "level": "easy",
+     "statement": [
+      "Read the principal amount, the yearly rate of interest and the time in years. Calculate the simple interest using SI = P × R × T / 100, and the total amount (P + SI)."
+     ],
+     "input": [
+      "Line 1: `principal` (decimal)",
+      "Line 2: `rate` (decimal)",
+      "Line 3: `time` (decimal)"
+     ],
+     "output": [
+      "Line 1: `Simple Interest: <si>`",
+      "Line 2: `Total Amount: <total>`",
+      "Both values rounded to 2 decimal places"
+     ],
+     "constraints": [
+      "0 ≤ `principal` ≤ 1000000",
+      "0 ≤ `rate` ≤ 50",
+      "0 ≤ `time` ≤ 50"
+     ],
+     "samples": [
+      [
+       "10000\n5\n2",
+       "Simple Interest: 1000.00\nTotal Amount: 11000.00"
+      ],
+      [
+       "2500.50\n7.5\n3",
+       "Simple Interest: 562.61\nTotal Amount: 3063.11"
+      ]
+     ],
+     "tests": [
+      [
+       "0\n10\n5",
+       "Simple Interest: 0.00\nTotal Amount: 0.00"
+      ],
+      [
+       "1000\n0\n10",
+       "Simple Interest: 0.00\nTotal Amount: 1000.00"
+      ],
+      [
+       "99999.99\n12.5\n1",
+       "Simple Interest: 12500.00\nTotal Amount: 112499.99"
+      ],
+      [
+       "1500\n4\n0.5",
+       "Simple Interest: 30.00\nTotal Amount: 1530.00"
+      ]
+     ],
+     "solution": "principal = float(input())\nrate = float(input())\ntime = float(input())\n\nsi = principal * rate * time / 100\nprint(f\"Simple Interest: {si:.2f}\")\nprint(f\"Total Amount: {principal + si:.2f}\")"
+    },
+    {
+     "id": "p2",
+     "title": "Integer Operations",
+     "level": "easy",
+     "statement": [
+      "Read two integers `a` and `b`, and print the result of each arithmetic operator on them."
+     ],
+     "input": [
+      "Line 1: `a`",
+      "Line 2: `b`"
+     ],
+     "output": [
+      "Line 1: `Sum: <a + b>`",
+      "Line 2: `Difference: <a - b>`",
+      "Line 3: `Product: <a * b>`",
+      "Line 4: `Division: <a / b>` rounded to 2 decimal places",
+      "Line 5: `Floor Division: <a // b>`",
+      "Line 6: `Modulus: <a % b>`"
+     ],
+     "constraints": [
+      "-1000 ≤ `a`, `b` ≤ 1000",
+      "`b` ≠ 0"
+     ],
+     "samples": [
+      [
+       "17\n5",
+       "Sum: 22\nDifference: 12\nProduct: 85\nDivision: 3.40\nFloor Division: 3\nModulus: 2"
+      ],
+      [
+       "-7\n2",
+       "Sum: -5\nDifference: -9\nProduct: -14\nDivision: -3.50\nFloor Division: -4\nModulus: 1"
+      ]
+     ],
+     "tests": [
+      [
+       "0\n9",
+       "Sum: 9\nDifference: -9\nProduct: 0\nDivision: 0.00\nFloor Division: 0\nModulus: 0"
+      ],
+      [
+       "100\n-3",
+       "Sum: 97\nDifference: 103\nProduct: -300\nDivision: -33.33\nFloor Division: -34\nModulus: -2"
+      ],
+      [
+       "5\n5",
+       "Sum: 10\nDifference: 0\nProduct: 25\nDivision: 1.00\nFloor Division: 1\nModulus: 0"
+      ],
+      [
+       "-1000\n-7",
+       "Sum: -1007\nDifference: -993\nProduct: 7000\nDivision: 142.86\nFloor Division: 142\nModulus: -6"
+      ]
+     ],
+     "solution": "a = int(input())\nb = int(input())\n\nprint(\"Sum:\", a + b)\nprint(\"Difference:\", a - b)\nprint(\"Product:\", a * b)\nprint(f\"Division: {a / b:.2f}\")\nprint(\"Floor Division:\", a // b)\nprint(\"Modulus:\", a % b)"
+    },
+    {
+     "id": "p3",
+     "title": "Duration Formatter",
+     "level": "medium",
+     "statement": [
+      "Read a duration in seconds and print it as days and a clock time in `HH:MM:SS` format. Use `//` and `%` to split the seconds, and format each of hours, minutes and seconds with two digits (for example `05`)."
+     ],
+     "input": [
+      "Line 1: `seconds`; an integer"
+     ],
+     "output": [
+      "Line 1: `<d> days <HH>:<MM>:<SS>`",
+      "Line 2: `Total minutes: <seconds // 60>`"
+     ],
+     "constraints": [
+      "0 ≤ `seconds` ≤ 10000000"
+     ],
+     "samples": [
+      [
+       "93784",
+       "1 days 02:03:04\nTotal minutes: 1563"
+      ],
+      [
+       "59",
+       "0 days 00:00:59\nTotal minutes: 0"
+      ]
+     ],
+     "tests": [
+      [
+       "0",
+       "0 days 00:00:00\nTotal minutes: 0"
+      ],
+      [
+       "86400",
+       "1 days 00:00:00\nTotal minutes: 1440"
+      ],
+      [
+       "86399",
+       "0 days 23:59:59\nTotal minutes: 1439"
+      ],
+      [
+       "3600",
+       "0 days 01:00:00\nTotal minutes: 60"
+      ],
+      [
+       "10000000",
+       "115 days 17:46:40\nTotal minutes: 166666"
+      ]
+     ],
+     "solution": "seconds = int(input())\n\ndays = seconds // 86400\nremaining = seconds % 86400\nhours = remaining // 3600\nminutes = (remaining % 3600) // 60\nsecs = remaining % 60\n\nprint(f\"{days} days {hours:02d}:{minutes:02d}:{secs:02d}\")\nprint(\"Total minutes:\", seconds // 60)"
+    }
+   ]
+  },
+  {
+   "name": "Data Types: int, float, complex",
+   "questions": [
+    {
+     "id": "p4",
+     "title": "Rectangle Measurements",
+     "level": "easy",
+     "statement": [
+      "Read the length and width of a rectangle as decimal numbers. Print its area, perimeter and diagonal. The diagonal is (length² + width²) raised to the power 0.5."
+     ],
+     "input": [
+      "Line 1: `length`",
+      "Line 2: `width`"
+     ],
+     "output": [
+      "Line 1: `Area: <value>`",
+      "Line 2: `Perimeter: <value>`",
+      "Line 3: `Diagonal: <value>`",
+      "All values rounded to 2 decimal places"
+     ],
+     "constraints": [
+      "0 < `length`, `width` ≤ 10000"
+     ],
+     "samples": [
+      [
+       "3\n4",
+       "Area: 12.00\nPerimeter: 14.00\nDiagonal: 5.00"
+      ],
+      [
+       "2.5\n1.2",
+       "Area: 3.00\nPerimeter: 7.40\nDiagonal: 2.77"
+      ]
+     ],
+     "tests": [
+      [
+       "1\n1",
+       "Area: 1.00\nPerimeter: 4.00\nDiagonal: 1.41"
+      ],
+      [
+       "10000\n10000",
+       "Area: 100000000.00\nPerimeter: 40000.00\nDiagonal: 14142.14"
+      ],
+      [
+       "0.1\n0.2",
+       "Area: 0.02\nPerimeter: 0.60\nDiagonal: 0.22"
+      ],
+      [
+       "7\n24",
+       "Area: 168.00\nPerimeter: 62.00\nDiagonal: 25.00"
+      ]
+     ],
+     "solution": "length = float(input())\nwidth = float(input())\n\narea = length * width\nperimeter = 2 * (length + width)\ndiagonal = (length ** 2 + width ** 2) ** 0.5\n\nprint(f\"Area: {area:.2f}\")\nprint(f\"Perimeter: {perimeter:.2f}\")\nprint(f\"Diagonal: {diagonal:.2f}\")"
+    },
+    {
+     "id": "p5",
+     "title": "Complex Number Details",
+     "level": "easy",
+     "statement": [
+      "Read a complex number with `complex(input())` and print its type name, real part, imaginary part, conjugate and magnitude."
+     ],
+     "input": [
+      "Line 1: a complex number written as `a+bj` or `a-bj`, with no spaces"
+     ],
+     "output": [
+      "Line 1: `Type: complex` (use `type(z).__name__`)",
+      "Line 2: `Real: <z.real>`",
+      "Line 3: `Imaginary: <z.imag>`",
+      "Line 4: `Conjugate: <z.conjugate()>`",
+      "Line 5: `Magnitude: <abs(z)>` rounded to 2 decimal places"
+     ],
+     "constraints": [
+      "The real and imaginary parts are non-zero numbers between -1000 and 1000"
+     ],
+     "samples": [
+      [
+       "3+4j",
+       "Type: complex\nReal: 3.0\nImaginary: 4.0\nConjugate: (3-4j)\nMagnitude: 5.00"
+      ],
+      [
+       "-2.5-6j",
+       "Type: complex\nReal: -2.5\nImaginary: -6.0\nConjugate: (-2.5+6j)\nMagnitude: 6.50"
+      ]
+     ],
+     "tests": [
+      [
+       "1+1j",
+       "Type: complex\nReal: 1.0\nImaginary: 1.0\nConjugate: (1-1j)\nMagnitude: 1.41"
+      ],
+      [
+       "-7+24j",
+       "Type: complex\nReal: -7.0\nImaginary: 24.0\nConjugate: (-7-24j)\nMagnitude: 25.00"
+      ],
+      [
+       "0.5-0.5j",
+       "Type: complex\nReal: 0.5\nImaginary: -0.5\nConjugate: (0.5+0.5j)\nMagnitude: 0.71"
+      ],
+      [
+       "100+200j",
+       "Type: complex\nReal: 100.0\nImaginary: 200.0\nConjugate: (100-200j)\nMagnitude: 223.61"
+      ]
+     ],
+     "solution": "z = complex(input())\n\nprint(\"Type:\", type(z).__name__)\nprint(\"Real:\", z.real)\nprint(\"Imaginary:\", z.imag)\nprint(\"Conjugate:\", z.conjugate())\nprint(f\"Magnitude: {abs(z):.2f}\")"
+    },
+    {
+     "id": "p6",
+     "title": "Quadratic Equation Roots",
+     "level": "medium",
+     "statement": [
+      "Read the coefficients `a`, `b` and `c` of the equation ax² + bx + c = 0 and find the discriminant d = b² − 4ac.",
+      [
+       [
+        "Discriminant",
+        "Nature of roots"
+       ],
+       [
+        "d > 0",
+        "Real and distinct"
+       ],
+       [
+        "d = 0",
+        "Real and equal"
+       ],
+       [
+        "d < 0",
+        "Complex"
+       ]
+      ],
+      "Find the roots with (−b ± √d) / 2a, taking `+` for Root 1 and `−` for Root 2. Use `math.sqrt()` when d ≥ 0, and `cmath.sqrt()` when d < 0 (the roots are then complex numbers)."
+     ],
+     "input": [
+      "Line 1: `a`",
+      "Line 2: `b`",
+      "Line 3: `c`"
+     ],
+     "output": [
+      "Line 1: `Nature: <nature>`",
+      "Lines 2 and 3: `Root 1: <r1>` and `Root 2: <r2>`. For real roots, print them rounded to 2 decimal places. For complex roots, print them as `<real>+<imag>j` or `<real>-<imag>j`, with both parts rounded to 2 decimal places (for example `-1.00+2.00j`)"
+     ],
+     "constraints": [
+      "1 ≤ `a` ≤ 100",
+      "-1000 ≤ `b`, `c` ≤ 1000"
+     ],
+     "samples": [
+      [
+       "1\n-3\n2",
+       "Nature: Real and distinct\nRoot 1: 2.00\nRoot 2: 1.00"
+      ],
+      [
+       "1\n2\n5",
+       "Nature: Complex\nRoot 1: -1.00+2.00j\nRoot 2: -1.00-2.00j"
+      ]
+     ],
+     "tests": [
+      [
+       "1\n2\n1",
+       "Nature: Real and equal\nRoot 1: -1.00\nRoot 2: -1.00"
+      ],
+      [
+       "2\n0\n-8",
+       "Nature: Real and distinct\nRoot 1: 2.00\nRoot 2: -2.00"
+      ],
+      [
+       "1\n0\n4",
+       "Nature: Complex\nRoot 1: 0.00+2.00j\nRoot 2: 0.00-2.00j"
+      ],
+      [
+       "3\n4\n5",
+       "Nature: Complex\nRoot 1: -0.67+1.11j\nRoot 2: -0.67-1.11j"
+      ],
+      [
+       "1\n-7\n0",
+       "Nature: Real and distinct\nRoot 1: 7.00\nRoot 2: 0.00"
+      ]
+     ],
+     "solution": "import math\nimport cmath\n\na = int(input())\nb = int(input())\nc = int(input())\n\nd = b * b - 4 * a * c\n\nif d > 0:\n    print(\"Nature: Real and distinct\")\nelif d == 0:\n    print(\"Nature: Real and equal\")\nelse:\n    print(\"Nature: Complex\")\n\nif d >= 0:\n    r1 = (-b + math.sqrt(d)) / (2 * a)\n    r2 = (-b - math.sqrt(d)) / (2 * a)\n    print(f\"Root 1: {r1:.2f}\")\n    print(f\"Root 2: {r2:.2f}\")\nelse:\n    r1 = (-b + cmath.sqrt(d)) / (2 * a)\n    r2 = (-b - cmath.sqrt(d)) / (2 * a)\n    print(f\"Root 1: {r1.real:.2f}{r1.imag:+.2f}j\")\n    print(f\"Root 2: {r2.real:.2f}{r2.imag:+.2f}j\")"
+    }
+   ]
+  },
+  {
+   "name": "Strings",
+   "questions": [
+    {
+     "id": "p7",
+     "title": "Palindrome Checker",
+     "level": "easy",
+     "statement": [
+      "A palindrome reads the same forwards and backwards. Read a line of text, keep only its letters and digits, convert it to lowercase, and check whether the result is a palindrome."
+     ],
+     "input": [
+      "Line 1: a line of text"
+     ],
+     "output": [
+      "Line 1: `Cleaned: <cleaned text>`",
+      "Line 2: `Palindrome` or `Not a palindrome`"
+     ],
+     "constraints": [
+      "1 ≤ length of the text ≤ 200",
+      "The text contains at least one letter or digit"
+     ],
+     "samples": [
+      [
+       "Madam",
+       "Cleaned: madam\nPalindrome"
+      ],
+      [
+       "A man, a plan, a canal: Panama",
+       "Cleaned: amanaplanacanalpanama\nPalindrome"
+      ]
+     ],
+     "tests": [
+      [
+       "Python",
+       "Cleaned: python\nNot a palindrome"
+      ],
+      [
+       "12321",
+       "Cleaned: 12321\nPalindrome"
+      ],
+      [
+       "No lemon, no melon",
+       "Cleaned: nolemonnomelon\nPalindrome"
+      ],
+      [
+       "ab",
+       "Cleaned: ab\nNot a palindrome"
+      ]
+     ],
+     "solution": "text = input()\n\ncleaned = \"\"\nfor ch in text:\n    if ch.isalnum():\n        cleaned += ch.lower()\n\nprint(\"Cleaned:\", cleaned)\nif cleaned == cleaned[::-1]:\n    print(\"Palindrome\")\nelse:\n    print(\"Not a palindrome\")"
+    },
+    {
+     "id": "p8",
+     "title": "Word Operations",
+     "level": "easy",
+     "statement": [
+      "Read a sentence and print the number of words, the sentence with each word reversed (words stay in the same order), the sentence in title case (`str.title()`), and the longest word (the first one if there is a tie)."
+     ],
+     "input": [
+      "Line 1: a sentence of words separated by single spaces"
+     ],
+     "output": [
+      "Line 1: `Words: <n>`",
+      "Line 2: `Reversed words: <sentence>`",
+      "Line 3: `Title case: <sentence>`",
+      "Line 4: `Longest word: <word>`"
+     ],
+     "constraints": [
+      "1 ≤ number of words ≤ 50",
+      "Words contain only letters"
+     ],
+     "samples": [
+      [
+       "python is fun",
+       "Words: 3\nReversed words: nohtyp si nuf\nTitle case: Python Is Fun\nLongest word: python"
+      ],
+      [
+       "Hello",
+       "Words: 1\nReversed words: olleH\nTitle case: Hello\nLongest word: Hello"
+      ]
+     ],
+     "tests": [
+      [
+       "learn python programming today",
+       "Words: 4\nReversed words: nrael nohtyp gnimmargorp yadot\nTitle case: Learn Python Programming Today\nLongest word: programming"
+      ],
+      [
+       "a bb ccc dd",
+       "Words: 4\nReversed words: a bb ccc dd\nTitle case: A Bb Ccc Dd\nLongest word: ccc"
+      ],
+      [
+       "WE LOVE CODING",
+       "Words: 3\nReversed words: EW EVOL GNIDOC\nTitle case: We Love Coding\nLongest word: CODING"
+      ]
+     ],
+     "solution": "sentence = input()\nwords = sentence.split()\n\nreversed_words = \" \".join(w[::-1] for w in words)\n\nlongest = words[0]\nfor w in words:\n    if len(w) > len(longest):\n        longest = w\n\nprint(\"Words:\", len(words))\nprint(\"Reversed words:\", reversed_words)\nprint(\"Title case:\", sentence.title())\nprint(\"Longest word:\", longest)"
+    },
+    {
+     "id": "p9",
+     "title": "Caesar Cipher",
+     "level": "medium",
+     "statement": [
+      "In a Caesar cipher each letter is shifted forward in the alphabet by `k` places, wrapping around from z to a. Uppercase letters stay uppercase, lowercase letters stay lowercase, and all other characters are unchanged.",
+      "Encrypt the text with shift `k`, then decrypt the encrypted text (shift back by `k`) to show the original is recovered. Use `ord()` and `chr()`."
+     ],
+     "input": [
+      "Line 1: the text",
+      "Line 2: `k`; the shift"
+     ],
+     "output": [
+      "Line 1: `Encrypted: <text>`",
+      "Line 2: `Decrypted: <text>`"
+     ],
+     "constraints": [
+      "1 ≤ length of the text ≤ 200",
+      "0 ≤ `k` ≤ 25"
+     ],
+     "samples": [
+      [
+       "Hello, World!\n3",
+       "Encrypted: Khoor, Zruog!\nDecrypted: Hello, World!"
+      ],
+      [
+       "xyz ABC\n2",
+       "Encrypted: zab CDE\nDecrypted: xyz ABC"
+      ]
+     ],
+     "tests": [
+      [
+       "Python 3.12\n0",
+       "Encrypted: Python 3.12\nDecrypted: Python 3.12"
+      ],
+      [
+       "Zebra\n25",
+       "Encrypted: Ydaqz\nDecrypted: Zebra"
+      ],
+      [
+       "attack at dawn\n13",
+       "Encrypted: nggnpx ng qnja\nDecrypted: attack at dawn"
+      ]
+     ],
+     "solution": "def shift_text(text, k):\n    result = \"\"\n    for ch in text:\n        if ch.isupper():\n            result += chr((ord(ch) - ord(\"A\") + k) % 26 + ord(\"A\"))\n        elif ch.islower():\n            result += chr((ord(ch) - ord(\"a\") + k) % 26 + ord(\"a\"))\n        else:\n            result += ch\n    return result\n\n\ntext = input()\nk = int(input())\n\nencrypted = shift_text(text, k)\ndecrypted = shift_text(encrypted, -k)\n\nprint(\"Encrypted:\", encrypted)\nprint(\"Decrypted:\", decrypted)"
+    }
+   ]
+  },
+  {
+   "name": "Control Flow: if-elif-else, match-case",
+   "questions": [
+    {
+     "id": "p10",
+     "title": "Leap Year",
+     "level": "easy",
+     "statement": [
+      "A year is a leap year if it is divisible by 400, or if it is divisible by 4 but not by 100. Read a year and print whether it is a leap year, and how many days February has in that year."
+     ],
+     "input": [
+      "Line 1: `year`"
+     ],
+     "output": [
+      "Line 1: `Leap year` or `Not a leap year`",
+      "Line 2: `February has <28 or 29> days`"
+     ],
+     "constraints": [
+      "1 ≤ `year` ≤ 9999"
+     ],
+     "samples": [
+      [
+       "2024",
+       "Leap year\nFebruary has 29 days"
+      ],
+      [
+       "1900",
+       "Not a leap year\nFebruary has 28 days"
+      ]
+     ],
+     "tests": [
+      [
+       "2000",
+       "Leap year\nFebruary has 29 days"
+      ],
+      [
+       "2023",
+       "Not a leap year\nFebruary has 28 days"
+      ],
+      [
+       "4",
+       "Leap year\nFebruary has 29 days"
+      ],
+      [
+       "9999",
+       "Not a leap year\nFebruary has 28 days"
+      ]
+     ],
+     "solution": "year = int(input())\n\nif year % 400 == 0 or (year % 4 == 0 and year % 100 != 0):\n    print(\"Leap year\")\n    print(\"February has 29 days\")\nelse:\n    print(\"Not a leap year\")\n    print(\"February has 28 days\")"
+    },
+    {
+     "id": "p11",
+     "title": "Day of the Week",
+     "level": "easy",
+     "statement": [
+      "Read a day number from 1 (Monday) to 7 (Sunday). Use `match-case` to print the day's name. Use a combined pattern `case 6 | 7` (or similar) to decide whether it is a weekday or the weekend."
+     ],
+     "input": [
+      "Line 1: `day`; an integer"
+     ],
+     "output": [
+      "Line 1: the day name, e.g. `Monday`",
+      "Line 2: `Weekday` or `Weekend`",
+      "If the number is not 1 to 7, print only one line: `Invalid day`"
+     ],
+     "constraints": [
+      "-100 ≤ `day` ≤ 100"
+     ],
+     "samples": [
+      [
+       "3",
+       "Wednesday\nWeekday"
+      ],
+      [
+       "7",
+       "Sunday\nWeekend"
+      ]
+     ],
+     "tests": [
+      [
+       "1",
+       "Monday\nWeekday"
+      ],
+      [
+       "6",
+       "Saturday\nWeekend"
+      ],
+      [
+       "0",
+       "Invalid day"
+      ],
+      [
+       "8",
+       "Invalid day"
+      ],
+      [
+       "-1",
+       "Invalid day"
+      ]
+     ],
+     "solution": "day = int(input())\n\nmatch day:\n    case 1:\n        name = \"Monday\"\n    case 2:\n        name = \"Tuesday\"\n    case 3:\n        name = \"Wednesday\"\n    case 4:\n        name = \"Thursday\"\n    case 5:\n        name = \"Friday\"\n    case 6:\n        name = \"Saturday\"\n    case 7:\n        name = \"Sunday\"\n    case _:\n        name = None\n\nif name is None:\n    print(\"Invalid day\")\nelse:\n    print(name)\n    match day:\n        case 6 | 7:\n            print(\"Weekend\")\n        case _:\n            print(\"Weekday\")"
+    },
+    {
+     "id": "p12",
+     "title": "Triangle Classifier",
+     "level": "medium",
+     "statement": [
+      "Read three side lengths. They form a triangle only if every side is positive and the sum of any two sides is greater than the third.",
+      "If they form a triangle, print its type: `Equilateral` (all sides equal), `Isosceles` (exactly two equal) or `Scalene` (all different). Then check whether it is right-angled: after sorting the sides, the square of the largest equals the sum of the squares of the other two."
+     ],
+     "input": [
+      "Line 1: three integers separated by spaces"
+     ],
+     "output": [
+      "Line 1: `Equilateral`, `Isosceles` or `Scalene`",
+      "Line 2: `Right-angled` or `Not right-angled`",
+      "If the sides do not form a triangle, print only one line: `Not a triangle`"
+     ],
+     "constraints": [
+      "-1000 ≤ each side ≤ 1000"
+     ],
+     "samples": [
+      [
+       "3 4 5",
+       "Scalene\nRight-angled"
+      ],
+      [
+       "5 5 5",
+       "Equilateral\nNot right-angled"
+      ]
+     ],
+     "tests": [
+      [
+       "1 2 3",
+       "Not a triangle"
+      ],
+      [
+       "5 5 8",
+       "Isosceles\nNot right-angled"
+      ],
+      [
+       "13 5 12",
+       "Scalene\nRight-angled"
+      ],
+      [
+       "0 4 4",
+       "Not a triangle"
+      ],
+      [
+       "7 10 12",
+       "Scalene\nNot right-angled"
+      ]
+     ],
+     "solution": "a, b, c = map(int, input().split())\n\nif a <= 0 or b <= 0 or c <= 0 or a + b <= c or a + c <= b or b + c <= a:\n    print(\"Not a triangle\")\nelse:\n    if a == b == c:\n        print(\"Equilateral\")\n    elif a == b or b == c or a == c:\n        print(\"Isosceles\")\n    else:\n        print(\"Scalene\")\n\n    x, y, z = sorted([a, b, c])\n    if x * x + y * y == z * z:\n        print(\"Right-angled\")\n    else:\n        print(\"Not right-angled\")"
+    }
+   ]
+  },
+  {
+   "name": "Loops: for, while, break, continue",
+   "questions": [
+    {
+     "id": "p13",
+     "title": "Multiplication Table",
+     "level": "easy",
+     "statement": [
+      "Read a number `n` and print its multiplication table from 1 to 10 using a `for` loop with `range()`."
+     ],
+     "input": [
+      "Line 1: `n`"
+     ],
+     "output": [
+      "10 lines, each in the form `n x i = product`"
+     ],
+     "constraints": [
+      "-100 ≤ `n` ≤ 100"
+     ],
+     "samples": [
+      [
+       "7",
+       "7 x 1 = 7\n7 x 2 = 14\n7 x 3 = 21\n7 x 4 = 28\n7 x 5 = 35\n7 x 6 = 42\n7 x 7 = 49\n7 x 8 = 56\n7 x 9 = 63\n7 x 10 = 70"
+      ],
+      [
+       "-3",
+       "-3 x 1 = -3\n-3 x 2 = -6\n-3 x 3 = -9\n-3 x 4 = -12\n-3 x 5 = -15\n-3 x 6 = -18\n-3 x 7 = -21\n-3 x 8 = -24\n-3 x 9 = -27\n-3 x 10 = -30"
+      ]
+     ],
+     "tests": [
+      [
+       "0",
+       "0 x 1 = 0\n0 x 2 = 0\n0 x 3 = 0\n0 x 4 = 0\n0 x 5 = 0\n0 x 6 = 0\n0 x 7 = 0\n0 x 8 = 0\n0 x 9 = 0\n0 x 10 = 0"
+      ],
+      [
+       "12",
+       "12 x 1 = 12\n12 x 2 = 24\n12 x 3 = 36\n12 x 4 = 48\n12 x 5 = 60\n12 x 6 = 72\n12 x 7 = 84\n12 x 8 = 96\n12 x 9 = 108\n12 x 10 = 120"
+      ],
+      [
+       "100",
+       "100 x 1 = 100\n100 x 2 = 200\n100 x 3 = 300\n100 x 4 = 400\n100 x 5 = 500\n100 x 6 = 600\n100 x 7 = 700\n100 x 8 = 800\n100 x 9 = 900\n100 x 10 = 1000"
+      ]
+     ],
+     "solution": "n = int(input())\n\nfor i in range(1, 11):\n    print(f\"{n} x {i} = {n * i}\")"
+    },
+    {
+     "id": "p14",
+     "title": "Digit Operations",
+     "level": "easy",
+     "statement": [
+      "Read a non-negative integer. Using a `while` loop with `%` and `//` (not string functions), find the sum of its digits, the number with its digits reversed, and how many digits it has."
+     ],
+     "input": [
+      "Line 1: `n`"
+     ],
+     "output": [
+      "Line 1: `Sum of digits: <s>`",
+      "Line 2: `Reversed: <r>` (for example, 1200 reversed is 21)",
+      "Line 3: `Digit count: <c>`"
+     ],
+     "constraints": [
+      "0 ≤ `n` ≤ 10^9",
+      "The number 0 has one digit"
+     ],
+     "samples": [
+      [
+       "12345",
+       "Sum of digits: 15\nReversed: 54321\nDigit count: 5"
+      ],
+      [
+       "1200",
+       "Sum of digits: 3\nReversed: 21\nDigit count: 4"
+      ]
+     ],
+     "tests": [
+      [
+       "0",
+       "Sum of digits: 0\nReversed: 0\nDigit count: 1"
+      ],
+      [
+       "7",
+       "Sum of digits: 7\nReversed: 7\nDigit count: 1"
+      ],
+      [
+       "1000000000",
+       "Sum of digits: 1\nReversed: 1\nDigit count: 10"
+      ],
+      [
+       "909",
+       "Sum of digits: 18\nReversed: 909\nDigit count: 3"
+      ]
+     ],
+     "solution": "n = int(input())\n\ntotal = 0\nreverse = 0\ncount = 0\ntemp = n\nwhile True:\n    digit = temp % 10\n    total += digit\n    reverse = reverse * 10 + digit\n    count += 1\n    temp //= 10\n    if temp == 0:\n        break\n\nprint(\"Sum of digits:\", total)\nprint(\"Reversed:\", reverse)\nprint(\"Digit count:\", count)"
+    },
+    {
+     "id": "p15",
+     "title": "GCD and LCM",
+     "level": "medium",
+     "statement": [
+      "Read two positive integers. Find their GCD using Euclid's method with a `while` loop: repeatedly replace (a, b) with (b, a % b) until b becomes 0; then a is the GCD. The LCM is a × b ÷ GCD. Two numbers are co-prime if their GCD is 1."
+     ],
+     "input": [
+      "Line 1: `a`",
+      "Line 2: `b`"
+     ],
+     "output": [
+      "Line 1: `GCD: <g>`",
+      "Line 2: `LCM: <l>`",
+      "Line 3: `Co-prime: Yes` or `Co-prime: No`"
+     ],
+     "constraints": [
+      "1 ≤ `a`, `b` ≤ 10^6",
+      "Do not use `math.gcd()`"
+     ],
+     "samples": [
+      [
+       "12\n18",
+       "GCD: 6\nLCM: 36\nCo-prime: No"
+      ],
+      [
+       "17\n5",
+       "GCD: 1\nLCM: 85\nCo-prime: Yes"
+      ]
+     ],
+     "tests": [
+      [
+       "1\n1",
+       "GCD: 1\nLCM: 1\nCo-prime: Yes"
+      ],
+      [
+       "100\n10",
+       "GCD: 10\nLCM: 100\nCo-prime: No"
+      ],
+      [
+       "1000000\n999999",
+       "GCD: 1\nLCM: 999999000000\nCo-prime: Yes"
+      ],
+      [
+       "48\n180",
+       "GCD: 12\nLCM: 720\nCo-prime: No"
+      ]
+     ],
+     "solution": "a = int(input())\nb = int(input())\n\nx, y = a, b\nwhile y != 0:\n    x, y = y, x % y\n\ngcd = x\nlcm = a * b // gcd\n\nprint(\"GCD:\", gcd)\nprint(\"LCM:\", lcm)\nprint(\"Co-prime:\", \"Yes\" if gcd == 1 else \"No\")"
+    }
+   ]
+  },
+  {
+   "name": "Lists & Tuples",
+   "questions": [
+    {
+     "id": "p16",
+     "title": "Second Largest",
+     "level": "easy",
+     "statement": [
+      "Read a list of integers and print the largest value and the second largest distinct value. If all values are the same, there is no second largest; print `None`."
+     ],
+     "input": [
+      "Line 1: integers separated by spaces"
+     ],
+     "output": [
+      "Line 1: `Largest: <value>`",
+      "Line 2: `Second largest: <value>` or `Second largest: None`"
+     ],
+     "constraints": [
+      "1 ≤ number of integers ≤ 100",
+      "-1000 ≤ each integer ≤ 1000"
+     ],
+     "samples": [
+      [
+       "4 9 2 9 7",
+       "Largest: 9\nSecond largest: 7"
+      ],
+      [
+       "5 5 5",
+       "Largest: 5\nSecond largest: None"
+      ]
+     ],
+     "tests": [
+      [
+       "8",
+       "Largest: 8\nSecond largest: None"
+      ],
+      [
+       "-1 -5 -3",
+       "Largest: -1\nSecond largest: -3"
+      ],
+      [
+       "1 2",
+       "Largest: 2\nSecond largest: 1"
+      ],
+      [
+       "100 -100 100 99",
+       "Largest: 100\nSecond largest: 99"
+      ]
+     ],
+     "solution": "numbers = list(map(int, input().split()))\n\nlargest = max(numbers)\nothers = [n for n in numbers if n != largest]\n\nprint(\"Largest:\", largest)\nif others:\n    print(\"Second largest:\", max(others))\nelse:\n    print(\"Second largest: None\")"
+    },
+    {
+     "id": "p17",
+     "title": "Rotate a List",
+     "level": "easy",
+     "statement": [
+      "Read a list of integers and a number `k`. Rotate the list to the left by `k` positions using slicing. If `k` is larger than the list length, use `k % length`. Then print the first and last elements of the rotated list as a tuple."
+     ],
+     "input": [
+      "Line 1: integers separated by spaces",
+      "Line 2: `k`"
+     ],
+     "output": [
+      "Line 1: `Rotated: <list>`",
+      "Line 2: `Ends: <(first, last)>`"
+     ],
+     "constraints": [
+      "1 ≤ number of integers ≤ 100",
+      "0 ≤ `k` ≤ 1000"
+     ],
+     "samples": [
+      [
+       "1 2 3 4 5\n2",
+       "Rotated: [3, 4, 5, 1, 2]\nEnds: (3, 2)"
+      ],
+      [
+       "10 20 30\n0",
+       "Rotated: [10, 20, 30]\nEnds: (10, 30)"
+      ]
+     ],
+     "tests": [
+      [
+       "7\n5",
+       "Rotated: [7]\nEnds: (7, 7)"
+      ],
+      [
+       "1 2 3 4\n4",
+       "Rotated: [1, 2, 3, 4]\nEnds: (1, 4)"
+      ],
+      [
+       "5 6 7 8\n10",
+       "Rotated: [7, 8, 5, 6]\nEnds: (7, 6)"
+      ]
+     ],
+     "solution": "numbers = list(map(int, input().split()))\nk = int(input())\n\nk = k % len(numbers)\nrotated = numbers[k:] + numbers[:k]\n\nprint(\"Rotated:\", rotated)\nprint(\"Ends:\", (rotated[0], rotated[-1]))"
+    },
+    {
+     "id": "p18",
+     "title": "Rank List",
+     "level": "medium",
+     "statement": [
+      "Read `n` students with their marks and store each as a tuple `(name, marks)` in a list. Sort the list by marks from highest to lowest; students with equal marks are sorted by name alphabetically. Use `sorted()` with a `lambda` key.",
+      "Print the rank list, then print the top student's tuple."
+     ],
+     "input": [
+      "Line 1: `n`",
+      "Next `n` lines: `name marks`"
+     ],
+     "output": [
+      "`n` lines in the form `<rank>. <name> - <marks>`",
+      "Last line: `Top: <tuple>`"
+     ],
+     "constraints": [
+      "1 ≤ `n` ≤ 50",
+      "Names are single words",
+      "0 ≤ marks ≤ 100"
+     ],
+     "samples": [
+      [
+       "4\nravi 78\nanu 92\nkiran 78\nmeena 65",
+       "1. anu - 92\n2. kiran - 78\n3. ravi - 78\n4. meena - 65\nTop: ('anu', 92)"
+      ],
+      [
+       "1\nsam 50",
+       "1. sam - 50\nTop: ('sam', 50)"
+      ]
+     ],
+     "tests": [
+      [
+       "3\nc 70\nb 70\na 70",
+       "1. a - 70\n2. b - 70\n3. c - 70\nTop: ('a', 70)"
+      ],
+      [
+       "3\nx 0\ny 100\nz 50",
+       "1. y - 100\n2. z - 50\n3. x - 0\nTop: ('y', 100)"
+      ]
+     ],
+     "solution": "n = int(input())\n\nstudents = []\nfor _ in range(n):\n    name, marks = input().split()\n    students.append((name, int(marks)))\n\nranked = sorted(students, key=lambda s: (-s[1], s[0]))\n\nfor rank, (name, marks) in enumerate(ranked, start=1):\n    print(f\"{rank}. {name} - {marks}\")\nprint(\"Top:\", ranked[0])"
+    }
+   ]
+  },
+  {
+   "name": "Dictionaries & Sets",
+   "questions": [
+    {
+     "id": "p19",
+     "title": "Word Frequency",
+     "level": "easy",
+     "statement": [
+      "Read a sentence of lowercase words. Count how many times each word appears, using a dictionary, with the words in order of first appearance. Then print the most frequent word (the first one in that order if there is a tie)."
+     ],
+     "input": [
+      "Line 1: lowercase words separated by spaces"
+     ],
+     "output": [
+      "Line 1: `Frequency: <dict>`",
+      "Line 2: `Most frequent: <word>`"
+     ],
+     "constraints": [
+      "1 ≤ number of words ≤ 100"
+     ],
+     "samples": [
+      [
+       "the cat and the dog and the bird",
+       "Frequency: {'the': 3, 'cat': 1, 'and': 2, 'dog': 1, 'bird': 1}\nMost frequent: the"
+      ],
+      [
+       "hello",
+       "Frequency: {'hello': 1}\nMost frequent: hello"
+      ]
+     ],
+     "tests": [
+      [
+       "a b a b",
+       "Frequency: {'a': 2, 'b': 2}\nMost frequent: a"
+      ],
+      [
+       "one two three",
+       "Frequency: {'one': 1, 'two': 1, 'three': 1}\nMost frequent: one"
+      ],
+      [
+       "go go go stop",
+       "Frequency: {'go': 3, 'stop': 1}\nMost frequent: go"
+      ]
+     ],
+     "solution": "words = input().split()\n\nfreq = {}\nfor w in words:\n    freq[w] = freq.get(w, 0) + 1\n\nbest = words[0]\nfor w in freq:\n    if freq[w] > freq[best]:\n        best = w\n\nprint(\"Frequency:\", freq)\nprint(\"Most frequent:\", best)"
+    },
+    {
+     "id": "p20",
+     "title": "Two List Comparison",
+     "level": "easy",
+     "statement": [
+      "Read two lists of integers. First remove duplicates from the first list while keeping the original order (use a set to remember what you have already seen). Then use set operations to compare the two lists."
+     ],
+     "input": [
+      "Line 1: the first list",
+      "Line 2: the second list"
+     ],
+     "output": [
+      "Line 1: `Without duplicates: <list>`",
+      "Line 2: `Common: <sorted list>`",
+      "Line 3: `Union: <sorted list>`",
+      "Line 4: `Only in first: <sorted list>`"
+     ],
+     "constraints": [
+      "1 ≤ size of each list ≤ 100",
+      "-1000 ≤ each integer ≤ 1000"
+     ],
+     "samples": [
+      [
+       "3 1 3 2 1\n2 3 5",
+       "Without duplicates: [3, 1, 2]\nCommon: [2, 3]\nUnion: [1, 2, 3, 5]\nOnly in first: [1]"
+      ],
+      [
+       "1 2 3\n4 5 6",
+       "Without duplicates: [1, 2, 3]\nCommon: []\nUnion: [1, 2, 3, 4, 5, 6]\nOnly in first: [1, 2, 3]"
+      ]
+     ],
+     "tests": [
+      [
+       "7 7 7\n7",
+       "Without duplicates: [7]\nCommon: [7]\nUnion: [7]\nOnly in first: []"
+      ],
+      [
+       "5\n5 6",
+       "Without duplicates: [5]\nCommon: [5]\nUnion: [5, 6]\nOnly in first: []"
+      ],
+      [
+       "-1 0 1 0\n0 2",
+       "Without duplicates: [-1, 0, 1]\nCommon: [0]\nUnion: [-1, 0, 1, 2]\nOnly in first: [-1, 1]"
+      ]
+     ],
+     "solution": "first = list(map(int, input().split()))\nsecond = list(map(int, input().split()))\n\nseen = set()\nunique = []\nfor n in first:\n    if n not in seen:\n        seen.add(n)\n        unique.append(n)\n\na = set(first)\nb = set(second)\n\nprint(\"Without duplicates:\", unique)\nprint(\"Common:\", sorted(a & b))\nprint(\"Union:\", sorted(a | b))\nprint(\"Only in first:\", sorted(a - b))"
+    },
+    {
+     "id": "p21",
+     "title": "Anagram Groups",
+     "level": "medium",
+     "statement": [
+      "Two words are anagrams if they contain the same letters in a different order (for example `listen` and `silent`). Read a list of lowercase words and group the anagrams together using a dictionary whose key is the word's letters in sorted order.",
+      "Print each group on its own line, with the words separated by spaces. Groups appear in the order their first word appears, and words inside a group keep their input order. A repeated word is included only once."
+     ],
+     "input": [
+      "Line 1: lowercase words separated by spaces"
+     ],
+     "output": [
+      "One line per group",
+      "Last line: `Groups: <count>`"
+     ],
+     "constraints": [
+      "1 ≤ number of words ≤ 100"
+     ],
+     "samples": [
+      [
+       "listen silent enlist google elgoog cat act",
+       "listen silent enlist\ngoogle elgoog\ncat act\nGroups: 3"
+      ],
+      [
+       "python",
+       "python\nGroups: 1"
+      ]
+     ],
+     "tests": [
+      [
+       "abc bca abc cab",
+       "abc bca cab\nGroups: 1"
+      ],
+      [
+       "dog god odg cat",
+       "dog god odg\ncat\nGroups: 2"
+      ],
+      [
+       "a b c a",
+       "a\nb\nc\nGroups: 3"
+      ]
+     ],
+     "solution": "words = input().split()\n\ngroups = {}\nfor w in words:\n    key = \"\".join(sorted(w))\n    if key not in groups:\n        groups[key] = []\n    if w not in groups[key]:\n        groups[key].append(w)\n\nfor members in groups.values():\n    print(\" \".join(members))\nprint(\"Groups:\", len(groups))"
+    }
+   ]
+  },
+  {
+   "name": "Functions, Callbacks & lambda",
+   "questions": [
+    {
+     "id": "p22",
+     "title": "Factorial and Combinations",
+     "level": "easy",
+     "statement": [
+      "Write a function `factorial(n)` that uses a loop to return n!. Then use it to find nCr = n! / (r! × (n − r)!)."
+     ],
+     "input": [
+      "Line 1: `n`",
+      "Line 2: `r`"
+     ],
+     "output": [
+      "Line 1: `<n>! = <value>`",
+      "Line 2: `<n>C<r> = <value>`"
+     ],
+     "constraints": [
+      "0 ≤ `r` ≤ `n` ≤ 20",
+      "Do not use the `math` module"
+     ],
+     "samples": [
+      [
+       "5\n2",
+       "5! = 120\n5C2 = 10"
+      ],
+      [
+       "10\n0",
+       "10! = 3628800\n10C0 = 1"
+      ]
+     ],
+     "tests": [
+      [
+       "0\n0",
+       "0! = 1\n0C0 = 1"
+      ],
+      [
+       "20\n10",
+       "20! = 2432902008176640000\n20C10 = 184756"
+      ],
+      [
+       "6\n6",
+       "6! = 720\n6C6 = 1"
+      ]
+     ],
+     "solution": "def factorial(n):\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    return result\n\n\nn = int(input())\nr = int(input())\n\nncr = factorial(n) // (factorial(r) * factorial(n - r))\nprint(f\"{n}! = {factorial(n)}\")\nprint(f\"{n}C{r} = {ncr}\")"
+    },
+    {
+     "id": "p23",
+     "title": "map, filter and lambda",
+     "level": "easy",
+     "statement": [
+      "Read a list of integers and use built-in functions with `lambda`:",
+      [
+       [
+        "Line",
+        "Task",
+        "Use"
+       ],
+       [
+        "1",
+        "Squares of the odd numbers",
+        "`filter()` then `map()`"
+       ],
+       [
+        "2",
+        "Sum of the even numbers",
+        "`filter()` and `sum()`"
+       ],
+       [
+        "3",
+        "Numbers sorted by absolute value (ties keep input order)",
+        "`sorted()` with `key=lambda`"
+       ]
+      ]
+     ],
+     "input": [
+      "Line 1: integers separated by spaces"
+     ],
+     "output": [
+      "Line 1: `Odd squares: <list>`",
+      "Line 2: `Sum of evens: <n>`",
+      "Line 3: `Sorted by absolute value: <list>`"
+     ],
+     "constraints": [
+      "1 ≤ number of integers ≤ 100",
+      "-1000 ≤ each integer ≤ 1000"
+     ],
+     "samples": [
+      [
+       "3 -4 5 2 -1",
+       "Odd squares: [9, 25, 1]\nSum of evens: -2\nSorted by absolute value: [-1, 2, 3, -4, 5]"
+      ],
+      [
+       "2 4 6",
+       "Odd squares: []\nSum of evens: 12\nSorted by absolute value: [2, 4, 6]"
+      ]
+     ],
+     "tests": [
+      [
+       "0",
+       "Odd squares: []\nSum of evens: 0\nSorted by absolute value: [0]"
+      ],
+      [
+       "-3 3 -2 2",
+       "Odd squares: [9, 9]\nSum of evens: 0\nSorted by absolute value: [-2, 2, -3, 3]"
+      ],
+      [
+       "7 -7 1",
+       "Odd squares: [49, 49, 1]\nSum of evens: 0\nSorted by absolute value: [1, 7, -7]"
+      ]
+     ],
+     "solution": "numbers = list(map(int, input().split()))\n\nodd_squares = list(map(lambda n: n * n, filter(lambda n: n % 2 != 0, numbers)))\neven_sum = sum(filter(lambda n: n % 2 == 0, numbers))\nby_abs = sorted(numbers, key=lambda n: abs(n))\n\nprint(\"Odd squares:\", odd_squares)\nprint(\"Sum of evens:\", even_sum)\nprint(\"Sorted by absolute value:\", by_abs)"
+    },
+    {
+     "id": "p24",
+     "title": "Callback Calculator",
+     "level": "medium",
+     "statement": [
+      "Write a function `calculate(a, b, operation)` that returns `operation(a, b)`; here `operation` is a callback function. Store the supported operations in a dictionary that maps a name to a `lambda`:",
+      [
+       [
+        "Name",
+        "Operation"
+       ],
+       [
+        "add",
+        "a + b"
+       ],
+       [
+        "sub",
+        "a − b"
+       ],
+       [
+        "mul",
+        "a × b"
+       ],
+       [
+        "max",
+        "the larger of a and b"
+       ],
+       [
+        "min",
+        "the smaller of a and b"
+       ],
+       [
+        "pow",
+        "a to the power b"
+       ]
+      ],
+      "Read two integers and a list of operation names. For each name, look up the lambda and pass it to `calculate()`. If a name is not in the dictionary, print `Unsupported`."
+     ],
+     "input": [
+      "Line 1: `a b`",
+      "Line 2: operation names separated by spaces"
+     ],
+     "output": [
+      "One line per operation name: `<name>: <result>` or `<name>: Unsupported`"
+     ],
+     "constraints": [
+      "-100 ≤ `a`, `b` ≤ 100",
+      "For `pow`, 0 ≤ `b` ≤ 10"
+     ],
+     "samples": [
+      [
+       "6 3\nadd mul pow",
+       "add: 9\nmul: 18\npow: 216"
+      ],
+      [
+       "4 9\nmax min div",
+       "max: 9\nmin: 4\ndiv: Unsupported"
+      ]
+     ],
+     "tests": [
+      [
+       "-2 5\nsub pow add",
+       "sub: -7\npow: -32\nadd: 3"
+      ],
+      [
+       "0 0\nadd sub mul max min pow",
+       "add: 0\nsub: 0\nmul: 0\nmax: 0\nmin: 0\npow: 1"
+      ],
+      [
+       "7 2\nmod",
+       "mod: Unsupported"
+      ]
+     ],
+     "solution": "def calculate(a, b, operation):\n    return operation(a, b)\n\n\noperations = {\n    \"add\": lambda a, b: a + b,\n    \"sub\": lambda a, b: a - b,\n    \"mul\": lambda a, b: a * b,\n    \"max\": lambda a, b: a if a > b else b,\n    \"min\": lambda a, b: a if a < b else b,\n    \"pow\": lambda a, b: a ** b,\n}\n\na, b = map(int, input().split())\nnames = input().split()\n\nfor name in names:\n    if name in operations:\n        print(f\"{name}: {calculate(a, b, operations[name])}\")\n    else:\n        print(f\"{name}: Unsupported\")"
+    }
+   ]
+  },
+  {
+   "name": "Comprehensions: list, set, dict",
+   "questions": [
+    {
+     "id": "p25",
+     "title": "Multiples of 3 or 5",
+     "level": "easy",
+     "statement": [
+      "Read `n`. Use a list comprehension to build the list of numbers from 1 to `n` that are divisible by 3 or by 5. Print the list and its sum."
+     ],
+     "input": [
+      "Line 1: `n`"
+     ],
+     "output": [
+      "Line 1: `Multiples: <list>`",
+      "Line 2: `Sum: <value>`"
+     ],
+     "constraints": [
+      "1 ≤ `n` ≤ 100"
+     ],
+     "samples": [
+      [
+       "15",
+       "Multiples: [3, 5, 6, 9, 10, 12, 15]\nSum: 60"
+      ],
+      [
+       "2",
+       "Multiples: []\nSum: 0"
+      ]
+     ],
+     "tests": [
+      [
+       "3",
+       "Multiples: [3]\nSum: 3"
+      ],
+      [
+       "10",
+       "Multiples: [3, 5, 6, 9, 10]\nSum: 33"
+      ],
+      [
+       "30",
+       "Multiples: [3, 5, 6, 9, 10, 12, 15, 18, 20, 21, 24, 25, 27, 30]\nSum: 225"
+      ]
+     ],
+     "solution": "n = int(input())\n\nmultiples = [i for i in range(1, n + 1) if i % 3 == 0 or i % 5 == 0]\n\nprint(\"Multiples:\", multiples)\nprint(\"Sum:\", sum(multiples))"
+    },
+    {
+     "id": "p26",
+     "title": "Dict and Set Comprehensions",
+     "level": "easy",
+     "statement": [
+      "Read a number `n` and a sentence. Then build:",
+      [
+       [
+        "Line",
+        "What to build",
+        "Comprehension"
+       ],
+       [
+        "1",
+        "A dictionary mapping each number from 1 to n to its square",
+        "dict comprehension"
+       ],
+       [
+        "2",
+        "The distinct word lengths in the sentence, sorted",
+        "set comprehension"
+       ],
+       [
+        "3",
+        "The words longer than 4 letters, converted to uppercase, in input order",
+        "list comprehension"
+       ]
+      ]
+     ],
+     "input": [
+      "Line 1: `n`",
+      "Line 2: a sentence of words separated by spaces"
+     ],
+     "output": [
+      "Line 1: `Squares: <dict>`",
+      "Line 2: `Distinct lengths: <sorted list>`",
+      "Line 3: `Long words: <list>`"
+     ],
+     "constraints": [
+      "1 ≤ `n` ≤ 20",
+      "1 ≤ number of words ≤ 50"
+     ],
+     "samples": [
+      [
+       "5\npython makes coding simple and fun",
+       "Squares: {1: 1, 2: 4, 3: 9, 4: 16, 5: 25}\nDistinct lengths: [3, 5, 6]\nLong words: ['PYTHON', 'MAKES', 'CODING', 'SIMPLE']"
+      ],
+      [
+       "1\nhi",
+       "Squares: {1: 1}\nDistinct lengths: [2]\nLong words: []"
+      ]
+     ],
+     "tests": [
+      [
+       "3\nthe quick brown fox",
+       "Squares: {1: 1, 2: 4, 3: 9}\nDistinct lengths: [3, 5]\nLong words: ['QUICK', 'BROWN']"
+      ],
+      [
+       "10\naaaaa bbbb ccccc",
+       "Squares: {1: 1, 2: 4, 3: 9, 4: 16, 5: 25, 6: 36, 7: 49, 8: 64, 9: 81, 10: 100}\nDistinct lengths: [4, 5]\nLong words: ['AAAAA', 'CCCCC']"
+      ]
+     ],
+     "solution": "n = int(input())\nwords = input().split()\n\nsquares = {i: i * i for i in range(1, n + 1)}\nlengths = {len(w) for w in words}\nlong_words = [w.upper() for w in words if len(w) > 4]\n\nprint(\"Squares:\", squares)\nprint(\"Distinct lengths:\", sorted(lengths))\nprint(\"Long words:\", long_words)"
+    },
+    {
+     "id": "p27",
+     "title": "Matrix Transpose",
+     "level": "medium",
+     "statement": [
+      "Read a matrix with `r` rows and `c` columns. Use a nested list comprehension to build its transpose (rows become columns). Also use list comprehensions to find the sum of each row and of each column of the original matrix."
+     ],
+     "input": [
+      "Line 1: `r c`",
+      "Next `r` lines: `c` integers separated by spaces"
+     ],
+     "output": [
+      "`c` lines: the rows of the transpose, numbers separated by single spaces",
+      "Next line: `Row sums: <list>`",
+      "Last line: `Column sums: <list>`"
+     ],
+     "constraints": [
+      "1 ≤ `r`, `c` ≤ 10",
+      "-100 ≤ each value ≤ 100"
+     ],
+     "samples": [
+      [
+       "2 3\n1 2 3\n4 5 6",
+       "1 4\n2 5\n3 6\nRow sums: [6, 15]\nColumn sums: [5, 7, 9]"
+      ],
+      [
+       "1 1\n7",
+       "7\nRow sums: [7]\nColumn sums: [7]"
+      ]
+     ],
+     "tests": [
+      [
+       "3 2\n1 2\n3 4\n5 6",
+       "1 3 5\n2 4 6\nRow sums: [3, 7, 11]\nColumn sums: [9, 12]"
+      ],
+      [
+       "2 2\n-1 0\n0 -1",
+       "-1 0\n0 -1\nRow sums: [-1, -1]\nColumn sums: [-1, -1]"
+      ]
+     ],
+     "solution": "r, c = map(int, input().split())\nmatrix = [list(map(int, input().split())) for _ in range(r)]\n\ntranspose = [[matrix[i][j] for i in range(r)] for j in range(c)]\nrow_sums = [sum(row) for row in matrix]\ncol_sums = [sum(matrix[i][j] for i in range(r)) for j in range(c)]\n\nfor row in transpose:\n    print(*row)\nprint(\"Row sums:\", row_sums)\nprint(\"Column sums:\", col_sums)"
+    }
+   ]
+  },
+  {
+   "name": "Modules, Exception Handling & File Handling",
+   "questions": [
+    {
+     "id": "p28",
+     "title": "Safe Division",
+     "level": "easy",
+     "statement": [
+      "Read two values and divide the first by the second. Use `try-except-else-finally`:",
+      [
+       [
+        "Situation",
+        "Print"
+       ],
+       [
+        "A value is not a whole number (`ValueError`)",
+        "Invalid input"
+       ],
+       [
+        "The second number is 0 (`ZeroDivisionError`)",
+        "Cannot divide by zero"
+       ],
+       [
+        "No error (`else` block)",
+        "Result: <a / b> rounded to 2 decimal places"
+       ],
+       [
+        "Always (`finally` block)",
+        "Done"
+       ]
+      ]
+     ],
+     "input": [
+      "Line 1: the first value",
+      "Line 2: the second value"
+     ],
+     "output": [
+      "Line 1: the result or the error message",
+      "Line 2: `Done`"
+     ],
+     "constraints": [
+      "Each line has at most 20 characters"
+     ],
+     "samples": [
+      [
+       "10\n4",
+       "Result: 2.50\nDone"
+      ],
+      [
+       "10\n0",
+       "Cannot divide by zero\nDone"
+      ]
+     ],
+     "tests": [
+      [
+       "ten\n2",
+       "Invalid input\nDone"
+      ],
+      [
+       "-9\n3",
+       "Result: -3.00\nDone"
+      ],
+      [
+       "5\n2.5",
+       "Invalid input\nDone"
+      ],
+      [
+       "0\n7",
+       "Result: 0.00\nDone"
+      ]
+     ],
+     "solution": "try:\n    a = int(input())\n    b = int(input())\n    result = a / b\nexcept ValueError:\n    print(\"Invalid input\")\nexcept ZeroDivisionError:\n    print(\"Cannot divide by zero\")\nelse:\n    print(f\"Result: {result:.2f}\")\nfinally:\n    print(\"Done\")"
+    },
+    {
+     "id": "p29",
+     "title": "Days Between Dates",
+     "level": "easy",
+     "statement": [
+      "Use the `datetime` module (`from datetime import date`) to work with two dates written as `YYYY-MM-DD`. Convert them with `date.fromisoformat()`. If either date is not valid, a `ValueError` is raised; catch it and print `Invalid date`.",
+      "Otherwise print the weekday of the first date (`strftime(\"%A\")`), the number of days between the two dates, and the later of the two dates."
+     ],
+     "input": [
+      "Line 1: the first date",
+      "Line 2: the second date"
+     ],
+     "output": [
+      "Line 1: `Weekday: <day name>`",
+      "Line 2: `Days between: <n>` (always positive or 0)",
+      "Line 3: `Later date: <YYYY-MM-DD>`",
+      "If a date is invalid, print only `Invalid date`"
+     ],
+     "constraints": [
+      "Years are between 1 and 9999"
+     ],
+     "samples": [
+      [
+       "2026-01-26\n2026-08-15",
+       "Weekday: Monday\nDays between: 201\nLater date: 2026-08-15"
+      ],
+      [
+       "2024-02-30\n2024-03-01",
+       "Invalid date"
+      ]
+     ],
+     "tests": [
+      [
+       "2000-01-01\n2000-01-01",
+       "Weekday: Saturday\nDays between: 0\nLater date: 2000-01-01"
+      ],
+      [
+       "2026-12-31\n2025-01-01",
+       "Weekday: Thursday\nDays between: 729\nLater date: 2026-12-31"
+      ],
+      [
+       "2024-02-29\n2028-02-29",
+       "Weekday: Thursday\nDays between: 1461\nLater date: 2028-02-29"
+      ]
+     ],
+     "solution": "from datetime import date\n\ntry:\n    d1 = date.fromisoformat(input().strip())\n    d2 = date.fromisoformat(input().strip())\nexcept ValueError:\n    print(\"Invalid date\")\nelse:\n    print(\"Weekday:\", d1.strftime(\"%A\"))\n    print(\"Days between:\", abs((d2 - d1).days))\n    print(\"Later date:\", max(d1, d2))"
+    },
+    {
+     "id": "p30",
+     "title": "File Word Count",
+     "level": "medium",
+     "statement": [
+      "Read `n` lines of text and write them to a file named `notes.txt`. Then open the file again in read mode and count its lines, words and characters (not counting the newline at the end of each line). Also print the longest line (the first one if there is a tie). Use `with open(...)` for both steps."
+     ],
+     "input": [
+      "Line 1: `n`",
+      "Next `n` lines: the text"
+     ],
+     "output": [
+      "Line 1: `Lines: <count>`",
+      "Line 2: `Words: <count>`",
+      "Line 3: `Characters: <count>`",
+      "Line 4: `Longest line: <line>`"
+     ],
+     "constraints": [
+      "1 ≤ `n` ≤ 50",
+      "Each line has 1 to 100 characters"
+     ],
+     "samples": [
+      [
+       "3\nPython is easy\nFiles store data\nPractice daily",
+       "Lines: 3\nWords: 8\nCharacters: 44\nLongest line: Files store data"
+      ],
+      [
+       "1\nHello",
+       "Lines: 1\nWords: 1\nCharacters: 5\nLongest line: Hello"
+      ]
+     ],
+     "tests": [
+      [
+       "2\na b c\nabcde",
+       "Lines: 2\nWords: 4\nCharacters: 10\nLongest line: a b c"
+      ],
+      [
+       "4\none\ntwo words\nthree more words\nfour",
+       "Lines: 4\nWords: 7\nCharacters: 32\nLongest line: three more words"
+      ]
+     ],
+     "solution": "n = int(input())\nwith open(\"notes.txt\", \"w\") as file:\n    for _ in range(n):\n        file.write(input() + \"\\n\")\n\nlines = words = chars = 0\nlongest = \"\"\nwith open(\"notes.txt\", \"r\") as file:\n    for line in file:\n        line = line.rstrip(\"\\n\")\n        lines += 1\n        words += len(line.split())\n        chars += len(line)\n        if len(line) > len(longest):\n            longest = line\n\nprint(\"Lines:\", lines)\nprint(\"Words:\", words)\nprint(\"Characters:\", chars)\nprint(\"Longest line:\", longest)"
+    }
+   ]
+  }
+ ],
+ "notes": []
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "problems" ADD COLUMN "members_only" boolean DEFAULT false NOT NULL;

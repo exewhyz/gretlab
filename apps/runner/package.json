@@ -1,0 +1,26 @@
+{
+  "name": "runner",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../.env src/main.ts",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "test:sandbox": "tsx --test --test-reporter=spec src/sandbox/attack.test.ts",
+    "test:queue": "tsx --test --test-reporter=spec src/queue.test.ts"
+  },
+  "dependencies": {
+    "@workspace/db": "workspace:*",
+    "@workspace/judge": "workspace:*",
+    "tar-stream": "^3.1.7",
+    "tsx": "^4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/tar-stream": "^3.1.3",
+    "@workspace/typescript-config": "workspace:*",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,8 @@
+**/node_modules
+**/.next
+**/.turbo
+.git
+apps/web/public/vendor
+**/.env
+**/.env.local
+e2e

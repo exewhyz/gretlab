@@ -1,0 +1,181 @@
+@use "../../../styles/mixins" as *;
+
+.body {
+  overflow: auto;
+  padding: 20px 24px 32px;
+  flex: 1;
+  min-height: 0;
+  font-size: var(--text-body-sm);
+  line-height: var(--text-body-sm--line-height);
+  color: var(--body);
+
+  h1 {
+    margin: 12px 0 16px;
+    font-size: var(--text-display-md);
+    font-weight: var(--text-display-md--font-weight);
+    line-height: var(--text-display-md--line-height);
+    letter-spacing: var(--text-display-md--letter-spacing);
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+  h2 {
+    @include caption-upper;
+    margin: 24px 0 8px;
+  }
+
+  p {
+    margin: 0 0 12px;
+    max-width: 68ch;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 20px;
+    display: grid;
+    gap: 4px;
+    list-style: disc;
+  }
+
+  code {
+    @include code;
+    font-size: 0.92em;
+    color: var(--ink);
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-xs);
+    padding: 0 4px;
+  }
+
+  pre {
+    @include code;
+    margin: 0;
+    color: var(--ink);
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  @include mobile {
+    overflow: visible;
+    padding: 16px;
+
+    h1 {
+      font-size: var(--text-display-sm);
+    }
+  }
+}
+
+.label {
+  @include caption-upper;
+}
+
+.hint {
+  margin-top: 12px !important;
+  font-size: var(--text-caption);
+}
+
+.teacherNote {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  color: var(--ink);
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-md);
+}
+
+.table {
+  overflow-x: auto;
+  margin: 8px 0 12px;
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    border: 1px solid var(--hairline);
+    padding: 6px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: var(--canvas-soft);
+    color: var(--ink);
+    font-weight: 600;
+  }
+}
+
+.sample {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.sampleCaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--canvas-soft);
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--text-caption);
+}
+
+.sampleIo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+
+  > div {
+    min-width: 0;
+    padding: 8px 12px;
+  }
+
+  > div + div {
+    border-left: 1px solid var(--hairline);
+  }
+
+  @include mobile {
+    grid-template-columns: 1fr;
+
+    > div + div {
+      border-left: 0;
+      border-top: 1px solid var(--hairline);
+    }
+  }
+}
+
+.solution {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--hairline-strong);
+
+  h2 {
+    margin-top: 0;
+  }
+
+  pre {
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+  }
+}
+
+.hintCard {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+}
+
+.hintTrigger {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 500;
+  text-align: start;
+  width: 100%;
+}

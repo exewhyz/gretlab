@@ -1,0 +1,13 @@
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	reverse_proxy {
+		# Finds replicas through DNS, so scaling needs no config change.
+		dynamic a web 3000 {
+			refresh 5s
+		}
+		lb_policy least_conn
+		lb_retries 2
+		health_uri /api/health
+		health_interval 5s
+	}
+}

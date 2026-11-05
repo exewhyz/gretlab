@@ -1,0 +1,22 @@
+# One per runner machine. Each should be a dedicated VM with Docker and gVisor installed,
+# and the sandbox images built: docker/sandbox/build.sh
+#
+# The Docker socket makes this container root-equivalent on the host. That's why the machine
+# must hold nothing else. Sandboxes themselves never get the socket. See AGENTS.md.
+services:
+  runner:
+    image: gretlab/runner:${TAG:-local}
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    restart: always
+    # Time to finish running jobs on deploy; anything longer returns to the queue.
+    stop_grace_period: 5m
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # Direct, not through PgBouncer: runners are few, and LISTEN needs a real session.
+      DATABASE_URL: ${DATABASE_URL:?}
+      SANDBOX_RUNTIME: runsc
+      RUNNER_CONCURRENCY: ${RUNNER_CONCURRENCY:-8}
+      DATABASE_POOL: "4"

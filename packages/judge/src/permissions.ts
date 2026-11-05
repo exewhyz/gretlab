@@ -1,0 +1,224 @@
+/**
+ * What a role inside an organization can allow. Roles are bundles of these, stored per
+ * organization; the server checks them on every request with `allows`. Add a permission
+ * here only together with the server check that enforces it.
+ */
+export const PERMISSIONS = {
+  "org.members.view": {
+    label: "See members",
+    description: "See who is in the organization and in which groups.",
+    module: "Members",
+  },
+  "org.members.invite": {
+    label: "Invite and approve",
+    description: "Create invite links and approve requests to join.",
+    module: "Members",
+  },
+  "org.members.manage": {
+    label: "Manage members",
+    description:
+      "Move members between groups, change their roles and remove them.",
+    module: "Members",
+  },
+  "org.groups.manage": {
+    label: "Manage groups",
+    description:
+      "Create, rename and delete groups such as branches, batches or teams.",
+    module: "Structure",
+  },
+  "org.roles.manage": {
+    label: "Manage roles",
+    description: "Create and edit roles and decide what each one allows.",
+    module: "Structure",
+  },
+  "org.settings.manage": {
+    label: "Organization settings",
+    description: "Name, description, who can join and how.",
+    module: "Structure",
+  },
+  "problems.manage": {
+    label: "Write problems",
+    description:
+      "Create and edit the organization's own problems. Published ones join the public library, credited to the organization.",
+    module: "Teaching",
+  },
+  "assignments.manage": {
+    label: "Set assignments",
+    description: "Create, edit and delete assignments for the groups this applies to.",
+    module: "Teaching",
+  },
+  "contests.manage": {
+    label: "Run contests",
+    description: "Create, edit and delete contests for the groups this applies to.",
+    module: "Teaching",
+  },
+  "gradebook.view": {
+    label: "See grades",
+    description: "See assignment marks of students in the groups this applies to.",
+    module: "Teaching",
+  },
+  "gradebook.export": {
+    label: "Download grades",
+    description: "Download gradebooks as CSV.",
+    module: "Teaching",
+  },
+  "notices.manage": {
+    label: "Post notices",
+    description: "Post and remove notices members see on the organization's page.",
+    module: "Teaching",
+  },
+  "teaching.log": {
+    label: "Log teaching",
+    description:
+      "Keep the syllabus of the groups this applies to and log the classes taught.",
+    module: "Teaching",
+  },
+  "reports.view": {
+    label: "See reports",
+    description:
+      "Activity, assignment results and teaching progress for the groups this applies to.",
+    module: "Reports",
+  },
+  "org.members.import": {
+    label: "Import members",
+    description: "Add many people at once from a CSV file.",
+    module: "Members",
+  },
+  "org.audit.view": {
+    label: "Activity log",
+    description: "See who changed members, roles and settings, and when.",
+    module: "Structure",
+  },
+} as const
+
+export type Permission = keyof typeof PERMISSIONS
+export const PERMISSION_KEYS = Object.keys(PERMISSIONS) as Permission[]
+
+export const isPermission = (value: string): value is Permission =>
+  value in PERMISSIONS
+
+/** The roles every organization starts with. They can't be deleted or renamed. */
+export const SYSTEM_ROLES = {
+  owner: {
+    name: "Owner",
+    description:
+      "Everything, including making others owners. Every organization keeps at least one.",
+    permissions: PERMISSION_KEYS,
+  },
+  admin: {
+    name: "Admin",
+    description: "Everything except changing owners.",
+    permissions: PERMISSION_KEYS,
+  },
+  teacher: {
+    name: "Teacher",
+    description:
+      "Teaches the groups they're given: members, problems, assignments, contests, grades and notices.",
+    permissions: [
+      "org.members.view",
+      "problems.manage",
+      "assignments.manage",
+      "contests.manage",
+      "gradebook.view",
+      "gradebook.export",
+      "notices.manage",
+      "teaching.log",
+      "reports.view",
+    ] as Permission[],
+  },
+  member: {
+    name: "Member",
+    description: "Belongs to the organization. No management access.",
+    permissions: [] as Permission[],
+  },
+} as const
+
+export type SystemRoleKey = keyof typeof SYSTEM_ROLES
+
+/** One role given to one person, either across the organization or within one group. */
+export interface Grant {
+  permissions: readonly string[]
+  /** null: the whole organization. Otherwise the group and everything under it. */
+  groupId: string | null
+}
+
+/**
+ * Whether these grants allow an action.
+ * `targetGroups` is the group the action is about followed by its ancestors, or null for
+ * an action about the whole organization, which only an organization-wide grant allows.
+ */
+export function allows(
+  grants: readonly Grant[],
+  permission: Permission,
+  targetGroups: readonly string[] | null = null
+): boolean {
+  return grants.some(
+    (grant) =>
+      grant.permissions.includes(permission) &&
+      (grant.groupId === null ||
+        (targetGroups !== null && targetGroups.includes(grant.groupId)))
+  )
+}
+
+/** Group ids from one group up to the top, using a parent lookup. Stops on cycles. */
+export function ancestry(
+  groupId: string,
+  parentOf: (id: string) => string | null | undefined
+): string[] {
+  const chain: string[] = []
+  let current: string | null | undefined = groupId
+  while (current && !chain.includes(current)) {
+    chain.push(current)
+    current = parentOf(current)
+  }
+  return chain
+}
+
+/** Whether an email's domain is one of the organization's, for joining automatically. */
+export function domainMatches(email: string, domains: readonly string[]) {
+  const domain = email.toLowerCase().split("@")[1] ?? ""
+  return domains.some((allowed) => {
+    const d = allowed.toLowerCase().replace(/^@/, "")
+    return domain === d || domain.endsWith("." + d)
+  })
+}
+
+/**
+ * Who content is for: conditions that must all hold, each met by being in any one of its
+ * groups (or a group inside one). [[3rd Year], [CAC]] is third-year students who also take
+ * CAC. No conditions means everyone in the organization.
+ */
+export type Audience = readonly (readonly string[])[]
+
+/** Every group an audience mentions, for checking they belong to the organization. */
+export const audienceGroups = (audience: Audience) => [...new Set(audience.flat())]
+
+/**
+ * Whether grants allow acting on content for this audience. Everyone it reaches is inside
+ * every condition, so covering all groups of any one condition is enough. Content for the
+ * whole organization needs an organization-wide grant.
+ */
+export function allowsFor(
+  grants: readonly Grant[],
+  permission: Permission,
+  audience: Audience,
+  chainOf: (groupId: string) => string[]
+): boolean {
+  const conditions = audience.filter((c) => c.length > 0)
+  if (conditions.length === 0) return allows(grants, permission, null)
+  return conditions.some((condition) =>
+    condition.every((id) => allows(grants, permission, chainOf(id)))
+  )
+}
+
+/** Whether someone in these groups meets every condition of the audience. */
+export function inAudience(
+  memberGroups: readonly string[],
+  audience: Audience,
+  chainOf: (groupId: string) => string[]
+): boolean {
+  const reach = new Set(memberGroups.flatMap(chainOf))
+  return audience.every(
+    (condition) => condition.length === 0 || condition.some((id) => reach.has(id))
+  )
+}

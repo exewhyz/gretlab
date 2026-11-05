@@ -1,0 +1,21 @@
+# Local development only. Production should use a managed Postgres.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gretlab
+      POSTGRES_PASSWORD: gretlab_dev_only
+      POSTGRES_DB: gretlab
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - gretlab-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gretlab"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  gretlab-pg:

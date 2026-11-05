@@ -1,0 +1,400 @@
+@use "../../../styles/mixins" as *;
+
+$gap: 16px;
+$handle: 14px;
+
+.app {
+  display: flex;
+  flex-direction: column;
+
+  @include desktop {
+    height: 100dvh;
+  }
+}
+
+.bench {
+  --list-w: 250px;
+
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns:
+    var(--list-w) minmax(0, var(--prob-fr, 1fr)) $handle
+    minmax(0, var(--ed-fr, 1fr));
+  padding: $gap;
+
+  @include mobile {
+    display: flex;
+    flex-direction: column;
+    gap: $gap;
+    flex: none;
+  }
+}
+
+.listCollapsed {
+  --list-w: 60px;
+}
+
+.problemCollapsed {
+  @include desktop {
+    grid-template-columns: var(--list-w) minmax(0, 1fr);
+
+    .problem,
+    .vertical {
+      display: none;
+    }
+  }
+}
+
+.paneHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--hairline);
+  flex: none;
+}
+
+.paneTitle {
+  @include caption-upper;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- question list ---------- */
+.list {
+  @include pane;
+  display: flex;
+  flex-direction: column;
+  margin-right: $gap;
+  overflow: hidden;
+
+  @include mobile {
+    display: none;
+  }
+}
+
+.listBody {
+  overflow: auto;
+  padding: 4px 0 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.listFoot {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--hairline);
+  padding: 8px 14px;
+  font-size: 12px;
+  flex: none;
+}
+
+.listFoot a,
+.mobileFooter a {
+  color: var(--body);
+
+  &:hover {
+    color: var(--ink);
+  }
+}
+
+.listRail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.railCount {
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+
+.mobileFooter {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 8px $gap 24px;
+  font-size: 12px;
+
+  @include desktop {
+    display: none;
+  }
+}
+
+/* ---------- problem ---------- */
+.problem {
+  @include pane;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  @include mobile {
+    overflow: visible;
+  }
+}
+
+/* ---------- editor ---------- */
+.editor {
+  @include pane;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  @include mobile {
+    overflow: visible;
+  }
+}
+
+.editorHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--hairline);
+  flex: none;
+}
+
+.fileName {
+  @include code;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.code {
+  background: var(--canvas-soft);
+  height: var(--code-h, 45%);
+  min-height: 120px;
+  flex: none;
+  overflow: hidden;
+
+  @include mobile {
+    height: 50vh;
+  }
+}
+
+.outputHidden .code {
+  flex: 1;
+  height: auto;
+}
+
+.outputHidden .horizontal,
+.outputHidden .panel {
+  display: none;
+}
+
+.fileTabs {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  flex: none;
+  background: var(--canvas-soft);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.fileTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  color: var(--body);
+  border-right: 1px solid var(--hairline);
+  cursor: pointer;
+
+  &[aria-selected="true"] {
+    color: var(--ink);
+    background: var(--card);
+  }
+}
+
+.entryMark {
+  color: var(--primary);
+  font-size: 10px;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--canvas-soft);
+  flex: none;
+}
+
+.panel {
+  padding: 12px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.stdin {
+  @include code;
+  width: 100%;
+  min-height: 84px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+.output {
+  @include code;
+  margin: 0;
+  padding: 8px 10px;
+  min-height: 36px;
+  max-height: 220px;
+  overflow: auto;
+  color: var(--ink);
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.outputError {
+  color: var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 35%, transparent);
+}
+
+.outputWrong {
+  border-color: color-mix(in srgb, var(--destructive) 35%, transparent);
+}
+
+.caseChips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.caseChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: var(--text-caption);
+  color: var(--body);
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+
+  &[aria-selected="true"] {
+    color: var(--ink);
+    border-color: var(--hairline-strong);
+    background: var(--muted);
+  }
+}
+
+.dotPass,
+.dotFail,
+.dotNeutral {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.dotPass {
+  background: var(--success);
+}
+
+.dotFail {
+  background: var(--destructive);
+}
+
+.dotNeutral {
+  background: var(--muted-foreground);
+}
+
+/* ---------- drag handles ---------- */
+.handle {
+  display: grid;
+  place-items: center;
+  touch-action: none;
+
+  &::before {
+    content: "";
+    border-radius: 2px;
+    background: var(--hairline-strong);
+    transition:
+      background 0.15s,
+      width 0.15s,
+      height 0.15s;
+  }
+
+  &:hover::before,
+  &:focus-visible::before,
+  &:active::before {
+    background: var(--ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      transition: none;
+    }
+  }
+
+  @include mobile {
+    display: none;
+  }
+}
+
+.vertical {
+  cursor: col-resize;
+
+  &::before {
+    width: 4px;
+    height: 44px;
+  }
+
+  &:hover::before,
+  &:focus-visible::before,
+  &:active::before {
+    height: 72px;
+  }
+}
+
+.horizontal {
+  height: 10px;
+  flex: none;
+  cursor: row-resize;
+  border-top: 1px solid var(--hairline);
+  background: var(--canvas-soft);
+
+  &::before {
+    width: 44px;
+    height: 3px;
+  }
+
+  &:hover::before,
+  &:focus-visible::before,
+  &:active::before {
+    width: 72px;
+  }
+}
+
+:global(body[data-resizing]) {
+  user-select: none;
+}
+
+:global(body[data-resizing="vertical"]) {
+  cursor: col-resize;
+}
+
+:global(body[data-resizing="horizontal"]) {
+  cursor: row-resize;
+}
