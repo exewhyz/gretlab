@@ -42,6 +42,8 @@ export interface CatalogProblem {
   unit: string | null
   /** The organization that wrote it, credited in the library. */
   by: string | null
+  /** Its slug, for showing one organization's problems. */
+  org: string | null
   tags: { slug: string; name: string }[]
   /** Accepted graded submissions over all graded submissions, or null before any. */
   acceptance: number | null
@@ -85,6 +87,7 @@ export async function getCatalog(): Promise<{
         level: problems.level,
         unit: units.name,
         by: organizations.name,
+        org: organizations.slug,
       })
       .from(problems)
       .leftJoin(units, eq(problems.unitId, units.id))
@@ -129,6 +132,7 @@ export async function getCatalog(): Promise<{
         level: row.level,
         unit: row.unit,
         by: row.by,
+        org: row.org,
         tags: tagsFor.get(row.id) ?? [],
         acceptance: stat?.total ? stat.accepted / stat.total : null,
         submissions: stat?.total ?? 0,

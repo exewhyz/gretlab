@@ -7,7 +7,26 @@ import { useState } from "react"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
+import {
+  rubricTotal,
+  type ExamSettings,
+  type RubricCriterion,
+} from "@workspace/judge"
 import { Checkbox } from "@workspace/ui/components/checkbox"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 
 import { ConfirmButton } from "@/components/confirm"
 import { Field, FormMessage, TextArea, TextInput } from "@/components/form"
@@ -21,6 +40,12 @@ import { assignmentInputSchema, slugify } from "@/features/problems/schemas"
 import { api, ApiRequestError } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 import { useOwner } from "@/features/admin/owner"
+import { LiveCode, Playback } from "@/features/drafts/components/student-work"
+import { formatLeft, type SittingView } from "@/features/exams/components/exam"
+import {
+  CommentedCode,
+  type LineComment,
+} from "@/features/feedback/components/commented-code"
 import { AudiencePicker } from "./audience"
 
 import { FieldError, ProblemPicker, toLocalInput } from "./contests"
@@ -114,6 +139,17 @@ interface AssignmentForm {
   published: boolean
   problemIds: string[]
   points: Record<string, string>
+  /** Criteria marked by hand, per problem, added to its test points. */
+  rubric: Record<string, RubricCriterion[]>
+  /** Course outcomes each problem assesses. */
+  outcomes: Record<string, string[]>
+  holdFeedback: boolean
+  /** A lab exam, with its settings as typed. */
+  exam: boolean
+  examMinutes: string
+  examFullscreen: boolean
+  /** One address or range per line. */
+  examNetworks: string
   audience: string[][]
 }
 
@@ -126,11 +162,19 @@ interface StoredAssignment {
   allowLate: boolean
   latePenaltyPercent: number
   published: boolean
+  holdFeedback: boolean
+  exam: ExamSettings | null
   audience: string[][]
-  problems: { problemId: string; points: number }[]
+  problems: {
+    problemId: string
+    points: number
+    rubric: RubricCriterion[]
+    outcomes: string[]
+  }[]
 }
 
-function blankForm(): AssignmentForm {
+/** A new one; made from a class page, it's for that class. */
+function blankForm(forClass: string | null): AssignmentForm {
   const due = new Date(Date.now() + 7 * 24 * 60 * 60_000)
   due.setHours(23, 59, 0, 0)
   return {
@@ -143,12 +187,26 @@ function blankForm(): AssignmentForm {
     latePenaltyPercent: "0",
     published: false,
     problemIds: [],
-    audience: [],
+    audience: forClass ? [[forClass]] : [],
     points: {},
+    rubric: {},
+    outcomes: {},
+    holdFeedback: false,
+    exam: false,
+    examMinutes: "60",
+    examFullscreen: true,
+    examNetworks: "",
   }
 }
 
-export function AssignmentEditorPage({ id }: { id: string | null }) {
+export function AssignmentEditorPage({
+  id,
+  forClass = null,
+}: {
+  id: string | null
+  /** Started from a class page: aimed at that class, and back there after saving. */
+  forClass?: string | null
+}) {
   const owner = useOwner()
   const { data, error } = useQuery({
     queryKey: owner.key("assignment", id),
@@ -173,12 +231,23 @@ export function AssignmentEditorPage({ id }: { id: string | null }) {
         points: Object.fromEntries(
           data.problems.map((p) => [p.problemId, String(p.points)])
         ),
+        rubric: Object.fromEntries(
+          data.problems.map((p) => [p.problemId, p.rubric ?? []])
+        ),
+        outcomes: Object.fromEntries(
+          data.problems.map((p) => [p.problemId, p.outcomes ?? []])
+        ),
+        exam: data.exam !== null,
+        examMinutes: data.exam?.minutes ? String(data.exam.minutes) : data.exam ? "" : "60",
+        examFullscreen: data.exam?.fullscreen ?? true,
+        examNetworks: (data.exam?.networks ?? []).join("\n"),
       }
-    : blankForm()
+    : blankForm(forClass)
   return (
     <AssignmentEditor
       key={id ?? "new"}
       id={id}
+      forClass={forClass}
       initial={initial}
       // Students reach problems through the practice pages, so drafts can't be assigned.
       problems={problems.data.problems.filter((p) => p.published)}
@@ -190,10 +259,12 @@ type FieldErrors = Partial<Record<keyof AssignmentForm | "problems", string>>
 
 function AssignmentEditor({
   id,
+  forClass,
   initial,
   problems,
 }: {
   id: string | null
+  forClass: string | null
   initial: AssignmentForm
   problems: StaffProblemList["problems"]
 }) {
@@ -217,8 +288,12 @@ function AssignmentEditor({
     setMessage(null)
   }
   const pointsOf = (problemId: string) => form.points[problemId] ?? "100"
+  const rubricOf = (problemId: string) => form.rubric[problemId] ?? []
   const totalPoints = form.problemIds.reduce(
-    (sum, problemId) => sum + (Number(pointsOf(problemId)) || 0),
+    (sum, problemId) =>
+      sum +
+      (Number(pointsOf(problemId)) || 0) +
+      rubricTotal(rubricOf(problemId)),
     0
   )
 
@@ -228,7 +303,19 @@ function AssignmentEditor({
       title: form.title,
       slug: form.slug,
       description: form.description,
-      allowLate: form.allowLate,
+      allowLate: form.exam ? false : form.allowLate,
+      holdFeedback: form.holdFeedback,
+      exam: form.exam
+        ? {
+            minutes:
+              form.examMinutes.trim() === "" ? null : Number(form.examMinutes),
+            fullscreen: form.examFullscreen,
+            networks: form.examNetworks
+              .split(/[\n,]/)
+              .map((n) => n.trim())
+              .filter(Boolean),
+          }
+        : null,
       published,
       latePenaltyPercent:
         form.latePenaltyPercent.trim() === ""
@@ -241,6 +328,8 @@ function AssignmentEditor({
         problemId,
         points:
           pointsOf(problemId).trim() === "" ? NaN : Number(pointsOf(problemId)),
+        rubric: rubricOf(problemId),
+        outcomes: form.outcomes[problemId] ?? [],
       })),
     })
     if (parsed.success) {
@@ -276,7 +365,9 @@ function AssignmentEditor({
           : "Saved as a draft. Only staff can see it.",
         kind: "ok",
       })
-      if (!id) router.push(owner.page(`/assignments/${saved.id}`))
+      if (!id && forClass && owner.orgSlug)
+        router.push(`/orgs/${owner.orgSlug}/classes/${forClass}?tab=classwork`)
+      else if (!id) router.push(owner.page(`/assignments/${saved.id}`))
     },
     onError: (error) => {
       if (error instanceof ApiRequestError && error.code === "conflict") {
@@ -410,6 +501,7 @@ function AssignmentEditor({
           orderLabel={`In the assignment · ${totalPoints} points in total`}
           marker={(index) => String(index + 1)}
           extra={(problemId) => (
+            <span className="flex items-center gap-1.5">
             <label className="flex items-center gap-1 text-xs">
               <TextInput
                 type="number"
@@ -426,16 +518,95 @@ function AssignmentEditor({
               />
               pts
             </label>
+              <RubricEditor
+                title={problems.find((p) => p.id === problemId)?.title ?? ""}
+                rubric={rubricOf(problemId)}
+                onChange={(rubric) =>
+                  set("rubric", { ...form.rubric, [problemId]: rubric })
+                }
+              />
+              {owner.orgSlug && (
+                <OutcomeTagger
+                  orgSlug={owner.orgSlug}
+                  title={problems.find((p) => p.id === problemId)?.title ?? ""}
+                  chosen={form.outcomes[problemId] ?? []}
+                  onChange={(ids) =>
+                    set("outcomes", { ...form.outcomes, [problemId]: ids })
+                  }
+                />
+              )}
+            </span>
           )}
         />
+
+        <div className="grid gap-3 rounded-md border border-hairline p-3">
+          <label className="inline-flex items-center gap-2 self-start text-ink">
+            <Checkbox
+              checked={form.exam}
+              onCheckedChange={(checked) => {
+                set("exam", checked)
+                if (checked) set("allowLate", false)
+              }}
+            />
+            Lab exam: each student starts it once and has a fixed time
+          </label>
+          {form.exam && (
+            <div className="grid gap-3 min-[901px]:grid-cols-2">
+              <Field
+                label="Minutes per student"
+                help="From when they press Start; it still ends at the due time. Leave empty for until the due time."
+              >
+                <TextInput
+                  type="number"
+                  min={5}
+                  max={600}
+                  value={form.examMinutes}
+                  onChange={(event) => set("examMinutes", event.target.value)}
+                />
+              </Field>
+              <Field
+                label="Lab networks (optional)"
+                help="One address or range per line, such as 10.1.0.0/16. Students can start and submit only from these. Empty allows anywhere."
+              >
+                <TextArea
+                  rows={3}
+                  mono
+                  value={form.examNetworks}
+                  onChange={(event) => set("examNetworks", event.target.value)}
+                />
+              </Field>
+              <label className="inline-flex items-center gap-2 self-start text-ink">
+                <Checkbox
+                  checked={form.examFullscreen}
+                  onCheckedChange={(checked) => set("examFullscreen", checked)}
+                />
+                Ask for fullscreen
+              </label>
+              <p className="text-caption min-[901px]:col-span-2">
+                Problems stay hidden until a student starts. Leaving the page or fullscreen
+                and pasting from elsewhere are recorded in the gradebook; editorials are
+                closed during the exam. Only work submitted during their time counts.
+              </p>
+            </div>
+          )}
+          <FieldError message={errors.exam} />
+        </div>
 
         <div className="grid gap-3 min-[901px]:grid-cols-2">
           <label className="inline-flex items-center gap-2 self-start text-ink">
             <Checkbox
+              disabled={form.exam}
               checked={form.allowLate}
               onCheckedChange={(checked) => set("allowLate", checked)}
             />
             Accept late submissions
+          </label>
+          <label className="inline-flex items-center gap-2 self-start text-ink">
+            <Checkbox
+              checked={form.holdFeedback}
+              onCheckedChange={(checked) => set("holdFeedback", checked)}
+            />
+            Hold rubric marks and comments until I release them
           </label>
           {form.allowLate && (
             <div className="grid content-start gap-1.5">
@@ -506,8 +677,18 @@ interface Gradebook {
     title: string
     dueAt: string
     phase: AssignmentPhase
+    holdFeedback: boolean
+    exam: ExamSettings | null
   }
-  problems: { problemId: string; slug: string; title: string; points: number }[]
+  /** `points` is tests plus rubric. */
+  problems: {
+    problemId: string
+    slug: string
+    title: string
+    points: number
+    tests: number
+    rubric: RubricCriterion[]
+  }[]
   total: number
   summary: {
     students: number
@@ -522,6 +703,7 @@ interface Gradebook {
     cells: { problemId: string; earned: number; status: GradeStatus }[]
     earned: number
     late: number
+    exam: (SittingView & { warnings: number }) | null
   }[]
 }
 
@@ -531,7 +713,15 @@ export function AssignmentGradebook({ id }: { id: string }) {
     email: string
     problemId: string
   } | null>(null)
+  const [now] = useState(() => Date.now())
   const [search, setSearch] = useState("")
+  const client = useQueryClient()
+  const release = useMutation({
+    mutationFn: () =>
+      api(owner.api(`/assignments/${id}/release`), { method: "POST" }),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: owner.key("gradebook", id) }),
+  })
   const { data, error } = useQuery({
     queryKey: owner.key("gradebook", id),
     queryFn: () => api<Gradebook>(owner.api(`/assignments/${id}/gradebook`)),
@@ -558,6 +748,19 @@ export function AssignmentGradebook({ id }: { id: string }) {
       <PageTitle
         action={
           <span className="flex gap-2">
+            {data.assignment.holdFeedback && (
+              <ConfirmButton
+                size="sm"
+                disabled={release.isPending}
+                title="Release feedback?"
+                description="Every student sees their rubric marks and line comments for this assignment. New feedback shows at once from then on."
+                confirmLabel="Release feedback"
+                tone="default"
+                onConfirm={() => release.mutate()}
+              >
+                Release feedback
+              </ConfirmButton>
+            )}
             <Link
               href={owner.page(`/assignments/${id}`)}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
@@ -580,6 +783,8 @@ export function AssignmentGradebook({ id }: { id: string }) {
         <PhaseBadge phase={data.assignment.phase} />
         Due {formatDateTime(data.assignment.dueAt)}. Marks update as students
         submit.
+        {data.assignment.holdFeedback &&
+          " Rubric marks and comments are held: students don't see them yet."}
       </p>
       <div className="mb-4 grid grid-cols-2 gap-3 min-[901px]:grid-cols-4">
         {stats.map(([label, value]) => (
@@ -599,6 +804,7 @@ export function AssignmentGradebook({ id }: { id: string }) {
       <Table
         headers={[
           "Student",
+          ...(data.assignment.exam ? ["Exam"] : []),
           ...data.problems.map((p) => `${p.title} (${p.points})`),
           `Total (${data.total})`,
         ]}
@@ -609,6 +815,37 @@ export function AssignmentGradebook({ id }: { id: string }) {
               <div className="text-ink">{row.name ?? row.handle}</div>
               <div className="text-xs">{row.email}</div>
             </td>
+            {row.exam && (
+              <td className="text-caption" data-testid="exam-cell">
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto p-0 text-caption font-normal text-ink"
+                  aria-label={`See ${row.email}'s exam`}
+                  disabled={!data.problems[0]}
+                  onClick={() =>
+                    setViewing({
+                      email: row.email,
+                      problemId: data.problems[0]!.problemId,
+                    })
+                  }
+                >
+                  {row.exam.status === "not_started"
+                    ? "Not started"
+                    : row.exam.status === "in_progress"
+                      ? `In progress, ${formatLeft(new Date(row.exam.endsAt!).getTime() - now)} left`
+                      : row.exam.finishedEarly
+                        ? "Finished"
+                        : "Time ran out"}
+                </Button>
+                {row.exam.warnings > 0 && (
+                  <div className="text-destructive">
+                    {row.exam.warnings}{" "}
+                    {row.exam.warnings === 1 ? "warning" : "warnings"}
+                  </div>
+                )}
+              </td>
+            )}
             {row.cells.map((cell) => (
               <td
                 key={cell.problemId}
@@ -648,7 +885,10 @@ export function AssignmentGradebook({ id }: { id: string }) {
       )}
       {viewing && (
         <StudentCode
-          path={`${owner.api(`/assignments/${id}/attempts`)}?student=${encodeURIComponent(viewing.email)}&problem=${viewing.problemId}`}
+          key={`${viewing.email} ${viewing.problemId}`}
+          assignmentId={id}
+          student={viewing.email}
+          problemId={viewing.problemId}
           onClose={() => setViewing(null)}
         />
       )}
@@ -657,8 +897,16 @@ export function AssignmentGradebook({ id }: { id: string }) {
 }
 
 interface Attempts {
+  exam:
+    | (SittingView & {
+        ip: string | null
+        events: { kind: string; detail: string; at: string }[]
+      })
+    | null
   student: { name: string | null; email: string }
-  problem: { title: string; points: number }
+  problem: { title: string; points: number; rubric: RubricCriterion[] }
+  marks: Record<string, number>
+  holdFeedback: boolean
   attempts: {
     id: string
     language: string
@@ -670,15 +918,47 @@ interface Attempts {
     totalTests: number | null
     createdAt: string
     late: boolean
+    outside: boolean
+    comments: LineComment[]
   }[]
 }
 
-/** A student's graded submissions on one problem, newest first, with their code. */
-function StudentCode({ path, onClose }: { path: string; onClose: () => void }) {
+/**
+ * One student on one problem: their graded submissions (with rubric marks and line
+ * comments), the code they're writing now, and how that code grew.
+ */
+function StudentCode({
+  assignmentId,
+  student,
+  problemId,
+  onClose,
+}: {
+  assignmentId: string
+  student: string
+  problemId: string
+  onClose: () => void
+}) {
+  const owner = useOwner()
+  const client = useQueryClient()
+  const path = `${owner.api(`/assignments/${assignmentId}/attempts`)}?student=${encodeURIComponent(student)}&problem=${problemId}`
   const { data, error } = useQuery({
     queryKey: ["attempts", path],
     queryFn: () => api<Attempts>(path),
   })
+  const refresh = () =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: ["attempts", path] }),
+      client.invalidateQueries({ queryKey: owner.key("gradebook", assignmentId) }),
+    ])
+  const addComment = (submissionId: string, file: string) =>
+    (line: number, body: string) =>
+      api(owner.api(`/assignments/${assignmentId}/comments`), {
+        body: { student, submissionId, path: file, line, body },
+      }).then(refresh)
+  const removeComment = (commentId: string) =>
+    api(owner.api(`/assignments/${assignmentId}/comments/${commentId}`), {
+      method: "DELETE",
+    }).then(refresh)
   return (
     // Card doesn't pass extra attributes through, so the test id sits on a wrapper.
     <div data-testid="student-code">
@@ -693,47 +973,510 @@ function StudentCode({ path, onClose }: { path: string; onClose: () => void }) {
             Close
           </Button>
         </div>
-        {!data && <Loading error={error} />}
-        {data?.attempts.length === 0 && (
-          <p className="text-body-sm text-body">
-            No graded submissions since it opened.
-          </p>
+        {data?.exam && (
+          <ExamRecord
+            exam={data.exam}
+            onExtend={(minutes) =>
+              api(owner.api(`/assignments/${assignmentId}/extend`), {
+                body: { student, minutes },
+              }).then(refresh)
+            }
+          />
         )}
-        {data?.attempts.map((a) => (
-          <div
-            key={a.id}
-            className="grid gap-1.5 border-t border-hairline pt-3"
-          >
-            <div className="flex flex-wrap gap-x-3 text-caption text-body">
-              <span
-                className={
-                  a.verdict === "AC" ? "text-success" : "text-destructive"
-                }
+        {data && data.problem.rubric.length > 0 && (
+          <RubricMarking
+            rubric={data.problem.rubric}
+            marks={data.marks}
+            held={data.holdFeedback}
+            onSave={(marks) =>
+              api(owner.api(`/assignments/${assignmentId}/marks`), {
+                method: "PUT",
+                body: { student, problemId, marks },
+              }).then(refresh)
+            }
+          />
+        )}
+        <Tabs defaultValue="submissions">
+          <TabsList variant="line">
+            <TabsTrigger value="submissions">
+              Submissions{data ? ` (${data.attempts.length})` : ""}
+            </TabsTrigger>
+            <TabsTrigger value="live">Working copy</TabsTrigger>
+            <TabsTrigger value="playback">Playback</TabsTrigger>
+          </TabsList>
+          <TabsContent value="live" className="pt-3">
+            <LiveCode path={path} />
+          </TabsContent>
+          <TabsContent value="playback" className="pt-3">
+            <Playback path={path} />
+          </TabsContent>
+          <TabsContent value="submissions" className="grid gap-3 pt-3">
+            {!data && <Loading error={error} />}
+            {data?.attempts.length === 0 && (
+              <p className="text-body-sm text-body">
+                No graded submissions since it opened.
+              </p>
+            )}
+            {data && data.attempts.length > 0 && (
+              <p className="text-caption">
+                Select a line number to comment on that line
+                {data.holdFeedback
+                  ? ". Students see comments once you release feedback."
+                  : "; the student sees it with the submission."}
+              </p>
+            )}
+            {data?.attempts.map((a) => (
+              <div
+                key={a.id}
+                className="grid gap-1.5 border-t border-hairline pt-3"
               >
-                {a.verdict === "AC" ? "Accepted" : (a.verdict ?? "—")}
-              </span>
-              {a.totalTests !== null && (
-                <span className="tabular-nums">
-                  {a.passedTests} / {a.totalTests} tests
-                </span>
-              )}
-              <span>{a.language}</span>
-              <span>{formatDateTime(a.createdAt)}</span>
-              {a.late && <span className="text-primary">Late</span>}
-            </div>
-            {a.files.map((f) => (
-              <div key={f.path}>
-                {a.files.length > 1 && (
-                  <div className="text-xs text-body">{f.path}</div>
-                )}
-                <pre className="max-h-80 overflow-auto rounded-md border border-hairline bg-canvas-soft p-3 font-mono text-xs text-ink">
-                  {f.content}
-                </pre>
+                <div className="flex flex-wrap gap-x-3 text-caption text-body">
+                  <span
+                    className={
+                      a.verdict === "AC" ? "text-success" : "text-destructive"
+                    }
+                  >
+                    {a.verdict === "AC" ? "Accepted" : (a.verdict ?? "—")}
+                  </span>
+                  {a.totalTests !== null && (
+                    <span className="tabular-nums">
+                      {a.passedTests} / {a.totalTests} tests
+                    </span>
+                  )}
+                  <span>{a.language}</span>
+                  <span>{formatDateTime(a.createdAt)}</span>
+                  {a.late && <span className="text-primary">Late</span>}
+                  {a.outside && (
+                    <span className="text-primary">
+                      Outside the exam: doesn&apos;t count
+                    </span>
+                  )}
+                </div>
+                {a.files.map((f) => (
+                  <div
+                    key={f.path}
+                    className="overflow-hidden rounded-md border border-hairline"
+                  >
+                    {a.files.length > 1 && (
+                      <div className="px-3 pt-2 text-xs text-body">{f.path}</div>
+                    )}
+                    <CommentedCode
+                      content={f.content}
+                      comments={a.comments.filter((c) => c.path === f.path)}
+                      onAdd={addComment(a.id, f.path)}
+                      onDelete={removeComment}
+                    />
+                  </div>
+                ))}
               </div>
             ))}
-          </div>
-        ))}
+          </TabsContent>
+        </Tabs>
       </Card>
     </div>
+  )
+}
+
+const EVENT_LABEL: Record<string, string> = {
+  left_tab: "Left the page",
+  left_fullscreen: "Left fullscreen",
+  pasted: "Pasted from elsewhere",
+  other_network: "Tried to submit from another network",
+}
+
+/** A student's exam sitting: when, from where, what the browser noticed, and more time. */
+function ExamRecord({
+  exam,
+  onExtend,
+}: {
+  exam: NonNullable<Attempts["exam"]>
+  onExtend: (minutes: number) => Promise<unknown>
+}) {
+  const [minutes, setMinutes] = useState("10")
+  const [message, setMessage] = useState<{
+    text: string
+    kind: "ok" | "err"
+  } | null>(null)
+  const extend = useMutation({
+    mutationFn: () => onExtend(Number(minutes)),
+    onSuccess: () => setMessage({ text: "More time given.", kind: "ok" }),
+    onError: (e) => setMessage({ text: e.message, kind: "err" }),
+  })
+  return (
+    <div
+      className="grid gap-2 rounded-md border border-hairline p-3"
+      data-testid="exam-record"
+    >
+      <h3 className="text-body-sm font-semibold text-ink">Exam</h3>
+      {exam.status === "not_started" ? (
+        <p className="text-caption">Hasn&apos;t started.</p>
+      ) : (
+        <>
+          <p className="text-caption">
+            Started {formatDateTime(exam.startedAt!)}
+            {exam.ip ? ` from ${exam.ip}` : ""};{" "}
+            {exam.status === "in_progress" ? "ends" : "ended"}{" "}
+            {formatDateTime(exam.endsAt!)}
+            {exam.finishedEarly ? " (finished early)" : ""}.
+          </p>
+          {exam.events.length === 0 ? (
+            <p className="text-caption">Nothing noticed during the exam.</p>
+          ) : (
+            <ul className="grid gap-0.5 text-caption" data-testid="exam-events">
+              {exam.events.map((e, i) => (
+                <li key={i}>
+                  <span className="tabular-nums">{formatDateTime(e.at)}</span>
+                  {" · "}
+                  <span className="text-ink">{EVENT_LABEL[e.kind] ?? e.kind}</span>
+                  {e.detail && ` (${e.detail})`}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <TextInput
+              type="number"
+              min={1}
+              max={600}
+              aria-label="Extra minutes"
+              className="w-20 py-0.5"
+              value={minutes}
+              onChange={(event) => {
+                setMinutes(event.target.value)
+                setMessage(null)
+              }}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={extend.isPending || !(Number(minutes) >= 1)}
+              onClick={() => extend.mutate()}
+            >
+              Give more time
+            </Button>
+            {message && <FormMessage message={message} />}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Marks for each rubric criterion, saved together. */
+function RubricMarking({
+  rubric,
+  marks,
+  held,
+  onSave,
+}: {
+  rubric: RubricCriterion[]
+  marks: Record<string, number>
+  held: boolean
+  onSave: (marks: Record<string, number>) => Promise<unknown>
+}) {
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      rubric.map((c) => [c.id, c.id in marks ? String(marks[c.id]) : ""])
+    )
+  )
+  const [message, setMessage] = useState<{
+    text: string
+    kind: "ok" | "err"
+  } | null>(null)
+  const save = useMutation({
+    mutationFn: () => {
+      const out: Record<string, number> = {}
+      for (const c of rubric) {
+        const text = values[c.id]?.trim() ?? ""
+        if (text === "") continue
+        const n = Number(text)
+        if (!Number.isFinite(n) || n < 0 || n > c.points) {
+          throw new Error(`${c.label}: give 0 to ${c.points}.`)
+        }
+        out[c.id] = n
+      }
+      return onSave(out)
+    },
+    onSuccess: () =>
+      setMessage({
+        text: held ? "Saved. Held until you release feedback." : "Saved.",
+        kind: "ok",
+      }),
+    onError: (e) => setMessage({ text: e.message, kind: "err" }),
+  })
+  const earned = rubric.reduce(
+    (t, c) => t + Math.min(c.points, Math.max(0, Number(values[c.id]) || 0)),
+    0
+  )
+  return (
+    <div
+      className="grid gap-2 rounded-md border border-hairline p-3"
+      data-testid="rubric-marking"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-body-sm font-semibold text-ink">Rubric</h3>
+        <span className="text-caption tabular-nums">
+          {earned} / {rubricTotal(rubric)} by hand
+        </span>
+      </div>
+      {rubric.map((c) => (
+        <label key={c.id} className="flex items-center gap-2 text-body-sm">
+          <span className="flex-1 text-ink">{c.label}</span>
+          <TextInput
+            type="number"
+            min={0}
+            max={c.points}
+            aria-label={`Marks for ${c.label}`}
+            className="w-20 py-0.5"
+            value={values[c.id] ?? ""}
+            onChange={(event) => {
+              setValues((v) => ({ ...v, [c.id]: event.target.value }))
+              setMessage(null)
+            }}
+          />
+          <span className="w-12 text-caption tabular-nums">/ {c.points}</span>
+        </label>
+      ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          size="sm"
+          disabled={save.isPending}
+          onClick={() => save.mutate()}
+        >
+          Save marks
+        </Button>
+        {message && <FormMessage message={message} />}
+      </div>
+    </div>
+  )
+}
+
+/** Criteria a teacher marks by hand for one problem, on top of its tests. */
+function RubricEditor({
+  title,
+  rubric,
+  onChange,
+}: {
+  title: string
+  rubric: RubricCriterion[]
+  onChange: (rubric: RubricCriterion[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState<
+    { id: string; label: string; points: string }[]
+  >([])
+  const begin = () => {
+    setDraft(rubric.map((c) => ({ ...c, points: String(c.points) })))
+    setOpen(true)
+  }
+  const edit = (index: number, change: Partial<(typeof draft)[number]>) =>
+    setDraft((rows) =>
+      rows.map((row, i) => (i === index ? { ...row, ...change } : row))
+    )
+  const total = rubricTotal(rubric)
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
+        aria-label={`Rubric for ${title}`}
+        onClick={begin}
+      >
+        {rubric.length ? `+ ${total} rubric` : "Rubric"}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Rubric for {title}</DialogTitle>
+            <DialogDescription>
+              Marked by hand in the gradebook and added to the test points:
+              naming, comments, approach.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            {draft.length === 0 && (
+              <p className="text-caption">No criteria: tests decide the marks.</p>
+            )}
+            {draft.map((row, index) => (
+              <div key={row.id} className="flex items-center gap-2">
+                <TextInput
+                  aria-label="Criterion"
+                  placeholder="Readable names"
+                  className="flex-1"
+                  value={row.label}
+                  onChange={(event) => edit(index, { label: event.target.value })}
+                />
+                <TextInput
+                  type="number"
+                  min={1}
+                  aria-label="Criterion points"
+                  className="w-20"
+                  value={row.points}
+                  onChange={(event) => edit(index, { points: event.target.value })}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Remove criterion"
+                  onClick={() => setDraft((rows) => rows.filter((_, i) => i !== index))}
+                >
+                  ×
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="justify-self-start"
+              disabled={draft.length >= 20}
+              onClick={() =>
+                setDraft((rows) => [
+                  ...rows,
+                  { id: crypto.randomUUID().slice(0, 8), label: "", points: "10" },
+                ])
+              }
+            >
+              Add criterion
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                onChange(
+                  draft.map((row) => ({
+                    id: row.id,
+                    label: row.label.trim(),
+                    points: Number(row.points) || 0,
+                  }))
+                )
+                setOpen(false)
+              }}
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+interface CourseOutcomeOption {
+  id: string
+  code: string
+  title: string
+  groupId: string
+  course: string
+}
+
+/** Which course outcomes a problem assesses, chosen from every course in the organization. */
+function OutcomeTagger({
+  orgSlug,
+  title,
+  chosen,
+  onChange,
+}: {
+  orgSlug: string
+  title: string
+  chosen: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const { data, error } = useQuery({
+    queryKey: ["org", orgSlug, "outcomes", "courses"],
+    queryFn: () =>
+      api<CourseOutcomeOption[]>(`/orgs/${orgSlug}/outcomes/courses`),
+    enabled: open || chosen.length > 0,
+  })
+  const query = search.trim().toLowerCase()
+  const shown = (data ?? []).filter(
+    (o) =>
+      !query ||
+      `${o.course} ${o.code} ${o.title}`.toLowerCase().includes(query)
+  )
+  const courses = [...new Set(shown.map((o) => o.course))]
+  const codes = (data ?? [])
+    .filter((o) => chosen.includes(o.id))
+    .map((o) => o.code)
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="xs"
+        aria-label={`Outcomes for ${title}`}
+        onClick={() => setOpen(true)}
+      >
+        {chosen.length ? codes.join(", ") || `${chosen.length} COs` : "COs"}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Outcomes {title} assesses</DialogTitle>
+            <DialogDescription>
+              Marks on this problem count toward each chosen course outcome.
+            </DialogDescription>
+          </DialogHeader>
+          {!data ? (
+            <Loading error={error} />
+          ) : data.length === 0 ? (
+            <p className="text-caption">
+              No course outcomes yet. A class sets them on its Outcomes tab.
+            </p>
+          ) : (
+            <div className="grid gap-2">
+              <TextInput
+                aria-label="Search outcomes"
+                placeholder="Search outcomes"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+              <div className="grid max-h-80 gap-3 overflow-y-auto">
+                {courses.map((course) => (
+                  <div key={course} className="grid gap-1">
+                    <div className="text-caption font-medium text-ink">{course}</div>
+                    {shown
+                      .filter((o) => o.course === course)
+                      .map((o) => (
+                        <label
+                          key={o.id}
+                          className="flex items-start gap-2 text-body-sm"
+                        >
+                          <Checkbox
+                            checked={chosen.includes(o.id)}
+                            onCheckedChange={(checked) =>
+                              onChange(
+                                checked
+                                  ? [...chosen, o.id]
+                                  : chosen.filter((id) => id !== o.id)
+                              )
+                            }
+                          />
+                          <span>
+                            <b>{o.code}</b> {o.title}
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" onClick={() => setOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

@@ -1,7 +1,12 @@
-import { getDb, problems, sql, type User } from "@workspace/db"
+import { getDb, notes, problems, sql, type User } from "@workspace/db"
 
 import {
+  addLineComment,
   deleteAssignment,
+  deleteLineComment,
+  releaseFeedback,
+  extendStudentSitting,
+  setRubricMarks,
   listAssignments,
   getAssignmentForStaff,
   getGradebook,
@@ -35,7 +40,7 @@ import {
 } from "@/features/problems/server"
 import { ApiError } from "@/lib/api/route"
 
-import { narrowLanguages } from "./access"
+import { accessTo, narrowLanguages, viewpoint } from "./access"
 
 import {
   canAnywhere,
@@ -253,7 +258,8 @@ export async function orgNotices(slug: string, user: User) {
 
 export async function addOrgNotice(slug: string, user: User, text: string) {
   const ctx = await orgContext(slug, user)
-  needAnywhere(ctx, "notices.manage")
+  // A notice here is for the whole organization; class notices go from the class page.
+  needFor(ctx, "notices.manage", [])
   const note = await addNote(text, null, ctx.org.id)
   await writeAudit(ctx, "notice.create", "Posted a notice")
   return note
@@ -262,6 +268,12 @@ export async function addOrgNotice(slug: string, user: User, text: string) {
 export async function deleteOrgNotice(slug: string, user: User, id: string) {
   const ctx = await orgContext(slug, user)
   needAnywhere(ctx, "notices.manage")
+  // Only for the people it's for: a class's teacher can remove that class's notices.
+  const [note] = await getDb()
+    .select({ audience: notes.audience })
+    .from(notes)
+    .where(and(eq(notes.id, id), eq(notes.orgId, ctx.org.id)))
+  if (note) needFor(ctx, "notices.manage", note.audience)
   await deleteNote(id, ctx.org.id)
   await writeAudit(ctx, "notice.delete", "Removed a notice")
 }
@@ -274,12 +286,22 @@ export async function orgFeed(slug: string, user: User) {
   if (ctx.membership?.status !== "active" && !ctx.platformAdmin) {
     throw new ApiError(404, "not_found", "Join to see this.")
   }
-  const [notices, assignments, contests] = await Promise.all([
+  const [allNotices, assignments, contests, vp] = await Promise.all([
     listNotes(ctx.org.id),
     // Either feature may be switched off; then that list is just empty.
     listAssignments(user).catch(() => []),
     listContests(user),
+    viewpoint(user),
   ])
+  // A class's notice reaches only that class.
+  const notices = allNotices.filter(
+    (n) =>
+      accessTo(
+        vp,
+        { orgId: ctx.org.id, audience: n.audience },
+        "notices.manage"
+      ) !== "none"
+  )
   return {
     notices: notices.map(({ id, text, createdAt }) => ({
       id,
@@ -358,7 +380,8 @@ export async function orgStudentAttempts(
   user: User,
   id: string,
   email: string,
-  problemId: string
+  problemId: string,
+  withHistory = false
 ) {
   const ctx = await orgContext(slug, user)
   needAnywhere(ctx, "gradebook.view")
@@ -367,6 +390,76 @@ export async function orgStudentAttempts(
     ctx.org.id,
     groupsFor(ctx, "gradebook.view"),
     email,
-    problemId
+    problemId,
+    withHistory
+  )
+}
+
+/* ---------- feedback: rubric marks, line comments, release ---------- */
+
+/** Giving feedback needs managing assignments, for students whose grades this person sees. */
+async function feedbackContext(slug: string, user: User) {
+  const ctx = await orgContext(slug, user)
+  needAnywhere(ctx, "assignments.manage")
+  needAnywhere(ctx, "gradebook.view")
+  return { ctx, scope: groupsFor(ctx, "gradebook.view") }
+}
+
+export async function orgSetRubricMarks(
+  slug: string,
+  user: User,
+  id: string,
+  input: Parameters<typeof setRubricMarks>[3]
+) {
+  const { ctx, scope } = await feedbackContext(slug, user)
+  return setRubricMarks(id, ctx.org.id, scope, input, user.id)
+}
+
+export async function orgAddLineComment(
+  slug: string,
+  user: User,
+  id: string,
+  input: Parameters<typeof addLineComment>[3]
+) {
+  const { ctx, scope } = await feedbackContext(slug, user)
+  return addLineComment(id, ctx.org.id, scope, input, user.id)
+}
+
+export async function orgDeleteLineComment(
+  slug: string,
+  user: User,
+  id: string,
+  commentId: string
+) {
+  const { ctx } = await feedbackContext(slug, user)
+  await deleteLineComment(id, ctx.org.id, commentId)
+}
+
+export async function orgExtendSitting(
+  slug: string,
+  user: User,
+  id: string,
+  input: Parameters<typeof extendStudentSitting>[3]
+) {
+  const { ctx, scope } = await feedbackContext(slug, user)
+  const sitting = await extendStudentSitting(id, ctx.org.id, scope, input)
+  await writeAudit(ctx, "assignment.exam_time", "Gave a student more exam time", {
+    assignment: id,
+    student: input.student,
+    minutes: input.minutes,
+  })
+  return sitting
+}
+
+export async function orgReleaseFeedback(slug: string, user: User, id: string) {
+  const { ctx } = await feedbackContext(slug, user)
+  await releaseFeedback(id, ctx.org.id)
+  await writeAudit(
+    ctx,
+    "assignment.feedback",
+    "Released an assignment's feedback",
+    {
+      assignment: id,
+    }
   )
 }

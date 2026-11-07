@@ -25,6 +25,7 @@ import { getLanguages, requireFeature } from "@/features/settings/server"
 import { contestFor } from "@/features/contests/server"
 import { accessTo, orgPolicy, viewpoint } from "@/features/orgs/access"
 import { cached } from "@/lib/ttl-cache"
+import { guardExamSubmission } from "@/features/exams/server"
 
 const { and, asc, count, desc, eq, gte, inArray, lt, ne } = sql
 
@@ -221,7 +222,12 @@ async function resolveRunCases(
   })
 }
 
-export async function createSubmission(user: User, input: CreateSubmission) {
+export async function createSubmission(
+  user: User,
+  input: CreateSubmission,
+  /** Where it came from, for exams limited to a lab's network. */
+  ip: string | null = null
+) {
   const settings = await requireFeature("server_execution.enabled")
 
   const files = sourceFilesSchema.safeParse(input.files)
@@ -286,6 +292,7 @@ export async function createSubmission(user: User, input: CreateSubmission) {
     throw notFound("Problem not found")
   }
   if (!contestId && problem?.membersOnly) ruledBy = problem.orgId
+  if (problem && !contestId) await guardExamSubmission(user, problem.id, ip)
   if (ruledBy) {
     const { languages } = await orgPolicy(ruledBy)
     if (languages && !languages.includes(language.id)) {

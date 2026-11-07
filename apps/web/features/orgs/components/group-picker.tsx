@@ -207,7 +207,7 @@ export function GroupPicker({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="grid w-(--anchor-width) min-w-72 gap-2 p-2"
+        className="grid w-(--anchor-width) min-w-72 grid-cols-[minmax(0,1fr)] gap-2 p-2"
         data-testid="group-picker"
       >
         {heading && <p className="px-1 text-caption text-body">{heading}</p>}
@@ -235,7 +235,7 @@ export function GroupPicker({
         <div
           role="listbox"
           aria-label={label}
-          className="grid max-h-72 gap-px overflow-auto"
+          className="grid max-h-72 grid-cols-[minmax(0,1fr)] gap-px overflow-auto"
           onKeyDown={arrowKeys}
         >
           {!q &&

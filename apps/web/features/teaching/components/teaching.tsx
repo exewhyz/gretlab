@@ -1,8 +1,9 @@
 "use client"
 
+import { CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
@@ -17,8 +18,10 @@ import {
   Table,
 } from "@/features/admin/components/shell"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
+import { useContentScope } from "@/features/account/scope"
+import { ScopeNote } from "@/features/account/scope-switcher"
 import { api } from "@/lib/api/client"
-import { formatDate } from "@/lib/format"
+import { formatDate, formatDateTime } from "@/lib/format"
 
 interface Progress {
   total: number
@@ -75,9 +78,12 @@ interface Home {
       grades: boolean
       reports: boolean
     }
+    dueSoon: { id: string; slug: string; title: string; dueAt: string }[]
     groups: {
       id: string
       name: string
+      parentId: string | null
+      level: string | null
       path: string
       members: number
       progress: Progress
@@ -92,21 +98,76 @@ export function TeacherHome() {
     queryKey: ["teach"],
     queryFn: () => api<Home>("/teach"),
   })
+  const { shows, orgs: mine } = useContentScope()
   if (!data) return <Loading error={error} />
+  const orgs = data.orgs.filter((org) => shows(org.slug))
+  const manages = (slug: string) =>
+    mine.some((o) => o.slug === slug && o.canManage)
+  const dueSoon = orgs.flatMap((org) => org.dueSoon.map((a) => ({ ...a, org })))
+  const behind = orgs.flatMap((org) =>
+    org.groups
+      .filter((g) => g.progress.behind.length > 0)
+      .map((g) => ({ ...g, org }))
+  )
 
   return (
     <>
-      <h1 className="mb-1 text-display-lg text-ink">Teach</h1>
-      <p className="mb-6 text-body-sm text-body">
-        Your groups in every organization you teach in.
+      <h1 className="mb-1 text-display-lg text-ink">My classes</h1>
+      <p className="mb-5 text-body-sm text-body">
+        Every class you teach, in every organization. Open one for its stream,
+        classwork, people, grades and log.
       </p>
+      <ScopeNote hidden={data.orgs.length - orgs.length} />
       {data.orgs.length === 0 && (
         <p className="text-body-sm text-body">
           You don&apos;t teach any groups yet. An organization gives you a
           teaching role from its Members page.
         </p>
       )}
-      {data.orgs.map((org) => {
+      {(dueSoon.length > 0 || behind.length > 0) && (
+        <section
+          data-testid="today"
+          className="mb-6 grid gap-3 min-[901px]:grid-cols-2"
+        >
+          <Card className="grid content-start gap-2">
+            <h2 className="text-title-sm text-ink">Due this week</h2>
+            {dueSoon.length === 0 && (
+              <p className="text-caption text-body">Nothing due.</p>
+            )}
+            {dueSoon.slice(0, 6).map((a) => (
+              <Link
+                key={a.id}
+                href={`/orgs/${a.org.slug}/manage/assignments/${a.id}/grades`}
+                className="flex items-baseline justify-between gap-3 text-body-sm hover:underline"
+              >
+                <span className="truncate text-ink">{a.title}</span>
+                <span className="shrink-0 text-caption text-body">
+                  {formatDateTime(a.dueAt)}
+                </span>
+              </Link>
+            ))}
+          </Card>
+          <Card className="grid content-start gap-2">
+            <h2 className="text-title-sm text-ink">Behind the syllabus</h2>
+            {behind.length === 0 && (
+              <p className="text-caption text-body">Every class is on plan.</p>
+            )}
+            {behind.slice(0, 6).map((g) => (
+              <Link
+                key={g.id}
+                href={`/orgs/${g.org.slug}/classes/${g.id}?tab=classes`}
+                className="flex items-baseline justify-between gap-3 text-body-sm hover:underline"
+              >
+                <span className="truncate text-ink">{g.path}</span>
+                <span className="shrink-0 text-caption text-primary">
+                  {g.progress.behind.length} behind
+                </span>
+              </Link>
+            ))}
+          </Card>
+        </section>
+      )}
+      {orgs.map((org) => {
         const base = `/orgs/${org.slug}/manage`
         return (
           <section
@@ -114,40 +175,41 @@ export function TeacherHome() {
             data-testid="teach-org"
             className="mb-8 grid gap-3"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
                 <h2 className="text-title-md text-ink">{org.name}</h2>
                 <p className="text-caption text-body">
+                  {org.groups.length}{" "}
+                  {org.groups.length === 1 ? "class" : "classes"} ·{" "}
                   {org.myClassesThisWeek}{" "}
                   {org.myClassesThisWeek === 1 ? "class" : "classes"} logged by
                   you this week
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {org.can.assignments && (
+              <div className="flex flex-wrap gap-1">
+                {manages(org.slug) && (
                   <Link
-                    href={`${base}/assignments/new`}
-                    className={cn(buttonVariants({ size: "sm" }))}
+                    href={base}
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "sm",
+                    })}
                   >
-                    New assignment
+                    Manage organization
                   </Link>
                 )}
-                {org.can.grades && (
+                {org.can.assignments && (
                   <Link
                     href={`${base}/assignments`}
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" })
-                    )}
+                    className={buttonVariants({ variant: "ghost", size: "sm" })}
                   >
-                    Grades
+                    All assignments
                   </Link>
                 )}
                 {org.can.contests && (
                   <Link
                     href={`${base}/contests`}
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" })
-                    )}
+                    className={buttonVariants({ variant: "ghost", size: "sm" })}
                   >
                     Contests
                   </Link>
@@ -155,9 +217,7 @@ export function TeacherHome() {
                 {org.can.reports && (
                   <Link
                     href={`${base}/reports`}
-                    className={cn(
-                      buttonVariants({ variant: "outline", size: "sm" })
-                    )}
+                    className={buttonVariants({ variant: "ghost", size: "sm" })}
                   >
                     Reports
                   </Link>
@@ -166,41 +226,114 @@ export function TeacherHome() {
             </div>
             {org.groups.length === 0 ? (
               <p className="text-body-sm text-body">
-                No groups assigned to you here.
+                No classes assigned to you here.
               </p>
             ) : (
-              <div className="grid gap-3 min-[901px]:grid-cols-2">
-                {org.groups.map((g) => (
-                  <Card key={g.id} className="grid gap-2">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <span className="text-title-sm text-ink">{g.path}</span>
-                      <span className="text-xs text-body">
-                        {g.members} {g.members === 1 ? "member" : "members"}
-                      </span>
-                    </div>
-                    <ProgressBar progress={g.progress} />
-                    <div className="text-xs text-body">
-                      {g.classesThisWeek}{" "}
-                      {g.classesThisWeek === 1 ? "class" : "classes"} this week
-                      {g.progress.next && ` · Next: ${g.progress.next}`}
-                    </div>
-                    <Link
-                      href={`${base}/teaching/${g.id}`}
-                      className={cn(
-                        buttonVariants({ variant: "outline", size: "sm" }),
-                        "justify-self-start"
-                      )}
-                    >
-                      {g.canLog ? "Syllabus and classes" : "View"}
-                    </Link>
-                  </Card>
-                ))}
-              </div>
+              <ClassTree slug={org.slug} groups={org.groups} />
             )}
           </section>
         )
       })}
     </>
+  )
+}
+
+/** A teacher's classes in one organization, as the group tree: folded, searchable. */
+function ClassTree({
+  slug,
+  groups,
+}: {
+  slug: string
+  groups: Home["orgs"][number]["groups"]
+}) {
+  const ids = new Set(groups.map((g) => g.id))
+  const roots = groups.filter((g) => !g.parentId || !ids.has(g.parentId))
+  const childrenOf = (id: string) => groups.filter((g) => g.parentId === id)
+  const [open, setOpen] = useState<Set<string>>(
+    () =>
+      new Set(
+        groups.length <= 15 ? groups.map((g) => g.id) : roots.map((g) => g.id)
+      )
+  )
+  const [query, setQuery] = useState("")
+  const q = query.trim().toLowerCase()
+  const matches = q
+    ? groups.filter((g) => g.path.toLowerCase().includes(q))
+    : []
+
+  const row = (g: (typeof groups)[number], depth: number): ReactNode => {
+    const kids = childrenOf(g.id)
+    const expanded = open.has(g.id)
+    return (
+      <div key={g.id}>
+        <div
+          data-testid="class-row"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-hairline px-2 py-2 last:border-0 hover:bg-muted/50"
+          style={{ paddingInlineStart: 8 + depth * 22 }}
+        >
+          {kids.length > 0 && !q ? (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`${expanded ? "Collapse" : "Expand"} ${g.name}`}
+              onClick={() =>
+                setOpen((cur) => {
+                  const next = new Set(cur)
+                  if (expanded) next.delete(g.id)
+                  else next.add(g.id)
+                  return next
+                })
+              }
+            >
+              {expanded ? <CaretDownIcon /> : <CaretRightIcon />}
+            </Button>
+          ) : (
+            <span aria-hidden className="w-6" />
+          )}
+          <Link
+            href={`/orgs/${slug}/classes/${g.id}`}
+            className="min-w-32 text-body-sm text-ink hover:underline"
+          >
+            {q ? g.path : g.name}
+          </Link>
+          {g.level && (
+            <span className="rounded-full bg-muted px-1.5 py-px text-xs text-body">
+              {g.level}
+            </span>
+          )}
+          <span className="text-xs text-body">
+            {g.members} {g.members === 1 ? "student" : "students"}
+          </span>
+          <span className="flex-1" />
+          <ProgressBar progress={g.progress} />
+          <span className="w-28 text-end text-xs text-body">
+            {g.classesThisWeek} {g.classesThisWeek === 1 ? "class" : "classes"}{" "}
+            this week
+          </span>
+        </div>
+        {!q && expanded && kids.map((k) => row(k, depth + 1))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid gap-2">
+      {groups.length > 8 && (
+        <TextInput
+          aria-label={`Find a class`}
+          placeholder={`Search ${groups.length} classes`}
+          className="max-w-72"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      )}
+      <Card className="p-0">
+        {q ? matches.map((g) => row(g, 0)) : roots.map((g) => row(g, 0))}
+        {q && matches.length === 0 && (
+          <p className="p-3 text-body-sm text-body">No class matches.</p>
+        )}
+      </Card>
+    </div>
   )
 }
 
@@ -229,9 +362,12 @@ const newId = () => Math.random().toString(36).slice(2, 10)
 export function GroupTeachingView({
   slug,
   groupId,
+  embedded = false,
 }: {
   slug: string
   groupId: string
+  /** Inside a class page, which already names the group. */
+  embedded?: boolean
 }) {
   const queryClient = useQueryClient()
   const { data, error } = useQuery({
@@ -243,12 +379,16 @@ export function GroupTeachingView({
       queryKey: ["org", slug, "teaching", groupId],
     })
     void queryClient.invalidateQueries({ queryKey: ["teach"] })
+    // The class page's stream and attendance show logged classes too.
+    void queryClient.invalidateQueries({
+      queryKey: ["org", slug, "class", groupId],
+    })
   }
   if (!data) return <Loading error={error} />
 
   return (
     <>
-      <PageTitle>{data.group}</PageTitle>
+      {!embedded && <PageTitle>{data.group}</PageTitle>}
       <div className="mb-4">
         <ProgressBar progress={data.progress} />
       </div>
@@ -420,6 +560,18 @@ function LogClass({
     text: string
     kind?: "ok" | "err"
   } | null>(null)
+  // Attendance: everyone starts present; untick who wasn't there.
+  const roster = useQuery({
+    queryKey: ["org", slug, "class", groupId, "attendance"],
+    queryFn: () =>
+      api<{ students: { id: string; name: string; email: string }[] }>(
+        `/orgs/${slug}/classes/${groupId}/attendance`
+      ),
+  })
+  const students = roster.data?.students ?? []
+  const [takeAttendance, setTakeAttendance] = useState(true)
+  const [absent, setAbsent] = useState<string[]>([])
+  const [who, setWho] = useState("")
   const log = useMutation({
     mutationFn: () =>
       api(`/orgs/${slug}/sessions`, {
@@ -429,11 +581,18 @@ function LogClass({
           minutes: Number(minutes),
           topicIds: picked,
           note,
+          attendance: takeAttendance
+            ? students.map((s) => ({
+                userId: s.id,
+                present: !absent.includes(s.id),
+              }))
+            : [],
         },
       }),
     onSuccess: () => {
       setPicked([])
       setNote("")
+      setAbsent([])
       setMessage({ text: "Logged.", kind: "ok" })
       onSaved()
     },
@@ -487,6 +646,79 @@ function LogClass({
               {t.title}
             </label>
           ))}
+        </fieldset>
+      )}
+      {students.length > 0 && (
+        <fieldset className="grid gap-1.5" data-testid="attendance-picker">
+          <legend className="mb-1 flex w-full flex-wrap items-center gap-2 text-caption font-semibold text-ink">
+            <label className="flex items-center gap-2">
+              <Checkbox
+                aria-label="Take attendance"
+                checked={takeAttendance}
+                onCheckedChange={(on) => setTakeAttendance(on === true)}
+              />
+              Take attendance
+            </label>
+            {takeAttendance && (
+              <span className="font-normal text-body">
+                {students.length - absent.length} of {students.length} present
+              </span>
+            )}
+          </legend>
+          {takeAttendance && (
+            <>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {students.length > 8 && (
+                  <TextInput
+                    aria-label="Find a student"
+                    placeholder="Find a student"
+                    className="h-7 max-w-48 text-xs"
+                    value={who}
+                    onChange={(e) => setWho(e.target.value)}
+                  />
+                )}
+                <Button size="xs" variant="ghost" onClick={() => setAbsent([])}>
+                  All present
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setAbsent(students.map((s) => s.id))}
+                >
+                  All absent
+                </Button>
+              </div>
+              <div className="grid max-h-56 gap-0.5 overflow-auto rounded-sm border border-hairline p-1.5 sm:grid-cols-2">
+                {students
+                  .filter(
+                    (s) =>
+                      !who.trim() ||
+                      `${s.name} ${s.email}`
+                        .toLowerCase()
+                        .includes(who.trim().toLowerCase())
+                  )
+                  .map((s) => (
+                    <label
+                      key={s.id}
+                      className="flex min-w-0 items-center gap-2 text-body-sm text-ink"
+                    >
+                      <Checkbox
+                        aria-label={`${s.email} was there`}
+                        checked={!absent.includes(s.id)}
+                        onCheckedChange={(on) =>
+                          setAbsent((cur) =>
+                            on === true
+                              ? cur.filter((x) => x !== s.id)
+                              : [...cur, s.id]
+                          )
+                        }
+                      />
+                      <span className="truncate">{s.name}</span>
+                    </label>
+                  ))}
+              </div>
+            </>
+          )}
         </fieldset>
       )}
       <Field label="Note">
@@ -604,8 +836,16 @@ interface Report {
   }[]
 }
 
-export function OrgReports({ slug }: { slug: string }) {
-  const [group, setGroup] = useState("")
+/** With `fixedGroup`, one class's insights: no title or group picker. */
+export function OrgReports({
+  slug,
+  fixedGroup,
+}: {
+  slug: string
+  fixedGroup?: string
+}) {
+  const [chosen, setGroup] = useState("")
+  const group = fixedGroup ?? chosen
   const { data, error, isFetching } = useQuery({
     queryKey: ["org", slug, "reports", group],
     queryFn: () => api<Report>(`/orgs/${slug}/reports?group=${group}`),
@@ -626,20 +866,37 @@ export function OrgReports({ slug }: { slug: string }) {
 
   return (
     <>
-      <PageTitle
-        action={
+      {fixedGroup ? (
+        <div className="mb-4 flex justify-end">
           <a
             href={`/api/v1/orgs/${slug}/reports?group=${group}&format=csv`}
             download
-            className={cn(buttonVariants({ size: "sm" }))}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             Download CSV
           </a>
-        }
+        </div>
+      ) : (
+        <PageTitle
+          action={
+            <a
+              href={`/api/v1/orgs/${slug}/reports?group=${group}&format=csv`}
+              download
+              className={cn(buttonVariants({ size: "sm" }))}
+            >
+              Download CSV
+            </a>
+          }
+        >
+          Reports
+        </PageTitle>
+      )}
+      <div
+        className={cn(
+          "mb-4 flex flex-wrap items-center gap-2",
+          fixedGroup && "hidden"
+        )}
       >
-        Reports
-      </PageTitle>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
         <GroupPicker
           label="Group"
           className="w-72"

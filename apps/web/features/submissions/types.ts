@@ -1,3 +1,4 @@
+import type { LineComment } from "@/features/feedback/components/commented-code"
 import type { SourceFile, Verdict } from "@workspace/judge"
 
 import type { TestOutcome } from "@/features/lab/hooks/use-question-session"
@@ -36,6 +37,8 @@ export interface SubmissionDetail extends SubmissionRow {
 }
 
 export type SubmissionView = Omit<SubmissionDetail, "problem" | "contest"> & {
+  /** Teachers' comments on lines, once released. */
+  comments?: LineComment[]
   problem: { slug: string; title: string } | null
   contest: { slug: string; title: string; scoring: "icpc" | "ioi" } | null
 }

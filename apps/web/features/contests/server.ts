@@ -16,10 +16,12 @@ import { computeLeaderboard, freezeTime } from "@workspace/judge"
 import { ApiError, notFound } from "@/lib/api/route"
 import {
   accessTo,
+  classLinks,
   narrowLanguages,
   orgPolicy,
   viewpoint,
   type Access,
+  type Viewpoint,
 } from "@/features/orgs/access"
 import { cached, invalidate } from "@/lib/ttl-cache"
 import { buildDetail, type ProblemSummary } from "@/features/problems/server"
@@ -42,14 +44,17 @@ function phaseOf(contest: Contest, now = new Date()): ContestPhase {
 async function findContest(
   slug: string,
   viewer: User | null
-): Promise<{ contest: Contest; access: Exclude<Access, "none"> }> {
+): Promise<{
+  contest: Contest
+  access: Exclude<Access, "none">
+  vp: Viewpoint
+}> {
   const [contest] = await getDb()
     .select()
     .from(contests)
     .where(eq(contests.slug, slug))
-  const access = contest
-    ? accessTo(await viewpoint(viewer), contest, "contests.manage")
-    : "none"
+  const vp = await viewpoint(viewer)
+  const access = contest ? accessTo(vp, contest, "contests.manage") : "none"
   if (
     !contest ||
     access === "none" ||
@@ -57,7 +62,7 @@ async function findContest(
   ) {
     throw notFound("Contest not found")
   }
-  return { contest, access }
+  return { contest, access, vp }
 }
 
 /** For submissions: the contest, if this person may take part in it. */
@@ -125,9 +130,10 @@ async function isRegistered(contestId: string, userId: string) {
 
 /** Problems stay secret until the start, except from staff. */
 export async function getContestView(slug: string, viewer: User | null) {
-  const { contest, access } = await findContest(slug, viewer)
+  const { contest, access, vp } = await findContest(slug, viewer)
   const phase = phaseOf(contest)
   const rows = await contestProblemRows(contest.id)
+  const classes = await classLinks(vp, contest, access === "manage")
   const canSeeProblems = phase !== "upcoming" || access === "manage"
   const status = viewer ? await ownStatus(contest.id, viewer.id) : {}
   const [participants] = await getDb()
@@ -137,6 +143,8 @@ export async function getContestView(slug: string, viewer: User | null) {
   return {
     ...contest,
     phase,
+    /** The classes it's for, linked. */
+    classes,
     participants: participants?.total ?? 0,
     registered: viewer ? await isRegistered(contest.id, viewer.id) : false,
     problems: canSeeProblems

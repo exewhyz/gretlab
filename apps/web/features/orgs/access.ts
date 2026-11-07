@@ -172,3 +172,39 @@ export function narrowLanguages(
   if (!org) return problem
   return problem ? problem.filter((l) => org.includes(l)) : org
 }
+
+/**
+ * The classes a piece of content is for, as links its viewer can open: groups they sit
+ * in or under, or every group for someone who manages it. Empty for platform content.
+ */
+export async function classLinks(
+  vp: Viewpoint,
+  content: { orgId: string | null; audience: Audience },
+  manages: boolean
+) {
+  if (!content.orgId) return []
+  const ids = [...new Set(content.audience.flat())]
+  if (ids.length === 0) return []
+  const standing = vp.orgs.get(content.orgId)
+  const under = new Set(
+    standing ? standing.groupIds.flatMap((id) => standing.chainOf(id)) : []
+  )
+  const open = ids.filter((id) => manages || under.has(id))
+  if (open.length === 0) return []
+  const db = getDb()
+  const [rows, [org]] = await Promise.all([
+    db
+      .select({ id: orgGroups.id, name: orgGroups.name })
+      .from(orgGroups)
+      .where(
+        and(eq(orgGroups.orgId, content.orgId), inArray(orgGroups.id, open))
+      ),
+    db
+      .select({ slug: organizations.slug })
+      .from(organizations)
+      .where(eq(organizations.id, content.orgId)),
+  ])
+  return rows
+    .map((g) => ({ name: g.name, href: `/orgs/${org!.slug}/classes/${g.id}` }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}

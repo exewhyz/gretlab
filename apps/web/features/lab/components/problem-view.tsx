@@ -8,16 +8,15 @@ import {
 } from "@workspace/ui/components/collapsible"
 
 import type { ProblemDetail } from "../types"
-import { RichText } from "@/components/rich-text"
+import { Markdown } from "@/components/markdown"
 import { TagChip } from "@/features/catalog/components/difficulty"
+import { HideDuringExam } from "@/features/exams/components/exam"
 import { AssignmentChips } from "@/features/assignments/components/assignment-chips"
 import { SaveMenu } from "@/features/catalog/components/save-menu"
 
 import { InlineCode } from "./inline-code"
 import styles from "./problem-view.module.scss"
 import { SampleCard } from "./sample-card"
-import { SolutionReveal } from "./solution-reveal"
-import { Statement } from "./statement"
 
 const LEVEL_COLORS: Record<string, string> = {
   easy: "text-success",
@@ -39,6 +38,7 @@ export function ProblemView({
   footer?: ReactNode
 }) {
   const ownNotes = question.notes
+  // The problem's structure, kept apart from its statement.
   const sections: [string, string[]][] = [
     ["Input Format", question.input],
     ["Output Format", question.output],
@@ -91,12 +91,12 @@ export function ProblemView({
         </div>
       )}
 
-      <Statement blocks={question.statement} />
+      <Markdown text={question.description} className="mb-2" />
 
       {sections.map(
         ([heading, items]) =>
           items.length > 0 && (
-            <section key={heading}>
+            <section key={heading} data-testid="problem-section">
               <h2>{heading}</h2>
               <ul>
                 {items.map((item, index) => (
@@ -131,6 +131,7 @@ export function ProblemView({
       </p>
 
       {question.hints.length > 0 && (
+        <HideDuringExam problemSlug={question.id}>
         <section>
           <h2>Hints</h2>
           <div className="grid gap-1.5">
@@ -140,15 +141,14 @@ export function ProblemView({
                   Hint {index + 1}
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <RichText text={hint} />
+                  <Markdown text={hint} />
                 </CollapsibleContent>
               </Collapsible>
             ))}
           </div>
         </section>
+        </HideDuringExam>
       )}
-
-      {question.hasSolution && <SolutionReveal slug={question.id} />}
 
       {footer}
     </div>

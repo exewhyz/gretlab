@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useRef, useState, type CSSProperties, type ReactNode } from "react"
 
 import { Button } from "@workspace/ui/components/button"
+import { useExamInProgress } from "@/features/exams/components/exam"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { NotesPanel } from "@/features/catalog/components/notes-panel"
@@ -18,6 +19,7 @@ import { EditorPane } from "./editor-pane"
 import { Notices, type Notice } from "./notices"
 import { QuestionList } from "./question-list"
 import { ResizeHandle } from "./resize-handle"
+import { EditorialPanel, useHasEditorial } from "./solution-reveal"
 import { TabButton } from "./tab-button"
 import { TopBar } from "./top-bar"
 import styles from "./workbench.module.scss"
@@ -66,9 +68,15 @@ export function Workbench({
   const layout = useLocalStore(layoutStore, (value) => value)
   const practice = useProgress()
   const status = statusOverride ?? practice
-  const [leftTab, setLeftTab] = useState<"problem" | "notes" | "submissions">(
-    "problem"
-  )
+  const [leftTab, setLeftTab] = useState<
+    "problem" | "editorial" | "notes" | "submissions"
+  >("problem")
+  // A different problem opens on its statement, never on its editorial.
+  const [tabProblem, setTabProblem] = useState(current?.id)
+  if (current?.id !== tabProblem) {
+    setTabProblem(current?.id)
+    setLeftTab("problem")
+  }
   const solved = questions.filter((q) => status[q.id] === "solved").length
   const problemPane = useRef<HTMLElement>(null)
   const editorPane = useRef<HTMLElement>(null)
@@ -180,6 +188,11 @@ export function Workbench({
               >
                 Problem
               </TabButton>
+              <EditorialTabButton
+                problemSlug={current.id}
+                selected={leftTab === "editorial"}
+                onClick={() => setLeftTab("editorial")}
+              />
               <TabButton
                 selected={leftTab === "notes"}
                 className="py-3"
@@ -215,6 +228,7 @@ export function Workbench({
             >
               {children}
             </div>
+            {leftTab === "editorial" && <EditorialPanel />}
             {leftTab === "notes" && <NotesPanel />}
             {leftTab === "submissions" && <SubmissionsPanel />}
           </article>
@@ -244,5 +258,26 @@ export function Workbench({
         <Link href="/privacy">Privacy</Link>
       </footer>
     </div>
+  )
+}
+
+/** Shown only when this problem has an editorial the viewer may read. */
+function EditorialTabButton({
+  problemSlug,
+  selected,
+  onClick,
+}: {
+  problemSlug: string
+  selected: boolean
+  onClick: () => void
+}) {
+  const hasEditorial = useHasEditorial()
+  // The server refuses it during an exam too; this just doesn't offer it.
+  const inExam = useExamInProgress(problemSlug)
+  if (!hasEditorial || inExam) return null
+  return (
+    <TabButton selected={selected} className="py-3" onClick={onClick}>
+      Editorial
+    </TabButton>
   )
 }

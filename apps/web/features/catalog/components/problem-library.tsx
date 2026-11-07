@@ -10,6 +10,8 @@ import { cn } from "@workspace/ui/lib/utils"
 import { SelectInput, TextInput } from "@/components/form"
 import { useViewer } from "@/features/account/use-viewer"
 import { useProgress } from "@/features/lab/hooks/use-progress"
+import { useContentScope } from "@/features/account/scope"
+import { ScopeNote } from "@/features/account/scope-switcher"
 import { api } from "@/lib/api/client"
 
 import type { CatalogProblem } from "../server"
@@ -89,6 +91,13 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
     enabled: Boolean(viewer?.features.lists),
   })
 
+  // Only the places chosen in the header's switcher.
+  const { shows } = useContentScope()
+  const problems = useMemo(
+    () => catalog.problems.filter((p) => shows(p.org)),
+    [catalog.problems, shows]
+  )
+
   const [search, setSearch] = useState("")
   const [level, setLevel] = useState("")
   const [status, setStatus] = useState("")
@@ -98,7 +107,7 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    const rows = catalog.problems.filter((problem) => {
+    const rows = problems.filter((problem) => {
       const state = progress[problem.id] ?? "todo"
       return (
         (!query ||
@@ -122,13 +131,11 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
     if (sort === "acceptance-low")
       sorted.sort((a, b) => byAcceptance(a) - byAcceptance(b))
     return sorted
-  }, [catalog.problems, search, level, status, activeTags, sort, progress])
+  }, [problems, search, level, status, activeTags, sort, progress])
 
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE))
   const shown = filtered.slice(page * PAGE, page * PAGE + PAGE)
-  const solvedCount = catalog.problems.filter(
-    (p) => progress[p.id] === "solved"
-  ).length
+  const solvedCount = problems.filter((p) => progress[p.id] === "solved").length
   const reset = () => setPage(0)
   const toggleTag = (slug: string) => {
     setActiveTags((current) =>
@@ -140,8 +147,8 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
   }
   const studyPlans = lists?.filter((list) => list.kind === "study_plan") ?? []
   const upNext =
-    catalog.problems.find((p) => progress[p.id] === "tried") ??
-    catalog.problems.find((p) => !progress[p.id])
+    problems.find((p) => progress[p.id] === "tried") ??
+    problems.find((p) => !progress[p.id])
 
   return (
     <div className="mx-auto grid max-w-7xl gap-5 p-4 min-[1100px]:grid-cols-[minmax(0,1fr)_300px]">
@@ -157,15 +164,16 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
                 <div
                   className="h-full bg-success"
                   style={{
-                    width: `${(100 * solvedCount) / Math.max(1, catalog.problems.length)}%`,
+                    width: `${(100 * solvedCount) / Math.max(1, problems.length)}%`,
                   }}
                 />
               </div>
-              {solvedCount} of {catalog.problems.length} solved
+              {solvedCount} of {problems.length} solved
             </div>
           </div>
         </div>
 
+        <ScopeNote hidden={catalog.problems.length - problems.length} />
         <div className="mb-3 flex flex-wrap gap-2">
           <TextInput
             aria-label="Search problems"

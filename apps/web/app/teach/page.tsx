@@ -5,7 +5,10 @@ import { PageHeader } from "@/components/page-header"
 import { getCurrentUser } from "@/features/auth/current-user"
 import { TeacherHome } from "@/features/teaching/components/teaching"
 
-export const metadata: Metadata = { title: "Teach", robots: { index: false } }
+export const metadata: Metadata = {
+  title: "My classes · Teaching",
+  robots: { index: false },
+}
 
 export default async function TeachPage() {
   if (!(await getCurrentUser())) redirect("/sign-in?callbackUrl=/teach")

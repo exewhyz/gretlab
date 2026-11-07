@@ -7,6 +7,8 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { PageHeader } from "@/components/page-header"
 import { Card, Loading } from "@/features/admin/components/shell"
+import { useContentScope } from "@/features/account/scope"
+import { ScopeNote } from "@/features/account/scope-switcher"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 
@@ -54,17 +56,20 @@ export function PhaseBadge({
 }
 
 export function ContestList() {
-  const { data, error } = useQuery({
+  const { data: all, error } = useQuery({
     queryKey: ["contests"],
     queryFn: () => api<ContestRow[]>("/contests"),
   })
+  const { shows } = useContentScope()
+  const data = all?.filter((contest) => shows(contest.org?.slug))
   return (
     <div className="min-h-dvh">
       <PageHeader />
       <main className="mx-auto grid max-w-5xl gap-3 p-4">
         <h1 className="mb-1 text-display-lg text-ink">Contests</h1>
+        {all && data && <ScopeNote hidden={all.length - data.length} />}
         {!data && <Loading error={error} />}
-        {data?.length === 0 && (
+        {data?.length === 0 && all?.length === 0 && (
           <p className="text-body-sm text-body">
             No contests yet. Teachers can create one in the dashboard, and it
             appears here once published.

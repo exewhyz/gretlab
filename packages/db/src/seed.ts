@@ -4,6 +4,7 @@
  */
 import { readFileSync } from "node:fs"
 
+import { statementToMarkdown, type ProblemCode } from "@workspace/judge"
 import { eq, sql } from "drizzle-orm"
 
 import { getDb, problems, tags, testCases, units } from "./index.ts"
@@ -18,7 +19,12 @@ interface RawQuestion {
   constraints: string[]
   samples: [string, string][]
   tests: [string, string][]
+  /** The Python reference solution. */
   solution: string
+  editorial?: string
+  hints?: string[]
+  /** Per language: starter code and, for languages other than Python, a solution. */
+  code?: Record<string, ProblemCode>
 }
 
 const path =
@@ -59,7 +65,14 @@ for (const [unitIndex, unit] of content.units.entries()) {
         inputFormat: question.input,
         outputFormat: question.output,
         constraints: question.constraints,
+        description: statementToMarkdown(question.statement),
         solution: question.solution,
+        editorial: question.editorial ?? "",
+        hints: question.hints ?? [],
+        code: {
+          ...question.code,
+          python: { ...question.code?.python, solution: question.solution },
+        },
       })
       .onConflictDoNothing({ target: problems.slug })
       .returning()

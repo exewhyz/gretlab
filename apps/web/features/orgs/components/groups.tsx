@@ -2,7 +2,7 @@
 
 import { CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 
 import {
   AlertDialog,
@@ -521,18 +521,54 @@ type Person = GroupPeopleData["people"][number]
 
 const PAGE = 50
 
+/** The people panel's frame: a dialog on the Groups page, a section on a class page. */
+function PeopleFrame({
+  inline,
+  onClose,
+  title,
+  description,
+  children,
+}: {
+  inline: boolean
+  onClose: () => void
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  if (inline) {
+    return (
+      <section className="grid gap-3 text-body-sm">
+        <p className="text-caption text-body">{description}</p>
+        {children}
+      </section>
+    )
+  }
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[88vh] overflow-auto text-body-sm sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle className="text-title-md text-ink">{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        {children}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 /**
  * A group's people, in sections by the group inside it where they sit, each folded and
  * paged so hundreds of people stay manageable. Each person can be moved or removed; ticked
  * people can be moved or removed together. People can be added from the organization.
  */
-function GroupPeople({
+export function GroupPeople({
   slug,
   groupId,
   groups,
   levels,
   onClose,
   onOpen,
+  inline = false,
 }: {
   slug: string
   groupId: string
@@ -540,6 +576,8 @@ function GroupPeople({
   levels: string[]
   onClose: () => void
   onOpen: (groupId: string) => void
+  /** On a class page: shown in place, not as a dialog. */
+  inline?: boolean
 }) {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
@@ -591,6 +629,7 @@ function GroupPeople({
   }, [groups, groupId])
 
   if (!data) {
+    if (inline) return <Loading error={error} />
     return (
       <Dialog open onOpenChange={(open) => !open && onClose()}>
         <DialogContent>
@@ -663,278 +702,265 @@ function GroupPeople({
     )
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[88vh] overflow-auto text-body-sm sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle className="text-title-md text-ink">
-            People in {data.group.name}
-          </DialogTitle>
-          <DialogDescription>
-            {data.people.length}{" "}
-            {data.people.length === 1 ? "person" : "people"}, in it or in groups
-            inside it.
-          </DialogDescription>
-        </DialogHeader>
-        <FormMessage message={message} />
-        <div className="grid gap-5 min-[901px]:grid-cols-[minmax(0,1fr)_300px]">
-          <section className="grid content-start gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <TextInput
-                aria-label="Search people in this group"
-                placeholder="Search by name or email"
-                className="w-64"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+    <PeopleFrame
+      inline={inline}
+      onClose={onClose}
+      title={`People in ${data.group.name}`}
+      description={`${data.people.length} ${data.people.length === 1 ? "person" : "people"}, in it or in groups inside it.`}
+    >
+      <FormMessage message={message} />
+      <div className="grid gap-5 min-[901px]:grid-cols-[minmax(0,1fr)_300px]">
+        <section className="grid content-start gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <TextInput
+              aria-label="Search people in this group"
+              placeholder="Search by name or email"
+              className="w-64"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {data.canManage && visibleIds.length > 0 && (
+              <label className="flex items-center gap-2 text-caption text-body">
+                <Checkbox
+                  aria-label="Tick everyone shown"
+                  checked={allTicked}
+                  indeterminate={
+                    !allTicked && visibleIds.some((id) => selected.includes(id))
+                  }
+                  onCheckedChange={(on) =>
+                    setSelected(
+                      on === true
+                        ? [...new Set([...selected, ...visibleIds])]
+                        : []
+                    )
+                  }
+                />
+                Tick everyone shown
+              </label>
+            )}
+          </div>
+          {data.canManage && selected.length > 0 && (
+            <div
+              data-testid="bulk-bar"
+              className="flex flex-wrap items-center gap-2 rounded-md border border-hairline bg-canvas-soft p-2"
+            >
+              <span className="text-caption text-ink">
+                {selected.length} ticked
+              </span>
+              <GroupPicker
+                label="Move ticked people to"
+                placeholder="Move to…"
+                heading={`Move ${selected.length} ticked ${selected.length === 1 ? "person" : "people"} out of ${data.group.name} into:`}
+                className="w-60"
+                groups={groups}
+                levels={levels}
+                isDisabled={(id) => id === groupId}
+                value={bulkInto}
+                onChange={setBulkInto}
               />
-              {data.canManage && visibleIds.length > 0 && (
-                <label className="flex items-center gap-2 text-caption text-body">
-                  <Checkbox
-                    aria-label="Tick everyone shown"
-                    checked={allTicked}
-                    indeterminate={
-                      !allTicked &&
-                      visibleIds.some((id) => selected.includes(id))
+              <Button
+                size="sm"
+                disabled={!bulkInto || act.isPending}
+                onClick={() => move(groupId, bulkInto, selected)}
+              >
+                Move
+              </Button>
+              <ConfirmButton
+                size="sm"
+                variant="destructive"
+                title={`Remove ${selected.length} ${selected.length === 1 ? "person" : "people"} from ${data.group.name}?`}
+                description={`They leave ${data.group.name} and every group inside it. They stay members of the organization.`}
+                confirmLabel="Remove"
+                onConfirm={() => remove(groupId, selected)}
+              >
+                Remove
+              </ConfirmButton>
+              <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+                Clear
+              </Button>
+            </div>
+          )}
+          {sectionList.length === 0 && (
+            <p className="text-body">
+              {query
+                ? "Nobody matches."
+                : "Nobody yet. Add people from the right."}
+            </p>
+          )}
+          {sectionList.map(([key, section]) => {
+            const limit = shownPerSection[key] ?? PAGE
+            return (
+              <Collapsible
+                key={key}
+                open={isOpen(key)}
+                onOpenChange={(open) =>
+                  setOpenSections((cur) => {
+                    const next = new Set(cur)
+                    if (open) next.add(key)
+                    else next.delete(key)
+                    return next
+                  })
+                }
+                className="rounded-md border border-hairline"
+              >
+                <CollapsibleTrigger
+                  data-testid="people-section"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-start text-ink hover:bg-muted"
+                >
+                  {isOpen(key) ? (
+                    <CaretDownIcon className="size-3.5" />
+                  ) : (
+                    <CaretRightIcon className="size-3.5" />
+                  )}
+                  <span
+                    className={
+                      key === "direct" && section.label.startsWith("Not placed")
+                        ? "text-primary"
+                        : ""
                     }
+                  >
+                    {section.label}
+                  </span>
+                  <span className="text-xs text-body">
+                    · {section.people.length}
+                  </span>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <ul className="grid gap-0.5 border-t border-hairline p-1.5">
+                    {section.people.slice(0, limit).map((p) => (
+                      <PersonRow
+                        key={p.userId}
+                        person={p}
+                        canManage={data.canManage}
+                        ticked={selected.includes(p.userId)}
+                        onTick={(on) => tick(p.userId, on)}
+                        fromName={name(section.source)}
+                        from={section.source}
+                        groups={groups}
+                        levels={levels}
+                        busy={act.isPending}
+                        onMove={(into) =>
+                          move(section.source, into, [p.userId])
+                        }
+                        onRemove={() => remove(section.source, [p.userId])}
+                      />
+                    ))}
+                  </ul>
+                  {section.people.length > limit && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      className="ms-2 mb-1.5"
+                      onClick={() =>
+                        setShownPerSection((cur) => ({
+                          ...cur,
+                          [key]: limit + PAGE,
+                        }))
+                      }
+                    >
+                      Show {Math.min(PAGE, section.people.length - limit)} more
+                      of {section.people.length - limit}
+                    </Button>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            )
+          })}
+        </section>
+        {data.canManage && (
+          <section className="grid content-start gap-2">
+            <h3 className="text-caption-upper text-body uppercase">
+              Add people
+            </h3>
+            {data.places.length > 0 && (
+              <p data-testid="spread-note" className="text-xs text-body">
+                {data.group.name} has groups inside, so people added here join{" "}
+                {data.places.length === 1
+                  ? data.places[0]!.path
+                  : `all ${data.places.length} of them`}
+                . To add to just one, open it:
+                <span className="mt-1 flex flex-wrap gap-1">
+                  {data.places.slice(0, 12).map((p) => (
+                    <Button
+                      key={p.id}
+                      size="xs"
+                      variant="outline"
+                      onClick={() => onOpen(p.id)}
+                    >
+                      {p.path}
+                    </Button>
+                  ))}
+                </span>
+              </p>
+            )}
+            <TextInput
+              aria-label="Find members to add"
+              placeholder="Search members by name or email"
+              value={addSearch}
+              onChange={(e) => setAddSearch(e.target.value)}
+            />
+            <div className="grid max-h-72 gap-0.5 overflow-auto">
+              {addable.slice(0, 200).map((m) => (
+                <label
+                  key={m.userId}
+                  className="flex items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-muted"
+                >
+                  <Checkbox
+                    aria-label={`Add ${m.email}`}
+                    checked={picked.includes(m.userId)}
                     onCheckedChange={(on) =>
-                      setSelected(
+                      setPicked(
                         on === true
-                          ? [...new Set([...selected, ...visibleIds])]
-                          : []
+                          ? [...picked, m.userId]
+                          : picked.filter((x) => x !== m.userId)
                       )
                     }
                   />
-                  Tick everyone shown
-                </label>
-              )}
-            </div>
-            {data.canManage && selected.length > 0 && (
-              <div
-                data-testid="bulk-bar"
-                className="flex flex-wrap items-center gap-2 rounded-md border border-hairline bg-canvas-soft p-2"
-              >
-                <span className="text-caption text-ink">
-                  {selected.length} ticked
-                </span>
-                <GroupPicker
-                  label="Move ticked people to"
-                  placeholder="Move to…"
-                  heading={`Move ${selected.length} ticked ${selected.length === 1 ? "person" : "people"} out of ${data.group.name} into:`}
-                  className="w-60"
-                  groups={groups}
-                  levels={levels}
-                  isDisabled={(id) => id === groupId}
-                  value={bulkInto}
-                  onChange={setBulkInto}
-                />
-                <Button
-                  size="sm"
-                  disabled={!bulkInto || act.isPending}
-                  onClick={() => move(groupId, bulkInto, selected)}
-                >
-                  Move
-                </Button>
-                <ConfirmButton
-                  size="sm"
-                  variant="destructive"
-                  title={`Remove ${selected.length} ${selected.length === 1 ? "person" : "people"} from ${data.group.name}?`}
-                  description={`They leave ${data.group.name} and every group inside it. They stay members of the organization.`}
-                  confirmLabel="Remove"
-                  onConfirm={() => remove(groupId, selected)}
-                >
-                  Remove
-                </ConfirmButton>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setSelected([])}
-                >
-                  Clear
-                </Button>
-              </div>
-            )}
-            {sectionList.length === 0 && (
-              <p className="text-body">
-                {query
-                  ? "Nobody matches."
-                  : "Nobody yet. Add people from the right."}
-              </p>
-            )}
-            {sectionList.map(([key, section]) => {
-              const limit = shownPerSection[key] ?? PAGE
-              return (
-                <Collapsible
-                  key={key}
-                  open={isOpen(key)}
-                  onOpenChange={(open) =>
-                    setOpenSections((cur) => {
-                      const next = new Set(cur)
-                      if (open) next.add(key)
-                      else next.delete(key)
-                      return next
-                    })
-                  }
-                  className="rounded-md border border-hairline"
-                >
-                  <CollapsibleTrigger
-                    data-testid="people-section"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-start text-ink hover:bg-muted"
-                  >
-                    {isOpen(key) ? (
-                      <CaretDownIcon className="size-3.5" />
-                    ) : (
-                      <CaretRightIcon className="size-3.5" />
-                    )}
-                    <span
-                      className={
-                        key === "direct" &&
-                        section.label.startsWith("Not placed")
-                          ? "text-primary"
-                          : ""
-                      }
-                    >
-                      {section.label}
+                  <span className="min-w-0">
+                    <span className="block truncate text-ink">
+                      {m.name ?? m.email}
                     </span>
-                    <span className="text-xs text-body">
-                      · {section.people.length}
+                    <span className="block truncate text-xs text-body">
+                      {m.email}
                     </span>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <ul className="grid gap-0.5 border-t border-hairline p-1.5">
-                      {section.people.slice(0, limit).map((p) => (
-                        <PersonRow
-                          key={p.userId}
-                          person={p}
-                          canManage={data.canManage}
-                          ticked={selected.includes(p.userId)}
-                          onTick={(on) => tick(p.userId, on)}
-                          fromName={name(section.source)}
-                          from={section.source}
-                          groups={groups}
-                          levels={levels}
-                          busy={act.isPending}
-                          onMove={(into) =>
-                            move(section.source, into, [p.userId])
-                          }
-                          onRemove={() => remove(section.source, [p.userId])}
-                        />
-                      ))}
-                    </ul>
-                    {section.people.length > limit && (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        className="ms-2 mb-1.5"
-                        onClick={() =>
-                          setShownPerSection((cur) => ({
-                            ...cur,
-                            [key]: limit + PAGE,
-                          }))
-                        }
-                      >
-                        Show {Math.min(PAGE, section.people.length - limit)}{" "}
-                        more of {section.people.length - limit}
-                      </Button>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
-              )
-            })}
-          </section>
-          {data.canManage && (
-            <section className="grid content-start gap-2">
-              <h3 className="text-caption-upper text-body uppercase">
-                Add people
-              </h3>
-              {data.places.length > 0 && (
-                <p data-testid="spread-note" className="text-xs text-body">
-                  {data.group.name} has groups inside, so people added here join{" "}
-                  {data.places.length === 1
-                    ? data.places[0]!.path
-                    : `all ${data.places.length} of them`}
-                  . To add to just one, open it:
-                  <span className="mt-1 flex flex-wrap gap-1">
-                    {data.places.slice(0, 12).map((p) => (
-                      <Button
-                        key={p.id}
-                        size="xs"
-                        variant="outline"
-                        onClick={() => onOpen(p.id)}
-                      >
-                        {p.path}
-                      </Button>
-                    ))}
                   </span>
+                </label>
+              ))}
+              {addable.length === 0 && (
+                <p className="text-xs text-body">
+                  {addSearch
+                    ? "Nobody matches."
+                    : "Everyone here is already in this group."}
                 </p>
               )}
-              <TextInput
-                aria-label="Find members to add"
-                placeholder="Search members by name or email"
-                value={addSearch}
-                onChange={(e) => setAddSearch(e.target.value)}
-              />
-              <div className="grid max-h-72 gap-0.5 overflow-auto">
-                {addable.slice(0, 200).map((m) => (
-                  <label
-                    key={m.userId}
-                    className="flex items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-muted"
-                  >
-                    <Checkbox
-                      aria-label={`Add ${m.email}`}
-                      checked={picked.includes(m.userId)}
-                      onCheckedChange={(on) =>
-                        setPicked(
-                          on === true
-                            ? [...picked, m.userId]
-                            : picked.filter((x) => x !== m.userId)
-                        )
-                      }
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-ink">
-                        {m.name ?? m.email}
-                      </span>
-                      <span className="block truncate text-xs text-body">
-                        {m.email}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-                {addable.length === 0 && (
-                  <p className="text-xs text-body">
-                    {addSearch
-                      ? "Nobody matches."
-                      : "Everyone here is already in this group."}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                disabled={picked.length === 0 || act.isPending}
+                onClick={() =>
+                  act.mutate(() => api(path, { body: { userIds: picked } }))
+                }
+              >
+                Add {picked.length || ""} to {data.group.name}
+              </Button>
+              {addable.length > 0 && (
                 <Button
-                  disabled={picked.length === 0 || act.isPending}
-                  onClick={() =>
-                    act.mutate(() => api(path, { body: { userIds: picked } }))
-                  }
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPicked(addable.map((m) => m.userId))}
                 >
-                  Add {picked.length || ""} to {data.group.name}
+                  Select all shown
                 </Button>
-                {addable.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setPicked(addable.map((m) => m.userId))}
-                  >
-                    Select all shown
-                  </Button>
-                )}
-              </div>
-              <p className="text-xs text-body">
-                Not a member yet? Invite them from Invites or Import, straight
-                into this group.
-              </p>
-            </section>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+              )}
+            </div>
+            <p className="text-xs text-body">
+              Not a member yet? Invite them from Invites or Import, straight
+              into this group.
+            </p>
+          </section>
+        )}
+      </div>
+    </PeopleFrame>
   )
 }
 

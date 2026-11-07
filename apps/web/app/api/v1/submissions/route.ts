@@ -1,3 +1,4 @@
+import { clientIp } from "@/lib/api/client-ip"
 import { route } from "@/lib/api/route"
 import { submissionInputSchema } from "@/features/problems/schemas"
 import {
@@ -7,7 +8,7 @@ import {
 
 export const POST = route(
   { access: "user", body: submissionInputSchema },
-  ({ user, body }) => createSubmission(user, body)
+  ({ user, body, request }) => createSubmission(user, body, clientIp(request))
 )
 
 export const GET = route({ access: "user" }, ({ user, query }) =>

@@ -148,7 +148,8 @@ interface StoredContest extends Omit<
   freezeMinutes: number
 }
 
-function blankForm(): ContestForm {
+/** A new one; made from a class page, it's for that class. */
+function blankForm(forClass: string | null): ContestForm {
   const start = new Date(Date.now() + 24 * 60 * 60_000)
   start.setMinutes(0, 0, 0)
   return {
@@ -163,11 +164,18 @@ function blankForm(): ContestForm {
     published: false,
     registrationOpen: true,
     problemIds: [],
-    audience: [],
+    audience: forClass ? [[forClass]] : [],
   }
 }
 
-export function ContestEditorPage({ id }: { id: string | null }) {
+export function ContestEditorPage({
+  id,
+  forClass = null,
+}: {
+  id: string | null
+  /** Started from a class page: aimed at that class, and back there after saving. */
+  forClass?: string | null
+}) {
   const owner = useOwner()
   const { data, error } = useQuery({
     queryKey: owner.key("contest", id),
@@ -190,11 +198,12 @@ export function ContestEditorPage({ id }: { id: string | null }) {
         penaltyMinutes: String(data.penaltyMinutes),
         freezeMinutes: String(data.freezeMinutes),
       }
-    : blankForm()
+    : blankForm(forClass)
   return (
     <ContestEditor
       key={id ?? "new"}
       id={id}
+      forClass={forClass}
       initial={initial}
       problems={problems.data.problems}
     />
@@ -379,10 +388,12 @@ export function ProblemPicker({
 
 function ContestEditor({
   id,
+  forClass,
   initial,
   problems,
 }: {
   id: string | null
+  forClass: string | null
   initial: ContestForm
   problems: StaffProblemList["problems"]
 }) {
@@ -458,7 +469,9 @@ function ContestEditor({
           : "Saved as a draft. Only staff can see it.",
         kind: "ok",
       })
-      if (!id) router.push(owner.page(`/contests/${saved.id}`))
+      if (!id && forClass && owner.orgSlug)
+        router.push(`/orgs/${owner.orgSlug}/classes/${forClass}?tab=classwork`)
+      else if (!id) router.push(owner.page(`/contests/${saved.id}`))
     },
     onError: (error) => {
       if (error instanceof ApiRequestError && error.code === "conflict") {

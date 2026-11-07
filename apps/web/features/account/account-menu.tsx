@@ -3,7 +3,7 @@
 import { CaretDownIcon, ListIcon } from "@phosphor-icons/react"
 import { signOut } from "next-auth/react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import {
@@ -17,6 +17,8 @@ import {
 } from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { writeMode, useMode, type Mode } from "./mode"
+import { useContentScope } from "./scope"
 import { useViewer, type Viewer } from "./use-viewer"
 
 interface NavItem {
@@ -26,33 +28,104 @@ interface NavItem {
   also?: string[]
 }
 
-/** The site's main sections, in the order students use them. */
-function sections(viewer: Viewer | undefined): NavItem[] {
+/** Whether this person has a teaching side at all: an organization role or platform staff. */
+export function canTeach(viewer: Viewer | undefined) {
+  const user = viewer?.user
+  return Boolean(
+    user && (user.teaches || user.role === "teacher" || user.role === "admin")
+  )
+}
+
+/** The main sections of the current mode, in the order people use them. */
+function useSections(): NavItem[] {
+  const { data: viewer } = useViewer()
+  const { orgs } = useContentScope()
+  const mode = useMode(canTeach(viewer))
   const user = viewer?.user
   const staff = user?.role === "teacher" || user?.role === "admin"
-  const items: (NavItem | false | null | undefined)[] = [
-    viewer?.features.practice && {
-      href: "/problems",
-      label: "Problems",
-      also: ["/lists"],
-    },
-    user &&
-      viewer?.features.assignments && {
-        href: "/assignments",
-        label: "Assignments",
-      },
-    viewer?.features.contests && { href: "/contests", label: "Contests" },
-    user &&
-      viewer?.features.profiles && {
-        href: "/leaderboard",
-        label: "Leaderboard",
-        also: ["/u"],
-      },
-    user?.teaches && { href: "/teach", label: "Teach" },
-    { href: "/playground", label: "Playground" },
-    staff && { href: "/admin", label: "Dashboard" },
-  ]
+  const items: (NavItem | false | null | undefined)[] =
+    mode === "teach"
+      ? [
+          user?.teaches && {
+            href: "/teach",
+            label: "My classes",
+            also: ["/orgs"],
+          },
+          orgs.some((o) => o.canManage) &&
+            !user?.teaches && { href: "/orgs", label: "Organizations" },
+          staff && { href: "/admin", label: "Dashboard" },
+          { href: "/playground", label: "Playground" },
+        ]
+      : [
+          viewer?.features.practice && {
+            href: "/problems",
+            label: "Problems",
+            also: ["/lists"],
+          },
+          orgs.length > 0 && { href: "/classes", label: "My classes" },
+          user &&
+            viewer?.features.assignments && {
+              href: "/assignments",
+              label: "Assignments",
+            },
+          viewer?.features.contests && {
+            href: "/contests",
+            label: "Contests",
+          },
+          user &&
+            viewer?.features.profiles && {
+              href: "/leaderboard",
+              label: "Leaderboard",
+              also: ["/u"],
+            },
+          { href: "/playground", label: "Playground" },
+        ]
   return items.filter((item): item is NavItem => Boolean(item))
+}
+
+/**
+ * Learn or Teach, for people who do both. Switching goes to that mode's home, so the
+ * page and the header always agree.
+ */
+export function ModeToggle() {
+  const { data: viewer } = useViewer()
+  const router = useRouter()
+  const show = canTeach(viewer)
+  const mode = useMode(show)
+  if (!show) return null
+  const go = (next: Mode) => {
+    writeMode(next)
+    router.push(
+      next === "teach"
+        ? viewer?.user?.teaches
+          ? "/teach"
+          : "/admin"
+        : viewer?.features.practice
+          ? "/problems"
+          : "/contests"
+    )
+  }
+  return (
+    <div
+      role="group"
+      aria-label="Mode"
+      data-testid="mode-toggle"
+      className="hidden items-center rounded-md border border-hairline p-0.5 sm:flex"
+    >
+      {(["learn", "teach"] as const).map((m) => (
+        <Button
+          key={m}
+          size="xs"
+          variant={mode === m ? "default" : "ghost"}
+          aria-pressed={mode === m}
+          onClick={() => mode !== m && go(m)}
+          className="px-2.5"
+        >
+          {m === "learn" ? "Learn" : "Teach"}
+        </Button>
+      ))}
+    </div>
+  )
 }
 
 const isActive = (item: NavItem, pathname: string) =>
@@ -62,12 +135,12 @@ const isActive = (item: NavItem, pathname: string) =>
 
 /** Main sections, shown inline from tablet width up. */
 export function PrimaryNav() {
-  const { data: viewer } = useViewer()
   const pathname = usePathname()
+  const items = useSections()
 
   return (
     <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
-      {sections(viewer).map((item) => {
+      {items.map((item) => {
         const active = isActive(item, pathname)
         return (
           <Link
@@ -75,7 +148,7 @@ export function PrimaryNav() {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "rounded-sm px-2.5 py-1.5 text-nav text-body hover:bg-muted hover:text-ink",
+              "rounded-sm px-2.5 py-1.5 text-nav whitespace-nowrap text-body hover:bg-muted hover:text-ink",
               active && "bg-muted text-ink"
             )}
           >
@@ -91,6 +164,9 @@ export function PrimaryNav() {
 export function MobileNav() {
   const { data: viewer } = useViewer()
   const pathname = usePathname()
+  const items = useSections()
+  const teacher = canTeach(viewer)
+  const mode = useMode(teacher)
 
   return (
     <div className="md:hidden">
@@ -101,7 +177,7 @@ export function MobileNav() {
           <ListIcon />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          {sections(viewer).map((item) => (
+          {items.map((item) => (
             <DropdownMenuItem
               key={item.href}
               render={<Link href={item.href} />}
@@ -111,6 +187,28 @@ export function MobileNav() {
               {item.label}
             </DropdownMenuItem>
           ))}
+          {teacher && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-nav"
+                onClick={() => writeMode(mode === "teach" ? "learn" : "teach")}
+                render={
+                  <Link
+                    href={
+                      mode === "teach"
+                        ? "/problems"
+                        : viewer?.user?.teaches
+                          ? "/teach"
+                          : "/admin"
+                    }
+                  />
+                }
+              >
+                Switch to {mode === "teach" ? "Learn" : "Teach"}
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

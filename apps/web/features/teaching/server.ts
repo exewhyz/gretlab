@@ -1,6 +1,7 @@
 import {
   assignmentProblems,
   assignments,
+  attendance,
   contests,
   getDb,
   groupMembers,
@@ -35,7 +36,7 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 
-const { and, desc, eq, gte, inArray } = sql
+const { and, desc, eq, gte, inArray, lte } = sql
 
 const NOBODY = "00000000-0000-0000-0000-000000000000"
 
@@ -61,6 +62,11 @@ export const sessionSchema = z.object({
   minutes: z.number().int().min(5, "At least 5 minutes").max(600),
   topicIds: z.array(z.string().max(40)).max(50).default([]),
   note: z.string().max(2000).default(""),
+  /** Who was there; leave empty to not take attendance. */
+  attendance: z
+    .array(z.object({ userId: z.uuid(), present: z.boolean() }))
+    .max(5000)
+    .default([]),
 })
 
 /** Groups a permission reaches, as tree-ordered ids. */
@@ -192,11 +198,47 @@ export async function logSession(
       "A topic isn't in this group's syllabus."
     )
   }
-  const [session] = await getDb()
-    .insert(teachingSessions)
-    .values({ ...input, orgId: ctx.org.id, teacherId: user.id })
-    .returning()
-  return session
+  const { attendance: marks, ...fields } = input
+  const db = getDb()
+  if (marks.length) {
+    // Only people sitting in the class (or a group inside it) can be marked.
+    const inside = ctx.groups
+      .filter((g) => groupChain(ctx, g.id).includes(input.groupId))
+      .map((g) => g.id)
+    const members = await db
+      .select({ userId: groupMembers.userId })
+      .from(groupMembers)
+      .where(
+        and(
+          inArray(groupMembers.groupId, inside),
+          inArray(
+            groupMembers.userId,
+            marks.map((m) => m.userId)
+          )
+        )
+      )
+    const known = new Set(members.map((m) => m.userId))
+    if (marks.some((m) => !known.has(m.userId))) {
+      throw new ApiError(
+        400,
+        "not_in_class",
+        "Attendance can only be marked for people in this class."
+      )
+    }
+  }
+  return db.transaction(async (tx) => {
+    const [session] = await tx
+      .insert(teachingSessions)
+      .values({ ...fields, orgId: ctx.org.id, teacherId: user.id })
+      .returning()
+    if (marks.length) {
+      await tx
+        .insert(attendance)
+        .values(marks.map((m) => ({ ...m, sessionId: session!.id })))
+        .onConflictDoNothing()
+    }
+    return session
+  })
 }
 
 export async function deleteSession(slug: string, user: User, id: string) {
@@ -287,6 +329,8 @@ export async function teacherHome(user: User) {
         return {
           id: g.id,
           name: g.name,
+          parentId: g.parentId,
+          level: ctx.org.groupLevels[groupChain(ctx, g.id).length - 1] ?? null,
           path: groupChain(ctx, g.id)
             .reverse()
             .map((id) => ctx.groups.find((x) => x.id === id)!.name)
@@ -302,10 +346,36 @@ export async function teacherHome(user: User) {
         }
       })
       .sort((a, b) => a.path.localeCompare(b.path))
+    // Published work this person runs, due in the coming week.
+    const now = new Date()
+    const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const dueSoon = (
+      await db
+        .select({
+          id: assignments.id,
+          slug: assignments.slug,
+          title: assignments.title,
+          dueAt: assignments.dueAt,
+          audience: assignments.audience,
+        })
+        .from(assignments)
+        .where(
+          and(
+            eq(assignments.orgId, ctx.org.id),
+            eq(assignments.published, true),
+            gte(assignments.dueAt, now),
+            lte(assignments.dueAt, weekAhead)
+          )
+        )
+    )
+      .filter((a) => canFor(ctx, "assignments.manage", a.audience))
+      .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
+      .map(({ audience: _, ...a }) => a)
     result.push({
       slug,
       name: ctx.org.name,
       type: ctx.org.type,
+      dueSoon,
       groups,
       myClassesThisWeek: sessions.filter(
         (s) => s.teacherId === user.id && s.day >= weekAgo

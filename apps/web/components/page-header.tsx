@@ -7,8 +7,10 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import {
   AccountMenu,
   MobileNav,
+  ModeToggle,
   PrimaryNav,
 } from "@/features/account/account-menu"
+import { ScopeSwitcher } from "@/features/account/scope-switcher"
 import { useViewer } from "@/features/account/use-viewer"
 import { Brand } from "@/features/lab/components/brand"
 
@@ -23,6 +25,8 @@ export function PageHeader({ children }: { children?: ReactNode }) {
       <Link href="/" className="mr-2 flex-none">
         <Brand title={viewer?.siteTitle ?? DEFAULT_TITLE} />
       </Link>
+      <ScopeSwitcher />
+      <ModeToggle />
       <PrimaryNav />
       {children}
       <span className="flex-1" />

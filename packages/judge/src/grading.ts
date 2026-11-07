@@ -64,3 +64,28 @@ export function gradeProblem(
   if (usedLate) return { earned, status: "late" }
   return { earned, status: onTime === 1 ? "solved" : "partial" }
 }
+
+/** One thing a teacher marks by hand on an assignment problem. */
+export interface RubricCriterion {
+  id: string
+  label: string
+  points: number
+}
+
+/** Hand marks for one problem: each criterion's mark, kept between 0 and its points. */
+export function rubricEarned(
+  rubric: readonly RubricCriterion[],
+  marks: Readonly<Record<string, number>> | undefined
+): number | null {
+  if (!marks || rubric.length === 0) return null
+  const given = rubric.filter((c) => typeof marks[c.id] === "number")
+  if (given.length === 0) return null
+  const sum = given.reduce(
+    (total, c) => total + Math.min(c.points, Math.max(0, marks[c.id]!)),
+    0
+  )
+  return Math.round(sum * 100) / 100
+}
+
+export const rubricTotal = (rubric: readonly RubricCriterion[]) =>
+  rubric.reduce((total, c) => total + c.points, 0)

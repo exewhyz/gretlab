@@ -211,6 +211,25 @@ if (phase === "all" || phase === "api") {
     if (r.verdict !== "AC") bad.push(`${slug}:${r.verdict}`)
   }
   check(`all ${seedQs.length} reference solutions AC in the sandbox`, bad.length === 0, bad.join(" "))
+  // And every other language's reference solution, with the same tests.
+  const ENTRY = { javascript: "main.js", c: "main.c", cpp: "main.cpp", java: "Main.java" }
+  const others = []
+  for (const q of seedQs) {
+    for (const [language, parts] of Object.entries(q.code ?? {})) {
+      if (language === "python" || !parts.solution) continue
+      const entry = ENTRY[language]
+      const r = await teach("/submissions", { body: { kind: "submit", language, entry, files: [{ path: entry, content: parts.solution }], problemSlug: q.id } })
+      others.push([`${q.id}/${language}`, r.json?.id, r.status])
+      while ((await teach("/submissions")).json.filter((s) => s.status !== "done").length >= 40) await new Promise((res) => setTimeout(res, 300))
+    }
+  }
+  const badOthers = []
+  for (const [name, id, status] of others) {
+    if (status !== 200) { badOthers.push(`${name}:${status}`); continue }
+    const r = await settle(teach, id)
+    if (r.verdict !== "AC") badOthers.push(`${name}:${r.verdict}`)
+  }
+  check(`all ${others.length} JavaScript, C, C++ and Java reference solutions AC in the sandbox`, others.length >= 60 && badOthers.length === 0, badOthers.join(" "))
   console.log(`      took ${Math.round((Date.now() - started) / 1000)}s`)
   check("no sandboxes left behind", execFileSync("docker", ["exec", "gretlab-gvisor-rig", "docker", "ps", "-aq", "--filter", "label=gretlab.sandbox=1"]).toString().trim() === "")
 }
@@ -406,8 +425,8 @@ if (phase === "all" || phase === "ui") {
 
   // Solution fetched only when asked
   await s.goto(BASE + "/problems/p1")
-  await s.getByRole("button", { name: "Show editorial and solution" }).click()
-  await s.getByRole("button", { name: "Show editorial" }).click()
+  await s.getByRole("tab", { name: "Editorial" }).click()
+  await s.getByRole("button", { name: "Show the editorial" }).click()
   await s.getByText("principal = float").waitFor({ timeout: 10000 })
   check("solution loads on request", true)
 
@@ -476,17 +495,38 @@ if (phase === "all" || phase === "ui") {
   await d.getByLabel("Title").waitFor()
   await d.getByLabel("Title").fill("UI Made Problem")
   await d.getByLabel("Address").fill("ui-made")
-  await d.getByLabel("Problem statement").fill("Double the `number`.\n\n| A | B |\n| 1 | 2 |")
-  await d.getByLabel("Reference solution").fill("print(int(input())*2)")
+  await d.getByLabel("Problem statement", { exact: true }).fill("Double the `number`.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |")
+  await d.getByTestId("markdown-preview").locator("table").waitFor({ timeout: 10000 })
+  await d.getByLabel("Input format").fill("Line 1: a number `n`")
+  // Images in markdown: uploaded from the editor, stored by the server, shown in the preview.
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64")
+  await d.getByLabel("Upload an image to Problem statement").setInputFiles({ name: "diagram.png", mimeType: "image/png", buffer: png })
+  await d.getByTestId("markdown-preview").locator('img[alt="diagram"]').waitFor({ timeout: 15000 })
+  const imageUrl = await d.getByTestId("markdown-preview").locator('img[alt="diagram"]').getAttribute("src")
+  check("an image uploads from the editor into the markdown", /^\/api\/v1\/uploads\/[0-9a-f-]{36}$/.test(imageUrl) && (await d.getByLabel("Problem statement", { exact: true }).inputValue()).includes(`![diagram](${imageUrl})`), imageUrl)
+  const served = await d.request.get(BASE + imageUrl)
+  check("and is served as an image that can't be read as anything else", served.status() === 200 && served.headers()["content-type"] === "image/png" && served.headers()["x-content-type-options"] === "nosniff")
+  const svg = await d.request.post(BASE + "/api/v1/uploads", { multipart: { file: { name: "x.svg", mimeType: "image/svg+xml", buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>') } } })
+  check("SVG and other files that aren't plain images are refused", svg.status() === 415)
+  const fromStudent = await s.request.post(BASE + "/api/v1/uploads", { multipart: { file: { name: "a.png", mimeType: "image/png", buffer: png } } })
+  check("students can't upload", fromStudent.status() === 403)
+  check("the statement editor previews markdown as it's typed", await d.getByTestId("markdown-preview").locator("code", { hasText: "number" }).isVisible())
+  await d.getByLabel(/^Reference solution \(Python/).fill("n = int(input())\nprint(n * 2)")
+  await d.getByRole("button", { name: "Generate from the reference solution" }).first().click()
+  check("starter code is generated from the solution: input kept, logic left out", (await d.getByLabel(/^Starter code \(Python/).inputValue()) === "n = int(input())\n\n# Your code here\n", JSON.stringify(await d.getByLabel(/^Starter code \(Python/).inputValue()))
+  await d.getByRole("button", { name: "Generate from the reference solution" }).first().click()
+  await d.getByRole("alertdialog", { name: /Replace the Python/ }).waitFor({ timeout: 10000 })
+  check("and asks before replacing starter code that's there", true)
+  await d.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click()
   await d.getByLabel("Test 1 input").fill("4")
-  await d.getByRole("button", { name: "Fill expected outputs from Python solution" }).click()
+  await d.getByRole("button", { name: "Fill expected outputs from the Python solution" }).click()
   await d.getByText("Expected outputs filled").waitFor({ timeout: 90000 })
   check("fill outputs from solution", (await d.getByLabel("Test 1 expected output").inputValue()) === "8")
   await d.getByText("Published in practice").click()
   await d.getByRole("button", { name: "Save", exact: true }).click()
   await d.waitForURL(/admin\/problems\/[0-9a-f-]{36}/, { timeout: 15000 })
   await d.getByLabel("Title").waitFor({ timeout: 15000 })
-  check("saved problem reopens with its data", (await d.getByLabel("Title").inputValue()) === "UI Made Problem" && (await d.getByLabel("Test 1 expected output").inputValue()) === "8" && (await d.getByLabel("Problem statement").inputValue()).includes("| 1 | 2 |"))
+  check("saved problem reopens with its data", (await d.getByLabel("Title").inputValue()) === "UI Made Problem" && (await d.getByLabel("Test 1 expected output").inputValue()) === "8" && (await d.getByLabel("Problem statement", { exact: true }).inputValue()).includes("| 1 | 2 |") && (await d.getByLabel("Input format").inputValue()) === "Line 1: a number `n`")
   await d.getByLabel("Title").fill("UI Made Problem Edited")
   await d.getByRole("button", { name: "Save", exact: true }).click()
   await d.getByRole("status").filter({ hasText: "Saved." }).waitFor({ timeout: 15000 })

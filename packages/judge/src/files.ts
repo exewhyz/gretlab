@@ -59,3 +59,24 @@ export const sourceFilesSchema = z
       ctx.addIssue({ code: "custom", message: "Files are too large in total" })
     }
   })
+
+/** A problem's code for one language. Every part is optional. */
+export interface ProblemCode {
+  /**
+   * What a student's editor starts with, as ordinary code they can change: input reading,
+   * or an empty function and the lines that call it. The language's default when empty.
+   */
+  starter?: string
+  /** The reference solution, shown under the editorial's rules. */
+  solution?: string
+  /** Older problems kept code to follow the starter here; it's folded into `starter`. */
+  driver?: string
+}
+
+/** A starter with older driver code after it, as one piece of code. */
+export function joinStarter(parts: ProblemCode): string | undefined {
+  const starter = parts.starter?.replace(/\s*$/, "") ?? ""
+  const driver = parts.driver?.replace(/\s*$/, "") ?? ""
+  if (!driver) return parts.starter
+  return starter ? `${starter}\n\n\n${driver}\n` : `${driver}\n`
+}

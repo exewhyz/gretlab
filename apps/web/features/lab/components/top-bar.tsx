@@ -38,7 +38,7 @@ export function TopBar({
       <PageHeader>
         <div
           title="Problems solved"
-          className="ml-2 hidden items-center gap-2.5 text-caption text-body tabular-nums lg:flex"
+          className="ml-2 hidden items-center gap-2.5 text-caption whitespace-nowrap text-body tabular-nums min-[1500px]:flex"
         >
           <div
             aria-hidden
@@ -53,7 +53,7 @@ export function TopBar({
           </div>
           {solved} / {questions.length} solved
         </div>
-        <EngineStatusIndicator className="ml-2 hidden lg:flex" />
+        <EngineStatusIndicator className="ml-2 hidden whitespace-nowrap lg:flex" />
       </PageHeader>
       <div className="flex-none border-b border-hairline bg-canvas px-4 py-2 min-[901px]:hidden">
         <label htmlFor="question-picker" className="text-caption text-body">

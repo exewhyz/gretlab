@@ -2,10 +2,22 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
+import {
+  starterFromSolution,
+  statementToMarkdown,
+  type LanguageId,
+  type ProblemCode,
+} from "@workspace/judge"
 
 import {
   Field,
@@ -17,7 +29,7 @@ import {
 import { ConfirmButton } from "@/components/confirm"
 import { useViewer } from "@/features/account/use-viewer"
 import { usePythonEngine } from "@/features/lab/hooks/use-python-engine"
-import { statementToText, parseStatement } from "@/features/problems/statement"
+import { MarkdownEditor } from "@/components/markdown-editor"
 import { slugify, type ProblemInput } from "@/features/problems/schemas"
 import { api } from "@/lib/api/client"
 import { useOwner } from "@/features/admin/owner"
@@ -26,6 +38,10 @@ import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle } from "./shell"
 
 type TestDraft = ProblemInput["tests"][number] & { key: number }
+
+/** Where a new problem's statement starts. */
+const DESCRIPTION_TEMPLATE = `Describe the task: what the program reads, and what it prints.
+`
 
 const toLines = (text: string) =>
   text
@@ -38,11 +54,13 @@ const EMPTY: ProblemInput = {
   title: "",
   unitId: null,
   level: "easy",
+  description: DESCRIPTION_TEMPLATE,
   statement: [],
   inputFormat: [],
   outputFormat: [],
   constraints: [],
   solution: "",
+  code: {},
   editorial: "",
   hints: [],
   tags: [],
@@ -91,16 +109,17 @@ function ProblemEditor({
   const router = useRouter()
   const queryClient = useQueryClient()
   const { data: viewer } = useViewer()
-  const [form, setForm] = useState(initial)
-  const [slugTouched, setSlugTouched] = useState(false)
-  const [statement, setStatement] = useState(() =>
-    statementToText(initial.statement)
-  )
   const [inputFormat, setInputFormat] = useState(initial.inputFormat.join("\n"))
   const [outputFormat, setOutputFormat] = useState(
     initial.outputFormat.join("\n")
   )
   const [constraints, setConstraints] = useState(initial.constraints.join("\n"))
+  const [form, setForm] = useState(() => ({
+    ...initial,
+    // Problems from before markdown get theirs made from the old fields.
+    description: initial.description || statementToMarkdown(initial.statement),
+  }))
+  const [slugTouched, setSlugTouched] = useState(false)
   const [tagText, setTagText] = useState(initial.tags.join(", "))
   const [hintText, setHintText] = useState(initial.hints.join("\n\n"))
   const [nextKey, setNextKey] = useState(initial.tests.length)
@@ -131,9 +150,13 @@ function ProblemEditor({
       current.map((test) => (test.key === key ? { ...test, ...change } : test))
     )
 
+  const python = form.code.python ?? {}
   async function fillOutputs() {
-    if (!form.solution.trim()) {
-      setMessage({ text: "Write a reference solution first.", kind: "err" })
+    if (!python.solution?.trim()) {
+      setMessage({
+        text: "Write a Python reference solution first.",
+        kind: "err",
+      })
       return
     }
     setUseEngine(true)
@@ -141,7 +164,7 @@ function ProblemEditor({
     let errors = 0
     for (const test of tests) {
       const result = await engine.run(
-        [{ path: "main.py", content: form.solution }],
+        [{ path: "main.py", content: python.solution }],
         "main.py",
         test.input
       )
@@ -159,7 +182,11 @@ function ProblemEditor({
     mutationFn: () => {
       const body: ProblemInput = {
         ...form,
-        statement: parseStatement(statement),
+        // Everything is in `code` now; the old single field would bring back a deleted
+        // Python solution.
+        solution: "",
+        // The markdown statement replaces the older blocks.
+        statement: [],
         inputFormat: toLines(inputFormat),
         outputFormat: toLines(outputFormat),
         constraints: toLines(constraints),
@@ -288,50 +315,54 @@ function ProblemEditor({
           </div>
         )}
 
-        <Field
-          label="Problem statement"
-          help="Blank line between paragraphs. Wrap code in backticks. Tables: rows such as | Units | Rate |"
+        <EditorSection
+          title="Problem statement"
+          help="The task, in markdown. Input format, output format and constraints go in their own boxes below, and samples come from the test cases."
         >
-          <TextArea
-            rows={7}
-            value={statement}
-            onChange={(event) => setStatement(event.target.value)}
+          <MarkdownEditor
+            label="Problem statement"
+            value={form.description}
+            onChange={(text) => set("description", text)}
+            rows={12}
           />
-        </Field>
+        </EditorSection>
         <div className="grid gap-3 min-[901px]:grid-cols-3">
-          <Field label="Input format" help="One bullet per line">
+          <Field
+            label="Input format"
+            help="One bullet per line. `backticks` for code."
+          >
             <TextArea
-              rows={3}
+              rows={4}
+              placeholder={"Line 1: an integer `n`\nLine 2: `n` numbers"}
               value={inputFormat}
               onChange={(event) => setInputFormat(event.target.value)}
             />
           </Field>
-          <Field label="Output format" help="One bullet per line">
+          <Field label="Output format" help="One bullet per line.">
             <TextArea
-              rows={3}
+              rows={4}
+              placeholder="One line: the answer"
               value={outputFormat}
               onChange={(event) => setOutputFormat(event.target.value)}
             />
           </Field>
-          <Field label="Constraints" help="One bullet per line">
+          <Field label="Constraints" help="One bullet per line.">
             <TextArea
-              rows={3}
+              rows={4}
+              placeholder="1 ≤ `n` ≤ 100"
               value={constraints}
               onChange={(event) => setConstraints(event.target.value)}
             />
           </Field>
         </div>
-        <Field
-          label="Reference solution"
-          help="Students may reveal it, depending on Settings. Hidden during a contest that uses this problem."
-        >
-          <TextArea
-            mono
-            rows={8}
-            value={form.solution}
-            onChange={(event) => set("solution", event.target.value)}
-          />
-        </Field>
+        <LanguageCode
+          languages={(viewer?.languages ?? []).filter(
+            (l) =>
+              !form.allowedLanguages || form.allowedLanguages.includes(l.id)
+          )}
+          value={form.code}
+          onChange={(code) => set("code", code)}
+        />
         <Field
           label="Topic tags"
           help="Comma-separated, such as Loops, Strings. Students filter problems by these."
@@ -352,16 +383,17 @@ function ProblemEditor({
             onChange={(event) => setHintText(event.target.value)}
           />
         </Field>
-        <Field
-          label="Editorial"
-          help="How to approach it. Shown with the solution, under the same rules. Blank lines separate paragraphs; ``` fences code."
+        <EditorSection
+          title="Editorial"
+          help="How to approach it. Shown in the Editorial tab with the reference solutions, under the same rules."
         >
-          <TextArea
-            rows={6}
+          <MarkdownEditor
+            label="Editorial"
             value={form.editorial}
-            onChange={(event) => set("editorial", event.target.value)}
+            onChange={(text) => set("editorial", text)}
+            rows={10}
           />
-        </Field>
+        </EditorSection>
 
         <div className="grid gap-3 min-[901px]:grid-cols-3">
           <Field
@@ -520,7 +552,7 @@ function ProblemEditor({
               + Add test
             </Button>
             <Button variant="outline" size="sm" onClick={fillOutputs}>
-              Fill expected outputs from Python solution
+              Fill expected outputs from the Python solution
             </Button>
           </div>
         </div>
@@ -562,5 +594,170 @@ function ProblemEditor({
         </div>
       </Card>
     </>
+  )
+}
+
+/**
+ * Starter code and reference solution for each language the problem allows.
+ * All optional: with none, students start from the language's blank file and write a
+ * whole program.
+ */
+function LanguageCode({
+  languages,
+  value,
+  onChange,
+}: {
+  languages: { id: string; label: string; starter: string }[]
+  value: Record<string, ProblemCode>
+  onChange: (code: Record<string, ProblemCode>) => void
+}) {
+  const setPart = (id: string, part: keyof ProblemCode, text: string) =>
+    onChange({ ...value, [id]: { ...value[id], [part]: text } })
+  const filled = (id: string) =>
+    Object.values(value[id] ?? {}).some((text) => text?.trim())
+  if (languages.length === 0) return null
+  return (
+    <section className="grid gap-2" data-testid="language-code">
+      <div>
+        <h2 className="text-body-sm font-semibold text-ink">
+          Code for each language
+        </h2>
+        <p className="text-caption text-body">
+          All optional. Starter code is what students begin with, as normal code
+          they can change: the input reading, or an empty function and the lines
+          that call it. The reference solution is a complete program, shown with
+          the editorial under the same rules (hidden during a contest that uses
+          this problem).
+        </p>
+      </div>
+      <Tabs defaultValue={languages[0]!.id}>
+        <TabsList variant="line" className="max-w-full overflow-x-auto">
+          {languages.map((l) => (
+            <TabsTrigger key={l.id} value={l.id}>
+              {l.label}
+              {filled(l.id) && (
+                <span
+                  aria-label="has code"
+                  className="size-1.5 rounded-full bg-primary"
+                />
+              )}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {languages.map((l) => {
+          const code = value[l.id] ?? {}
+          return (
+            <TabsContent key={l.id} value={l.id} className="grid gap-3 pt-2">
+              <Field label={`Reference solution (${l.label})`}>
+                <TextArea
+                  mono
+                  rows={8}
+                  value={code.solution ?? ""}
+                  onChange={(e) => setPart(l.id, "solution", e.target.value)}
+                />
+              </Field>
+              <div className="grid gap-1.5">
+                <Field
+                  label={`Starter code (${l.label})`}
+                  help="Exactly what students begin with, as normal code they can change. Empty uses the language's blank file."
+                >
+                  <TextArea
+                    mono
+                    rows={6}
+                    placeholder={l.starter}
+                    value={code.starter ?? ""}
+                    onChange={(e) => setPart(l.id, "starter", e.target.value)}
+                  />
+                </Field>
+                <GenerateStarter
+                  label={l.label}
+                  hasStarter={Boolean(code.starter?.trim())}
+                  solution={code.solution ?? ""}
+                  onGenerate={() =>
+                    setPart(
+                      l.id,
+                      "starter",
+                      starterFromSolution(
+                        l.id as LanguageId,
+                        code.solution ?? ""
+                      )
+                    )
+                  }
+                />
+              </div>
+            </TabsContent>
+          )
+        })}
+      </Tabs>
+    </section>
+  )
+}
+
+/** A titled part of the form holding a larger editor (not a single labelled input). */
+function EditorSection({
+  title,
+  help,
+  children,
+}: {
+  title: string
+  help?: string
+  children: ReactNode
+}) {
+  return (
+    <section className="grid gap-1.5">
+      <h2 className="text-body-sm font-semibold text-ink">{title}</h2>
+      {help && <p className="-mt-1 text-caption text-body">{help}</p>}
+      {children}
+    </section>
+  )
+}
+
+/**
+ * Fills the starter code from the reference solution: its input reading stays, its logic
+ * becomes "Your code here". Asks before replacing starter code that's already there.
+ */
+function GenerateStarter({
+  label,
+  hasStarter,
+  solution,
+  onGenerate,
+}: {
+  label: string
+  hasStarter: boolean
+  solution: string
+  onGenerate: () => void
+}) {
+  const text = "Generate from the reference solution"
+  const disabled = !solution.trim()
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {hasStarter ? (
+        <ConfirmButton
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          title={`Replace the ${label} starter code?`}
+          description="It's made again from the reference solution: the input reading stays, the rest becomes a “Your code here” comment. Your current starter code is replaced."
+          confirmLabel="Replace"
+          onConfirm={onGenerate}
+        >
+          {text}
+        </ConfirmButton>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={onGenerate}
+        >
+          {text}
+        </Button>
+      )}
+      <span className="text-caption text-body">
+        {disabled
+          ? "Write the reference solution first."
+          : "Keeps how the input is read; the logic becomes “Your code here”. Review it before saving."}
+      </span>
+    </div>
   )
 }

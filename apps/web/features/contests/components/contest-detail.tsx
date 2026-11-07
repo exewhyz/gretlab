@@ -13,6 +13,7 @@ import { TabButton } from "@/features/lab/components/tab-button"
 import { useViewer } from "@/features/account/use-viewer"
 import { Card, Loading, Table } from "@/features/admin/components/shell"
 import { MySubmissions } from "@/features/submissions/components/my-submissions"
+import { ClassChips } from "@/features/classes/components/class-chips"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 
@@ -20,6 +21,7 @@ import { Countdown } from "./countdown"
 import { PhaseBadge } from "./contest-list"
 
 interface ContestView {
+  classes: { name: string; href: string }[]
   id: string
   title: string
   description: string
@@ -114,6 +116,7 @@ export function ContestDetail({ slug }: { slug: string }) {
                   published={contest.published}
                 />
               </div>
+              <ClassChips classes={contest.classes} className="mt-1.5" />
               <p className="mt-1 text-caption">
                 {formatDateTime(contest.startsAt)} to{" "}
                 {formatDateTime(contest.endsAt)} ·{" "}

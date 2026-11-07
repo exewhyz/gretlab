@@ -1,3 +1,4 @@
+import { isNetwork, LANGUAGES } from "@workspace/judge"
 import { z } from "zod"
 
 /** A readable address from a title: "Midterm 2026!" becomes "midterm-2026". */
@@ -22,11 +23,28 @@ export const problemInputSchema = z.object({
   title: z.string().trim().min(1, "Give the problem a title").max(200),
   unitId: z.uuid().nullable(),
   level: z.enum(["easy", "medium", "hard"]),
-  statement: z.array(z.union([z.string(), z.array(z.array(z.string()))])),
-  inputFormat: z.array(z.string()),
-  outputFormat: z.array(z.string()),
-  constraints: z.array(z.string()),
-  solution: z.string().max(100_000),
+  /** The statement in markdown. Older callers send `statement` blocks instead. */
+  description: z.string().max(200_000).default(""),
+  statement: z
+    .array(z.union([z.string(), z.array(z.array(z.string()))]))
+    .default([]),
+  /** One bullet each, shown under their own headings below the statement. */
+  inputFormat: z.array(z.string().max(2000)).max(100).default([]),
+  outputFormat: z.array(z.string().max(2000)).max(100).default([]),
+  constraints: z.array(z.string().max(2000)).max(100).default([]),
+  /** The Python reference solution; `code.python.solution` wins when both are given. */
+  solution: z.string().max(100_000).default(""),
+  /** Per language: starter code and reference solution. `driver` is folded into the starter. */
+  code: z
+    .record(
+      z.string().refine((id) => id in LANGUAGES, "Unknown language"),
+      z.object({
+        starter: z.string().max(100_000).optional(),
+        solution: z.string().max(100_000).optional(),
+        driver: z.string().max(100_000).optional(),
+      })
+    )
+    .default({}),
   membersOnly: z.boolean().default(false),
   editorial: z.string().max(100_000).default(""),
   hints: z.array(z.string().trim().min(1).max(2000)).max(10).default([]),
@@ -116,6 +134,29 @@ export const assignmentInputSchema = z
       .min(0, "Can't be negative")
       .max(100, "At most 100%"),
     published: z.boolean(),
+    /** Keep rubric marks and line comments from students until released. */
+    holdFeedback: z.boolean().default(false),
+    /** A lab exam: one sitting per student. Null for an ordinary assignment. */
+    exam: z
+      .object({
+        minutes: z
+          .number({ error: "Enter the minutes" })
+          .int()
+          .min(5, "At least 5 minutes")
+          .max(600, "At most 10 hours")
+          .nullable(),
+        fullscreen: z.boolean(),
+        networks: z
+          .array(
+            z
+              .string()
+              .trim()
+              .refine(isNetwork, "Use an address like 10.1.2.3 or a range like 10.1.0.0/16")
+          )
+          .max(50, "At most 50 networks"),
+      })
+      .nullable()
+      .default(null),
     problems: z
       .array(
         z.object({
@@ -125,6 +166,27 @@ export const assignmentInputSchema = z
             .int()
             .min(1, "At least 1 point")
             .max(1000, "At most 1000 points"),
+          /** Marked by hand, on top of the tests. */
+          rubric: z
+            .array(
+              z.object({
+                id: z.string().min(1).max(40),
+                label: z
+                  .string()
+                  .trim()
+                  .min(1, "Name each rubric criterion")
+                  .max(200),
+                points: z
+                  .number({ error: "Enter the criterion's points" })
+                  .int()
+                  .min(1, "A criterion is worth at least 1 point")
+                  .max(1000),
+              })
+            )
+            .max(20, "At most 20 criteria")
+            .default([]),
+          /** Course outcomes it assesses. */
+          outcomes: z.array(z.uuid()).max(20).default([]),
         })
       )
       .min(1, "Add at least one problem")
@@ -138,6 +200,10 @@ export const assignmentInputSchema = z
   .refine((a) => a.dueAt > a.opensAt, {
     message: "The due time must be after it opens",
     path: ["dueAt"],
+  })
+  .refine((a) => !(a.exam && a.allowLate), {
+    message: "An exam ends at its due time: turn off late submissions",
+    path: ["allowLate"],
   })
 
 export type AssignmentInput = z.infer<typeof assignmentInputSchema>

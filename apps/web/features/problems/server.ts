@@ -11,9 +11,16 @@ import {
   units,
   type Problem,
 } from "@workspace/db"
+import {
+  LANGUAGE_IDS,
+  joinStarter,
+  LANGUAGES,
+  statementToMarkdown,
+  type ProblemCode,
+} from "@workspace/judge"
 import { revalidatePath } from "next/cache"
 
-import { notFound } from "@/lib/api/route"
+import { ApiError, notFound } from "@/lib/api/route"
 import {
   getProblemTagNames,
   refreshCatalog,
@@ -36,6 +43,8 @@ export interface ProblemSummary {
 
 /** What any visitor may see. Hidden tests and the solution are deliberately absent. */
 export interface ProblemDetail extends ProblemSummary {
+  /** The statement in markdown; input and output format and constraints are separate. */
+  description: string
   statement: (string | string[][])[]
   input: string[]
   output: string[]
@@ -44,6 +53,8 @@ export interface ProblemDetail extends ProblemSummary {
   hiddenTestCount: number
   allowedLanguages: string[] | null
   hasSolution: boolean
+  /** Starter code by language, where the problem sets its own. */
+  starters: Record<string, string>
   /** The organization running this contest turned pasting off. */
   pasteBlocked?: boolean
   hints: string[]
@@ -84,6 +95,67 @@ export async function listPublicProblems(): Promise<ProblemSummary[]> {
   return (await numbered()).map((row) => row.summary)
 }
 
+/**
+ * The stored code and the Python solution column, kept in step. Older callers send only
+ * `solution`, which is Python; empty parts are dropped.
+ */
+function problemCode(
+  code: Record<string, ProblemCode>,
+  legacySolution: string
+): { code: Record<string, ProblemCode>; solution: string } {
+  // Older callers may send a separate driver; it becomes part of the starter.
+  const merged: Record<string, ProblemCode> = Object.fromEntries(
+    Object.entries(code).map(([id, parts]) => [
+      id,
+      { starter: joinStarter(parts), solution: parts.solution },
+    ])
+  )
+  if (legacySolution.trim() && !merged.python?.solution?.trim()) {
+    merged.python = { ...merged.python, solution: legacySolution }
+  }
+  const cleaned = Object.fromEntries(
+    Object.entries(merged)
+      .map(([id, parts]) => [
+        id,
+        Object.fromEntries(
+          Object.entries(parts).filter(
+            ([, text]) => typeof text === "string" && text.trim()
+          )
+        ) as ProblemCode,
+      ])
+      .filter(([, parts]) => Object.keys(parts as ProblemCode).length > 0)
+  )
+  return { code: cleaned, solution: cleaned.python?.solution ?? "" }
+}
+
+/** Reference solutions by language, for the editorial: never part of public page data. */
+export function referenceSolutions(problem: Problem) {
+  // Rows from before per-language code have only the Python solution column.
+  const code =
+    problem.solution.trim() && !problem.code.python?.solution?.trim()
+      ? {
+          ...problem.code,
+          python: { ...problem.code.python, solution: problem.solution },
+        }
+      : problem.code
+  // In the order languages are offered: Python first.
+  return LANGUAGE_IDS.map((id) => [id, code[id]] as const)
+    .filter(([, parts]) => parts?.solution?.trim())
+    .map(([id, parts]) => ({
+      language: id,
+      label: LANGUAGES[id].label,
+      code: parts!.solution!,
+    }))
+}
+
+/** Each language's starter code, with any older driver code folded in. */
+const starters = (problem: Problem) =>
+  Object.fromEntries(
+    Object.entries(problem.code)
+      .map(([id, parts]) => [id, joinStarter(parts)] as const)
+      .filter(([, starter]) => starter?.trim())
+  ) as Record<string, string>
+
 export async function buildDetail(
   problem: Problem,
   summary: ProblemSummary
@@ -112,6 +184,7 @@ export async function buildDetail(
   ])
   return {
     ...summary,
+    description: problem.description || statementToMarkdown(problem.statement),
     statement: problem.statement,
     input: problem.inputFormat,
     output: problem.outputFormat,
@@ -121,7 +194,10 @@ export async function buildDetail(
       .map((test) => [test.input, test.expected]),
     hiddenTestCount: tests.filter((test) => !test.isSample).length,
     allowedLanguages: problem.allowedLanguages,
-    hasSolution: problem.solution.length > 0 || problem.editorial.length > 0,
+    hasSolution:
+      problem.editorial.length > 0 || referenceSolutions(problem).length > 0,
+    // Starter code is part of the problem, not its answer.
+    starters: starters(problem),
     hints: problem.hints,
     tags: tagRows,
     notes: problemNotes,
@@ -236,7 +312,19 @@ export async function saveProblem(
   input: ProblemInput,
   orgId: string | null
 ) {
-  const { tests, tags: tagNames, ...fields } = input
+  const { tests, tags: tagNames, ...given } = input
+  const fields = {
+    ...given,
+    ...problemCode(given.code, given.solution),
+    // Written as markdown, or made from the older statement blocks.
+    description:
+      given.description.trim() || statementToMarkdown(given.statement),
+    // The markdown replaces the blocks.
+    statement: [],
+  }
+  if (!fields.description.trim()) {
+    throw new ApiError(400, "no_description", "Describe the problem first.")
+  }
   // Units are the platform's course outline; organizations' problems stand alone.
   const values = { ...fields, orgId, unitId: orgId ? null : fields.unitId }
   const saved = await getDb().transaction(async (tx) => {

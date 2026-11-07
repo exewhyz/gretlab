@@ -8,6 +8,7 @@ import { useState } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { CommentedCode } from "@/features/feedback/components/commented-code"
 import { OutcomeBrowser } from "@/features/lab/components/test-results"
 import styles from "@/features/lab/components/workbench.module.scss"
 import { api } from "@/lib/api/client"
@@ -30,7 +31,6 @@ function CodeBlock({ submission }: { submission: Submission }) {
   const file =
     submission.files.find((item) => item.path === path) ?? submission.files[0]
   if (!file) return null
-  const lines = file.content.replace(/\n$/, "").split("\n")
   return (
     <div className="overflow-hidden rounded-md border border-hairline">
       {submission.files.length > 1 && (
@@ -50,19 +50,10 @@ function CodeBlock({ submission }: { submission: Submission }) {
           ))}
         </div>
       )}
-      <pre className="max-h-96 overflow-auto bg-canvas-soft p-3 font-mono text-code text-ink">
-        {lines.map((line, index) => (
-          <div key={index} className="flex">
-            <span
-              aria-hidden
-              className="w-8 flex-none pr-3 text-right text-muted-foreground select-none"
-            >
-              {index + 1}
-            </span>
-            <span className="whitespace-pre">{line || " "}</span>
-          </div>
-        ))}
-      </pre>
+      <CommentedCode
+        content={file.content}
+        comments={(submission.comments ?? []).filter((c) => c.path === file.path)}
+      />
     </div>
   )
 }

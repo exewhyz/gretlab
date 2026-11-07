@@ -85,6 +85,76 @@
       "when": 1793789417370,
       "tag": "0011_audience_conditions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793855529767,
+      "tag": "0012_class_notices_attendance",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793870547845,
+      "tag": "0013_problem_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793870970010,
+      "tag": "0014_problem_description",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793871848020,
+      "tag": "0015_separate_io_format",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793872119104,
+      "tag": "0016_uploads",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793875446354,
+      "tag": "0017_fold_driver_into_starter",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793941666498,
+      "tag": "0018_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793942455409,
+      "tag": "0019_feedback_and_rubrics",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793947013144,
+      "tag": "0020_lab_exams",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793952855566,
+      "tag": "0021_outcomes",
+      "breakpoints": true
     }
   ]
 }

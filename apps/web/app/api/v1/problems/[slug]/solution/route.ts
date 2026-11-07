@@ -2,10 +2,15 @@ import { getDb, sql, submissions } from "@workspace/db"
 
 import { ApiError, isStaff, notFound, route } from "@/lib/api/route"
 import { canEditProblem, canReachProblem } from "@/features/submissions/server"
-import { getProblemBySlug, isInLiveContest } from "@/features/problems/server"
+import {
+  getProblemBySlug,
+  isInLiveContest,
+  referenceSolutions,
+} from "@/features/problems/server"
 import { requireFeature } from "@/features/settings/server"
+import { guardExamSolutions } from "@/features/exams/server"
 
-/** The editorial and reference solution, once the student is allowed to see them. */
+/** The editorial and reference solutions, once the student is allowed to see them. */
 export const GET = route({ access: "user" }, async ({ user, params }) => {
   const problem = await getProblemBySlug(params.slug ?? "")
   // Its writers, and platform staff, see solutions without the student rules.
@@ -16,6 +21,7 @@ export const GET = route({ access: "user" }, async ({ user, params }) => {
   }
   if (!writer) {
     const settings = await requireFeature("practice.show_solutions")
+    await guardExamSolutions(user.id, problem.id)
     if (await isInLiveContest(problem.id)) {
       throw new ApiError(
         403,
@@ -45,5 +51,11 @@ export const GET = route({ access: "user" }, async ({ user, params }) => {
       }
     }
   }
-  return { editorial: problem.editorial, solution: problem.solution }
+  return {
+    editorial: problem.editorial,
+    /** One per language that has a reference solution. */
+    solutions: referenceSolutions(problem),
+    /** The Python one, for older clients. */
+    solution: problem.solution,
+  }
 })

@@ -25,6 +25,8 @@ interface ConfirmText {
   description?: ReactNode
   /** The red button: "Delete", "Remove", "Leave". */
   confirmLabel: string
+  /** Not destructive but can't be undone (releasing feedback): a normal button. */
+  tone?: "destructive" | "default"
 }
 
 /** The dialog alone, for actions started from a control that isn't a button. */
@@ -35,6 +37,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  tone = "destructive",
 }: ConfirmText & {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -52,7 +55,7 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <Button
-            variant="destructive"
+            variant={tone}
             onClick={() => {
               onOpenChange(false)
               onConfirm()
@@ -71,6 +74,7 @@ export function ConfirmButton({
   title,
   description,
   confirmLabel,
+  tone,
   onConfirm,
   children,
   ...button
@@ -96,6 +100,7 @@ export function ConfirmButton({
         title={title}
         description={description}
         confirmLabel={confirmLabel}
+        tone={tone}
       />
     </span>
   )

@@ -55,7 +55,34 @@
        "Simple Interest: 30.00\nTotal Amount: 1530.00"
       ]
      ],
-     "solution": "principal = float(input())\nrate = float(input())\ntime = float(input())\n\nsi = principal * rate * time / 100\nprint(f\"Simple Interest: {si:.2f}\")\nprint(f\"Total Amount: {principal + si:.2f}\")"
+     "solution": "principal = float(input())\nrate = float(input())\ntime = float(input())\n\nsi = principal * rate * time / 100\nprint(f\"Simple Interest: {si:.2f}\")\nprint(f\"Total Amount: {principal + si:.2f}\")",
+     "editorial": "Read the three values as decimals with `float()`, then apply the formula directly:\n\n```python\nsi = principal * rate * time / 100\ntotal = principal + si\n```\n\nPrint both with two decimal places using a format specification such as `f\"{si:.2f}\"`. Rounding only when printing keeps the calculation exact until the end.\n\n**Watch out for:** reading the numbers with `int()`; a rate such as `7.5` would then fail.",
+     "hints": [
+      "The formula is SI = P × R × T / 100. Which type should the values be read as?",
+      "Use `float(input())` for each line, since the rate and time can be decimals.",
+      "Print with `f\"{value:.2f}\"` to round to two decimal places."
+     ],
+     "code": {
+      "python": {
+       "starter": "principal = float(input())\nrate = float(input())\ntime = float(input())\n\n# Your code here: the simple interest, then the total amount.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [principal, rate, time] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const [principal, rate, time] = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number)\n\nconst si = (principal * rate * time) / 100\nconsole.log(`Simple Interest: ${si.toFixed(2)}`)\nconsole.log(`Total Amount: ${(principal + si).toFixed(2)}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    double principal, rate, time;\n    scanf(\"%lf %lf %lf\", &principal, &rate, &time);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    double principal, rate, time;\n    scanf(\"%lf %lf %lf\", &principal, &rate, &time);\n\n    double si = principal * rate * time / 100;\n    printf(\"Simple Interest: %.2f\\n\", si);\n    printf(\"Total Amount: %.2f\\n\", principal + si);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    double principal, rate, time;\n    std::cin >> principal >> rate >> time;\n\n    // Your code here\n}\n",
+       "solution": "#include <cstdio>\n#include <iostream>\n\nint main() {\n    double principal, rate, time;\n    std::cin >> principal >> rate >> time;\n\n    double si = principal * rate * time / 100;\n    std::printf(\"Simple Interest: %.2f\\n\", si);\n    std::printf(\"Total Amount: %.2f\\n\", principal + si);\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        double principal = in.nextDouble(), rate = in.nextDouble(), time = in.nextDouble();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        double principal = in.nextDouble(), rate = in.nextDouble(), time = in.nextDouble();\n\n        double si = principal * rate * time / 100;\n        System.out.printf(\"Simple Interest: %.2f%n\", si);\n        System.out.printf(\"Total Amount: %.2f%n\", principal + si);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p2",
@@ -108,7 +135,34 @@
        "Sum: -1007\nDifference: -993\nProduct: 7000\nDivision: 142.86\nFloor Division: 142\nModulus: -6"
       ]
      ],
-     "solution": "a = int(input())\nb = int(input())\n\nprint(\"Sum:\", a + b)\nprint(\"Difference:\", a - b)\nprint(\"Product:\", a * b)\nprint(f\"Division: {a / b:.2f}\")\nprint(\"Floor Division:\", a // b)\nprint(\"Modulus:\", a % b)"
+     "solution": "a = int(input())\nb = int(input())\n\nprint(\"Sum:\", a + b)\nprint(\"Difference:\", a - b)\nprint(\"Product:\", a * b)\nprint(f\"Division: {a / b:.2f}\")\nprint(\"Floor Division:\", a // b)\nprint(\"Modulus:\", a % b)",
+     "editorial": "Each line is one Python operator applied to `a` and `b`. The interesting ones are the last three:\n\n| Operator | Meaning | `-7` and `2` |\n| --- | --- | --- |\n| `/` | true division, always a float | `-3.5` |\n| `//` | floor division: rounds **down** | `-4` |\n| `%` | remainder with the sign of the divisor | `1` |\n\n`//` rounds toward negative infinity, not toward zero, and `%` always satisfies `a == b * (a // b) + a % b`. Print the division with `f\"{a / b:.2f}\"`.\n\n**In other languages:** C, C++, Java and JavaScript round integer division toward zero, so the reference solutions there adjust the quotient (Java has `Math.floorDiv` and `Math.floorMod`).",
+     "hints": [
+      "There is one Python operator for each line of output.",
+      "`/` always gives a float; round it when printing with `:.2f`.",
+      "Try `-7 // 2` and `-7 % 2` in Python: floor division rounds down, not toward zero."
+     ],
+     "code": {
+      "python": {
+       "starter": "a = int(input())\nb = int(input())\n\n# Your code here: print each result in the order shown.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [a, b] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const [a, b] = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number)\n\n// Python's // and % round toward negative infinity; JavaScript's / and % don't.\nconst floorDiv = Math.floor(a / b)\nconst mod = a - b * floorDiv\n\nconsole.log(`Sum: ${a + b}`)\nconsole.log(`Difference: ${a - b}`)\nconsole.log(`Product: ${a * b}`)\nconsole.log(`Division: ${(a / b).toFixed(2)}`)\nconsole.log(`Floor Division: ${floorDiv}`)\nconsole.log(`Modulus: ${mod}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int a, b;\n    scanf(\"%d %d\", &a, &b);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    int a, b;\n    scanf(\"%d %d\", &a, &b);\n\n    /* C's / and % round toward zero; Python's // and % round toward negative infinity. */\n    int q = a / b;\n    if (a % b != 0 && ((a < 0) != (b < 0))) q--;\n    int r = a - b * q;\n\n    printf(\"Sum: %d\\n\", a + b);\n    printf(\"Difference: %d\\n\", a - b);\n    printf(\"Product: %d\\n\", a * b);\n    printf(\"Division: %.2f\\n\", (double)a / b);\n    printf(\"Floor Division: %d\\n\", q);\n    printf(\"Modulus: %d\\n\", r);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    int a, b;\n    std::cin >> a >> b;\n\n    // Your code here\n}\n",
+       "solution": "#include <cstdio>\n#include <iostream>\n\nint main() {\n    int a, b;\n    std::cin >> a >> b;\n\n    // C++'s / and % round toward zero; Python's // and % round toward negative infinity.\n    int q = a / b;\n    if (a % b != 0 && ((a < 0) != (b < 0))) q--;\n    int r = a - b * q;\n\n    std::cout << \"Sum: \" << a + b << \"\\n\";\n    std::cout << \"Difference: \" << a - b << \"\\n\";\n    std::cout << \"Product: \" << a * b << \"\\n\";\n    std::printf(\"Division: %.2f\\n\", static_cast<double>(a) / b);\n    std::cout << \"Floor Division: \" << q << \"\\n\";\n    std::cout << \"Modulus: \" << r << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int a = in.nextInt(), b = in.nextInt();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int a = in.nextInt(), b = in.nextInt();\n\n        System.out.println(\"Sum: \" + (a + b));\n        System.out.println(\"Difference: \" + (a - b));\n        System.out.println(\"Product: \" + (a * b));\n        System.out.printf(\"Division: %.2f%n\", (double) a / b);\n        // Like Python's // and %: rounded toward negative infinity.\n        System.out.println(\"Floor Division: \" + Math.floorDiv(a, b));\n        System.out.println(\"Modulus: \" + Math.floorMod(a, b));\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p3",
@@ -159,7 +213,34 @@
        "115 days 17:46:40\nTotal minutes: 166666"
       ]
      ],
-     "solution": "seconds = int(input())\n\ndays = seconds // 86400\nremaining = seconds % 86400\nhours = remaining // 3600\nminutes = (remaining % 3600) // 60\nsecs = remaining % 60\n\nprint(f\"{days} days {hours:02d}:{minutes:02d}:{secs:02d}\")\nprint(\"Total minutes:\", seconds // 60)"
+     "solution": "seconds = int(input())\n\ndays = seconds // 86400\nremaining = seconds % 86400\nhours = remaining // 3600\nminutes = (remaining % 3600) // 60\nsecs = remaining % 60\n\nprint(f\"{days} days {hours:02d}:{minutes:02d}:{secs:02d}\")\nprint(\"Total minutes:\", seconds // 60)",
+     "editorial": "Split the seconds from the largest unit to the smallest, each time keeping what is left over:\n\n```python\ndays = seconds // 86400          # 24 * 60 * 60\nremaining = seconds % 86400\nhours = remaining // 3600\nminutes = (remaining % 3600) // 60\nsecs = remaining % 60\n```\n\nFormat each part of the clock with two digits using `f\"{hours:02d}\"`. The total minutes are simply `seconds // 60`.",
+     "hints": [
+      "How many seconds are in a day, an hour and a minute?",
+      "Use `//` to take whole units and `%` to keep what is left.",
+      "`f\"{n:02d}\"` pads a number to two digits, such as `05`."
+     ],
+     "code": {
+      "python": {
+       "starter": "seconds = int(input())\n\n# Your code here: split the seconds into days, hours, minutes and seconds.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [seconds] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const seconds = Number(require(\"fs\").readFileSync(0, \"utf8\").trim())\n\nconst days = Math.floor(seconds / 86400)\nconst remaining = seconds % 86400\nconst hours = Math.floor(remaining / 3600)\nconst minutes = Math.floor((remaining % 3600) / 60)\nconst secs = remaining % 60\nconst two = (n) => String(n).padStart(2, \"0\")\n\nconsole.log(`${days} days ${two(hours)}:${two(minutes)}:${two(secs)}`)\nconsole.log(`Total minutes: ${Math.floor(seconds / 60)}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    long seconds;\n    scanf(\"%ld\", &seconds);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    long seconds;\n    scanf(\"%ld\", &seconds);\n\n    long days = seconds / 86400;\n    long remaining = seconds % 86400;\n    long hours = remaining / 3600;\n    long minutes = (remaining % 3600) / 60;\n    long secs = remaining % 60;\n\n    printf(\"%ld days %02ld:%02ld:%02ld\\n\", days, hours, minutes, secs);\n    printf(\"Total minutes: %ld\\n\", seconds / 60);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    long long seconds;\n    std::cin >> seconds;\n\n    // Your code here\n}\n",
+       "solution": "#include <cstdio>\n#include <iostream>\n\nint main() {\n    long long seconds;\n    std::cin >> seconds;\n\n    long long days = seconds / 86400;\n    long long remaining = seconds % 86400;\n    long long hours = remaining / 3600;\n    long long minutes = (remaining % 3600) / 60;\n    long long secs = remaining % 60;\n\n    std::printf(\"%lld days %02lld:%02lld:%02lld\\n\", days, hours, minutes, secs);\n    std::cout << \"Total minutes: \" << seconds / 60 << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        long seconds = new Scanner(System.in).nextLong();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        long seconds = new Scanner(System.in).nextLong();\n\n        long days = seconds / 86400;\n        long remaining = seconds % 86400;\n        long hours = remaining / 3600;\n        long minutes = (remaining % 3600) / 60;\n        long secs = remaining % 60;\n\n        System.out.printf(\"%d days %02d:%02d:%02d%n\", days, hours, minutes, secs);\n        System.out.println(\"Total minutes: \" + seconds / 60);\n    }\n}\n"
+      }
+     }
     }
    ]
   },
@@ -214,7 +295,34 @@
        "Area: 168.00\nPerimeter: 62.00\nDiagonal: 25.00"
       ]
      ],
-     "solution": "length = float(input())\nwidth = float(input())\n\narea = length * width\nperimeter = 2 * (length + width)\ndiagonal = (length ** 2 + width ** 2) ** 0.5\n\nprint(f\"Area: {area:.2f}\")\nprint(f\"Perimeter: {perimeter:.2f}\")\nprint(f\"Diagonal: {diagonal:.2f}\")"
+     "solution": "length = float(input())\nwidth = float(input())\n\narea = length * width\nperimeter = 2 * (length + width)\ndiagonal = (length ** 2 + width ** 2) ** 0.5\n\nprint(f\"Area: {area:.2f}\")\nprint(f\"Perimeter: {perimeter:.2f}\")\nprint(f\"Diagonal: {diagonal:.2f}\")",
+     "editorial": "Read both sides as decimals and use the formulas:\n\n- area = length × width\n- perimeter = 2 × (length + width)\n- diagonal = (length² + width²) ** 0.5, from Pythagoras' theorem\n\nRaising to the power `0.5` is the same as taking the square root, without importing `math`. Print each value with `:.2f`.",
+     "hints": [
+      "The diagonal splits the rectangle into two right-angled triangles.",
+      "`x ** 0.5` is the square root of `x`.",
+      "Print every value with two decimal places: `f\"{area:.2f}\"`."
+     ],
+     "code": {
+      "python": {
+       "starter": "length = float(input())\nwidth = float(input())\n\n# Your code here: area, perimeter and diagonal.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [length, width] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const [length, width] = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number)\n\nconst area = length * width\nconst perimeter = 2 * (length + width)\nconst diagonal = (length ** 2 + width ** 2) ** 0.5\n\nconsole.log(`Area: ${area.toFixed(2)}`)\nconsole.log(`Perimeter: ${perimeter.toFixed(2)}`)\nconsole.log(`Diagonal: ${diagonal.toFixed(2)}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    double length, width;\n    scanf(\"%lf %lf\", &length, &width);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <math.h>\n#include <stdio.h>\n\nint main(void) {\n    double length, width;\n    scanf(\"%lf %lf\", &length, &width);\n\n    double area = length * width;\n    double perimeter = 2 * (length + width);\n    double diagonal = pow(length * length + width * width, 0.5);\n\n    printf(\"Area: %.2f\\n\", area);\n    printf(\"Perimeter: %.2f\\n\", perimeter);\n    printf(\"Diagonal: %.2f\\n\", diagonal);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    double length, width;\n    std::cin >> length >> width;\n\n    // Your code here\n}\n",
+       "solution": "#include <cmath>\n#include <cstdio>\n#include <iostream>\n\nint main() {\n    double length, width;\n    std::cin >> length >> width;\n\n    double area = length * width;\n    double perimeter = 2 * (length + width);\n    double diagonal = std::pow(length * length + width * width, 0.5);\n\n    std::printf(\"Area: %.2f\\n\", area);\n    std::printf(\"Perimeter: %.2f\\n\", perimeter);\n    std::printf(\"Diagonal: %.2f\\n\", diagonal);\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        double length = in.nextDouble(), width = in.nextDouble();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        double length = in.nextDouble(), width = in.nextDouble();\n\n        double area = length * width;\n        double perimeter = 2 * (length + width);\n        double diagonal = Math.pow(length * length + width * width, 0.5);\n\n        System.out.printf(\"Area: %.2f%n\", area);\n        System.out.printf(\"Perimeter: %.2f%n\", perimeter);\n        System.out.printf(\"Diagonal: %.2f%n\", diagonal);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p5",
@@ -264,7 +372,34 @@
        "Type: complex\nReal: 100.0\nImaginary: 200.0\nConjugate: (100-200j)\nMagnitude: 223.61"
       ]
      ],
-     "solution": "z = complex(input())\n\nprint(\"Type:\", type(z).__name__)\nprint(\"Real:\", z.real)\nprint(\"Imaginary:\", z.imag)\nprint(\"Conjugate:\", z.conjugate())\nprint(f\"Magnitude: {abs(z):.2f}\")"
+     "solution": "z = complex(input())\n\nprint(\"Type:\", type(z).__name__)\nprint(\"Real:\", z.real)\nprint(\"Imaginary:\", z.imag)\nprint(\"Conjugate:\", z.conjugate())\nprint(f\"Magnitude: {abs(z):.2f}\")",
+     "editorial": "`complex(input())` turns text such as `3+4j` into a complex number. Python complex numbers carry everything the output asks for:\n\n| Output | Expression |\n| --- | --- |\n| type name | `type(z).__name__` |\n| real part | `z.real` (a float) |\n| imaginary part | `z.imag` (a float) |\n| conjugate | `z.conjugate()` |\n| magnitude | `abs(z)`, rounded with `:.2f` |\n\nPrinting `z.conjugate()` directly gives Python's form with brackets, such as `(3-4j)`, which is what the output expects.",
+     "hints": [
+      "`complex(\"3+4j\")` builds a complex number from text.",
+      "Complex numbers have `.real`, `.imag` and `.conjugate()`.",
+      "The magnitude √(a² + b²) is `abs(z)`."
+     ],
+     "code": {
+      "python": {
+       "starter": "z = complex(input())\n\n# Your code here: type name, real and imaginary parts, conjugate, magnitude.\n"
+      },
+      "javascript": {
+       "starter": "const text = require(\"fs\").readFileSync(0, \"utf8\").trim()\n\n// \"a+bj\" or \"a-bj\": split at the sign before the imaginary part.\nconst at = Math.max(text.lastIndexOf(\"+\"), text.lastIndexOf(\"-\"))\nconst real = Number(text.slice(0, at))\nconst imag = Number(text.slice(at, -1))\n\n// Your code here\n",
+       "solution": "const text = require(\"fs\").readFileSync(0, \"utf8\").trim()\n\n// \"a+bj\" or \"a-bj\": split at the sign before the imaginary part.\nconst at = Math.max(text.lastIndexOf(\"+\"), text.lastIndexOf(\"-\"))\nconst real = Number(text.slice(0, at))\nconst imag = Number(text.slice(at, -1))\n\n// Python prints a float with \".0\" when it's whole; inside a complex number it doesn't.\nconst asFloat = (x) => (Number.isInteger(x) ? `${x}.0` : String(x))\nconst conjugateImag = -imag\n\nconsole.log(\"Type: complex\")\nconsole.log(`Real: ${asFloat(real)}`)\nconsole.log(`Imaginary: ${asFloat(imag)}`)\nconsole.log(`Conjugate: (${real}${conjugateImag < 0 ? \"-\" : \"+\"}${Math.abs(conjugateImag)}j)`)\nconsole.log(`Magnitude: ${Math.hypot(real, imag).toFixed(2)}`)\n"
+      },
+      "c": {
+       "starter": "#include <math.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n/*\n * The shortest text that reads back as the same number, like Python's repr: plain\n * digits from 0.0001 up to 10^16, an exponent outside that.\n */\nvoid shortest(double x, char *out) {\n    // Your code here\n}\n\nint main(void) {\n    char text[128];\n    if (scanf(\"%127s\", text) != 1) return 0;\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <math.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n/*\n * The shortest text that reads back as the same number, like Python's repr: plain\n * digits from 0.0001 up to 10^16, an exponent outside that.\n */\nvoid shortest(double x, char *out) {\n    for (int precision = 1; precision <= 17; precision++) {\n        snprintf(out, 64, \"%.*g\", precision, x);\n        if (strtod(out, NULL) != x) continue;\n        double size = fabs(x);\n        if (strchr(out, 'e') && size >= 1e-4 && size < 1e16) {\n            int exponent = (int)floor(log10(size));\n            int decimals = precision - 1 - exponent;\n            snprintf(out, 64, \"%.*f\", decimals > 0 ? decimals : 0, x);\n        }\n        return;\n    }\n}\n\nint main(void) {\n    char text[128];\n    if (scanf(\"%127s\", text) != 1) return 0;\n\n    /* \"a+bj\" or \"a-bj\": split at the sign before the imaginary part. */\n    int at = 0;\n    for (int i = 1; text[i]; i++) {\n        if ((text[i] == '+' || text[i] == '-') && text[i - 1] != 'e') at = i;\n    }\n    double real = strtod(text, NULL);\n    double imag = strtod(text + at, NULL);\n\n    char r[64], im[64], conj[64];\n    shortest(real, r);\n    shortest(imag, im);\n    shortest(fabs(imag), conj);\n\n    printf(\"Type: complex\\n\");\n    /* Python prints a whole float with \".0\"; inside a complex number it doesn't. */\n    printf(\"Real: %s%s\\n\", r, strpbrk(r, \".e\") ? \"\" : \".0\");\n    printf(\"Imaginary: %s%s\\n\", im, strpbrk(im, \".e\") ? \"\" : \".0\");\n    printf(\"Conjugate: (%s%c%sj)\\n\", r, -imag < 0 ? '-' : '+', conj);\n    printf(\"Magnitude: %.2f\\n\", hypot(real, imag));\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <cmath>\n#include <cstdio>\n#include <cstdlib>\n#include <iostream>\n#include <string>\n\n// The shortest text that reads back as the same number, like Python's repr: plain\n// digits from 0.0001 up to 10^16, an exponent outside that.\nstd::string shortest(double x) {\n    // Your code here\n}\n\n// Python prints a whole float with \".0\"; inside a complex number it doesn't.\nstd::string as_float(double x) {\n    // Your code here\n}\n\nint main() {\n    std::string text;\n    std::cin >> text;\n\n    // Your code here\n}\n",
+       "solution": "#include <cmath>\n#include <cstdio>\n#include <cstdlib>\n#include <iostream>\n#include <string>\n\n// The shortest text that reads back as the same number, like Python's repr: plain\n// digits from 0.0001 up to 10^16, an exponent outside that.\nstd::string shortest(double x) {\n    char out[64];\n    for (int precision = 1; precision <= 17; precision++) {\n        std::snprintf(out, sizeof out, \"%.*g\", precision, x);\n        if (std::strtod(out, nullptr) != x) continue;\n        double size = std::fabs(x);\n        if (std::string(out).find('e') != std::string::npos && size >= 1e-4 && size < 1e16) {\n            int exponent = static_cast<int>(std::floor(std::log10(size)));\n            int decimals = precision - 1 - exponent;\n            std::snprintf(out, sizeof out, \"%.*f\", decimals > 0 ? decimals : 0, x);\n        }\n        break;\n    }\n    return out;\n}\n\n// Python prints a whole float with \".0\"; inside a complex number it doesn't.\nstd::string as_float(double x) {\n    std::string s = shortest(x);\n    return s.find_first_of(\".e\") == std::string::npos ? s + \".0\" : s;\n}\n\nint main() {\n    std::string text;\n    std::cin >> text;\n\n    // \"a+bj\" or \"a-bj\": split at the sign before the imaginary part.\n    std::size_t at = 0;\n    for (std::size_t i = 1; i < text.size(); i++) {\n        if ((text[i] == '+' || text[i] == '-') && text[i - 1] != 'e') at = i;\n    }\n    double real = std::stod(text.substr(0, at));\n    double imag = std::stod(text.substr(at, text.size() - at - 1));\n\n    std::cout << \"Type: complex\\n\";\n    std::cout << \"Real: \" << as_float(real) << \"\\n\";\n    std::cout << \"Imaginary: \" << as_float(imag) << \"\\n\";\n    std::cout << \"Conjugate: (\" << shortest(real) << (-imag < 0 ? '-' : '+') << shortest(std::fabs(imag)) << \"j)\\n\";\n    std::printf(\"Magnitude: %.2f\\n\", std::hypot(real, imag));\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    // Java prints a double like Python's repr (3.0, -2.5); inside a complex number\n    // Python drops a whole number's \".0\".\n    static String inComplex(double x) {\n        // Your code here\n        return null;\n    }\n\n    public static void main(String[] args) {\n        String text = new Scanner(System.in).next();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    // Java prints a double like Python's repr (3.0, -2.5); inside a complex number\n    // Python drops a whole number's \".0\".\n    static String inComplex(double x) {\n        String s = Double.toString(x);\n        return s.endsWith(\".0\") ? s.substring(0, s.length() - 2) : s;\n    }\n\n    public static void main(String[] args) {\n        String text = new Scanner(System.in).next();\n\n        // \"a+bj\" or \"a-bj\": split at the sign before the imaginary part.\n        int at = 0;\n        for (int i = 1; i < text.length(); i++) {\n            char ch = text.charAt(i);\n            if ((ch == '+' || ch == '-') && text.charAt(i - 1) != 'e') at = i;\n        }\n        double real = Double.parseDouble(text.substring(0, at));\n        double imag = Double.parseDouble(text.substring(at, text.length() - 1));\n\n        System.out.println(\"Type: complex\");\n        System.out.println(\"Real: \" + real);\n        System.out.println(\"Imaginary: \" + imag);\n        System.out.println(\"Conjugate: (\" + inComplex(real) + (-imag < 0 ? \"-\" : \"+\") + inComplex(Math.abs(imag)) + \"j)\");\n        System.out.printf(\"Magnitude: %.2f%n\", Math.hypot(real, imag));\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p6",
@@ -337,7 +472,34 @@
        "Nature: Real and distinct\nRoot 1: 7.00\nRoot 2: 0.00"
       ]
      ],
-     "solution": "import math\nimport cmath\n\na = int(input())\nb = int(input())\nc = int(input())\n\nd = b * b - 4 * a * c\n\nif d > 0:\n    print(\"Nature: Real and distinct\")\nelif d == 0:\n    print(\"Nature: Real and equal\")\nelse:\n    print(\"Nature: Complex\")\n\nif d >= 0:\n    r1 = (-b + math.sqrt(d)) / (2 * a)\n    r2 = (-b - math.sqrt(d)) / (2 * a)\n    print(f\"Root 1: {r1:.2f}\")\n    print(f\"Root 2: {r2:.2f}\")\nelse:\n    r1 = (-b + cmath.sqrt(d)) / (2 * a)\n    r2 = (-b - cmath.sqrt(d)) / (2 * a)\n    print(f\"Root 1: {r1.real:.2f}{r1.imag:+.2f}j\")\n    print(f\"Root 2: {r2.real:.2f}{r2.imag:+.2f}j\")"
+     "solution": "import math\nimport cmath\n\na = int(input())\nb = int(input())\nc = int(input())\n\nd = b * b - 4 * a * c\n\nif d > 0:\n    print(\"Nature: Real and distinct\")\nelif d == 0:\n    print(\"Nature: Real and equal\")\nelse:\n    print(\"Nature: Complex\")\n\nif d >= 0:\n    r1 = (-b + math.sqrt(d)) / (2 * a)\n    r2 = (-b - math.sqrt(d)) / (2 * a)\n    print(f\"Root 1: {r1:.2f}\")\n    print(f\"Root 2: {r2:.2f}\")\nelse:\n    r1 = (-b + cmath.sqrt(d)) / (2 * a)\n    r2 = (-b - cmath.sqrt(d)) / (2 * a)\n    print(f\"Root 1: {r1.real:.2f}{r1.imag:+.2f}j\")\n    print(f\"Root 2: {r2.real:.2f}{r2.imag:+.2f}j\")",
+     "editorial": "Compute the discriminant `d = b*b - 4*a*c` first: its sign tells you the nature of the roots.\n\n- **d ≥ 0:** the roots are real. Use `math.sqrt(d)` and print each root with `:.2f`.\n- **d < 0:** the roots are complex. `cmath.sqrt(d)` returns an imaginary number, so `(-b + cmath.sqrt(d)) / (2 * a)` is complex.\n\nTo print a complex root in the required form, format the parts separately; `+` in the format makes the sign of the imaginary part always appear:\n\n```python\nprint(f\"Root 1: {r1.real:.2f}{r1.imag:+.2f}j\")\n```",
+     "hints": [
+      "Find d = b² − 4ac first; the three cases depend only on its sign.",
+      "`math.sqrt` fails for negative numbers; `cmath.sqrt` returns a complex result.",
+      "`f\"{x:+.2f}\"` always prints a sign, which gives forms like `-1.00+2.00j`."
+     ],
+     "code": {
+      "python": {
+       "starter": "import math\nimport cmath\n\na = int(input())\nb = int(input())\nc = int(input())\n\n# Your code here: the discriminant, the nature of the roots, then the roots.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [a, b, c] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const [a, b, c] = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number)\n\nconst d = b * b - 4 * a * c\nif (d > 0) console.log(\"Nature: Real and distinct\")\nelse if (d === 0) console.log(\"Nature: Real and equal\")\nelse console.log(\"Nature: Complex\")\n\nif (d >= 0) {\n  console.log(`Root 1: ${((-b + Math.sqrt(d)) / (2 * a)).toFixed(2)}`)\n  console.log(`Root 2: ${((-b - Math.sqrt(d)) / (2 * a)).toFixed(2)}`)\n} else {\n  // Complex roots: real part -b/2a, imaginary part ±√(-d)/2a.\n  const real = (-b / (2 * a)).toFixed(2)\n  const imag = Math.sqrt(-d) / (2 * a)\n  console.log(`Root 1: ${real}+${imag.toFixed(2)}j`)\n  console.log(`Root 2: ${real}-${imag.toFixed(2)}j`)\n}\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int a, b, c;\n    scanf(\"%d %d %d\", &a, &b, &c);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <math.h>\n#include <stdio.h>\n\nint main(void) {\n    int a, b, c;\n    scanf(\"%d %d %d\", &a, &b, &c);\n\n    int d = b * b - 4 * a * c;\n    if (d > 0) printf(\"Nature: Real and distinct\\n\");\n    else if (d == 0) printf(\"Nature: Real and equal\\n\");\n    else printf(\"Nature: Complex\\n\");\n\n    if (d >= 0) {\n        printf(\"Root 1: %.2f\\n\", (-b + sqrt(d)) / (2.0 * a));\n        printf(\"Root 2: %.2f\\n\", (-b - sqrt(d)) / (2.0 * a));\n    } else {\n        /* Complex roots: real part -b/2a, imaginary part ±√(-d)/2a. */\n        double real = -b / (2.0 * a);\n        double imag = sqrt(-d) / (2.0 * a);\n        printf(\"Root 1: %.2f%+.2fj\\n\", real, imag);\n        printf(\"Root 2: %.2f%+.2fj\\n\", real, -imag);\n    }\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    int a, b, c;\n    std::cin >> a >> b >> c;\n\n    // Your code here\n}\n",
+       "solution": "#include <cmath>\n#include <cstdio>\n#include <iostream>\n\nint main() {\n    int a, b, c;\n    std::cin >> a >> b >> c;\n\n    int d = b * b - 4 * a * c;\n    if (d > 0) std::cout << \"Nature: Real and distinct\\n\";\n    else if (d == 0) std::cout << \"Nature: Real and equal\\n\";\n    else std::cout << \"Nature: Complex\\n\";\n\n    if (d >= 0) {\n        std::printf(\"Root 1: %.2f\\n\", (-b + std::sqrt(d)) / (2.0 * a));\n        std::printf(\"Root 2: %.2f\\n\", (-b - std::sqrt(d)) / (2.0 * a));\n    } else {\n        // Complex roots: real part -b/2a, imaginary part ±√(-d)/2a.\n        double real = -b / (2.0 * a);\n        double imag = std::sqrt(-d) / (2.0 * a);\n        std::printf(\"Root 1: %.2f%+.2fj\\n\", real, imag);\n        std::printf(\"Root 2: %.2f%+.2fj\\n\", real, -imag);\n    }\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int a = in.nextInt(), b = in.nextInt(), c = in.nextInt();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int a = in.nextInt(), b = in.nextInt(), c = in.nextInt();\n\n        int d = b * b - 4 * a * c;\n        if (d > 0) System.out.println(\"Nature: Real and distinct\");\n        else if (d == 0) System.out.println(\"Nature: Real and equal\");\n        else System.out.println(\"Nature: Complex\");\n\n        if (d >= 0) {\n            System.out.printf(\"Root 1: %.2f%n\", (-b + Math.sqrt(d)) / (2.0 * a));\n            System.out.printf(\"Root 2: %.2f%n\", (-b - Math.sqrt(d)) / (2.0 * a));\n        } else {\n            // Complex roots: real part -b/2a, imaginary part ±√(-d)/2a.\n            double real = -b / (2.0 * a);\n            double imag = Math.sqrt(-d) / (2.0 * a);\n            System.out.printf(\"Root 1: %.2f%+.2fj%n\", real, imag);\n            System.out.printf(\"Root 2: %.2f%+.2fj%n\", real, -imag);\n        }\n    }\n}\n"
+      }
+     }
     }
    ]
   },
@@ -390,7 +552,34 @@
        "Cleaned: ab\nNot a palindrome"
       ]
      ],
-     "solution": "text = input()\n\ncleaned = \"\"\nfor ch in text:\n    if ch.isalnum():\n        cleaned += ch.lower()\n\nprint(\"Cleaned:\", cleaned)\nif cleaned == cleaned[::-1]:\n    print(\"Palindrome\")\nelse:\n    print(\"Not a palindrome\")"
+     "solution": "text = input()\n\ncleaned = \"\"\nfor ch in text:\n    if ch.isalnum():\n        cleaned += ch.lower()\n\nprint(\"Cleaned:\", cleaned)\nif cleaned == cleaned[::-1]:\n    print(\"Palindrome\")\nelse:\n    print(\"Not a palindrome\")",
+     "editorial": "Build the cleaned text one character at a time: keep a character only if `ch.isalnum()` is true, and add it in lowercase.\n\nA string is a palindrome when it equals its reverse, and slicing with a step of `-1` reverses it:\n\n```python\nif cleaned == cleaned[::-1]:\n```\n\nCleaning first is what makes `\"A man, a plan, a canal: Panama\"` count as a palindrome.",
+     "hints": [
+      "First remove everything that isn't a letter or digit, and lowercase the rest.",
+      "`str.isalnum()` tells you whether a character is a letter or digit.",
+      "`text[::-1]` is the text reversed."
+     ],
+     "code": {
+      "python": {
+       "starter": "text = input()\n\n# Your code here: keep letters and digits, lowercase, then compare with the reverse.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst text = input.split(\"\\n\")[0]\n\n// Your code here\n",
+       "solution": "const text = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")[0].replace(/\\r$/, \"\")\n\nlet cleaned = \"\"\nfor (const ch of text) {\n  if (/[\\p{L}\\p{N}]/u.test(ch)) cleaned += ch.toLowerCase()\n}\n\nconsole.log(`Cleaned: ${cleaned}`)\nconst reversed = [...cleaned].reverse().join(\"\")\nconsole.log(cleaned === reversed ? \"Palindrome\" : \"Not a palindrome\")\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    char text[512];\n    fgets(text, sizeof text, stdin);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <ctype.h>\n#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char text[512], cleaned[512];\n    if (!fgets(text, sizeof text, stdin)) return 0;\n\n    int n = 0;\n    for (int i = 0; text[i]; i++) {\n        unsigned char ch = (unsigned char)text[i];\n        if (isalnum(ch)) cleaned[n++] = (char)tolower(ch);\n    }\n    cleaned[n] = '\\0';\n\n    int palindrome = 1;\n    for (int i = 0; i < n / 2; i++) {\n        if (cleaned[i] != cleaned[n - 1 - i]) palindrome = 0;\n    }\n\n    printf(\"Cleaned: %s\\n\", cleaned);\n    printf(palindrome ? \"Palindrome\\n\" : \"Not a palindrome\\n\");\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <string>\n\nint main() {\n    std::string text;\n    std::getline(std::cin, text);\n\n    // Your code here\n}\n",
+       "solution": "#include <algorithm>\n#include <cctype>\n#include <iostream>\n#include <string>\n\nint main() {\n    std::string text, cleaned;\n    std::getline(std::cin, text);\n\n    for (unsigned char ch : text) {\n        if (std::isalnum(ch)) cleaned += static_cast<char>(std::tolower(ch));\n    }\n    std::string reversed(cleaned.rbegin(), cleaned.rend());\n\n    std::cout << \"Cleaned: \" << cleaned << \"\\n\";\n    std::cout << (cleaned == reversed ? \"Palindrome\" : \"Not a palindrome\") << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        String text = new Scanner(System.in).nextLine();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        String text = new BufferedReader(new InputStreamReader(System.in)).readLine();\n\n        StringBuilder cleaned = new StringBuilder();\n        for (char ch : text.toCharArray()) {\n            if (Character.isLetterOrDigit(ch)) cleaned.append(Character.toLowerCase(ch));\n        }\n        String forward = cleaned.toString();\n        String backward = cleaned.reverse().toString();\n\n        System.out.println(\"Cleaned: \" + forward);\n        System.out.println(forward.equals(backward) ? \"Palindrome\" : \"Not a palindrome\");\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p8",
@@ -436,7 +625,34 @@
        "Words: 3\nReversed words: EW EVOL GNIDOC\nTitle case: We Love Coding\nLongest word: CODING"
       ]
      ],
-     "solution": "sentence = input()\nwords = sentence.split()\n\nreversed_words = \" \".join(w[::-1] for w in words)\n\nlongest = words[0]\nfor w in words:\n    if len(w) > len(longest):\n        longest = w\n\nprint(\"Words:\", len(words))\nprint(\"Reversed words:\", reversed_words)\nprint(\"Title case:\", sentence.title())\nprint(\"Longest word:\", longest)"
+     "solution": "sentence = input()\nwords = sentence.split()\n\nreversed_words = \" \".join(w[::-1] for w in words)\n\nlongest = words[0]\nfor w in words:\n    if len(w) > len(longest):\n        longest = w\n\nprint(\"Words:\", len(words))\nprint(\"Reversed words:\", reversed_words)\nprint(\"Title case:\", sentence.title())\nprint(\"Longest word:\", longest)",
+     "editorial": "`sentence.split()` gives the list of words. Then:\n\n- the count is `len(words)`\n- each word reversed is `w[::-1]`; join them back with `\" \".join(...)`\n- title case is `sentence.title()`\n- for the longest word, keep the first word and replace it only when a word is **strictly** longer, so a tie keeps the earlier one\n\n`max(words, key=len)` also returns the first of equally long words.",
+     "hints": [
+      "Start with `words = sentence.split()`.",
+      "Reverse each word with slicing, then join them with spaces.",
+      "For the longest word, only replace your best so far when a word is strictly longer."
+     ],
+     "code": {
+      "python": {
+       "starter": "sentence = input()\nwords = sentence.split()\n\n# Your code here\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst words = input.trim().split(/\\s+/)\n\n// Your code here\n",
+       "solution": "const sentence = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")[0].replace(/\\r$/, \"\")\nconst words = sentence.split(/\\s+/).filter(Boolean)\n\nconst reversedWords = words.map((w) => [...w].reverse().join(\"\")).join(\" \")\nconst title = words.map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(\" \")\n\nlet longest = words[0]\nfor (const w of words) if (w.length > longest.length) longest = w\n\nconsole.log(`Words: ${words.length}`)\nconsole.log(`Reversed words: ${reversedWords}`)\nconsole.log(`Title case: ${title}`)\nconsole.log(`Longest word: ${longest}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    char words[64][128]; int count = 0;\n    while (count < 64 && scanf(\"%127s\", words[count]) == 1) count++;\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <ctype.h>\n#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char words[64][128];\n    int count = 0;\n    while (count < 64 && scanf(\"%127s\", words[count]) == 1) count++;\n\n    printf(\"Words: %d\\n\", count);\n\n    printf(\"Reversed words:\");\n    for (int w = 0; w < count; w++) {\n        printf(\" \");\n        for (int i = (int)strlen(words[w]) - 1; i >= 0; i--) putchar(words[w][i]);\n    }\n    printf(\"\\n\");\n\n    printf(\"Title case:\");\n    for (int w = 0; w < count; w++) {\n        printf(\" \");\n        for (int i = 0; words[w][i]; i++) {\n            unsigned char ch = (unsigned char)words[w][i];\n            putchar(i == 0 ? toupper(ch) : tolower(ch));\n        }\n    }\n    printf(\"\\n\");\n\n    int longest = 0;\n    for (int w = 1; w < count; w++) {\n        if (strlen(words[w]) > strlen(words[longest])) longest = w;\n    }\n    printf(\"Longest word: %s\\n\", words[longest]);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <string>\n#include <vector>\n\nint main() {\n    std::vector<std::string> words;\n    for (std::string w; std::cin >> w;) words.push_back(w);\n\n    // Your code here\n}\n",
+       "solution": "#include <algorithm>\n#include <cctype>\n#include <iostream>\n#include <string>\n#include <vector>\n\nint main() {\n    std::vector<std::string> words;\n    for (std::string w; std::cin >> w;) words.push_back(w);\n\n    std::cout << \"Words: \" << words.size() << \"\\n\";\n\n    std::cout << \"Reversed words:\";\n    for (const auto &w : words) std::cout << \" \" << std::string(w.rbegin(), w.rend());\n    std::cout << \"\\n\";\n\n    std::cout << \"Title case:\";\n    for (auto w : words) {\n        for (std::size_t i = 0; i < w.size(); i++) {\n            unsigned char ch = w[i];\n            w[i] = static_cast<char>(i == 0 ? std::toupper(ch) : std::tolower(ch));\n        }\n        std::cout << \" \" << w;\n    }\n    std::cout << \"\\n\";\n\n    std::string longest = words[0];\n    for (const auto &w : words) if (w.size() > longest.size()) longest = w;\n    std::cout << \"Longest word: \" << longest << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        String[] words = new Scanner(System.in).nextLine().trim().split(\"\\\\s+\");\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        String[] words = new BufferedReader(new InputStreamReader(System.in)).readLine().trim().split(\"\\\\s+\");\n\n        StringBuilder reversed = new StringBuilder();\n        StringBuilder title = new StringBuilder();\n        String longest = words[0];\n        for (String w : words) {\n            if (reversed.length() > 0) {\n                reversed.append(' ');\n                title.append(' ');\n            }\n            reversed.append(new StringBuilder(w).reverse());\n            title.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1).toLowerCase());\n            if (w.length() > longest.length()) longest = w;\n        }\n\n        System.out.println(\"Words: \" + words.length);\n        System.out.println(\"Reversed words: \" + reversed);\n        System.out.println(\"Title case: \" + title);\n        System.out.println(\"Longest word: \" + longest);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p9",
@@ -482,7 +698,34 @@
        "Encrypted: nggnpx ng qnja\nDecrypted: attack at dawn"
       ]
      ],
-     "solution": "def shift_text(text, k):\n    result = \"\"\n    for ch in text:\n        if ch.isupper():\n            result += chr((ord(ch) - ord(\"A\") + k) % 26 + ord(\"A\"))\n        elif ch.islower():\n            result += chr((ord(ch) - ord(\"a\") + k) % 26 + ord(\"a\"))\n        else:\n            result += ch\n    return result\n\n\ntext = input()\nk = int(input())\n\nencrypted = shift_text(text, k)\ndecrypted = shift_text(encrypted, -k)\n\nprint(\"Encrypted:\", encrypted)\nprint(\"Decrypted:\", decrypted)"
+     "solution": "def shift_text(text, k):\n    result = \"\"\n    for ch in text:\n        if ch.isupper():\n            result += chr((ord(ch) - ord(\"A\") + k) % 26 + ord(\"A\"))\n        elif ch.islower():\n            result += chr((ord(ch) - ord(\"a\") + k) % 26 + ord(\"a\"))\n        else:\n            result += ch\n    return result\n\n\ntext = input()\nk = int(input())\n\nencrypted = shift_text(text, k)\ndecrypted = shift_text(encrypted, -k)\n\nprint(\"Encrypted:\", encrypted)\nprint(\"Decrypted:\", decrypted)",
+     "editorial": "Turn each letter into its position in the alphabet, shift it, and wrap around with `% 26`:\n\n```python\nchr((ord(ch) - ord(\"A\") + k) % 26 + ord(\"A\"))\n```\n\nDo the same with `\"a\"` for lowercase letters, and leave every other character unchanged. Decrypting is shifting by `-k`; Python's `%` always returns a value from 0 to 25, even for negative numbers, so the same function works both ways.",
+     "hints": [
+      "`ord()` turns a letter into a number and `chr()` turns it back.",
+      "Subtract `ord(\"A\")` (or `ord(\"a\")`) so the alphabet runs from 0 to 25, then use `% 26` to wrap.",
+      "Decrypting is the same as encrypting with `-k`."
+     ],
+     "code": {
+      "python": {
+       "starter": "def shift_text(text, k):\n    # Your code here: shift each letter by k, wrapping around.\n    return text\n\n\ntext = input()\nk = int(input())\n\nencrypted = shift_text(text, k)\nprint(\"Encrypted:\", encrypted)\nprint(\"Decrypted:\", shift_text(encrypted, -k))\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [text, kLine] = input.split(\"\\n\")\nconst k = Number(kLine)\n\n// Your code here\n",
+       "solution": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\nconst text = lines[0].replace(/\\r$/, \"\")\nconst k = Number(lines[1])\n\nfunction shiftText(text, k) {\n  let result = \"\"\n  for (const ch of text) {\n    const code = ch.charCodeAt(0)\n    if (ch >= \"A\" && ch <= \"Z\") result += String.fromCharCode(((((code - 65 + k) % 26) + 26) % 26) + 65)\n    else if (ch >= \"a\" && ch <= \"z\") result += String.fromCharCode(((((code - 97 + k) % 26) + 26) % 26) + 97)\n    else result += ch\n  }\n  return result\n}\n\nconst encrypted = shiftText(text, k)\nconsole.log(`Encrypted: ${encrypted}`)\nconsole.log(`Decrypted: ${shiftText(encrypted, -k)}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    char text[512]; int k;\n    fgets(text, sizeof text, stdin);\n    scanf(\"%d\", &k);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n#include <string.h>\n\nvoid shift_text(const char *text, int k, char *out) {\n    int i = 0;\n    for (; text[i]; i++) {\n        char ch = text[i];\n        if (ch >= 'A' && ch <= 'Z') out[i] = (char)('A' + ((ch - 'A' + k) % 26 + 26) % 26);\n        else if (ch >= 'a' && ch <= 'z') out[i] = (char)('a' + ((ch - 'a' + k) % 26 + 26) % 26);\n        else out[i] = ch;\n    }\n    out[i] = '\\0';\n}\n\nint main(void) {\n    char text[512], encrypted[512], decrypted[512];\n    int k;\n    if (!fgets(text, sizeof text, stdin)) return 0;\n    text[strcspn(text, \"\\r\\n\")] = '\\0';\n    scanf(\"%d\", &k);\n\n    shift_text(text, k, encrypted);\n    shift_text(encrypted, -k, decrypted);\n    printf(\"Encrypted: %s\\n\", encrypted);\n    printf(\"Decrypted: %s\\n\", decrypted);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <string>\n\nint main() {\n    std::string text; int k;\n    std::getline(std::cin, text);\n    std::cin >> k;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n#include <string>\n\nstd::string shift_text(const std::string &text, int k) {\n    std::string result;\n    for (char ch : text) {\n        if (ch >= 'A' && ch <= 'Z') result += static_cast<char>('A' + ((ch - 'A' + k) % 26 + 26) % 26);\n        else if (ch >= 'a' && ch <= 'z') result += static_cast<char>('a' + ((ch - 'a' + k) % 26 + 26) % 26);\n        else result += ch;\n    }\n    return result;\n}\n\nint main() {\n    std::string text;\n    int k;\n    std::getline(std::cin, text);\n    if (!text.empty() && text.back() == '\\r') text.pop_back();\n    std::cin >> k;\n\n    std::string encrypted = shift_text(text, k);\n    std::cout << \"Encrypted: \" << encrypted << \"\\n\";\n    std::cout << \"Decrypted: \" << shift_text(encrypted, -k) << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        String text = in.nextLine();\n        int k = Integer.parseInt(in.nextLine().trim());\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\n\npublic class Main {\n    static String shiftText(String text, int k) {\n        StringBuilder result = new StringBuilder();\n        for (char ch : text.toCharArray()) {\n            if (ch >= 'A' && ch <= 'Z') result.append((char) ('A' + Math.floorMod(ch - 'A' + k, 26)));\n            else if (ch >= 'a' && ch <= 'z') result.append((char) ('a' + Math.floorMod(ch - 'a' + k, 26)));\n            else result.append(ch);\n        }\n        return result.toString();\n    }\n\n    public static void main(String[] args) throws IOException {\n        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));\n        String text = in.readLine();\n        int k = Integer.parseInt(in.readLine().trim());\n\n        String encrypted = shiftText(text, k);\n        System.out.println(\"Encrypted: \" + encrypted);\n        System.out.println(\"Decrypted: \" + shiftText(encrypted, -k));\n    }\n}\n"
+      }
+     }
     }
    ]
   },
@@ -534,7 +777,34 @@
        "Not a leap year\nFebruary has 28 days"
       ]
      ],
-     "solution": "year = int(input())\n\nif year % 400 == 0 or (year % 4 == 0 and year % 100 != 0):\n    print(\"Leap year\")\n    print(\"February has 29 days\")\nelse:\n    print(\"Not a leap year\")\n    print(\"February has 28 days\")"
+     "solution": "year = int(input())\n\nif year % 400 == 0 or (year % 4 == 0 and year % 100 != 0):\n    print(\"Leap year\")\n    print(\"February has 29 days\")\nelse:\n    print(\"Not a leap year\")\n    print(\"February has 28 days\")",
+     "editorial": "Translate the rule into one condition:\n\n```python\nif year % 400 == 0 or (year % 4 == 0 and year % 100 != 0):\n```\n\nThe brackets matter: a year divisible by 100 is a leap year only when it is also divisible by 400. So 2000 is a leap year and 1900 is not. February has 29 days in a leap year and 28 otherwise.",
+     "hints": [
+      "Most leap years are divisible by 4. Which ones are the exceptions?",
+      "Century years such as 1900 are not leap years unless divisible by 400.",
+      "Combine the conditions with `or` and `and`, using brackets."
+     ],
+     "code": {
+      "python": {
+       "starter": "year = int(input())\n\n# Your code here\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [year] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const year = Number(require(\"fs\").readFileSync(0, \"utf8\").trim())\n\nif (year % 400 === 0 || (year % 4 === 0 && year % 100 !== 0)) {\n  console.log(\"Leap year\")\n  console.log(\"February has 29 days\")\n} else {\n  console.log(\"Not a leap year\")\n  console.log(\"February has 28 days\")\n}\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int year;\n    scanf(\"%d\", &year);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    int year;\n    scanf(\"%d\", &year);\n\n    if (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)) {\n        printf(\"Leap year\\n\");\n        printf(\"February has 29 days\\n\");\n    } else {\n        printf(\"Not a leap year\\n\");\n        printf(\"February has 28 days\\n\");\n    }\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    int year;\n    std::cin >> year;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n\nint main() {\n    int year;\n    std::cin >> year;\n\n    if (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)) {\n        std::cout << \"Leap year\\nFebruary has 29 days\\n\";\n    } else {\n        std::cout << \"Not a leap year\\nFebruary has 28 days\\n\";\n    }\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        int year = new Scanner(System.in).nextInt();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        int year = new Scanner(System.in).nextInt();\n\n        if (year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)) {\n            System.out.println(\"Leap year\");\n            System.out.println(\"February has 29 days\");\n        } else {\n            System.out.println(\"Not a leap year\");\n            System.out.println(\"February has 28 days\");\n        }\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p11",
@@ -586,7 +856,34 @@
        "Invalid day"
       ]
      ],
-     "solution": "day = int(input())\n\nmatch day:\n    case 1:\n        name = \"Monday\"\n    case 2:\n        name = \"Tuesday\"\n    case 3:\n        name = \"Wednesday\"\n    case 4:\n        name = \"Thursday\"\n    case 5:\n        name = \"Friday\"\n    case 6:\n        name = \"Saturday\"\n    case 7:\n        name = \"Sunday\"\n    case _:\n        name = None\n\nif name is None:\n    print(\"Invalid day\")\nelse:\n    print(name)\n    match day:\n        case 6 | 7:\n            print(\"Weekend\")\n        case _:\n            print(\"Weekday\")"
+     "solution": "day = int(input())\n\nmatch day:\n    case 1:\n        name = \"Monday\"\n    case 2:\n        name = \"Tuesday\"\n    case 3:\n        name = \"Wednesday\"\n    case 4:\n        name = \"Thursday\"\n    case 5:\n        name = \"Friday\"\n    case 6:\n        name = \"Saturday\"\n    case 7:\n        name = \"Sunday\"\n    case _:\n        name = None\n\nif name is None:\n    print(\"Invalid day\")\nelse:\n    print(name)\n    match day:\n        case 6 | 7:\n            print(\"Weekend\")\n        case _:\n            print(\"Weekday\")",
+     "editorial": "`match day:` compares the value against each `case` in turn. Give each number from 1 to 7 its own case that sets the name, and use `case _:` for anything else, so invalid numbers are caught.\n\nFor weekday or weekend, a second `match` can use a combined pattern:\n\n```python\nmatch day:\n    case 6 | 7:\n        print(\"Weekend\")\n    case _:\n        print(\"Weekday\")\n```\n\nOnly print the second line when the day was valid.",
+     "hints": [
+      "Use `match day:` with one `case` per day number.",
+      "`case _:` catches every value no other case matched.",
+      "`case 6 | 7:` matches either value."
+     ],
+     "code": {
+      "python": {
+       "starter": "day = int(input())\n\nmatch day:\n    case 1:\n        name = \"Monday\"\n    # Your code here: the other days, then weekday or weekend.\n    case _:\n        name = None\n"
+      },
+      "javascript": {
+       "starter": "const day = Number(require(\"fs\").readFileSync(0, \"utf8\").trim())\n\n// Your code here\n",
+       "solution": "const day = Number(require(\"fs\").readFileSync(0, \"utf8\").trim())\n\nlet name = null\nswitch (day) {\n  case 1: name = \"Monday\"; break\n  case 2: name = \"Tuesday\"; break\n  case 3: name = \"Wednesday\"; break\n  case 4: name = \"Thursday\"; break\n  case 5: name = \"Friday\"; break\n  case 6: name = \"Saturday\"; break\n  case 7: name = \"Sunday\"; break\n}\n\nif (name === null) {\n  console.log(\"Invalid day\")\n} else {\n  console.log(name)\n  switch (day) {\n    case 6:\n    case 7:\n      console.log(\"Weekend\")\n      break\n    default:\n      console.log(\"Weekday\")\n  }\n}\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int day;\n    scanf(\"%d\", &day);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    int day;\n    scanf(\"%d\", &day);\n\n    const char *name = NULL;\n    switch (day) {\n        case 1: name = \"Monday\"; break;\n        case 2: name = \"Tuesday\"; break;\n        case 3: name = \"Wednesday\"; break;\n        case 4: name = \"Thursday\"; break;\n        case 5: name = \"Friday\"; break;\n        case 6: name = \"Saturday\"; break;\n        case 7: name = \"Sunday\"; break;\n    }\n\n    if (name == NULL) {\n        printf(\"Invalid day\\n\");\n        return 0;\n    }\n    printf(\"%s\\n\", name);\n    switch (day) {\n        case 6:\n        case 7:\n            printf(\"Weekend\\n\");\n            break;\n        default:\n            printf(\"Weekday\\n\");\n    }\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <string>\n\nint main() {\n    int day;\n    std::cin >> day;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n#include <string>\n\nint main() {\n    int day;\n    std::cin >> day;\n\n    std::string name;\n    switch (day) {\n        case 1: name = \"Monday\"; break;\n        case 2: name = \"Tuesday\"; break;\n        case 3: name = \"Wednesday\"; break;\n        case 4: name = \"Thursday\"; break;\n        case 5: name = \"Friday\"; break;\n        case 6: name = \"Saturday\"; break;\n        case 7: name = \"Sunday\"; break;\n    }\n\n    if (name.empty()) {\n        std::cout << \"Invalid day\\n\";\n        return 0;\n    }\n    std::cout << name << \"\\n\";\n    switch (day) {\n        case 6:\n        case 7:\n            std::cout << \"Weekend\\n\";\n            break;\n        default:\n            std::cout << \"Weekday\\n\";\n    }\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        int day = new Scanner(System.in).nextInt();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        int day = new Scanner(System.in).nextInt();\n\n        String name = switch (day) {\n            case 1 -> \"Monday\";\n            case 2 -> \"Tuesday\";\n            case 3 -> \"Wednesday\";\n            case 4 -> \"Thursday\";\n            case 5 -> \"Friday\";\n            case 6 -> \"Saturday\";\n            case 7 -> \"Sunday\";\n            default -> null;\n        };\n\n        if (name == null) {\n            System.out.println(\"Invalid day\");\n            return;\n        }\n        System.out.println(name);\n        System.out.println(switch (day) {\n            case 6, 7 -> \"Weekend\";\n            default -> \"Weekday\";\n        });\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p12",
@@ -639,7 +936,34 @@
        "Scalene\nNot right-angled"
       ]
      ],
-     "solution": "a, b, c = map(int, input().split())\n\nif a <= 0 or b <= 0 or c <= 0 or a + b <= c or a + c <= b or b + c <= a:\n    print(\"Not a triangle\")\nelse:\n    if a == b == c:\n        print(\"Equilateral\")\n    elif a == b or b == c or a == c:\n        print(\"Isosceles\")\n    else:\n        print(\"Scalene\")\n\n    x, y, z = sorted([a, b, c])\n    if x * x + y * y == z * z:\n        print(\"Right-angled\")\n    else:\n        print(\"Not right-angled\")"
+     "solution": "a, b, c = map(int, input().split())\n\nif a <= 0 or b <= 0 or c <= 0 or a + b <= c or a + c <= b or b + c <= a:\n    print(\"Not a triangle\")\nelse:\n    if a == b == c:\n        print(\"Equilateral\")\n    elif a == b or b == c or a == c:\n        print(\"Isosceles\")\n    else:\n        print(\"Scalene\")\n\n    x, y, z = sorted([a, b, c])\n    if x * x + y * y == z * z:\n        print(\"Right-angled\")\n    else:\n        print(\"Not right-angled\")",
+     "editorial": "Check that the sides form a triangle before anything else: every side must be positive and each pair must add up to more than the third side. If not, print `Not a triangle` and stop.\n\nThen classify:\n\n1. all three equal: `Equilateral`\n2. any two equal: `Isosceles`\n3. otherwise: `Scalene`\n\nFor the right angle, sort the sides so the largest is last, then test Pythagoras: `x * x + y * y == z * z`. Integers keep the comparison exact.",
+     "hints": [
+      "Check the triangle inequality first: a + b > c for every pair.",
+      "Test for all three equal before testing for two equal.",
+      "Sort the sides; the largest must be the hypotenuse."
+     ],
+     "code": {
+      "python": {
+       "starter": "a, b, c = map(int, input().split())\n\n# Your code here: first check it's a triangle.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [a, b, c] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const [a, b, c] = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number)\n\nif (a <= 0 || b <= 0 || c <= 0 || a + b <= c || a + c <= b || b + c <= a) {\n  console.log(\"Not a triangle\")\n} else {\n  if (a === b && b === c) console.log(\"Equilateral\")\n  else if (a === b || b === c || a === c) console.log(\"Isosceles\")\n  else console.log(\"Scalene\")\n\n  const [x, y, z] = [a, b, c].sort((p, q) => p - q)\n  console.log(x * x + y * y === z * z ? \"Right-angled\" : \"Not right-angled\")\n}\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int a, b, c;\n    scanf(\"%d %d %d\", &a, &b, &c);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    int a, b, c;\n    scanf(\"%d %d %d\", &a, &b, &c);\n\n    if (a <= 0 || b <= 0 || c <= 0 || a + b <= c || a + c <= b || b + c <= a) {\n        printf(\"Not a triangle\\n\");\n        return 0;\n    }\n    if (a == b && b == c) printf(\"Equilateral\\n\");\n    else if (a == b || b == c || a == c) printf(\"Isosceles\\n\");\n    else printf(\"Scalene\\n\");\n\n    /* Sort the three sides so z is the largest. */\n    int x = a, y = b, z = c, t;\n    if (x > y) { t = x; x = y; y = t; }\n    if (y > z) { t = y; y = z; z = t; }\n    if (x > y) { t = x; x = y; y = t; }\n    printf(x * x + y * y == z * z ? \"Right-angled\\n\" : \"Not right-angled\\n\");\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    int a, b, c;\n    std::cin >> a >> b >> c;\n\n    // Your code here\n}\n",
+       "solution": "#include <algorithm>\n#include <array>\n#include <iostream>\n\nint main() {\n    int a, b, c;\n    std::cin >> a >> b >> c;\n\n    if (a <= 0 || b <= 0 || c <= 0 || a + b <= c || a + c <= b || b + c <= a) {\n        std::cout << \"Not a triangle\\n\";\n        return 0;\n    }\n    if (a == b && b == c) std::cout << \"Equilateral\\n\";\n    else if (a == b || b == c || a == c) std::cout << \"Isosceles\\n\";\n    else std::cout << \"Scalene\\n\";\n\n    std::array<int, 3> s{a, b, c};\n    std::sort(s.begin(), s.end());\n    std::cout << (s[0] * s[0] + s[1] * s[1] == s[2] * s[2] ? \"Right-angled\" : \"Not right-angled\") << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int a = in.nextInt(), b = in.nextInt(), c = in.nextInt();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Arrays;\nimport java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int a = in.nextInt(), b = in.nextInt(), c = in.nextInt();\n\n        if (a <= 0 || b <= 0 || c <= 0 || a + b <= c || a + c <= b || b + c <= a) {\n            System.out.println(\"Not a triangle\");\n            return;\n        }\n        if (a == b && b == c) System.out.println(\"Equilateral\");\n        else if (a == b || b == c || a == c) System.out.println(\"Isosceles\");\n        else System.out.println(\"Scalene\");\n\n        int[] s = {a, b, c};\n        Arrays.sort(s);\n        System.out.println(s[0] * s[0] + s[1] * s[1] == s[2] * s[2] ? \"Right-angled\" : \"Not right-angled\");\n    }\n}\n"
+      }
+     }
     }
    ]
   },
@@ -686,7 +1010,33 @@
        "100 x 1 = 100\n100 x 2 = 200\n100 x 3 = 300\n100 x 4 = 400\n100 x 5 = 500\n100 x 6 = 600\n100 x 7 = 700\n100 x 8 = 800\n100 x 9 = 900\n100 x 10 = 1000"
       ]
      ],
-     "solution": "n = int(input())\n\nfor i in range(1, 11):\n    print(f\"{n} x {i} = {n * i}\")"
+     "solution": "n = int(input())\n\nfor i in range(1, 11):\n    print(f\"{n} x {i} = {n * i}\")",
+     "editorial": "`range(1, 11)` gives the numbers 1 to 10 (the end is not included). Print one line for each:\n\n```python\nfor i in range(1, 11):\n    print(f\"{n} x {i} = {n * i}\")\n```\n\nNegative numbers work the same way, for example `-3 x 2 = -6`.",
+     "hints": [
+      "Which `range()` gives 1 to 10?",
+      "An f-string builds each line: `f\"{n} x {i} = {n * i}\"`."
+     ],
+     "code": {
+      "python": {
+       "starter": "n = int(input())\n\nfor i in range(1, 11):\n    pass  # Your code here\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [n] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const n = Number(require(\"fs\").readFileSync(0, \"utf8\").trim())\n\nfor (let i = 1; i <= 10; i++) console.log(`${n} x ${i} = ${n * i}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n\n    for (int i = 1; i <= 10; i++) printf(\"%d x %d = %d\\n\", n, i, n * i);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n\nint main() {\n    int n;\n    std::cin >> n;\n\n    for (int i = 1; i <= 10; i++) std::cout << n << \" x \" << i << \" = \" << n * i << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        int n = new Scanner(System.in).nextInt();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        int n = new Scanner(System.in).nextInt();\n\n        for (int i = 1; i <= 10; i++) System.out.println(n + \" x \" + i + \" = \" + n * i);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p14",
@@ -735,7 +1085,34 @@
        "Sum of digits: 18\nReversed: 909\nDigit count: 3"
       ]
      ],
-     "solution": "n = int(input())\n\ntotal = 0\nreverse = 0\ncount = 0\ntemp = n\nwhile True:\n    digit = temp % 10\n    total += digit\n    reverse = reverse * 10 + digit\n    count += 1\n    temp //= 10\n    if temp == 0:\n        break\n\nprint(\"Sum of digits:\", total)\nprint(\"Reversed:\", reverse)\nprint(\"Digit count:\", count)"
+     "solution": "n = int(input())\n\ntotal = 0\nreverse = 0\ncount = 0\ntemp = n\nwhile True:\n    digit = temp % 10\n    total += digit\n    reverse = reverse * 10 + digit\n    count += 1\n    temp //= 10\n    if temp == 0:\n        break\n\nprint(\"Sum of digits:\", total)\nprint(\"Reversed:\", reverse)\nprint(\"Digit count:\", count)",
+     "editorial": "`n % 10` is the last digit and `n // 10` removes it. Repeat until nothing is left, building all three answers as you go:\n\n```python\ndigit = temp % 10\ntotal += digit\nreverse = reverse * 10 + digit\ncount += 1\ntemp //= 10\n```\n\nRun the loop body at least once (for example `while True:` with a `break`), so that `0` is counted as one digit. Reversing `1200` gives `21` naturally, because leading zeros disappear in a number.",
+     "hints": [
+      "What do `n % 10` and `n // 10` give you?",
+      "Build the reversed number with `reverse = reverse * 10 + digit`.",
+      "Make sure the number 0 still counts as one digit."
+     ],
+     "code": {
+      "python": {
+       "starter": "n = int(input())\n\ntotal = 0\nreverse = 0\ncount = 0\ntemp = n\n# Your code here: a while loop taking off one digit at a time with % and //.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [n] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const n = Number(require(\"fs\").readFileSync(0, \"utf8\").trim())\n\nlet total = 0\nlet reverse = 0\nlet count = 0\nlet temp = n\ndo {\n  const digit = temp % 10\n  total += digit\n  reverse = reverse * 10 + digit\n  count += 1\n  temp = Math.floor(temp / 10)\n} while (temp !== 0)\n\nconsole.log(`Sum of digits: ${total}`)\nconsole.log(`Reversed: ${reverse}`)\nconsole.log(`Digit count: ${count}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    long long n;\n    scanf(\"%lld\", &n);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    long long n;\n    scanf(\"%lld\", &n);\n\n    long long total = 0, reverse = 0, temp = n;\n    int count = 0;\n    do {\n        long long digit = temp % 10;\n        total += digit;\n        reverse = reverse * 10 + digit;\n        count++;\n        temp /= 10;\n    } while (temp != 0);\n\n    printf(\"Sum of digits: %lld\\n\", total);\n    printf(\"Reversed: %lld\\n\", reverse);\n    printf(\"Digit count: %d\\n\", count);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    long long n;\n    std::cin >> n;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n\nint main() {\n    long long n;\n    std::cin >> n;\n\n    long long total = 0, reverse = 0, temp = n;\n    int count = 0;\n    do {\n        long long digit = temp % 10;\n        total += digit;\n        reverse = reverse * 10 + digit;\n        count++;\n        temp /= 10;\n    } while (temp != 0);\n\n    std::cout << \"Sum of digits: \" << total << \"\\n\";\n    std::cout << \"Reversed: \" << reverse << \"\\n\";\n    std::cout << \"Digit count: \" << count << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        long n = new Scanner(System.in).nextLong();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        long n = new Scanner(System.in).nextLong();\n\n        long total = 0, reverse = 0, temp = n;\n        int count = 0;\n        do {\n            long digit = temp % 10;\n            total += digit;\n            reverse = reverse * 10 + digit;\n            count++;\n            temp /= 10;\n        } while (temp != 0);\n\n        System.out.println(\"Sum of digits: \" + total);\n        System.out.println(\"Reversed: \" + reverse);\n        System.out.println(\"Digit count: \" + count);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p15",
@@ -785,7 +1162,34 @@
        "GCD: 12\nLCM: 720\nCo-prime: No"
       ]
      ],
-     "solution": "a = int(input())\nb = int(input())\n\nx, y = a, b\nwhile y != 0:\n    x, y = y, x % y\n\ngcd = x\nlcm = a * b // gcd\n\nprint(\"GCD:\", gcd)\nprint(\"LCM:\", lcm)\nprint(\"Co-prime:\", \"Yes\" if gcd == 1 else \"No\")"
+     "solution": "a = int(input())\nb = int(input())\n\nx, y = a, b\nwhile y != 0:\n    x, y = y, x % y\n\ngcd = x\nlcm = a * b // gcd\n\nprint(\"GCD:\", gcd)\nprint(\"LCM:\", lcm)\nprint(\"Co-prime:\", \"Yes\" if gcd == 1 else \"No\")",
+     "editorial": "Euclid's method relies on gcd(a, b) = gcd(b, a % b). Keep replacing the pair until the second number is 0:\n\n```python\nx, y = a, b\nwhile y != 0:\n    x, y = y, x % y\ngcd = x\n```\n\nThe LCM is `a * b // gcd`. Two numbers are co-prime when their GCD is 1.",
+     "hints": [
+      "gcd(a, b) is the same as gcd(b, a % b).",
+      "Stop when the second number becomes 0; the first is then the GCD.",
+      "lcm × gcd = a × b."
+     ],
+     "code": {
+      "python": {
+       "starter": "a = int(input())\nb = int(input())\n\n# Your code here: Euclid's method with a while loop.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [a, b] = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const [a, b] = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number)\n\nlet x = a\nlet y = b\nwhile (y !== 0) [x, y] = [y, x % y]\n\nconst gcd = x\nconst lcm = (a / gcd) * b\n\nconsole.log(`GCD: ${gcd}`)\nconsole.log(`LCM: ${lcm}`)\nconsole.log(`Co-prime: ${gcd === 1 ? \"Yes\" : \"No\"}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    long long a, b;\n    scanf(\"%lld %lld\", &a, &b);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    long long a, b;\n    scanf(\"%lld %lld\", &a, &b);\n\n    long long x = a, y = b;\n    while (y != 0) {\n        long long r = x % y;\n        x = y;\n        y = r;\n    }\n    long long gcd = x;\n    long long lcm = a / gcd * b;\n\n    printf(\"GCD: %lld\\n\", gcd);\n    printf(\"LCM: %lld\\n\", lcm);\n    printf(\"Co-prime: %s\\n\", gcd == 1 ? \"Yes\" : \"No\");\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    long long a, b;\n    std::cin >> a >> b;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n\nint main() {\n    long long a, b;\n    std::cin >> a >> b;\n\n    long long x = a, y = b;\n    while (y != 0) {\n        long long r = x % y;\n        x = y;\n        y = r;\n    }\n    long long gcd = x;\n    long long lcm = a / gcd * b;\n\n    std::cout << \"GCD: \" << gcd << \"\\n\";\n    std::cout << \"LCM: \" << lcm << \"\\n\";\n    std::cout << \"Co-prime: \" << (gcd == 1 ? \"Yes\" : \"No\") << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        long a = in.nextLong(), b = in.nextLong();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        long a = in.nextLong(), b = in.nextLong();\n\n        long x = a, y = b;\n        while (y != 0) {\n            long r = x % y;\n            x = y;\n            y = r;\n        }\n        long gcd = x;\n        long lcm = a / gcd * b;\n\n        System.out.println(\"GCD: \" + gcd);\n        System.out.println(\"LCM: \" + lcm);\n        System.out.println(\"Co-prime: \" + (gcd == 1 ? \"Yes\" : \"No\"));\n    }\n}\n"
+      }
+     }
     }
    ]
   },
@@ -838,7 +1242,34 @@
        "Largest: 100\nSecond largest: 99"
       ]
      ],
-     "solution": "numbers = list(map(int, input().split()))\n\nlargest = max(numbers)\nothers = [n for n in numbers if n != largest]\n\nprint(\"Largest:\", largest)\nif others:\n    print(\"Second largest:\", max(others))\nelse:\n    print(\"Second largest: None\")"
+     "solution": "numbers = list(map(int, input().split()))\n\nlargest = max(numbers)\nothers = [n for n in numbers if n != largest]\n\nprint(\"Largest:\", largest)\nif others:\n    print(\"Second largest:\", max(others))\nelse:\n    print(\"Second largest: None\")",
+     "editorial": "Find the largest with `max()`. For the second largest **distinct** value, ignore every copy of the largest:\n\n```python\nothers = [n for n in numbers if n != largest]\n```\n\nIf nothing is left, all values were equal and there is no second largest, so print `None`. Otherwise it is `max(others)`. Sorting would also work, but this needs only two passes over the list.",
+     "hints": [
+      "The second largest must be different from the largest, so duplicates of the largest don't count.",
+      "Remove every copy of the largest, then take the maximum of what is left.",
+      "If nothing is left, print `None`."
+     ],
+     "code": {
+      "python": {
+       "starter": "numbers = list(map(int, input().split()))\n\n# Your code here\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst numbers = input.trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const numbers = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number)\n\nconst largest = Math.max(...numbers)\nconst others = numbers.filter((n) => n !== largest)\n\nconsole.log(`Largest: ${largest}`)\nconsole.log(`Second largest: ${others.length ? Math.max(...others) : \"None\"}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int numbers[128], n = 0;\n    while (n < 128 && scanf(\"%d\", &numbers[n]) == 1) n++;\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    int numbers[128], n = 0;\n    while (n < 128 && scanf(\"%d\", &numbers[n]) == 1) n++;\n\n    int largest = numbers[0];\n    for (int i = 1; i < n; i++) if (numbers[i] > largest) largest = numbers[i];\n\n    int found = 0, second = 0;\n    for (int i = 0; i < n; i++) {\n        if (numbers[i] != largest && (!found || numbers[i] > second)) {\n            second = numbers[i];\n            found = 1;\n        }\n    }\n\n    printf(\"Largest: %d\\n\", largest);\n    if (found) printf(\"Second largest: %d\\n\", second);\n    else printf(\"Second largest: None\\n\");\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <vector>\n\nint main() {\n    std::vector<int> numbers;\n    for (int x; std::cin >> x;) numbers.push_back(x);\n\n    // Your code here\n}\n",
+       "solution": "#include <algorithm>\n#include <iostream>\n#include <vector>\n\nint main() {\n    std::vector<int> numbers;\n    for (int x; std::cin >> x;) numbers.push_back(x);\n\n    int largest = *std::max_element(numbers.begin(), numbers.end());\n    std::vector<int> others;\n    for (int x : numbers) if (x != largest) others.push_back(x);\n\n    std::cout << \"Largest: \" << largest << \"\\n\";\n    if (others.empty()) std::cout << \"Second largest: None\\n\";\n    else std::cout << \"Second largest: \" << *std::max_element(others.begin(), others.end()) << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        int[] numbers = java.util.Arrays.stream(new Scanner(System.in).nextLine().trim().split(\"\\\\s+\")).mapToInt(Integer::parseInt).toArray();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Arrays;\nimport java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        int[] numbers = Arrays.stream(new Scanner(System.in).nextLine().trim().split(\"\\\\s+\"))\n                .mapToInt(Integer::parseInt).toArray();\n\n        int largest = Arrays.stream(numbers).max().getAsInt();\n        var second = Arrays.stream(numbers).filter(n -> n != largest).max();\n\n        System.out.println(\"Largest: \" + largest);\n        System.out.println(\"Second largest: \" + (second.isPresent() ? String.valueOf(second.getAsInt()) : \"None\"));\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p17",
@@ -883,7 +1314,34 @@
        "Rotated: [7, 8, 5, 6]\nEnds: (7, 6)"
       ]
      ],
-     "solution": "numbers = list(map(int, input().split()))\nk = int(input())\n\nk = k % len(numbers)\nrotated = numbers[k:] + numbers[:k]\n\nprint(\"Rotated:\", rotated)\nprint(\"Ends:\", (rotated[0], rotated[-1]))"
+     "solution": "numbers = list(map(int, input().split()))\nk = int(input())\n\nk = k % len(numbers)\nrotated = numbers[k:] + numbers[:k]\n\nprint(\"Rotated:\", rotated)\nprint(\"Ends:\", (rotated[0], rotated[-1]))",
+     "editorial": "Rotating left by `k` moves the first `k` elements to the end. With slicing that is:\n\n```python\nk = k % len(numbers)\nrotated = numbers[k:] + numbers[:k]\n```\n\n`k % len(numbers)` handles `k` larger than the list: rotating a 5-element list 7 times is the same as rotating it twice. Print the list and `(rotated[0], rotated[-1])` directly; Python prints them in the expected form.",
+     "hints": [
+      "Rotating left by k moves the first k elements to the end.",
+      "`numbers[k:] + numbers[:k]` does it with slicing.",
+      "Use `k % len(numbers)` when k is larger than the list."
+     ],
+     "code": {
+      "python": {
+       "starter": "numbers = list(map(int, input().split()))\nk = int(input())\n\n# Your code here: rotate with slicing.\n"
+      },
+      "javascript": {
+       "starter": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\nconst numbers = lines[0].trim().split(/\\s+/).map(Number)\nconst k = Number(lines[1]) % numbers.length\n\n// Your code here\n",
+       "solution": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\nconst numbers = lines[0].trim().split(/\\s+/).map(Number)\nconst k = Number(lines[1]) % numbers.length\n\nconst rotated = [...numbers.slice(k), ...numbers.slice(0, k)]\n\n// Printed the way Python prints a list and a tuple.\nconsole.log(`Rotated: [${rotated.join(\", \")}]`)\nconsole.log(`Ends: (${rotated[0]}, ${rotated[rotated.length - 1]})`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int numbers[128], n = 0, k;\n    char line[2048];\n    fgets(line, sizeof line, stdin);\n    for (char *p = line; n < 128;) {\n        int value, used;\n        if (sscanf(p, \"%d%n\", &value, &used) != 1) break;\n        numbers[n++] = value;\n        p += used;\n    }\n    scanf(\"%d\", &k);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    int numbers[128], n = 0, k;\n    char line[2048];\n    fgets(line, sizeof line, stdin);\n    for (char *p = line; n < 128;) {\n        int value, used;\n        if (sscanf(p, \"%d%n\", &value, &used) != 1) break;\n        numbers[n++] = value;\n        p += used;\n    }\n    scanf(\"%d\", &k);\n    k %= n;\n\n    /* Printed the way Python prints a list and a tuple. */\n    printf(\"Rotated: [\");\n    for (int i = 0; i < n; i++) printf(i ? \", %d\" : \"%d\", numbers[(i + k) % n]);\n    printf(\"]\\n\");\n    printf(\"Ends: (%d, %d)\\n\", numbers[k % n], numbers[(k + n - 1) % n]);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <sstream>\n#include <string>\n#include <vector>\n\nint main() {\n    std::string line;\n    std::getline(std::cin, line);\n    std::istringstream in(line);\n    std::vector<int> numbers;\n    for (int x; in >> x;) numbers.push_back(x);\n    int k;\n    std::cin >> k;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n#include <sstream>\n#include <string>\n#include <vector>\n\nint main() {\n    std::string line;\n    std::getline(std::cin, line);\n    std::istringstream in(line);\n    std::vector<int> numbers;\n    for (int x; in >> x;) numbers.push_back(x);\n    int k;\n    std::cin >> k;\n    k %= static_cast<int>(numbers.size());\n\n    std::vector<int> rotated(numbers.begin() + k, numbers.end());\n    rotated.insert(rotated.end(), numbers.begin(), numbers.begin() + k);\n\n    // Printed the way Python prints a list and a tuple.\n    std::cout << \"Rotated: [\";\n    for (std::size_t i = 0; i < rotated.size(); i++) std::cout << (i ? \", \" : \"\") << rotated[i];\n    std::cout << \"]\\n\";\n    std::cout << \"Ends: (\" << rotated.front() << \", \" << rotated.back() << \")\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.ArrayList;\nimport java.util.List;\nimport java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        List<Integer> numbers = new ArrayList<>();\n        for (String s : in.nextLine().trim().split(\"\\\\s+\")) numbers.add(Integer.parseInt(s));\n        int k = in.nextInt() % numbers.size();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.ArrayList;\nimport java.util.List;\nimport java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        List<Integer> numbers = new ArrayList<>();\n        for (String s : in.nextLine().trim().split(\"\\\\s+\")) numbers.add(Integer.parseInt(s));\n        int k = in.nextInt() % numbers.size();\n\n        List<Integer> rotated = new ArrayList<>(numbers.subList(k, numbers.size()));\n        rotated.addAll(numbers.subList(0, k));\n\n        // A Java List prints like a Python list: [3, 4, 5, 1, 2].\n        System.out.println(\"Rotated: \" + rotated);\n        System.out.println(\"Ends: (\" + rotated.get(0) + \", \" + rotated.get(rotated.size() - 1) + \")\");\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p18",
@@ -926,7 +1384,34 @@
        "1. y - 100\n2. z - 50\n3. x - 0\nTop: ('y', 100)"
       ]
      ],
-     "solution": "n = int(input())\n\nstudents = []\nfor _ in range(n):\n    name, marks = input().split()\n    students.append((name, int(marks)))\n\nranked = sorted(students, key=lambda s: (-s[1], s[0]))\n\nfor rank, (name, marks) in enumerate(ranked, start=1):\n    print(f\"{rank}. {name} - {marks}\")\nprint(\"Top:\", ranked[0])"
+     "solution": "n = int(input())\n\nstudents = []\nfor _ in range(n):\n    name, marks = input().split()\n    students.append((name, int(marks)))\n\nranked = sorted(students, key=lambda s: (-s[1], s[0]))\n\nfor rank, (name, marks) in enumerate(ranked, start=1):\n    print(f\"{rank}. {name} - {marks}\")\nprint(\"Top:\", ranked[0])",
+     "editorial": "Store each student as a tuple `(name, marks)`, then sort with a key that returns a tuple. Python compares tuples element by element, so the second element breaks ties:\n\n```python\nranked = sorted(students, key=lambda s: (-s[1], s[0]))\n```\n\nNegating the marks sorts them from highest to lowest while names stay alphabetical. `enumerate(ranked, start=1)` gives the ranks.",
+     "hints": [
+      "Read each line with `name, marks = input().split()` and store `(name, int(marks))`.",
+      "A sort key can be a tuple: the second value only matters when the first ties.",
+      "Sort by `-marks` to get highest first while keeping names in A to Z order."
+     ],
+     "code": {
+      "python": {
+       "starter": "n = int(input())\n\nstudents = []\nfor _ in range(n):\n    name, marks = input().split()\n    students.append((name, int(marks)))\n\n# Your code here: sorted() with a lambda key.\n"
+      },
+      "javascript": {
+       "starter": "const lines = require(\"fs\").readFileSync(0, \"utf8\").trim().split(\"\\n\")\nconst n = Number(lines[0])\n\nconst students = lines.slice(1, n + 1).map((line) => {\n  const [name, marks] = line.trim().split(/\\s+/)\n  return [name, Number(marks)]\n})\n\n// Your code here\n",
+       "solution": "const lines = require(\"fs\").readFileSync(0, \"utf8\").trim().split(\"\\n\")\nconst n = Number(lines[0])\n\nconst students = lines.slice(1, n + 1).map((line) => {\n  const [name, marks] = line.trim().split(/\\s+/)\n  return [name, Number(marks)]\n})\n\n// Highest marks first; equal marks by name.\nconst ranked = [...students].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))\n\nranked.forEach(([name, marks], i) => console.log(`${i + 1}. ${name} - ${marks}`))\nconsole.log(`Top: ('${ranked[0][0]}', ${ranked[0][1]})`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstruct student {\n    char name[64];\n    int marks;\n};\n\n/* Highest marks first; equal marks by name. */\nstatic int by_rank(const void *a, const void *b) {\n    // Your code here\n}\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n    struct student students[64];\n    for (int i = 0; i < n; i++) scanf(\"%63s %d\", students[i].name, &students[i].marks);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstruct student {\n    char name[64];\n    int marks;\n};\n\n/* Highest marks first; equal marks by name. */\nstatic int by_rank(const void *a, const void *b) {\n    const struct student *x = a, *y = b;\n    if (x->marks != y->marks) return y->marks - x->marks;\n    return strcmp(x->name, y->name);\n}\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n    struct student students[64];\n    for (int i = 0; i < n; i++) scanf(\"%63s %d\", students[i].name, &students[i].marks);\n\n    qsort(students, n, sizeof students[0], by_rank);\n    for (int i = 0; i < n; i++) printf(\"%d. %s - %d\\n\", i + 1, students[i].name, students[i].marks);\n    printf(\"Top: ('%s', %d)\\n\", students[0].name, students[0].marks);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <algorithm>\n#include <iostream>\n#include <string>\n#include <utility>\n#include <vector>\n\nint main() {\n    int n;\n    std::cin >> n;\n    std::vector<std::pair<std::string, int>> students(n);\n    for (auto &[name, marks] : students) std::cin >> name >> marks;\n\n    // Your code here\n}\n",
+       "solution": "#include <algorithm>\n#include <iostream>\n#include <string>\n#include <utility>\n#include <vector>\n\nint main() {\n    int n;\n    std::cin >> n;\n    std::vector<std::pair<std::string, int>> students(n);\n    for (auto &[name, marks] : students) std::cin >> name >> marks;\n\n    // Highest marks first; equal marks by name.\n    std::sort(students.begin(), students.end(), [](const auto &a, const auto &b) {\n        return a.second != b.second ? a.second > b.second : a.first < b.first;\n    });\n\n    for (int i = 0; i < n; i++) std::cout << i + 1 << \". \" << students[i].first << \" - \" << students[i].second << \"\\n\";\n    std::cout << \"Top: ('\" << students[0].first << \"', \" << students[0].second << \")\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.ArrayList;\nimport java.util.Comparator;\nimport java.util.List;\nimport java.util.Scanner;\n\npublic class Main {\n    record Student(String name, int marks) {}\n\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int n = in.nextInt();\n        List<Student> students = new ArrayList<>();\n        for (int i = 0; i < n; i++) students.add(new Student(in.next(), in.nextInt()));\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.ArrayList;\nimport java.util.Comparator;\nimport java.util.List;\nimport java.util.Scanner;\n\npublic class Main {\n    record Student(String name, int marks) {}\n\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int n = in.nextInt();\n        List<Student> students = new ArrayList<>();\n        for (int i = 0; i < n; i++) students.add(new Student(in.next(), in.nextInt()));\n\n        // Highest marks first; equal marks by name.\n        students.sort(Comparator.comparingInt(Student::marks).reversed().thenComparing(Student::name));\n\n        for (int i = 0; i < n; i++) {\n            Student s = students.get(i);\n            System.out.println((i + 1) + \". \" + s.name() + \" - \" + s.marks());\n        }\n        Student top = students.get(0);\n        System.out.println(\"Top: ('\" + top.name() + \"', \" + top.marks() + \")\");\n    }\n}\n"
+      }
+     }
     }
    ]
   },
@@ -974,7 +1459,34 @@
        "Frequency: {'go': 3, 'stop': 1}\nMost frequent: go"
       ]
      ],
-     "solution": "words = input().split()\n\nfreq = {}\nfor w in words:\n    freq[w] = freq.get(w, 0) + 1\n\nbest = words[0]\nfor w in freq:\n    if freq[w] > freq[best]:\n        best = w\n\nprint(\"Frequency:\", freq)\nprint(\"Most frequent:\", best)"
+     "solution": "words = input().split()\n\nfreq = {}\nfor w in words:\n    freq[w] = freq.get(w, 0) + 1\n\nbest = words[0]\nfor w in freq:\n    if freq[w] > freq[best]:\n        best = w\n\nprint(\"Frequency:\", freq)\nprint(\"Most frequent:\", best)",
+     "editorial": "Count with a dictionary; `freq.get(w, 0)` gives 0 for a word not seen yet:\n\n```python\nfor w in words:\n    freq[w] = freq.get(w, 0) + 1\n```\n\nDictionaries remember the order keys were added, so printing `freq` shows the words in order of first appearance. For the most frequent word, go through the dictionary and replace your best only when a count is strictly greater, so ties keep the earliest word.",
+     "hints": [
+      "Use a dictionary from word to count.",
+      "`freq.get(w, 0) + 1` adds one, starting from 0 for new words.",
+      "Replace the most frequent word only when a count is strictly higher."
+     ],
+     "code": {
+      "python": {
+       "starter": "words = input().split()\n\nfreq = {}\n# Your code here\n"
+      },
+      "javascript": {
+       "starter": "const words = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/)\n\n// A Map keeps words in the order they first appear, like a Python dict.\nconst freq = new Map()\nfor (const w of words) freq.set(w, (freq.get(w) ?? 0) + 1)\n\nlet best = words[0]\n\n// Your code here\n",
+       "solution": "const words = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/)\n\n// A Map keeps words in the order they first appear, like a Python dict.\nconst freq = new Map()\nfor (const w of words) freq.set(w, (freq.get(w) ?? 0) + 1)\n\nlet best = words[0]\nfor (const [w, count] of freq) if (count > freq.get(best)) best = w\n\nconst shown = [...freq].map(([w, count]) => `'${w}': ${count}`).join(\", \")\nconsole.log(`Frequency: {${shown}}`)\nconsole.log(`Most frequent: ${best}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char words[128][64];\n    int nwords = 0;\n    while (nwords < 128 && scanf(\"%63s\", words[nwords]) == 1) nwords++;\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char words[128][64];\n    int counts[128];\n    int nwords = 0;\n    char w[64];\n    /* Distinct words in the order they first appear, like a Python dict. */\n    while (scanf(\"%63s\", w) == 1) {\n        int i = 0;\n        while (i < nwords && strcmp(words[i], w) != 0) i++;\n        if (i == nwords) {\n            strcpy(words[nwords], w);\n            counts[nwords++] = 0;\n        }\n        counts[i]++;\n    }\n\n    int best = 0;\n    for (int i = 1; i < nwords; i++) if (counts[i] > counts[best]) best = i;\n\n    printf(\"Frequency: {\");\n    for (int i = 0; i < nwords; i++) printf(i ? \", '%s': %d\" : \"'%s': %d\", words[i], counts[i]);\n    printf(\"}\\n\");\n    printf(\"Most frequent: %s\\n\", words[best]);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <string>\n#include <vector>\n\nint main() {\n    std::vector<std::string> words;\n    for (std::string w; std::cin >> w;) words.push_back(w);\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n#include <map>\n#include <string>\n#include <vector>\n\nint main() {\n    std::vector<std::string> order;  // words in the order they first appear, like a Python dict\n    std::map<std::string, int> freq;\n    for (std::string w; std::cin >> w;) {\n        if (!freq.count(w)) order.push_back(w);\n        freq[w]++;\n    }\n\n    std::string best = order[0];\n    for (const auto &w : order) if (freq[w] > freq[best]) best = w;\n\n    std::cout << \"Frequency: {\";\n    for (std::size_t i = 0; i < order.size(); i++) std::cout << (i ? \", '\" : \"'\") << order[i] << \"': \" << freq[order[i]];\n    std::cout << \"}\\n\";\n    std::cout << \"Most frequent: \" << best << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.LinkedHashMap;\nimport java.util.Map;\nimport java.util.Scanner;\nimport java.util.StringJoiner;\n\npublic class Main {\n    public static void main(String[] args) {\n        String[] words = new Scanner(System.in).nextLine().trim().split(\"\\\\s+\");\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.LinkedHashMap;\nimport java.util.Map;\nimport java.util.Scanner;\nimport java.util.StringJoiner;\n\npublic class Main {\n    public static void main(String[] args) {\n        String[] words = new Scanner(System.in).nextLine().trim().split(\"\\\\s+\");\n\n        // LinkedHashMap keeps words in the order they first appear, like a Python dict.\n        Map<String, Integer> freq = new LinkedHashMap<>();\n        for (String w : words) freq.merge(w, 1, Integer::sum);\n\n        String best = words[0];\n        for (var entry : freq.entrySet()) if (entry.getValue() > freq.get(best)) best = entry.getKey();\n\n        StringJoiner shown = new StringJoiner(\", \", \"{\", \"}\");\n        freq.forEach((w, count) -> shown.add(\"'\" + w + \"': \" + count));\n        System.out.println(\"Frequency: \" + shown);\n        System.out.println(\"Most frequent: \" + best);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p20",
@@ -1021,7 +1533,34 @@
        "Without duplicates: [-1, 0, 1]\nCommon: [0]\nUnion: [-1, 0, 1, 2]\nOnly in first: [-1, 1]"
       ]
      ],
-     "solution": "first = list(map(int, input().split()))\nsecond = list(map(int, input().split()))\n\nseen = set()\nunique = []\nfor n in first:\n    if n not in seen:\n        seen.add(n)\n        unique.append(n)\n\na = set(first)\nb = set(second)\n\nprint(\"Without duplicates:\", unique)\nprint(\"Common:\", sorted(a & b))\nprint(\"Union:\", sorted(a | b))\nprint(\"Only in first:\", sorted(a - b))"
+     "solution": "first = list(map(int, input().split()))\nsecond = list(map(int, input().split()))\n\nseen = set()\nunique = []\nfor n in first:\n    if n not in seen:\n        seen.add(n)\n        unique.append(n)\n\na = set(first)\nb = set(second)\n\nprint(\"Without duplicates:\", unique)\nprint(\"Common:\", sorted(a & b))\nprint(\"Union:\", sorted(a | b))\nprint(\"Only in first:\", sorted(a - b))",
+     "editorial": "To remove duplicates while keeping order, remember the values already seen in a set, which checks membership quickly:\n\n```python\nseen = set()\nunique = []\nfor n in first:\n    if n not in seen:\n        seen.add(n)\n        unique.append(n)\n```\n\nThen compare with set operators and sort each result: `a & b` (common), `a | b` (union) and `a - b` (only in the first).",
+     "hints": [
+      "A set can't keep order, so use it only to remember what you've seen.",
+      "`&`, `|` and `-` are intersection, union and difference.",
+      "Sets have no order, so wrap each result in `sorted()`."
+     ],
+     "code": {
+      "python": {
+       "starter": "first = list(map(int, input().split()))\nsecond = list(map(int, input().split()))\n\n# Your code here\n"
+      },
+      "javascript": {
+       "starter": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\nconst first = lines[0].trim().split(/\\s+/).map(Number)\nconst second = lines[1].trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\nconst first = lines[0].trim().split(/\\s+/).map(Number)\nconst second = lines[1].trim().split(/\\s+/).map(Number)\n\nconst seen = new Set()\nconst unique = []\nfor (const n of first) {\n  if (!seen.has(n)) {\n    seen.add(n)\n    unique.push(n)\n  }\n}\n\nconst a = new Set(first)\nconst b = new Set(second)\nconst sorted = (values) => [...values].sort((x, y) => x - y)\nconst list = (values) => `[${values.join(\", \")}]`\n\nconsole.log(`Without duplicates: ${list(unique)}`)\nconsole.log(`Common: ${list(sorted([...a].filter((n) => b.has(n))))}`)\nconsole.log(`Union: ${list(sorted(new Set([...a, ...b])))}`)\nconsole.log(`Only in first: ${list(sorted([...a].filter((n) => !b.has(n))))}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n#include <stdlib.h>\n\nstatic int read_line(int *out) {\n    char line[4096];\n    int n = 0;\n    if (!fgets(line, sizeof line, stdin)) return 0;\n    for (char *p = line; n < 128;) {\n        int value, used;\n        if (sscanf(p, \"%d%n\", &value, &used) != 1) break;\n        out[n++] = value;\n        p += used;\n    }\n    return n;\n}\n\nstatic int contains(const int *values, int n, int x) {\n    // Your code here\n}\n\nstatic int ascending(const void *a, const void *b) {\n    // Your code here\n}\n\n/* Sorted, without duplicates, printed the way Python prints a list. */\nstatic void print_sorted(const char *label, int *values, int n) {\n    // Your code here\n}\n\nint main(void) {\n    int first[128], second[128];\n    int n1 = read_line(first), n2 = read_line(second);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n#include <stdlib.h>\n\nstatic int read_line(int *out) {\n    char line[4096];\n    int n = 0;\n    if (!fgets(line, sizeof line, stdin)) return 0;\n    for (char *p = line; n < 128;) {\n        int value, used;\n        if (sscanf(p, \"%d%n\", &value, &used) != 1) break;\n        out[n++] = value;\n        p += used;\n    }\n    return n;\n}\n\nstatic int contains(const int *values, int n, int x) {\n    for (int i = 0; i < n; i++) if (values[i] == x) return 1;\n    return 0;\n}\n\nstatic int ascending(const void *a, const void *b) {\n    return *(const int *)a - *(const int *)b;\n}\n\n/* Sorted, without duplicates, printed the way Python prints a list. */\nstatic void print_sorted(const char *label, int *values, int n) {\n    qsort(values, n, sizeof(int), ascending);\n    printf(\"%s: [\", label);\n    int shown = 0;\n    for (int i = 0; i < n; i++) {\n        if (i > 0 && values[i] == values[i - 1]) continue;\n        printf(shown++ ? \", %d\" : \"%d\", values[i]);\n    }\n    printf(\"]\\n\");\n}\n\nint main(void) {\n    int first[128], second[128];\n    int n1 = read_line(first), n2 = read_line(second);\n\n    int unique[128], nu = 0;\n    for (int i = 0; i < n1; i++) if (!contains(unique, nu, first[i])) unique[nu++] = first[i];\n    printf(\"Without duplicates: [\");\n    for (int i = 0; i < nu; i++) printf(i ? \", %d\" : \"%d\", unique[i]);\n    printf(\"]\\n\");\n\n    int common[128], nc = 0, all[256], na = 0, only[128], no = 0;\n    for (int i = 0; i < n1; i++) {\n        all[na++] = first[i];\n        if (contains(second, n2, first[i])) common[nc++] = first[i];\n        else only[no++] = first[i];\n    }\n    for (int i = 0; i < n2; i++) all[na++] = second[i];\n    print_sorted(\"Common\", common, nc);\n    print_sorted(\"Union\", all, na);\n    print_sorted(\"Only in first\", only, no);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <set>\n#include <sstream>\n#include <string>\n#include <vector>\n\nstd::vector<int> read_line() {\n    std::string line;\n    std::getline(std::cin, line);\n    std::istringstream in(line);\n    std::vector<int> out;\n    for (int x; in >> x;) out.push_back(x);\n    return out;\n}\n\n// Printed the way Python prints a list.\ntemplate <typename C>\nvoid print(const std::string &label, const C &values) {\n    // Your code here\n}\n\nint main() {\n    std::vector<int> first = read_line(), second = read_line();\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n#include <set>\n#include <sstream>\n#include <string>\n#include <vector>\n\nstd::vector<int> read_line() {\n    std::string line;\n    std::getline(std::cin, line);\n    std::istringstream in(line);\n    std::vector<int> out;\n    for (int x; in >> x;) out.push_back(x);\n    return out;\n}\n\n// Printed the way Python prints a list.\ntemplate <typename C>\nvoid print(const std::string &label, const C &values) {\n    std::cout << label << \": [\";\n    bool first = true;\n    for (int x : values) {\n        std::cout << (first ? \"\" : \", \") << x;\n        first = false;\n    }\n    std::cout << \"]\\n\";\n}\n\nint main() {\n    std::vector<int> first = read_line(), second = read_line();\n\n    std::set<int> seen;\n    std::vector<int> unique;\n    for (int x : first) if (seen.insert(x).second) unique.push_back(x);\n\n    std::set<int> a(first.begin(), first.end()), b(second.begin(), second.end());\n    std::set<int> common, all = a, only;\n    for (int x : a) (b.count(x) ? common : only).insert(x);\n    all.insert(b.begin(), b.end());\n\n    print(\"Without duplicates\", unique);\n    print(\"Common\", common);\n    print(\"Union\", all);\n    print(\"Only in first\", only);\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.ArrayList;\nimport java.util.LinkedHashSet;\nimport java.util.List;\nimport java.util.Scanner;\nimport java.util.TreeSet;\n\npublic class Main {\n    static List<Integer> readLine(Scanner in) {\n        List<Integer> out = new ArrayList<>();\n        for (String s : in.nextLine().trim().split(\"\\\\s+\")) out.add(Integer.parseInt(s));\n        return out;\n    }\n\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        List<Integer> first = readLine(in), second = readLine(in);\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.ArrayList;\nimport java.util.LinkedHashSet;\nimport java.util.List;\nimport java.util.Scanner;\nimport java.util.TreeSet;\n\npublic class Main {\n    static List<Integer> readLine(Scanner in) {\n        List<Integer> out = new ArrayList<>();\n        for (String s : in.nextLine().trim().split(\"\\\\s+\")) out.add(Integer.parseInt(s));\n        return out;\n    }\n\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        List<Integer> first = readLine(in), second = readLine(in);\n\n        // A LinkedHashSet drops repeats and keeps the original order.\n        List<Integer> unique = new ArrayList<>(new LinkedHashSet<>(first));\n        TreeSet<Integer> a = new TreeSet<>(first), b = new TreeSet<>(second);\n        TreeSet<Integer> common = new TreeSet<>(a), union = new TreeSet<>(a), only = new TreeSet<>(a);\n        common.retainAll(b);\n        union.addAll(b);\n        only.removeAll(b);\n\n        // Java collections print like Python lists: [1, 2, 3].\n        System.out.println(\"Without duplicates: \" + unique);\n        System.out.println(\"Common: \" + common);\n        System.out.println(\"Union: \" + union);\n        System.out.println(\"Only in first: \" + only);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p21",
@@ -1065,7 +1604,34 @@
        "a\nb\nc\nGroups: 3"
       ]
      ],
-     "solution": "words = input().split()\n\ngroups = {}\nfor w in words:\n    key = \"\".join(sorted(w))\n    if key not in groups:\n        groups[key] = []\n    if w not in groups[key]:\n        groups[key].append(w)\n\nfor members in groups.values():\n    print(\" \".join(members))\nprint(\"Groups:\", len(groups))"
+     "solution": "words = input().split()\n\ngroups = {}\nfor w in words:\n    key = \"\".join(sorted(w))\n    if key not in groups:\n        groups[key] = []\n    if w not in groups[key]:\n        groups[key].append(w)\n\nfor members in groups.values():\n    print(\" \".join(members))\nprint(\"Groups:\", len(groups))",
+     "editorial": "Anagrams have the same letters, so sorting a word's letters gives the same key for every word in a group: `\"\".join(sorted(\"listen\"))` and `\"\".join(sorted(\"silent\"))` are both `\"eilnst\"`.\n\nMap each key to the list of its words, and skip a word already in its list:\n\n```python\nkey = \"\".join(sorted(w))\ngroups.setdefault(key, [])\nif w not in groups[key]:\n    groups[key].append(w)\n```\n\nA dictionary keeps keys in insertion order, so the groups come out in the order their first word appeared.",
+     "hints": [
+      "What do all the anagrams of a word have in common?",
+      "Sort the letters of each word to make a key.",
+      "Use a dictionary from key to a list of words, and skip repeated words."
+     ],
+     "code": {
+      "python": {
+       "starter": "words = input().split()\n\ngroups = {}\n# Your code here: the key is the word's letters in sorted order.\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst words = input.trim().split(/\\s+/)\n\n// Your code here\n",
+       "solution": "const words = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/)\n\n// A Map keeps keys in the order they were first added.\nconst groups = new Map()\nfor (const w of words) {\n  const key = [...w].sort().join(\"\")\n  if (!groups.has(key)) groups.set(key, [])\n  const members = groups.get(key)\n  if (!members.includes(w)) members.push(w)\n}\n\nfor (const members of groups.values()) console.log(members.join(\" \"))\nconsole.log(`Groups: ${groups.size}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    char words[128][128]; int n = 0;\n    while (n < 128 && scanf(\"%127s\", words[n]) == 1) n++;\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstatic int by_char(const void *a, const void *b) {\n    return *(const char *)a - *(const char *)b;\n}\n\nint main(void) {\n    char words[128][128], keys[128][128];\n    int members[128][128], sizes[128];\n    int nwords = 0, ngroups = 0;\n    while (nwords < 128 && scanf(\"%127s\", words[nwords]) == 1) nwords++;\n\n    for (int w = 0; w < nwords; w++) {\n        char key[128];\n        strcpy(key, words[w]);\n        qsort(key, strlen(key), 1, by_char);\n\n        int g = 0;\n        while (g < ngroups && strcmp(keys[g], key) != 0) g++;\n        if (g == ngroups) {\n            strcpy(keys[ngroups], key);\n            sizes[ngroups++] = 0;\n        }\n        int seen = 0;\n        for (int m = 0; m < sizes[g]; m++) {\n            if (strcmp(words[members[g][m]], words[w]) == 0) seen = 1;\n        }\n        if (!seen) members[g][sizes[g]++] = w;\n    }\n\n    for (int g = 0; g < ngroups; g++) {\n        for (int m = 0; m < sizes[g]; m++) printf(m ? \" %s\" : \"%s\", words[members[g][m]]);\n        printf(\"\\n\");\n    }\n    printf(\"Groups: %d\\n\", ngroups);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <string>\n#include <vector>\n\nint main() {\n    std::vector<std::string> words;\n    for (std::string w; std::cin >> w;) words.push_back(w);\n\n    // Your code here\n}\n",
+       "solution": "#include <algorithm>\n#include <iostream>\n#include <map>\n#include <string>\n#include <vector>\n\nint main() {\n    std::vector<std::string> order;                      // keys in first-seen order\n    std::map<std::string, std::vector<std::string>> groups;\n    for (std::string w; std::cin >> w;) {\n        std::string key = w;\n        std::sort(key.begin(), key.end());\n        if (!groups.count(key)) order.push_back(key);\n        auto &members = groups[key];\n        if (std::find(members.begin(), members.end(), w) == members.end()) members.push_back(w);\n    }\n\n    for (const auto &key : order) {\n        const auto &members = groups[key];\n        for (std::size_t i = 0; i < members.size(); i++) std::cout << (i ? \" \" : \"\") << members[i];\n        std::cout << \"\\n\";\n    }\n    std::cout << \"Groups: \" << order.size() << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        String[] words = new Scanner(System.in).nextLine().trim().split(\"\\\\s+\");\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.ArrayList;\nimport java.util.Arrays;\nimport java.util.LinkedHashMap;\nimport java.util.List;\nimport java.util.Map;\nimport java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        String[] words = new Scanner(System.in).nextLine().trim().split(\"\\\\s+\");\n\n        // LinkedHashMap keeps groups in the order their first word appeared.\n        Map<String, List<String>> groups = new LinkedHashMap<>();\n        for (String w : words) {\n            char[] letters = w.toCharArray();\n            Arrays.sort(letters);\n            List<String> members = groups.computeIfAbsent(new String(letters), key -> new ArrayList<>());\n            if (!members.contains(w)) members.add(w);\n        }\n\n        for (List<String> members : groups.values()) System.out.println(String.join(\" \", members));\n        System.out.println(\"Groups: \" + groups.size());\n    }\n}\n"
+      }
+     }
     }
    ]
   },
@@ -1115,7 +1681,34 @@
        "6! = 720\n6C6 = 1"
       ]
      ],
-     "solution": "def factorial(n):\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    return result\n\n\nn = int(input())\nr = int(input())\n\nncr = factorial(n) // (factorial(r) * factorial(n - r))\nprint(f\"{n}! = {factorial(n)}\")\nprint(f\"{n}C{r} = {ncr}\")"
+     "solution": "def factorial(n):\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    return result\n\n\nn = int(input())\nr = int(input())\n\nncr = factorial(n) // (factorial(r) * factorial(n - r))\nprint(f\"{n}! = {factorial(n)}\")\nprint(f\"{n}C{r} = {ncr}\")",
+     "editorial": "Multiply the numbers from 2 to `n` together:\n\n```python\ndef factorial(n):\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    return result\n```\n\n`0!` and `1!` are both 1, which the loop gives naturally because it doesn't run. Then nCr = n! // (r! × (n − r)!); use `//` so the result stays a whole number.\n\n**In other languages:** 20! is about 2.4 × 10¹⁸. It fits in a 64-bit integer (`long long`, `long`), but JavaScript needs `BigInt`.",
+     "hints": [
+      "n! is 1 × 2 × … × n, and 0! is 1.",
+      "A `for` loop over `range(2, n + 1)` multiplies the numbers together.",
+      "Use `//` for nCr so the answer is an integer."
+     ],
+     "code": {
+      "python": {
+       "starter": "def factorial(n):\n    # Your code here: use a loop.\n    return 1\n\n\nn = int(input())\nr = int(input())\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [n, r] = input.trim().split(/\\s+/).map(BigInt) // 20! needs BigInt\n\n// Your code here\n",
+       "solution": "const [n, r] = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(BigInt)\n\n// 20! is larger than JavaScript numbers hold exactly, so this uses BigInt.\nfunction factorial(n) {\n  let result = 1n\n  for (let i = 2n; i <= n; i++) result *= i\n  return result\n}\n\nconst ncr = factorial(n) / (factorial(r) * factorial(n - r))\nconsole.log(`${n}! = ${factorial(n)}`)\nconsole.log(`${n}C${r} = ${ncr}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int n, r;\n    scanf(\"%d %d\", &n, &r);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nlong long factorial(int n) {\n    long long result = 1;\n    for (int i = 2; i <= n; i++) result *= i;\n    return result;\n}\n\nint main(void) {\n    int n, r;\n    scanf(\"%d %d\", &n, &r);\n\n    /* 20! still fits in a 64-bit long long. */\n    long long ncr = factorial(n) / (factorial(r) * factorial(n - r));\n    printf(\"%d! = %lld\\n\", n, factorial(n));\n    printf(\"%dC%d = %lld\\n\", n, r, ncr);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n\nint main() {\n    int n, r;\n    std::cin >> n >> r;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n\nlong long factorial(int n) {\n    long long result = 1;\n    for (int i = 2; i <= n; i++) result *= i;\n    return result;\n}\n\nint main() {\n    int n, r;\n    std::cin >> n >> r;\n\n    // 20! still fits in a 64-bit long long.\n    long long ncr = factorial(n) / (factorial(r) * factorial(n - r));\n    std::cout << n << \"! = \" << factorial(n) << \"\\n\";\n    std::cout << n << \"C\" << r << \" = \" << ncr << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int n = in.nextInt(), r = in.nextInt();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Scanner;\n\npublic class Main {\n    static long factorial(int n) {\n        long result = 1;\n        for (int i = 2; i <= n; i++) result *= i;\n        return result;\n    }\n\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int n = in.nextInt(), r = in.nextInt();\n\n        // 20! still fits in a long.\n        long ncr = factorial(n) / (factorial(r) * factorial(n - r));\n        System.out.println(n + \"! = \" + factorial(n));\n        System.out.println(n + \"C\" + r + \" = \" + ncr);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p23",
@@ -1182,7 +1775,34 @@
        "Odd squares: [49, 49, 1]\nSum of evens: 0\nSorted by absolute value: [1, 7, -7]"
       ]
      ],
-     "solution": "numbers = list(map(int, input().split()))\n\nodd_squares = list(map(lambda n: n * n, filter(lambda n: n % 2 != 0, numbers)))\neven_sum = sum(filter(lambda n: n % 2 == 0, numbers))\nby_abs = sorted(numbers, key=lambda n: abs(n))\n\nprint(\"Odd squares:\", odd_squares)\nprint(\"Sum of evens:\", even_sum)\nprint(\"Sorted by absolute value:\", by_abs)"
+     "solution": "numbers = list(map(int, input().split()))\n\nodd_squares = list(map(lambda n: n * n, filter(lambda n: n % 2 != 0, numbers)))\neven_sum = sum(filter(lambda n: n % 2 == 0, numbers))\nby_abs = sorted(numbers, key=lambda n: abs(n))\n\nprint(\"Odd squares:\", odd_squares)\nprint(\"Sum of evens:\", even_sum)\nprint(\"Sorted by absolute value:\", by_abs)",
+     "editorial": "Each line is one built-in function given a `lambda`:\n\n```python\nodd_squares = list(map(lambda n: n * n, filter(lambda n: n % 2 != 0, numbers)))\neven_sum = sum(filter(lambda n: n % 2 == 0, numbers))\nby_abs = sorted(numbers, key=lambda n: abs(n))\n```\n\n`filter()` keeps the values where the lambda is true, and `map()` transforms each one. `sorted()` is stable: values with the same absolute value keep their input order. Note that `n % 2 != 0` is also true for negative odd numbers.",
+     "hints": [
+      "`filter(lambda n: ..., numbers)` keeps the values where the condition is true.",
+      "`map()` and `filter()` return iterators; wrap them in `list()` to print them.",
+      "`sorted(numbers, key=abs)` sorts by absolute value and keeps ties in order."
+     ],
+     "code": {
+      "python": {
+       "starter": "numbers = list(map(int, input().split()))\n\n# Your code here: filter(), map(), sum() and sorted() with lambdas.\n"
+      },
+      "javascript": {
+       "starter": "const numbers = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number)\n\n// Your code here\n",
+       "solution": "const numbers = require(\"fs\").readFileSync(0, \"utf8\").trim().split(/\\s+/).map(Number)\n\nconst oddSquares = numbers.filter((n) => n % 2 !== 0).map((n) => n * n)\nconst evenSum = numbers.filter((n) => n % 2 === 0).reduce((sum, n) => sum + n, 0)\n// sort() is stable, so equal absolute values keep their input order.\nconst byAbs = [...numbers].sort((a, b) => Math.abs(a) - Math.abs(b))\n\nconst list = (values) => `[${values.join(\", \")}]`\nconsole.log(`Odd squares: ${list(oddSquares)}`)\nconsole.log(`Sum of evens: ${evenSum}`)\nconsole.log(`Sorted by absolute value: ${list(byAbs)}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    int numbers[128], n = 0;\n    while (n < 128 && scanf(\"%d\", &numbers[n]) == 1) n++;\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n#include <stdlib.h>\n\nint main(void) {\n    int numbers[128], n = 0;\n    while (n < 128 && scanf(\"%d\", &numbers[n]) == 1) n++;\n\n    printf(\"Odd squares: [\");\n    int shown = 0;\n    for (int i = 0; i < n; i++) {\n        if (numbers[i] % 2 != 0) printf(shown++ ? \", %d\" : \"%d\", numbers[i] * numbers[i]);\n    }\n    printf(\"]\\n\");\n\n    int even_sum = 0;\n    for (int i = 0; i < n; i++) if (numbers[i] % 2 == 0) even_sum += numbers[i];\n    printf(\"Sum of evens: %d\\n\", even_sum);\n\n    /* Insertion sort is stable: equal absolute values keep their input order. */\n    int sorted[128];\n    for (int i = 0; i < n; i++) {\n        int x = numbers[i], j = i;\n        while (j > 0 && abs(sorted[j - 1]) > abs(x)) {\n            sorted[j] = sorted[j - 1];\n            j--;\n        }\n        sorted[j] = x;\n    }\n    printf(\"Sorted by absolute value: [\");\n    for (int i = 0; i < n; i++) printf(i ? \", %d\" : \"%d\", sorted[i]);\n    printf(\"]\\n\");\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <algorithm>\n#include <cstdlib>\n#include <iostream>\n#include <vector>\n\nvoid print(const char *label, const std::vector<int> &values) {\n    // Your code here\n}\n\nint main() {\n    std::vector<int> numbers;\n    for (int x; std::cin >> x;) numbers.push_back(x);\n\n    // Your code here\n}\n",
+       "solution": "#include <algorithm>\n#include <cstdlib>\n#include <iostream>\n#include <vector>\n\nvoid print(const char *label, const std::vector<int> &values) {\n    std::cout << label << \": [\";\n    for (std::size_t i = 0; i < values.size(); i++) std::cout << (i ? \", \" : \"\") << values[i];\n    std::cout << \"]\\n\";\n}\n\nint main() {\n    std::vector<int> numbers;\n    for (int x; std::cin >> x;) numbers.push_back(x);\n\n    std::vector<int> odd_squares;\n    int even_sum = 0;\n    for (int n : numbers) {\n        if (n % 2 != 0) odd_squares.push_back(n * n);\n        else even_sum += n;\n    }\n\n    // stable_sort: equal absolute values keep their input order.\n    std::vector<int> by_abs = numbers;\n    std::stable_sort(by_abs.begin(), by_abs.end(), [](int a, int b) { return std::abs(a) < std::abs(b); });\n\n    print(\"Odd squares\", odd_squares);\n    std::cout << \"Sum of evens: \" << even_sum << \"\\n\";\n    print(\"Sorted by absolute value\", by_abs);\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Arrays;\nimport java.util.Comparator;\nimport java.util.List;\nimport java.util.Scanner;\nimport java.util.stream.Collectors;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<Integer> numbers = Arrays.stream(new Scanner(System.in).nextLine().trim().split(\"\\\\s+\"))\n                .map(Integer::parseInt).collect(Collectors.toList());\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Arrays;\nimport java.util.Comparator;\nimport java.util.List;\nimport java.util.Scanner;\nimport java.util.stream.Collectors;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<Integer> numbers = Arrays.stream(new Scanner(System.in).nextLine().trim().split(\"\\\\s+\"))\n                .map(Integer::parseInt).collect(Collectors.toList());\n\n        List<Integer> oddSquares = numbers.stream().filter(n -> n % 2 != 0).map(n -> n * n).toList();\n        int evenSum = numbers.stream().filter(n -> n % 2 == 0).mapToInt(Integer::intValue).sum();\n        // Sorting is stable, so equal absolute values keep their input order.\n        List<Integer> byAbs = numbers.stream().sorted(Comparator.comparingInt(Math::abs)).toList();\n\n        System.out.println(\"Odd squares: \" + oddSquares);\n        System.out.println(\"Sum of evens: \" + evenSum);\n        System.out.println(\"Sorted by absolute value: \" + byAbs);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p24",
@@ -1257,7 +1877,34 @@
        "mod: Unsupported"
       ]
      ],
-     "solution": "def calculate(a, b, operation):\n    return operation(a, b)\n\n\noperations = {\n    \"add\": lambda a, b: a + b,\n    \"sub\": lambda a, b: a - b,\n    \"mul\": lambda a, b: a * b,\n    \"max\": lambda a, b: a if a > b else b,\n    \"min\": lambda a, b: a if a < b else b,\n    \"pow\": lambda a, b: a ** b,\n}\n\na, b = map(int, input().split())\nnames = input().split()\n\nfor name in names:\n    if name in operations:\n        print(f\"{name}: {calculate(a, b, operations[name])}\")\n    else:\n        print(f\"{name}: Unsupported\")"
+     "solution": "def calculate(a, b, operation):\n    return operation(a, b)\n\n\noperations = {\n    \"add\": lambda a, b: a + b,\n    \"sub\": lambda a, b: a - b,\n    \"mul\": lambda a, b: a * b,\n    \"max\": lambda a, b: a if a > b else b,\n    \"min\": lambda a, b: a if a < b else b,\n    \"pow\": lambda a, b: a ** b,\n}\n\na, b = map(int, input().split())\nnames = input().split()\n\nfor name in names:\n    if name in operations:\n        print(f\"{name}: {calculate(a, b, operations[name])}\")\n    else:\n        print(f\"{name}: Unsupported\")",
+     "editorial": "Functions are values in Python, so a dictionary can map each name to a `lambda`, and `calculate()` just calls whatever function it is given:\n\n```python\noperations = {\n    \"add\": lambda a, b: a + b,\n    \"pow\": lambda a, b: a ** b,\n}\n```\n\nFor each name, check `name in operations` before looking it up; otherwise print `Unsupported`.\n\n**In other languages:** a power such as 100¹⁰ doesn't fit in 64 bits, so the reference solutions use `BigInt`, `BigInteger` or 128-bit integers.",
+     "hints": [
+      "A dictionary value can be a function, such as a `lambda`.",
+      "`calculate(a, b, operations[name])` passes the function as an argument.",
+      "Check `name in operations` first to handle unsupported names."
+     ],
+     "code": {
+      "python": {
+       "starter": "def calculate(a, b, operation):\n    return operation(a, b)\n\n\noperations = {\n    \"add\": lambda a, b: a + b,\n    # Your code here: the other operations.\n}\n\na, b = map(int, input().split())\nnames = input().split()\n"
+      },
+      "javascript": {
+       "starter": "const input = require(\"fs\").readFileSync(0, \"utf8\")\nconst [first, second = \"\"] = input.split(\"\\n\")\nconst [a, b] = first.trim().split(/\\s+/).map(BigInt) // powers get big\nconst names = second.trim().split(/\\s+/).filter(Boolean)\n\n// Your code here\n",
+       "solution": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\nconst [a, b] = lines[0].trim().split(/\\s+/).map(BigInt)\nconst names = (lines[1] ?? \"\").trim().split(/\\s+/).filter(Boolean)\n\nfunction calculate(a, b, operation) {\n  return operation(a, b)\n}\n\n// BigInt, because a power like 100 ** 10 doesn't fit in a regular number exactly.\nconst operations = {\n  add: (a, b) => a + b,\n  sub: (a, b) => a - b,\n  mul: (a, b) => a * b,\n  max: (a, b) => (a > b ? a : b),\n  min: (a, b) => (a < b ? a : b),\n  pow: (a, b) => a ** b,\n}\n\nfor (const name of names) {\n  if (Object.hasOwn(operations, name)) console.log(`${name}: ${calculate(a, b, operations[name])}`)\n  else console.log(`${name}: Unsupported`)\n}\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    long long a, b; char name[64];\n    scanf(\"%lld %lld\", &a, &b);\n    // Then read each operation name with scanf(\"%63s\", name)\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n#include <string.h>\n\n/* 100 to the power 10 doesn't fit in 64 bits, so results use GCC's 128-bit integers. */\ntypedef __int128 big;\n\nbig add(big a, big b) { return a + b; }\nbig sub(big a, big b) { return a - b; }\nbig mul(big a, big b) { return a * b; }\nbig max_of(big a, big b) { return a > b ? a : b; }\nbig min_of(big a, big b) { return a < b ? a : b; }\nbig power(big a, big b) {\n    big result = 1;\n    for (big i = 0; i < b; i++) result *= a;\n    return result;\n}\n\nbig calculate(big a, big b, big (*operation)(big, big)) {\n    return operation(a, b);\n}\n\nvoid print_big(big value) {\n    char digits[64];\n    int n = 0;\n    int negative = value < 0;\n    if (value == 0) digits[n++] = '0';\n    while (value != 0) {\n        int d = (int)(value % 10);\n        digits[n++] = (char)('0' + (d < 0 ? -d : d));\n        value /= 10;\n    }\n    if (negative) putchar('-');\n    while (n > 0) putchar(digits[--n]);\n}\n\nint main(void) {\n    const char *names[] = {\"add\", \"sub\", \"mul\", \"max\", \"min\", \"pow\"};\n    big (*functions[])(big, big) = {add, sub, mul, max_of, min_of, power};\n\n    long long a, b;\n    scanf(\"%lld %lld\", &a, &b);\n    char name[64];\n    while (scanf(\"%63s\", name) == 1) {\n        int found = -1;\n        for (int i = 0; i < 6; i++) if (strcmp(name, names[i]) == 0) found = i;\n        printf(\"%s: \", name);\n        if (found < 0) {\n            printf(\"Unsupported\\n\");\n        } else {\n            print_big(calculate(a, b, functions[found]));\n            printf(\"\\n\");\n        }\n    }\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <string>\n\nint main() {\n    long long a, b;\n    std::cin >> a >> b;\n    // Then read each operation name: for (std::string name; std::cin >> name;)\n\n    // Your code here\n}\n",
+       "solution": "#include <functional>\n#include <iostream>\n#include <map>\n#include <string>\n\n// 100 to the power 10 doesn't fit in 64 bits, so results use GCC's 128-bit integers.\nusing big = __int128;\n\nbig calculate(big a, big b, const std::function<big(big, big)> &operation) {\n    return operation(a, b);\n}\n\nstd::string to_string(big value) {\n    if (value == 0) return \"0\";\n    bool negative = value < 0;\n    std::string digits;\n    while (value != 0) {\n        int d = static_cast<int>(value % 10);\n        digits.insert(digits.begin(), static_cast<char>('0' + (d < 0 ? -d : d)));\n        value /= 10;\n    }\n    return negative ? \"-\" + digits : digits;\n}\n\nint main() {\n    const std::map<std::string, std::function<big(big, big)>> operations{\n        {\"add\", [](big a, big b) { return a + b; }},\n        {\"sub\", [](big a, big b) { return a - b; }},\n        {\"mul\", [](big a, big b) { return a * b; }},\n        {\"max\", [](big a, big b) { return a > b ? a : b; }},\n        {\"min\", [](big a, big b) { return a < b ? a : b; }},\n        {\"pow\", [](big a, big b) {\n             big result = 1;\n             for (big i = 0; i < b; i++) result *= a;\n             return result;\n         }},\n    };\n\n    long long a, b;\n    std::cin >> a >> b;\n    for (std::string name; std::cin >> name;) {\n        auto found = operations.find(name);\n        if (found == operations.end()) std::cout << name << \": Unsupported\\n\";\n        else std::cout << name << \": \" << to_string(calculate(a, b, found->second)) << \"\\n\";\n    }\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        long a = in.nextLong(), b = in.nextLong();\n        // Then read each operation name with in.next() while in.hasNext()\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.math.BigInteger;\nimport java.util.Map;\nimport java.util.Scanner;\nimport java.util.function.BinaryOperator;\n\npublic class Main {\n    static BigInteger calculate(BigInteger a, BigInteger b, BinaryOperator<BigInteger> operation) {\n        return operation.apply(a, b);\n    }\n\n    public static void main(String[] args) {\n        // BigInteger, because a power like 100 to the 10th doesn't fit in a long.\n        Map<String, BinaryOperator<BigInteger>> operations = Map.of(\n                \"add\", BigInteger::add,\n                \"sub\", BigInteger::subtract,\n                \"mul\", BigInteger::multiply,\n                \"max\", BigInteger::max,\n                \"min\", BigInteger::min,\n                \"pow\", (a, b) -> a.pow(b.intValueExact()));\n\n        Scanner in = new Scanner(System.in);\n        BigInteger a = in.nextBigInteger(), b = in.nextBigInteger();\n        while (in.hasNext()) {\n            String name = in.next();\n            BinaryOperator<BigInteger> operation = operations.get(name);\n            System.out.println(name + \": \" + (operation == null ? \"Unsupported\" : calculate(a, b, operation)));\n        }\n    }\n}\n"
+      }
+     }
     }
    ]
   },
@@ -1305,7 +1952,34 @@
        "Multiples: [3, 5, 6, 9, 10, 12, 15, 18, 20, 21, 24, 25, 27, 30]\nSum: 225"
       ]
      ],
-     "solution": "n = int(input())\n\nmultiples = [i for i in range(1, n + 1) if i % 3 == 0 or i % 5 == 0]\n\nprint(\"Multiples:\", multiples)\nprint(\"Sum:\", sum(multiples))"
+     "solution": "n = int(input())\n\nmultiples = [i for i in range(1, n + 1) if i % 3 == 0 or i % 5 == 0]\n\nprint(\"Multiples:\", multiples)\nprint(\"Sum:\", sum(multiples))",
+     "editorial": "A list comprehension builds the list in one expression, with the condition at the end:\n\n```python\nmultiples = [i for i in range(1, n + 1) if i % 3 == 0 or i % 5 == 0]\n```\n\n`range(1, n + 1)` includes `n` itself. The sum is `sum(multiples)`.",
+     "hints": [
+      "A list comprehension has the form `[expression for i in ... if condition]`.",
+      "`range(1, n + 1)` includes n.",
+      "Divisible by 3 or 5: `i % 3 == 0 or i % 5 == 0`."
+     ],
+     "code": {
+      "python": {
+       "starter": "n = int(input())\n\n# Your code here: a list comprehension.\n"
+      },
+      "javascript": {
+       "starter": "const n = Number(require(\"fs\").readFileSync(0, \"utf8\").trim())\n\n// Your code here\n",
+       "solution": "const n = Number(require(\"fs\").readFileSync(0, \"utf8\").trim())\n\nconst multiples = Array.from({ length: n }, (_, i) => i + 1).filter((i) => i % 3 === 0 || i % 5 === 0)\n\nconsole.log(`Multiples: [${multiples.join(\", \")}]`)\nconsole.log(`Sum: ${multiples.reduce((sum, i) => sum + i, 0)}`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n\n    int sum = 0, shown = 0;\n    printf(\"Multiples: [\");\n    for (int i = 1; i <= n; i++) {\n        if (i % 3 == 0 || i % 5 == 0) {\n            printf(shown++ ? \", %d\" : \"%d\", i);\n            sum += i;\n        }\n    }\n    printf(\"]\\n\");\n    printf(\"Sum: %d\\n\", sum);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <vector>\n\nint main() {\n    int n;\n    std::cin >> n;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n#include <vector>\n\nint main() {\n    int n;\n    std::cin >> n;\n\n    std::vector<int> multiples;\n    for (int i = 1; i <= n; i++) if (i % 3 == 0 || i % 5 == 0) multiples.push_back(i);\n\n    int sum = 0;\n    std::cout << \"Multiples: [\";\n    for (std::size_t i = 0; i < multiples.size(); i++) {\n        std::cout << (i ? \", \" : \"\") << multiples[i];\n        sum += multiples[i];\n    }\n    std::cout << \"]\\n\";\n    std::cout << \"Sum: \" << sum << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.List;\nimport java.util.Scanner;\nimport java.util.stream.IntStream;\n\npublic class Main {\n    public static void main(String[] args) {\n        int n = new Scanner(System.in).nextInt();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.List;\nimport java.util.Scanner;\nimport java.util.stream.IntStream;\n\npublic class Main {\n    public static void main(String[] args) {\n        int n = new Scanner(System.in).nextInt();\n\n        List<Integer> multiples = IntStream.rangeClosed(1, n)\n                .filter(i -> i % 3 == 0 || i % 5 == 0).boxed().toList();\n\n        System.out.println(\"Multiples: \" + multiples);\n        System.out.println(\"Sum: \" + multiples.stream().mapToInt(Integer::intValue).sum());\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p26",
@@ -1369,7 +2043,34 @@
        "Squares: {1: 1, 2: 4, 3: 9, 4: 16, 5: 25, 6: 36, 7: 49, 8: 64, 9: 81, 10: 100}\nDistinct lengths: [4, 5]\nLong words: ['AAAAA', 'CCCCC']"
       ]
      ],
-     "solution": "n = int(input())\nwords = input().split()\n\nsquares = {i: i * i for i in range(1, n + 1)}\nlengths = {len(w) for w in words}\nlong_words = [w.upper() for w in words if len(w) > 4]\n\nprint(\"Squares:\", squares)\nprint(\"Distinct lengths:\", sorted(lengths))\nprint(\"Long words:\", long_words)"
+     "solution": "n = int(input())\nwords = input().split()\n\nsquares = {i: i * i for i in range(1, n + 1)}\nlengths = {len(w) for w in words}\nlong_words = [w.upper() for w in words if len(w) > 4]\n\nprint(\"Squares:\", squares)\nprint(\"Distinct lengths:\", sorted(lengths))\nprint(\"Long words:\", long_words)",
+     "editorial": "The three comprehensions differ only in their brackets and what they produce:\n\n```python\nsquares = {i: i * i for i in range(1, n + 1)}       # dict: key: value\nlengths = {len(w) for w in words}                   # set: no duplicates\nlong_words = [w.upper() for w in words if len(w) > 4]\n```\n\nA set has no order, so print `sorted(lengths)` to get the distinct lengths in order.",
+     "hints": [
+      "A dict comprehension uses `{key: value for ...}`; a set comprehension uses `{value for ...}`.",
+      "A set removes duplicate lengths for you.",
+      "Sort the set before printing it."
+     ],
+     "code": {
+      "python": {
+       "starter": "n = int(input())\nwords = input().split()\n\n# Your code here: a dict, a set and a list comprehension.\n"
+      },
+      "javascript": {
+       "starter": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\nconst n = Number(lines[0])\nconst words = lines[1].trim().split(/\\s+/)\n\n// Your code here\n",
+       "solution": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\nconst n = Number(lines[0])\nconst words = lines[1].trim().split(/\\s+/)\n\nconst squares = Array.from({ length: n }, (_, i) => `${i + 1}: ${(i + 1) ** 2}`)\nconst lengths = [...new Set(words.map((w) => w.length))].sort((a, b) => a - b)\nconst longWords = words.filter((w) => w.length > 4).map((w) => `'${w.toUpperCase()}'`)\n\n// Printed the way Python prints a dict and lists.\nconsole.log(`Squares: {${squares.join(\", \")}}`)\nconsole.log(`Distinct lengths: [${lengths.join(\", \")}]`)\nconsole.log(`Long words: [${longWords.join(\", \")}]`)\n"
+      },
+      "c": {
+       "starter": "#include <ctype.h>\n#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n    char words[64][128];\n    int count = 0;\n    while (count < 64 && scanf(\"%127s\", words[count]) == 1) count++;\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <ctype.h>\n#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    int n;\n    scanf(\"%d\", &n);\n    char words[64][128];\n    int count = 0;\n    while (count < 64 && scanf(\"%127s\", words[count]) == 1) count++;\n\n    /* Printed the way Python prints a dict and lists. */\n    printf(\"Squares: {\");\n    for (int i = 1; i <= n; i++) printf(i > 1 ? \", %d: %d\" : \"%d: %d\", i, i * i);\n    printf(\"}\\n\");\n\n    int seen[128] = {0};\n    for (int w = 0; w < count; w++) seen[strlen(words[w])] = 1;\n    printf(\"Distinct lengths: [\");\n    int shown = 0;\n    for (int len = 0; len < 128; len++) if (seen[len]) printf(shown++ ? \", %d\" : \"%d\", len);\n    printf(\"]\\n\");\n\n    printf(\"Long words: [\");\n    shown = 0;\n    for (int w = 0; w < count; w++) {\n        if (strlen(words[w]) <= 4) continue;\n        printf(shown++ ? \", '\" : \"'\");\n        for (int i = 0; words[w][i]; i++) putchar(toupper((unsigned char)words[w][i]));\n        printf(\"'\");\n    }\n    printf(\"]\\n\");\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <cctype>\n#include <iostream>\n#include <set>\n#include <string>\n#include <vector>\n\nint main() {\n    int n;\n    std::cin >> n;\n    std::vector<std::string> words;\n    for (std::string w; std::cin >> w;) words.push_back(w);\n\n    // Your code here\n}\n",
+       "solution": "#include <cctype>\n#include <iostream>\n#include <set>\n#include <string>\n#include <vector>\n\nint main() {\n    int n;\n    std::cin >> n;\n    std::vector<std::string> words;\n    for (std::string w; std::cin >> w;) words.push_back(w);\n\n    // Printed the way Python prints a dict and lists.\n    std::cout << \"Squares: {\";\n    for (int i = 1; i <= n; i++) std::cout << (i > 1 ? \", \" : \"\") << i << \": \" << i * i;\n    std::cout << \"}\\n\";\n\n    std::set<std::size_t> lengths;\n    for (const auto &w : words) lengths.insert(w.size());\n    std::cout << \"Distinct lengths: [\";\n    bool first = true;\n    for (auto len : lengths) {\n        std::cout << (first ? \"\" : \", \") << len;\n        first = false;\n    }\n    std::cout << \"]\\n\";\n\n    std::cout << \"Long words: [\";\n    first = true;\n    for (auto w : words) {\n        if (w.size() <= 4) continue;\n        for (auto &ch : w) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));\n        std::cout << (first ? \"'\" : \", '\") << w << \"'\";\n        first = false;\n    }\n    std::cout << \"]\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.Arrays;\nimport java.util.List;\nimport java.util.Scanner;\nimport java.util.StringJoiner;\nimport java.util.TreeSet;\nimport java.util.stream.Collectors;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int n = Integer.parseInt(in.nextLine().trim());\n        String[] words = in.nextLine().trim().split(\"\\\\s+\");\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.Arrays;\nimport java.util.List;\nimport java.util.Scanner;\nimport java.util.StringJoiner;\nimport java.util.TreeSet;\nimport java.util.stream.Collectors;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int n = Integer.parseInt(in.nextLine().trim());\n        String[] words = in.nextLine().trim().split(\"\\\\s+\");\n\n        // Printed the way Python prints a dict and lists.\n        StringJoiner squares = new StringJoiner(\", \", \"{\", \"}\");\n        for (int i = 1; i <= n; i++) squares.add(i + \": \" + i * i);\n        TreeSet<Integer> lengths = Arrays.stream(words).map(String::length)\n                .collect(Collectors.toCollection(TreeSet::new));\n        String longWords = Arrays.stream(words).filter(w -> w.length() > 4)\n                .map(w -> \"'\" + w.toUpperCase() + \"'\").collect(Collectors.joining(\", \", \"[\", \"]\"));\n\n        System.out.println(\"Squares: \" + squares);\n        System.out.println(\"Distinct lengths: \" + lengths);\n        System.out.println(\"Long words: \" + longWords);\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p27",
@@ -1411,7 +2112,34 @@
        "-1 0\n0 -1\nRow sums: [-1, -1]\nColumn sums: [-1, -1]"
       ]
      ],
-     "solution": "r, c = map(int, input().split())\nmatrix = [list(map(int, input().split())) for _ in range(r)]\n\ntranspose = [[matrix[i][j] for i in range(r)] for j in range(c)]\nrow_sums = [sum(row) for row in matrix]\ncol_sums = [sum(matrix[i][j] for i in range(r)) for j in range(c)]\n\nfor row in transpose:\n    print(*row)\nprint(\"Row sums:\", row_sums)\nprint(\"Column sums:\", col_sums)"
+     "solution": "r, c = map(int, input().split())\nmatrix = [list(map(int, input().split())) for _ in range(r)]\n\ntranspose = [[matrix[i][j] for i in range(r)] for j in range(c)]\nrow_sums = [sum(row) for row in matrix]\ncol_sums = [sum(matrix[i][j] for i in range(r)) for j in range(c)]\n\nfor row in transpose:\n    print(*row)\nprint(\"Row sums:\", row_sums)\nprint(\"Column sums:\", col_sums)",
+     "editorial": "In the transpose, row `j` is column `j` of the original. A nested comprehension builds it, with the outer loop over columns:\n\n```python\ntranspose = [[matrix[i][j] for i in range(r)] for j in range(c)]\n```\n\nRow sums are `[sum(row) for row in matrix]`; column sums use the same shape as the transpose, summing over `i`. `print(*row)` prints a row's numbers separated by spaces.",
+     "hints": [
+      "Read the matrix with a comprehension that calls `input()` r times.",
+      "Transpose: the outer loop goes over columns, the inner over rows.",
+      "`print(*row)` prints the values separated by single spaces."
+     ],
+     "code": {
+      "python": {
+       "starter": "r, c = map(int, input().split())\nmatrix = [list(map(int, input().split())) for _ in range(r)]\n\n# Your code here: a nested list comprehension for the transpose.\n"
+      },
+      "javascript": {
+       "starter": "const lines = require(\"fs\").readFileSync(0, \"utf8\").trim().split(\"\\n\")\nconst [r, c] = lines[0].trim().split(/\\s+/).map(Number)\nconst matrix = lines.slice(1, r + 1).map((line) => line.trim().split(/\\s+/).map(Number))\n\n// Your code here\n",
+       "solution": "const lines = require(\"fs\").readFileSync(0, \"utf8\").trim().split(\"\\n\")\nconst [r, c] = lines[0].trim().split(/\\s+/).map(Number)\nconst matrix = lines.slice(1, r + 1).map((line) => line.trim().split(/\\s+/).map(Number))\n\nconst transpose = Array.from({ length: c }, (_, j) => matrix.map((row) => row[j]))\nconst rowSums = matrix.map((row) => row.reduce((s, v) => s + v, 0))\nconst colSums = transpose.map((col) => col.reduce((s, v) => s + v, 0))\n\nfor (const row of transpose) console.log(row.join(\" \"))\nconsole.log(`Row sums: [${rowSums.join(\", \")}]`)\nconsole.log(`Column sums: [${colSums.join(\", \")}]`)\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n\nint main(void) {\n    int r, c, m[10][10];\n    scanf(\"%d %d\", &r, &c);\n    for (int i = 0; i < r; i++)\n        for (int j = 0; j < c; j++) scanf(\"%d\", &m[i][j]);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n\nint main(void) {\n    int r, c, m[10][10];\n    scanf(\"%d %d\", &r, &c);\n    for (int i = 0; i < r; i++)\n        for (int j = 0; j < c; j++) scanf(\"%d\", &m[i][j]);\n\n    for (int j = 0; j < c; j++) {\n        for (int i = 0; i < r; i++) printf(i ? \" %d\" : \"%d\", m[i][j]);\n        printf(\"\\n\");\n    }\n    printf(\"Row sums: [\");\n    for (int i = 0; i < r; i++) {\n        int sum = 0;\n        for (int j = 0; j < c; j++) sum += m[i][j];\n        printf(i ? \", %d\" : \"%d\", sum);\n    }\n    printf(\"]\\nColumn sums: [\");\n    for (int j = 0; j < c; j++) {\n        int sum = 0;\n        for (int i = 0; i < r; i++) sum += m[i][j];\n        printf(j ? \", %d\" : \"%d\", sum);\n    }\n    printf(\"]\\n\");\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <iostream>\n#include <vector>\n\nvoid print(const char *label, const std::vector<int> &values) {\n    // Your code here\n}\n\nint main() {\n    int r, c;\n    std::cin >> r >> c;\n    std::vector<std::vector<int>> m(r, std::vector<int>(c));\n    for (auto &row : m) for (auto &x : row) std::cin >> x;\n\n    // Your code here\n}\n",
+       "solution": "#include <iostream>\n#include <vector>\n\nvoid print(const char *label, const std::vector<int> &values) {\n    std::cout << label << \": [\";\n    for (std::size_t i = 0; i < values.size(); i++) std::cout << (i ? \", \" : \"\") << values[i];\n    std::cout << \"]\\n\";\n}\n\nint main() {\n    int r, c;\n    std::cin >> r >> c;\n    std::vector<std::vector<int>> m(r, std::vector<int>(c));\n    for (auto &row : m) for (auto &x : row) std::cin >> x;\n\n    std::vector<int> row_sums(r, 0), col_sums(c, 0);\n    for (int i = 0; i < r; i++)\n        for (int j = 0; j < c; j++) {\n            row_sums[i] += m[i][j];\n            col_sums[j] += m[i][j];\n        }\n\n    for (int j = 0; j < c; j++) {\n        for (int i = 0; i < r; i++) std::cout << (i ? \" \" : \"\") << m[i][j];\n        std::cout << \"\\n\";\n    }\n    print(\"Row sums\", row_sums);\n    print(\"Column sums\", col_sums);\n}\n"
+      },
+      "java": {
+       "starter": "import java.util.ArrayList;\nimport java.util.List;\nimport java.util.Scanner;\nimport java.util.StringJoiner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int r = in.nextInt(), c = in.nextInt();\n        int[][] m = new int[r][c];\n        for (int i = 0; i < r; i++)\n            for (int j = 0; j < c; j++) m[i][j] = in.nextInt();\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.util.ArrayList;\nimport java.util.List;\nimport java.util.Scanner;\nimport java.util.StringJoiner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int r = in.nextInt(), c = in.nextInt();\n        int[][] m = new int[r][c];\n        for (int i = 0; i < r; i++)\n            for (int j = 0; j < c; j++) m[i][j] = in.nextInt();\n\n        List<Integer> rowSums = new ArrayList<>(), colSums = new ArrayList<>();\n        for (int i = 0; i < r; i++) {\n            int sum = 0;\n            for (int j = 0; j < c; j++) sum += m[i][j];\n            rowSums.add(sum);\n        }\n        for (int j = 0; j < c; j++) {\n            StringJoiner row = new StringJoiner(\" \");\n            int sum = 0;\n            for (int i = 0; i < r; i++) {\n                row.add(String.valueOf(m[i][j]));\n                sum += m[i][j];\n            }\n            colSums.add(sum);\n            System.out.println(row);\n        }\n        System.out.println(\"Row sums: \" + rowSums);\n        System.out.println(\"Column sums: \" + colSums);\n    }\n}\n"
+      }
+     }
     }
    ]
   },
@@ -1486,7 +2214,34 @@
        "Result: 0.00\nDone"
       ]
      ],
-     "solution": "try:\n    a = int(input())\n    b = int(input())\n    result = a / b\nexcept ValueError:\n    print(\"Invalid input\")\nexcept ZeroDivisionError:\n    print(\"Cannot divide by zero\")\nelse:\n    print(f\"Result: {result:.2f}\")\nfinally:\n    print(\"Done\")"
+     "solution": "try:\n    a = int(input())\n    b = int(input())\n    result = a / b\nexcept ValueError:\n    print(\"Invalid input\")\nexcept ZeroDivisionError:\n    print(\"Cannot divide by zero\")\nelse:\n    print(f\"Result: {result:.2f}\")\nfinally:\n    print(\"Done\")",
+     "editorial": "Put everything that can fail inside `try`: both `int()` conversions and the division.\n\n| Block | Runs when |\n| --- | --- |\n| `except ValueError` | a value isn't a whole number |\n| `except ZeroDivisionError` | the second value is 0 |\n| `else` | nothing went wrong: print the result |\n| `finally` | always: print `Done` |\n\n`int(\"2.5\")` raises `ValueError`, so a decimal is invalid input here.",
+     "hints": [
+      "`int()` raises `ValueError` for text that isn't a whole number, such as `2.5`.",
+      "Dividing by 0 raises `ZeroDivisionError`.",
+      "`else` runs only when no exception happened; `finally` always runs."
+     ],
+     "code": {
+      "python": {
+       "starter": "# Your code here: read both values inside try, then except, else and finally.\n"
+      },
+      "javascript": {
+       "starter": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\n\nfunction toInt(text) {\n  // Your code here\n}\n\n// Your code here\n",
+       "solution": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\n\n// Like Python's int(): optional sign, digits (underscores allowed between them), spaces around.\nfunction toInt(text) {\n  const t = (text ?? \"\").trim()\n  if (!/^[+-]?\\d+(_\\d+)*$/.test(t)) throw new Error(\"ValueError\")\n  return Number(t.replaceAll(\"_\", \"\"))\n}\n\ntry {\n  const a = toInt(lines[0])\n  const b = toInt(lines[1])\n  if (b === 0) {\n    console.log(\"Cannot divide by zero\")\n  } else {\n    const result = a / b\n    console.log(`Result: ${Object.is(result, -0) ? \"-\" : \"\"}${result.toFixed(2)}`)\n  }\n} catch {\n  console.log(\"Invalid input\")\n} finally {\n  console.log(\"Done\")\n}\n"
+      },
+      "c": {
+       "starter": "#include <ctype.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n/* Like Python's int(): optional sign, digits (underscores allowed between them), spaces around. */\nstatic int to_int(const char *text, long long *out) {\n    // Your code here\n}\n\nint main(void) {\n    char first[128] = \"\", second[128] = \"\";\n    fgets(first, sizeof first, stdin);\n    fgets(second, sizeof second, stdin);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <ctype.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\n/* Like Python's int(): optional sign, digits (underscores allowed between them), spaces around. */\nstatic int to_int(const char *text, long long *out) {\n    char digits[64];\n    int n = 0, i = 0;\n    while (isspace((unsigned char)text[i])) i++;\n    if (text[i] == '+' || text[i] == '-') digits[n++] = text[i++];\n    int count = 0;\n    while (isdigit((unsigned char)text[i]) || (text[i] == '_' && count > 0 && isdigit((unsigned char)text[i + 1]))) {\n        if (text[i] != '_') {\n            if (n >= 40) return 0;\n            digits[n++] = text[i];\n            count++;\n        }\n        i++;\n    }\n    while (isspace((unsigned char)text[i])) i++;\n    if (count == 0 || text[i] != '\\0') return 0;\n    digits[n] = '\\0';\n    *out = strtoll(digits, NULL, 10);\n    return 1;\n}\n\nint main(void) {\n    char first[128] = \"\", second[128] = \"\";\n    fgets(first, sizeof first, stdin);\n    fgets(second, sizeof second, stdin);\n\n    long long a, b;\n    if (!to_int(first, &a) || !to_int(second, &b)) printf(\"Invalid input\\n\");\n    else if (b == 0) printf(\"Cannot divide by zero\\n\");\n    else printf(\"Result: %.2f\\n\", (double)a / (double)b);\n    printf(\"Done\\n\");\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <cstdio>\n#include <iostream>\n#include <optional>\n#include <regex>\n#include <string>\n\n// Like Python's int(): optional sign, digits (underscores allowed between them), spaces around.\nstd::optional<long long> to_int(std::string text) {\n    // Your code here\n}\n\nint main() {\n    std::string first, second;\n    std::getline(std::cin, first);\n    std::getline(std::cin, second);\n\n    // Your code here\n}\n",
+       "solution": "#include <cstdio>\n#include <iostream>\n#include <optional>\n#include <regex>\n#include <string>\n\n// Like Python's int(): optional sign, digits (underscores allowed between them), spaces around.\nstd::optional<long long> to_int(std::string text) {\n    static const std::regex pattern(R\"(^\\s*[+-]?\\d+(_\\d+)*\\s*$)\");\n    if (!std::regex_match(text, pattern)) return std::nullopt;\n    std::string digits;\n    for (char ch : text) if (ch != '_' && !std::isspace(static_cast<unsigned char>(ch))) digits += ch;\n    try {\n        return std::stoll(digits);\n    } catch (...) {\n        return std::nullopt;\n    }\n}\n\nint main() {\n    std::string first, second;\n    std::getline(std::cin, first);\n    std::getline(std::cin, second);\n\n    auto a = to_int(first), b = to_int(second);\n    if (!a || !b) std::cout << \"Invalid input\\n\";\n    else if (*b == 0) std::cout << \"Cannot divide by zero\\n\";\n    else std::printf(\"Result: %.2f\\n\", static_cast<double>(*a) / static_cast<double>(*b));\n    std::cout << \"Done\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\n\npublic class Main {\n    // Like Python's int(): optional sign, digits (underscores allowed between them), spaces around.\n    static long toInt(String text) {\n        // Your code here\n        return 0;\n    }\n\n    public static void main(String[] args) throws IOException {\n        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\n\npublic class Main {\n    // Like Python's int(): optional sign, digits (underscores allowed between them), spaces around.\n    static long toInt(String text) {\n        String t = text == null ? \"\" : text.strip();\n        if (!t.matches(\"[+-]?\\\\d+(_\\\\d+)*\")) throw new NumberFormatException(t);\n        return Long.parseLong(t.replace(\"_\", \"\"));\n    }\n\n    public static void main(String[] args) throws IOException {\n        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));\n        try {\n            long a = toInt(in.readLine());\n            long b = toInt(in.readLine());\n            if (b == 0) System.out.println(\"Cannot divide by zero\");\n            else System.out.printf(\"Result: %.2f%n\", (double) a / b);\n        } catch (NumberFormatException e) {\n            System.out.println(\"Invalid input\");\n        } finally {\n            System.out.println(\"Done\");\n        }\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p29",
@@ -1533,7 +2288,34 @@
        "Weekday: Thursday\nDays between: 1461\nLater date: 2028-02-29"
       ]
      ],
-     "solution": "from datetime import date\n\ntry:\n    d1 = date.fromisoformat(input().strip())\n    d2 = date.fromisoformat(input().strip())\nexcept ValueError:\n    print(\"Invalid date\")\nelse:\n    print(\"Weekday:\", d1.strftime(\"%A\"))\n    print(\"Days between:\", abs((d2 - d1).days))\n    print(\"Later date:\", max(d1, d2))"
+     "solution": "from datetime import date\n\ntry:\n    d1 = date.fromisoformat(input().strip())\n    d2 = date.fromisoformat(input().strip())\nexcept ValueError:\n    print(\"Invalid date\")\nelse:\n    print(\"Weekday:\", d1.strftime(\"%A\"))\n    print(\"Days between:\", abs((d2 - d1).days))\n    print(\"Later date:\", max(d1, d2))",
+     "editorial": "`date.fromisoformat(\"2026-01-26\")` reads a date, and raises `ValueError` for an impossible one such as `2026-02-30`. Read both dates inside `try` and print `Invalid date` in the `except`.\n\nIn the `else` block:\n\n- `d1.strftime(\"%A\")` is the weekday's name\n- subtracting two dates gives a `timedelta`; `abs((d2 - d1).days)` is the number of days between them\n- `max(d1, d2)` is the later date, and printing a date gives `YYYY-MM-DD`",
+     "hints": [
+      "`date.fromisoformat()` raises `ValueError` for an invalid date.",
+      "Subtracting dates gives a `timedelta`; its `.days` can be negative.",
+      "`strftime(\"%A\")` gives the weekday's name."
+     ],
+     "code": {
+      "python": {
+       "starter": "from datetime import date\n\n# Your code here: read both dates with date.fromisoformat() inside try.\n"
+      },
+      "javascript": {
+       "starter": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\n\n// A YYYY-MM-DD date, or null if it isn't a real date.\nfunction parseDate(text) {\n  // Your code here\n}\n\nconst d1 = parseDate(lines[0])\nconst d2 = parseDate(lines[1])\n\n// Your code here\n",
+       "solution": "const lines = require(\"fs\").readFileSync(0, \"utf8\").split(\"\\n\")\n\n// A YYYY-MM-DD date, or null if it isn't a real date.\nfunction parseDate(text) {\n  const m = (text ?? \"\").trim().match(/^(\\d{4})-(\\d{2})-(\\d{2})$/)\n  if (!m) return null\n  const [y, mo, d] = m.slice(1).map(Number)\n  const date = new Date(Date.UTC(2000, mo - 1, d))\n  date.setUTCFullYear(y)\n  if (y < 1 || date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null\n  return date\n}\n\nconst d1 = parseDate(lines[0])\nconst d2 = parseDate(lines[1])\nif (!d1 || !d2) {\n  console.log(\"Invalid date\")\n} else {\n  const names = [\"Sunday\", \"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"]\n  const iso = (d) => `${String(d.getUTCFullYear()).padStart(4, \"0\")}-${String(d.getUTCMonth() + 1).padStart(2, \"0\")}-${String(d.getUTCDate()).padStart(2, \"0\")}`\n  console.log(`Weekday: ${names[d1.getUTCDay()]}`)\n  console.log(`Days between: ${Math.abs(Math.round((d2 - d1) / 86400000))}`)\n  console.log(`Later date: ${iso(d2 > d1 ? d2 : d1)}`)\n}\n"
+      },
+      "c": {
+       "starter": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstatic int is_leap(int y) {\n    // Your code here\n}\n\n/* Days since 1970-01-01 for a real date (works for any year). */\nstatic long days_from_civil(int y, int m, int d) {\n    // Your code here\n}\n\n/* A YYYY-MM-DD date, or 0 if it isn't a real date. */\nstatic int parse_date(char *text, int *y, int *m, int *d) {\n    // Your code here\n}\n\nint main(void) {\n    char first[64] = \"\", second[64] = \"\";\n    fgets(first, sizeof first, stdin);\n    fgets(second, sizeof second, stdin);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n\nstatic int is_leap(int y) { return y % 400 == 0 || (y % 4 == 0 && y % 100 != 0); }\n\n/* Days since 1970-01-01 for a real date (works for any year). */\nstatic long days_from_civil(int y, int m, int d) {\n    y -= m <= 2;\n    long era = (y >= 0 ? y : y - 399) / 400;\n    long yoe = y - era * 400;\n    long doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;\n    long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;\n    return era * 146097 + doe - 719468;\n}\n\n/* A YYYY-MM-DD date, or 0 if it isn't a real date. */\nstatic int parse_date(char *text, int *y, int *m, int *d) {\n    text[strcspn(text, \"\\r\\n\")] = '\\0';\n    while (*text == ' ') text++;\n    char tail;\n    int len = (int)strlen(text);\n    while (len > 0 && text[len - 1] == ' ') text[--len] = '\\0';\n    if (len != 10 || text[4] != '-' || text[7] != '-') return 0;\n    if (sscanf(text, \"%4d-%2d-%2d%c\", y, m, d, &tail) != 3) return 0;\n    static const int days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};\n    if (*y < 1 || *m < 1 || *m > 12 || *d < 1) return 0;\n    int limit = days[*m - 1] + (*m == 2 && is_leap(*y));\n    return *d <= limit;\n}\n\nint main(void) {\n    char first[64] = \"\", second[64] = \"\";\n    fgets(first, sizeof first, stdin);\n    fgets(second, sizeof second, stdin);\n    int y1, m1, d1, y2, m2, d2;\n    if (!parse_date(first, &y1, &m1, &d1) || !parse_date(second, &y2, &m2, &d2)) {\n        printf(\"Invalid date\\n\");\n        return 0;\n    }\n    long a = days_from_civil(y1, m1, d1), b = days_from_civil(y2, m2, d2);\n    static const char *names[] = {\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\", \"Sunday\"};\n    long weekday = ((a + 3) % 7 + 7) % 7; /* 1970-01-01 was a Thursday */\n    printf(\"Weekday: %s\\n\", names[weekday]);\n    printf(\"Days between: %ld\\n\", labs(b - a));\n    if (b > a) printf(\"Later date: %04d-%02d-%02d\\n\", y2, m2, d2);\n    else printf(\"Later date: %04d-%02d-%02d\\n\", y1, m1, d1);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <chrono>\n#include <cstdio>\n#include <iostream>\n#include <optional>\n#include <regex>\n#include <string>\n\nusing namespace std::chrono;\n\n// A YYYY-MM-DD date, or nothing if it isn't a real date.\nstd::optional<year_month_day> parse_date(const std::string &text) {\n    // Your code here\n}\n\nint main() {\n    std::string first, second;\n    std::getline(std::cin, first);\n    std::getline(std::cin, second);\n\n    // Your code here\n}\n",
+       "solution": "#include <chrono>\n#include <cstdio>\n#include <iostream>\n#include <optional>\n#include <regex>\n#include <string>\n\nusing namespace std::chrono;\n\n// A YYYY-MM-DD date, or nothing if it isn't a real date.\nstd::optional<year_month_day> parse_date(const std::string &text) {\n    std::smatch m;\n    static const std::regex pattern(R\"(^\\s*(\\d{4})-(\\d{2})-(\\d{2})\\s*$)\");\n    if (!std::regex_match(text, m, pattern)) return std::nullopt;\n    year_month_day date{year{std::stoi(m[1])}, month{static_cast<unsigned>(std::stoi(m[2]))},\n                        day{static_cast<unsigned>(std::stoi(m[3]))}};\n    if (!date.ok() || date.year() < year{1}) return std::nullopt;\n    return date;\n}\n\nint main() {\n    std::string first, second;\n    std::getline(std::cin, first);\n    std::getline(std::cin, second);\n    auto d1 = parse_date(first), d2 = parse_date(second);\n    if (!d1 || !d2) {\n        std::cout << \"Invalid date\\n\";\n        return 0;\n    }\n\n    static const char *names[] = {\"Sunday\", \"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"};\n    sys_days a{*d1}, b{*d2};\n    long between = (b - a).count();\n    const year_month_day &later = b > a ? *d2 : *d1;\n\n    std::cout << \"Weekday: \" << names[weekday{a}.c_encoding()] << \"\\n\";\n    std::cout << \"Days between: \" << (between < 0 ? -between : between) << \"\\n\";\n    std::printf(\"Later date: %04d-%02u-%02u\\n\", static_cast<int>(later.year()),\n                static_cast<unsigned>(later.month()), static_cast<unsigned>(later.day()));\n}\n"
+      },
+      "java": {
+       "starter": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\nimport java.time.LocalDate;\nimport java.time.format.DateTimeFormatter;\nimport java.time.format.DateTimeParseException;\nimport java.time.format.ResolverStyle;\nimport java.time.format.TextStyle;\nimport java.time.temporal.ChronoUnit;\nimport java.util.Locale;\n\npublic class Main {\n    // Strict, so 2024-02-30 is an error rather than March 1st.\n    static final DateTimeFormatter ISO = DateTimeFormatter.ofPattern(\"uuuu-MM-dd\").withResolverStyle(ResolverStyle.STRICT);\n\n    public static void main(String[] args) throws IOException {\n        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\nimport java.time.LocalDate;\nimport java.time.format.DateTimeFormatter;\nimport java.time.format.DateTimeParseException;\nimport java.time.format.ResolverStyle;\nimport java.time.format.TextStyle;\nimport java.time.temporal.ChronoUnit;\nimport java.util.Locale;\n\npublic class Main {\n    // Strict, so 2024-02-30 is an error rather than March 1st.\n    static final DateTimeFormatter ISO = DateTimeFormatter.ofPattern(\"uuuu-MM-dd\").withResolverStyle(ResolverStyle.STRICT);\n\n    public static void main(String[] args) throws IOException {\n        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));\n        LocalDate d1, d2;\n        try {\n            d1 = LocalDate.parse(in.readLine().strip(), ISO);\n            d2 = LocalDate.parse(in.readLine().strip(), ISO);\n        } catch (DateTimeParseException | NullPointerException e) {\n            System.out.println(\"Invalid date\");\n            return;\n        }\n        System.out.println(\"Weekday: \" + d1.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH));\n        System.out.println(\"Days between: \" + Math.abs(ChronoUnit.DAYS.between(d1, d2)));\n        System.out.println(\"Later date: \" + (d2.isAfter(d1) ? d2 : d1));\n    }\n}\n"
+      }
+     }
     },
     {
      "id": "p30",
@@ -1576,7 +2358,34 @@
        "Lines: 4\nWords: 7\nCharacters: 32\nLongest line: three more words"
       ]
      ],
-     "solution": "n = int(input())\nwith open(\"notes.txt\", \"w\") as file:\n    for _ in range(n):\n        file.write(input() + \"\\n\")\n\nlines = words = chars = 0\nlongest = \"\"\nwith open(\"notes.txt\", \"r\") as file:\n    for line in file:\n        line = line.rstrip(\"\\n\")\n        lines += 1\n        words += len(line.split())\n        chars += len(line)\n        if len(line) > len(longest):\n            longest = line\n\nprint(\"Lines:\", lines)\nprint(\"Words:\", words)\nprint(\"Characters:\", chars)\nprint(\"Longest line:\", longest)"
+     "solution": "n = int(input())\nwith open(\"notes.txt\", \"w\") as file:\n    for _ in range(n):\n        file.write(input() + \"\\n\")\n\nlines = words = chars = 0\nlongest = \"\"\nwith open(\"notes.txt\", \"r\") as file:\n    for line in file:\n        line = line.rstrip(\"\\n\")\n        lines += 1\n        words += len(line.split())\n        chars += len(line)\n        if len(line) > len(longest):\n            longest = line\n\nprint(\"Lines:\", lines)\nprint(\"Words:\", words)\nprint(\"Characters:\", chars)\nprint(\"Longest line:\", longest)",
+     "editorial": "Write the lines with `open(\"notes.txt\", \"w\")`, adding `\"\\n\"` to each. Opening the file again with `\"r\"` and looping over it gives one line at a time, each ending in a newline:\n\n```python\nfor line in file:\n    line = line.rstrip(\"\\n\")\n```\n\nThen count: one more line, `len(line.split())` words and `len(line)` characters. Keep the longest line, replacing it only when a line is strictly longer. `with` closes the file for you after each block.",
+     "hints": [
+      "`with open(\"notes.txt\", \"w\") as file:` then `file.write(text + \"\\n\")`.",
+      "Looping over a file gives one line at a time, each with its newline.",
+      "Strip the newline before counting characters."
+     ],
+     "code": {
+      "python": {
+       "starter": "n = int(input())\nwith open(\"notes.txt\", \"w\") as file:\n    for _ in range(n):\n        file.write(input() + \"\\n\")\n\n# Your code here: open notes.txt again and count.\n"
+      },
+      "javascript": {
+       "starter": "const fs = require(\"fs\")\nconst lines = fs.readFileSync(0, \"utf8\").split(\"\\n\").map((l) => l.replace(/\\r$/, \"\"))\nconst n = Number(lines[0])\n\n// Your code here\n",
+       "solution": "const fs = require(\"fs\")\nconst lines = fs.readFileSync(0, \"utf8\").split(\"\\n\").map((l) => l.replace(/\\r$/, \"\"))\nconst n = Number(lines[0])\n\nfs.writeFileSync(\"notes.txt\", lines.slice(1, n + 1).map((l) => l + \"\\n\").join(\"\"))\n\nlet count = 0\nlet words = 0\nlet chars = 0\nlet longest = \"\"\nfor (const line of fs.readFileSync(\"notes.txt\", \"utf8\").split(\"\\n\").slice(0, -1)) {\n  count += 1\n  words += line.split(/\\s+/).filter(Boolean).length\n  chars += [...line].length\n  if ([...line].length > [...longest].length) longest = line\n}\n\nconsole.log(`Lines: ${count}`)\nconsole.log(`Words: ${words}`)\nconsole.log(`Characters: ${chars}`)\nconsole.log(`Longest line: ${longest}`)\n"
+      },
+      "c": {
+       "starter": "#include <ctype.h>\n#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    int n;\n    char line[256];\n    if (scanf(\"%d\\n\", &n) != 1) return 0;\n\n    FILE *file = fopen(\"notes.txt\", \"w\");\n    for (int i = 0; i < n && fgets(line, sizeof line, stdin); i++) {\n        line[strcspn(line, \"\\r\\n\")] = '\\0';\n        fprintf(file, \"%s\\n\", line);\n    }\n    fclose(file);\n\n    // Your code here\n\n    return 0;\n}\n",
+       "solution": "#include <ctype.h>\n#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    int n;\n    char line[256];\n    if (scanf(\"%d\\n\", &n) != 1) return 0;\n\n    FILE *file = fopen(\"notes.txt\", \"w\");\n    for (int i = 0; i < n && fgets(line, sizeof line, stdin); i++) {\n        line[strcspn(line, \"\\r\\n\")] = '\\0';\n        fprintf(file, \"%s\\n\", line);\n    }\n    fclose(file);\n\n    int lines = 0, words = 0, chars = 0;\n    char longest[256] = \"\";\n    file = fopen(\"notes.txt\", \"r\");\n    while (fgets(line, sizeof line, file)) {\n        line[strcspn(line, \"\\n\")] = '\\0';\n        lines++;\n        int in_word = 0;\n        for (int i = 0; line[i]; i++) {\n            if (isspace((unsigned char)line[i])) in_word = 0;\n            else if (!in_word) {\n                in_word = 1;\n                words++;\n            }\n        }\n        chars += (int)strlen(line);\n        if (strlen(line) > strlen(longest)) strcpy(longest, line);\n    }\n    fclose(file);\n\n    printf(\"Lines: %d\\n\", lines);\n    printf(\"Words: %d\\n\", words);\n    printf(\"Characters: %d\\n\", chars);\n    printf(\"Longest line: %s\\n\", longest);\n    return 0;\n}\n"
+      },
+      "cpp": {
+       "starter": "#include <fstream>\n#include <iostream>\n#include <sstream>\n#include <string>\n\nint main() {\n    int n;\n    std::string line;\n    std::getline(std::cin, line);\n    n = std::stoi(line);\n\n    {\n        std::ofstream file(\"notes.txt\");\n        for (int i = 0; i < n && std::getline(std::cin, line); i++) {\n            if (!line.empty() && line.back() == '\\r') line.pop_back();\n            file << line << \"\\n\";\n        }\n    }\n\n    // Your code here\n}\n",
+       "solution": "#include <fstream>\n#include <iostream>\n#include <sstream>\n#include <string>\n\nint main() {\n    int n;\n    std::string line;\n    std::getline(std::cin, line);\n    n = std::stoi(line);\n\n    {\n        std::ofstream file(\"notes.txt\");\n        for (int i = 0; i < n && std::getline(std::cin, line); i++) {\n            if (!line.empty() && line.back() == '\\r') line.pop_back();\n            file << line << \"\\n\";\n        }\n    }\n\n    int lines = 0, words = 0, chars = 0;\n    std::string longest;\n    std::ifstream file(\"notes.txt\");\n    while (std::getline(file, line)) {\n        lines++;\n        std::istringstream in(line);\n        for (std::string w; in >> w;) words++;\n        chars += static_cast<int>(line.size());\n        if (line.size() > longest.size()) longest = line;\n    }\n\n    std::cout << \"Lines: \" << lines << \"\\n\";\n    std::cout << \"Words: \" << words << \"\\n\";\n    std::cout << \"Characters: \" << chars << \"\\n\";\n    std::cout << \"Longest line: \" << longest << \"\\n\";\n}\n"
+      },
+      "java": {
+       "starter": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport java.util.ArrayList;\nimport java.util.List;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));\n        int n = Integer.parseInt(in.readLine().strip());\n        List<String> text = new ArrayList<>();\n        for (int i = 0; i < n; i++) text.add(in.readLine());\n\n        // Your code here\n    }\n}\n",
+       "solution": "import java.io.BufferedReader;\nimport java.io.IOException;\nimport java.io.InputStreamReader;\nimport java.nio.file.Files;\nimport java.nio.file.Path;\nimport java.util.ArrayList;\nimport java.util.List;\n\npublic class Main {\n    public static void main(String[] args) throws IOException {\n        BufferedReader in = new BufferedReader(new InputStreamReader(System.in));\n        int n = Integer.parseInt(in.readLine().strip());\n        List<String> text = new ArrayList<>();\n        for (int i = 0; i < n; i++) text.add(in.readLine());\n\n        Path notes = Path.of(\"notes.txt\");\n        Files.write(notes, text);\n\n        int lines = 0, words = 0, chars = 0;\n        String longest = \"\";\n        for (String line : Files.readAllLines(notes)) {\n            lines++;\n            if (!line.isBlank()) words += line.strip().split(\"\\\\s+\").length;\n            chars += line.codePointCount(0, line.length());\n            if (line.length() > longest.length()) longest = line;\n        }\n\n        System.out.println(\"Lines: \" + lines);\n        System.out.println(\"Words: \" + words);\n        System.out.println(\"Characters: \" + chars);\n        System.out.println(\"Longest line: \" + longest);\n    }\n}\n"
+      }
+     }
     }
    ]
   }

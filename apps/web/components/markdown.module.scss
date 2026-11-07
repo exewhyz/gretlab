@@ -1,0 +1,157 @@
+// Rendered markdown: problem descriptions, editorials and hints. Uses the site's tokens so
+// it matches the rest of the page in both themes.
+
+.md {
+  color: var(--body);
+  font-size: var(--text-body-sm);
+  line-height: var(--text-body-sm--line-height);
+  overflow-wrap: anywhere;
+
+  > :first-child {
+    margin-top: 0;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  p,
+  ul,
+  ol,
+  blockquote,
+  pre,
+  table {
+    margin: 0 0 12px;
+  }
+
+  p {
+    max-width: 72ch;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--ink);
+    font-weight: 600;
+    margin: 20px 0 8px;
+    line-height: 1.3;
+  }
+
+  h1 {
+    font-size: 1.4em;
+  }
+
+  h2 {
+    font-size: 1.2em;
+  }
+
+  // Section headings such as "Input format" read like the page's own section labels.
+  h3 {
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--body);
+  }
+
+  h4 {
+    font-size: 1em;
+  }
+
+  ul,
+  ol {
+    padding-left: 22px;
+    display: grid;
+    gap: 4px;
+  }
+
+  ul {
+    list-style: disc;
+  }
+
+  ol {
+    list-style: decimal;
+  }
+
+  li > ul,
+  li > ol {
+    margin: 4px 0 0;
+  }
+
+  a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  blockquote {
+    border-left: 3px solid var(--hairline-strong);
+    padding: 2px 0 2px 12px;
+    color: var(--body);
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--hairline);
+    margin: 16px 0;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    // Show != and == as typed, not as joined symbols.
+    font-variant-ligatures: none;
+    font-size: 0.9em;
+    color: var(--ink);
+    background: var(--canvas-soft);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-xs);
+    padding: 0 4px;
+  }
+
+  pre {
+    overflow-x: auto;
+    padding: 10px 12px;
+    // A shade darker than the card in both themes, so code blocks stand out.
+    background: var(--hairline-soft);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+
+    code {
+      padding: 0;
+      border: 0;
+      background: none;
+      font-size: 0.88em;
+      white-space: pre;
+    }
+  }
+
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    border: 1px solid var(--hairline);
+    padding: 6px 10px;
+    text-align: left;
+  }
+
+  th {
+    color: var(--ink);
+    font-weight: 600;
+    background: var(--canvas-soft);
+  }
+
+  img {
+    max-width: 100%;
+    border-radius: var(--radius-md);
+  }
+}

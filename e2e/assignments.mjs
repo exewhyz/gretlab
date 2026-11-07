@@ -35,8 +35,8 @@ const studentsBefore = Number(psql(`select count(*) from users where role='stude
 
 const client = async (email) => {
   const cookie = `next-auth.session-token=${await encode({ token: { email }, secret: SECRET })}`
-  return async (path, { method, body, raw } = {}) => {
-    const res = await fetch(BASE + "/api/v1" + path, { method: method ?? (body === undefined ? "GET" : "POST"), headers: { cookie, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) })
+  return async (path, { method, body, raw, headers = {} } = {}) => {
+    const res = await fetch(BASE + "/api/v1" + path, { method: method ?? (body === undefined ? "GET" : "POST"), headers: { cookie, "content-type": "application/json", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) })
     if (raw) return res
     return { status: res.status, json: await res.json().catch(() => null) }
   }
@@ -50,7 +50,7 @@ const settle = async (api, id) => {
   }
   throw new Error("timeout")
 }
-const submit = async (api, slug, code) => settle(api, (await api("/submissions", { body: { kind: "submit", language: "python", entry: "main.py", files: [{ path: "main.py", content: code }], problemSlug: slug } })).json.id)
+const submit = async (api, slug, code, headers) => settle(api, (await api("/submissions", { headers, body: { kind: "submit", language: "python", entry: "main.py", files: [{ path: "main.py", content: code }], problemSlug: slug } })).json.id)
 const SI = 'principal = float(input())\nrate = float(input())\ntime = float(input())\nsi = principal * rate * time / 100\nprint(f"Simple Interest: {si:.2f}")\nprint(f"Total Amount: {principal + si:.2f}")\n'
 const WRONG = 'print("no")\n'
 
@@ -117,6 +117,107 @@ check("CSV header and a student's row", text.includes("Total (150)") && text.spl
 check("CSV can't run formulas", text.includes(`"'=HYPERLINK(""x"")"`) && !text.includes("\n=HYPERLINK"))
 
 // ---------- the switch
+// ---------- drafts: code saved to the account, seen live by teachers, replayed
+const DRAFT1 = "principal = float(input())\n"
+const DRAFT2 = DRAFT1 + "rate = float(input())\n"
+const putDraft = (api, content, extra = {}) => api("/problems/p1/draft", { method: "PUT", body: { language: "python", files: [{ path: "main.py", content }], entry: "main.py", ...extra } })
+check("a student's code saves to their account", (await putDraft(a, DRAFT1)).status === 200)
+await putDraft(a, DRAFT1)
+await putDraft(a, DRAFT2)
+const myDraft = (await a("/problems/p1/draft")).json.drafts
+check("and comes back, on any computer", myDraft?.length === 1 && myDraft[0].files[0].content === DRAFT2, JSON.stringify(myDraft))
+check("other students don't get it", (await b("/problems/p1/draft")).json.drafts.length === 0)
+check("a draft needs a real language", (await putDraft(a, "x", { language: "cobol" })).status === 400)
+check("and a problem the student can open", (await a("/problems/no-such-problem/draft")).status === 404)
+const attemptsPath = `/admin/assignments/${week1.json.id}/attempts?student=asg-a@example.com&problem=${id("p1")}`
+check("the teacher sees the code being written", (await t(attemptsPath)).json.draft?.files?.[0]?.content === DRAFT2)
+const replay = (await t(attemptsPath + "&history=1")).json.history
+check("and how it grew, oldest first, without repeats", replay?.length === 2 && replay[0].files[0].content === DRAFT1 && replay[1].files[0].content === DRAFT2, JSON.stringify(replay?.map((r) => r.files[0].content)))
+check("students can't look at each other's code", (await b(attemptsPath)).status === 403)
+
+// ---------- feedback: rubric marks and line comments, held until released
+const RUBRIC = [{ id: "names", label: "Readable names", points: 10 }]
+const fb = await t("/admin/assignments", { body: body({ title: "Feedback", slug: "asg-fb", published: true, holdFeedback: true, problems: [{ problemId: id("p1"), points: 100, rubric: RUBRIC }] }) })
+check("an assignment with a rubric and held feedback", fb.status === 200, JSON.stringify(fb.json).slice(0, 150))
+check("rubric criteria need a name", (await t("/admin/assignments", { body: body({ slug: "asg-fb-bad", problems: [{ problemId: id("p1"), points: 10, rubric: [{ id: "x", label: " ", points: 5 }] }] }) })).status === 400)
+const fbBase = `/admin/assignments/${fb.json.id}`
+const mark = (api, marks, student = "asg-a@example.com") => api(fbBase + "/marks", { method: "PUT", body: { student, problemId: id("p1"), marks } })
+check("the teacher marks the rubric", (await mark(t, { names: 8 })).status === 200)
+check("marks can't pass a criterion's points", (await mark(t, { names: 11 })).status === 400)
+check("or name a criterion that isn't there", (await mark(t, { style: 3 })).status === 400)
+check("students can't mark", (await mark(a, { names: 10 })).status === 403)
+const fbBook = (await t(fbBase + "/gradebook")).json
+const fbRow = fbBook.rows.find((r) => r.email === "asg-a@example.com")
+check("the gradebook adds rubric marks to test marks", fbRow?.earned === 108 && fbBook.total === 110 && fbBook.problems[0].tests === 100 && fbBook.problems[0].points === 110 && fbBook.problems[0].rubric[0]?.points === 10, `${fbRow?.earned} / ${fbBook.total}`)
+const held = (await a("/assignments/asg-fb")).json
+check("held: the student sees test marks only", held.feedbackHeld && held.earned === 100 && held.total === 110 && held.problems[0].rubric[0].mark === null, JSON.stringify(held.problems[0]))
+const attempt = (await t(`${fbBase}/attempts?student=asg-a@example.com&problem=${id("p1")}`)).json.attempts.find((x) => x.verdict === "AC")
+const comment = (api, extra = {}) => api(fbBase + "/comments", { body: { student: "asg-a@example.com", submissionId: attempt.id, path: "main.py", line: 4, body: "Name this interest, not si.", ...extra } })
+const commented = await comment(t)
+check("the teacher comments on a line", commented.status === 200, JSON.stringify(commented.json).slice(0, 150))
+check("only on a line that exists", (await comment(t, { line: 99 })).status === 400)
+check("and on that student's own submission", (await comment(t, { student: "asg-b@example.com" })).status >= 400)
+check("students can't comment", (await comment(a)).status === 403)
+check("held: comments stay hidden from the student", (await a(`/submissions/${attempt.id}`)).json.comments?.length === 0)
+check("students can't release feedback", (await a(fbBase + "/release", { method: "POST" })).status === 403)
+check("the teacher releases feedback", (await t(fbBase + "/release", { method: "POST" })).status === 200)
+const released = (await a("/assignments/asg-fb")).json
+check("released: rubric marks count for the student", !released.feedbackHeld && released.earned === 108 && released.problems[0].rubric[0].mark === 8, JSON.stringify(released.problems[0]))
+const seen = (await a(`/submissions/${attempt.id}`)).json.comments
+check("and comments show on the submission", seen?.length === 1 && seen[0].line === 4 && seen[0].body.startsWith("Name this"), JSON.stringify(seen))
+check("teachers save comments to reuse", (await t("/me/snippets", { body: { body: "Use a clearer name." } })).status === 200 && (await t("/me/snippets")).json.some((x) => x.body === "Use a clearer name."))
+check("students have no saved comments", (await a("/me/snippets")).status === 403)
+
+// ---------- lab exams: one timed sitting, from the lab's network
+const LAB = { "x-forwarded-for": "10.9.1.2" }
+const HOME = { "x-forwarded-for": "8.8.8.8" }
+const EXAM = { minutes: 30, fullscreen: true, networks: ["10.9.0.0/16"] }
+check("an exam can't take late work", (await t("/admin/assignments", { body: body({ slug: "asg-exam-bad", exam: EXAM }) })).status === 400)
+check("exam networks must be addresses", (await t("/admin/assignments", { body: body({ slug: "asg-exam-bad", allowLate: false, exam: { ...EXAM, networks: ["lab"] } }) })).status === 400)
+const exam = await t("/admin/assignments", { body: body({ title: "Lab exam", slug: "asg-exam", allowLate: false, published: true, exam: EXAM }) })
+check("teacher creates a lab exam", exam.status === 200, JSON.stringify(exam.json).slice(0, 150))
+const examBase = `/admin/assignments/${exam.json.id}`
+const before = (await a("/assignments/asg-exam")).json
+check("before starting: the rules, not the problems", before.exam?.sitting.status === "not_started" && before.exam.minutes === 30 && before.exam.restricted && before.problems.length === 0 && before.problemCount === 2, JSON.stringify(before.exam))
+check("the networks themselves stay private", !JSON.stringify(before).includes("10.9.0.0"))
+check("earlier solutions don't count for an exam", (await a("/assignments")).json.find((x) => x.slug === "asg-exam")?.earned === 0)
+const start = (headers) => a("/assignments/asg-exam/exam", { method: "POST", headers })
+check("can't start from outside the lab", (await start(HOME)).json?.error?.code === "exam_network")
+const started = await start(LAB)
+check("starts from the lab's network", started.status === 200 && started.json.status === "in_progress", JSON.stringify(started.json))
+const endsIn = new Date(started.json.endsAt).getTime() - Date.now()
+check("with its own 30 minutes", endsIn > 29 * 60_000 && endsIn <= 30 * 60_000, endsIn)
+check("starting again gives the same sitting", (await start(LAB)).json.endsAt === started.json.endsAt)
+check("its problems show once started", (await a("/assignments/asg-exam")).json.problems.length === 2)
+check("editorials are closed during the exam", (await a("/problems/p1/solution")).json?.error?.code === "exam_running")
+check("the problem page knows the exam is on", (await a("/problems/p1/assignments")).json.find((x) => x.slug === "asg-exam")?.exam?.sitting.status === "in_progress")
+check("submitting from outside the lab is refused", (await a("/submissions", { headers: HOME, body: { kind: "submit", language: "python", entry: "main.py", files: [{ path: "main.py", content: SI }], problemSlug: "p1" } })).json?.error?.code === "exam_network")
+check("solved from the lab", (await submit(a, "p1", SI, LAB)).verdict === "AC")
+check("work during the sitting counts", (await a("/assignments/asg-exam")).json.earned === 100)
+const event = (api, kind) => api("/assignments/asg-exam/exam/events", { body: { kind, detail: "test" } })
+check("the browser reports leaving the tab", (await event(a, "left_tab")).json?.recorded === true)
+check("only known kinds", (await event(a, "hacked")).status === 400)
+check("nothing is recorded for someone not sitting it", (await event(b, "left_tab")).json?.recorded === false)
+const examBook = (await t(examBase + "/gradebook")).json
+const examRow = examBook.rows.find((r) => r.email === "asg-a@example.com")
+check("the gradebook shows the sitting and warnings", examRow?.exam?.status === "in_progress" && examRow.exam.warnings === 2 && examBook.rows.find((r) => r.email === "asg-b@example.com")?.exam?.status === "not_started", JSON.stringify(examRow?.exam))
+const record = (await t(`${examBase}/attempts?student=asg-a@example.com&problem=${id("p1")}`)).json.exam
+check("and what happened, with where it started", record?.ip === "10.9.1.2" && record.events.map((e) => e.kind).join() === "other_network,left_tab", JSON.stringify(record))
+check("finishing early", (await a("/assignments/asg-exam/exam/finish", { method: "POST" })).json?.status === "finished")
+await submit(a, "p2", 'n = int(input())\nprint("Leap Year" if n % 4 == 0 and (n % 100 != 0 or n % 400 == 0) else "Not a Leap Year")\n', LAB)
+check("work after finishing doesn't count", (await a("/assignments/asg-exam")).json.earned === 100)
+check("editorials open again", (await a("/problems/p1/solution")).json?.error?.code !== "exam_running")
+check("one attempt only", (await start(LAB)).json?.error?.code === "exam_over")
+check("students can't give themselves time", (await a(examBase + "/extend", { body: { student: "asg-a@example.com", minutes: 10 } })).status === 403)
+const extended = await t(examBase + "/extend", { body: { student: "asg-a@example.com", minutes: 10 } })
+check("a teacher gives more time and the sitting reopens", extended.json?.status === "in_progress" && new Date(extended.json.endsAt).getTime() - Date.now() > 9 * 60_000, JSON.stringify(extended.json))
+check("not to someone who never started", (await t(examBase + "/extend", { body: { student: "asg-b@example.com", minutes: 10 } })).status === 409)
+await a("/assignments/asg-exam/exam/finish", { method: "POST" })
+const examCsv = await (await t(examBase + "/gradebook?format=csv", { raw: true })).text()
+check("the CSV has the exam and its warnings", examCsv.includes("Exam,Exam warnings") && examCsv.split("\r\n").some((l) => l.startsWith("Asha,") && l.endsWith(",Finished,2")), examCsv.split("\r\n").slice(0, 2).join(" | "))
+// For the pages: an exam without a network rule.
+const exam2 = await t("/admin/assignments", { body: body({ title: "Quiz exam", slug: "asg-exam2", allowLate: false, published: true, exam: { minutes: 20, fullscreen: true, networks: [] }, problems: [{ problemId: id("p1"), points: 10 }] }) })
+
 await admin("/admin/settings", { method: "PATCH", body: { "assignments.enabled": false } })
 await new Promise((r) => setTimeout(r, 5500))
 check("assignments off: refused", (await a("/assignments")).status === 403)
@@ -160,11 +261,19 @@ check("address follows the title", (await tp.getByLabel("Address").inputValue())
 await tp.getByRole("button", { name: "Add Leap Year" }).click()
 await tp.getByLabel("Points").fill("40")
 check("total points follow the points given", await tp.getByText("40 points in total").isVisible())
+await tp.getByRole("button", { name: "Rubric for Leap Year" }).click()
+await tp.getByRole("button", { name: "Add criterion" }).click()
+await tp.getByLabel("Criterion", { exact: true }).fill("Readable names")
+await tp.getByLabel("Criterion points").fill("10")
+await tp.screenshot({ path: SHOTS + "rubric-editor.png" })
+await tp.getByRole("button", { name: "Done" }).click()
+check("a rubric adds to the problem's points", await tp.getByText("50 points in total").isVisible() && await tp.getByRole("button", { name: "Rubric for Leap Year" }).innerText() === "+ 10 rubric")
 await tp.getByRole("button", { name: "Publish" }).click()
 await tp.waitForURL(/\/admin\/assignments\/[0-9a-f-]{36}$/, { timeout: 15000 })
 await tp.getByText("Published: students can see this assignment.").waitFor({ timeout: 15000 })
 await tp.screenshot({ path: SHOTS + "assignment-editor.png", fullPage: true })
-check("publishing from the form works", (await t("/assignments/asg-ui-made")).json?.problems?.[0]?.points === 40)
+const madeProblem = (await t("/assignments/asg-ui-made")).json?.problems?.[0]
+check("publishing from the form works, rubric included", madeProblem?.points === 40 && madeProblem.rubric?.[0]?.label === "Readable names", JSON.stringify(madeProblem))
 await tp.getByRole("link", { name: "Gradebook" }).click()
 await tp.getByTestId("grade-row").first().waitFor({ timeout: 15000 })
 check("gradebook page with a CSV download", await tp.getByRole("link", { name: "Download CSV" }).isVisible())
@@ -172,6 +281,84 @@ await tp.goto(`${BASE}/admin/assignments/${week1.json.id}/grades`)
 await tp.getByTestId("grade-row").first().waitFor({ timeout: 15000 })
 check("gradebook page shows marks", await tp.getByTestId("grade-row").filter({ hasText: "asg-a@example.com" }).getByRole("cell", { name: "100" }).first().isVisible())
 await tp.screenshot({ path: SHOTS + "gradebook.png", fullPage: true })
+// Code saved on one computer is there on another.
+const elsewhere = await open("asg-a@example.com")
+await elsewhere.goto(`${BASE}/problems/p1`)
+await elsewhere.locator(".monaco-editor .view-line").first().waitFor({ timeout: 60000 })
+// Monaco draws spaces as non-breaking spaces.
+const editorText = async (page) => (await page.locator(".monaco-editor .view-lines").first().innerText()).replace(/\u00a0/g, " ")
+await elsewhere.waitForFunction(() => document.querySelector(".monaco-editor .view-lines")?.textContent?.replace(/\u00a0/g, " ").startsWith("principal = float(input())rate"), null, { timeout: 15000 }).catch(() => {})
+check("code saved to the account opens on another computer", (await editorText(elsewhere)).trim() === DRAFT2.trim(), await editorText(elsewhere))
+// The teacher watches it, then replays it.
+await tp.getByTestId("grade-row").filter({ hasText: "asg-a@example.com" }).getByTestId("grade-cell").first().click()
+await tp.getByTestId("student-code").waitFor({ timeout: 15000 })
+await tp.getByTestId("student-code").getByRole("tab", { name: "Working copy" }).click()
+await tp.getByTestId("working-copy").waitFor({ timeout: 15000 })
+check("the gradebook shows a student's working copy", (await tp.getByTestId("working-copy").innerText()).includes("rate = float(input())"))
+await tp.getByTestId("student-code").getByRole("tab", { name: "Playback" }).click()
+await tp.getByTestId("playback").waitFor({ timeout: 15000 })
+check("and plays back how it was written", (await tp.getByTestId("playback").innerText()).includes("2 of 2"))
+await tp.waitForTimeout(300)
+await tp.screenshot({ path: SHOTS + "playback.png", fullPage: true })
+// Marking and commenting from the gradebook.
+await tp.goto(`${BASE}/admin/assignments/${fb.json.id}/grades`)
+await tp.getByTestId("grade-row").filter({ hasText: "asg-a@example.com" }).getByTestId("grade-cell").first().click()
+await tp.getByTestId("rubric-marking").waitFor({ timeout: 15000 })
+await tp.getByLabel("Marks for Readable names").fill("9")
+await tp.getByRole("button", { name: "Save marks" }).click()
+await tp.getByText("Saved.").waitFor({ timeout: 15000 })
+check("marks saved from the gradebook", (await t(fbBase + "/gradebook")).json.rows.find((r) => r.email === "asg-a@example.com")?.earned === 109)
+// The submission that already has the comment from the API (newer ones may sit above it).
+const code = tp.getByTestId("student-code").getByTestId("commented-code").filter({ has: tp.getByTestId("line-comment") }).first()
+await code.getByRole("button", { name: "Comment on line 1" }).click()
+await tp.getByLabel("Use a saved comment").selectOption({ label: "Use a clearer name." })
+await tp.getByRole("button", { name: "Comment", exact: true }).click()
+await code.getByTestId("line-comment").filter({ hasText: "Use a clearer name." }).waitFor({ timeout: 15000 })
+check("a saved comment goes on a line", (await code.getByTestId("line-comment").count()) === 2)
+await tp.screenshot({ path: SHOTS + "feedback-gradebook.png", fullPage: true })
+await s.goto(`${BASE}/submissions/${attempt.id}`)
+await s.getByTestId("line-comment").first().waitFor({ timeout: 30000 })
+check("the student reads comments under their lines", (await s.getByTestId("line-comment").count()) === 2)
+await s.screenshot({ path: SHOTS + "feedback-student.png", fullPage: true })
+await s.goto(`${BASE}/assignments/asg-fb`)
+await s.getByTestId("rubric-breakdown").waitFor({ timeout: 15000 })
+check("the assignment page breaks marks down", (await s.getByTestId("rubric-breakdown").innerText()).includes("Readable names: 9 / 10"))
+
+// A lab exam from the student's side.
+const xs = await open("asg-b@example.com")
+await xs.goto(`${BASE}/problems/p1`)
+await xs.getByTestId("assignment-chip").filter({ hasText: "Quiz exam" }).waitFor({ timeout: 30000 })
+check("before the exam the chip says how to start", (await xs.getByTestId("assignment-chip").filter({ hasText: "Quiz exam" }).innerText()).includes("start it from its page"))
+check("and hints show as usual", await xs.getByRole("heading", { name: "Hints" }).isVisible())
+await xs.goto(`${BASE}/assignments/asg-exam2`)
+await xs.getByTestId("exam-panel").waitFor({ timeout: 30000 })
+check("the exam page lists the rules, no problems", (await xs.getByTestId("exam-panel").innerText()).includes("20 minutes from when you start") && (await xs.getByTestId("assignment-problem").count()) === 0)
+await xs.screenshot({ path: SHOTS + "exam-start.png", fullPage: true })
+await xs.getByRole("button", { name: "Start exam" }).click()
+await xs.getByRole("alertdialog").getByRole("button", { name: "Start exam" }).click()
+await xs.getByTestId("exam-clock").waitFor({ timeout: 15000 })
+await xs.getByTestId("assignment-problem").first().waitFor({ timeout: 15000 })
+check("started: the clock and the problems", /^(19|20):\d\d$/.test(await xs.getByTestId("exam-clock").innerText()), await xs.getByTestId("exam-clock").innerText())
+await xs.screenshot({ path: SHOTS + "exam-running.png", fullPage: true })
+await xs.getByRole("link", { name: "Simple Interest" }).click()
+await xs.waitForURL(/\/problems\/p1$/, { timeout: 30000 })
+await xs.getByTestId("assignment-chip").filter({ hasText: "Quiz exam" }).waitFor({ timeout: 30000 })
+await xs.getByTestId("exam-timer").waitFor({ timeout: 30000 })
+check("the problem page shows the time left", (await xs.getByTestId("exam-timer").innerText()).includes("Quiz exam ·"))
+check("hints are hidden during the exam", (await xs.getByRole("heading", { name: "Sample Test Cases" }).count()) === 1 && (await xs.getByRole("heading", { name: "Hints" }).count()) === 0)
+check("and the chip says it's the exam being taken", (await xs.getByTestId("assignment-chip").filter({ hasText: "Quiz exam" }).innerText()).includes("the exam you're taking"))
+await xs.screenshot({ path: SHOTS + "exam-problem.png" })
+await tp.goto(`${BASE}/admin/assignments/${exam2.json.id}/grades`)
+await tp.getByTestId("exam-cell").first().waitFor({ timeout: 15000 })
+check("the gradebook shows who is sitting it", (await tp.getByTestId("grade-row").filter({ hasText: "asg-b@example.com" }).getByTestId("exam-cell").innerText()).includes("In progress"))
+await tp.getByRole("button", { name: "See asg-a@example.com's exam" }).isVisible()
+await tp.goto(`${BASE}/admin/assignments/${exam.json.id}/grades`)
+await tp.getByRole("button", { name: "See asg-a@example.com's exam" }).click()
+await tp.getByTestId("exam-events").waitFor({ timeout: 15000 })
+check("a student's exam record lists what was noticed", (await tp.getByTestId("exam-events").innerText()).includes("Left the page"))
+check("submissions outside the sitting are marked", (await tp.getByTestId("student-code").getByText("Outside the exam: doesn't count").count()) >= 1)
+await tp.screenshot({ path: SHOTS + "exam-gradebook.png", fullPage: true })
+await b("/assignments/asg-exam2/exam/finish", { method: "POST" })
 
 check("no console or hydration errors", errors.length === 0, [...new Set(errors)].slice(0, 5).join(" || "))
 await browser.close()

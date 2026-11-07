@@ -5,7 +5,9 @@ import {
 } from "@/features/assignments/server"
 import { assignmentInputSchema } from "@/features/problems/schemas"
 
-export const GET = route({ access: "teacher" }, () => listAssignmentsForStaff(null))
+export const GET = route({ access: "teacher" }, () =>
+  listAssignmentsForStaff(null)
+)
 
 export const POST = route(
   { access: "teacher", body: assignmentInputSchema },

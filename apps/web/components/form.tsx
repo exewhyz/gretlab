@@ -51,7 +51,9 @@ export function TextArea({
       spellCheck={!mono}
       className={cn(
         "min-h-16 resize-y bg-card text-body-sm text-ink",
-        mono && "bg-canvas-soft font-mono text-code",
+        // Code shows != and >= as typed, not joined into symbols.
+        mono &&
+          "bg-canvas-soft font-mono text-code [font-variant-ligatures:none]",
         className
       )}
       {...props}

@@ -73,7 +73,7 @@ const submit = async (p) => {
 const s = await as("flows-student@example.com")
 await s.goto(`${BASE}/problems/p1`)
 await s.locator(".monaco-editor .view-line").first().waitFor({ timeout: 60000 })
-await s.getByText("Server sandbox").waitFor({ timeout: 30000 })
+await s.waitForFunction(() => [...document.querySelectorAll("button")].some((b) => b.textContent === "Run" && !b.disabled), null, { timeout: 30000 })
 check("test cases start as the problem's samples", await s.getByRole("tab", { name: /Sample 1/ }).isVisible() && await s.getByRole("tab", { name: /Sample 2/ }).isVisible())
 check("expected output is shown for a sample", await s.getByText("Expected output").isVisible())
 

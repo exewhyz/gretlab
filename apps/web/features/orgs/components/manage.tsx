@@ -133,6 +133,11 @@ export function ManageShell({
           show: has("notices.manage"),
         },
         {
+          href: `${base}/outcomes`,
+          label: "Outcomes",
+          show: has("org.settings.manage", "assignments.manage", "reports.view"),
+        },
+        {
           href: `${base}/settings`,
           label: "Settings",
           show: has("org.settings.manage"),

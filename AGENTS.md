@@ -54,11 +54,30 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 
 ## Navigation (keep it this simple)
 
-- One header everywhere (`components/page-header.tsx`): the site title, then the main sections (Problems, Assignments, Contests, Leaderboard, Playground, and Dashboard for staff) with the current one highlighted. Personal pages (profile, submissions, lists, sign out) live in the account menu. Don't add top-level links; put new pages under a section.
+- The header's switcher (`features/account/scope-switcher.tsx`, shown to people in an organization) chooses whose content lists show: everything, personal (from no organization), any mix of organizations, or one; each organization can be opened from it. It's a per-browser cookie read by `useContentScope()`; Problems, Assignments, Contests and Teach filter with it and show a note with the hidden count and "Show everything". It only narrows lists; access is still decided on the server.
+- One header everywhere (`components/page-header.tsx`): the site title, the organization switcher, the Learn/Teach toggle, then the current mode's sections. Learn: Problems, My classes (`/classes`), Assignments, Contests, Leaderboard, Playground. Teach: My classes (`/teach`), Organizations (managers who don't teach), Dashboard (platform staff), Playground. Only people who teach somewhere or are platform staff get the toggle (`features/account/mode.ts`); a page that belongs to one mode switches the header to it, and pages in both (a class, the playground) keep the last choice. Personal pages (profile, submissions, lists, sign out) live in the account menu. Don't add top-level links; put new pages under a section.
 - Problems are at `/problems` (library) and `/problems/[slug]` (solve). `/questions/[slug]` only redirects, for old links.
 - The dashboard sidebar is grouped by task: Content, Students, Setup.
 - Say "problem", never "question", in anything a person reads.
 - Messages must match who is reading: never tell a signed-in person to sign in. With server execution off, signed-in students run in the browser and Submit is paused.
+
+## Problem statements are markdown
+
+- A problem's `description` is its statement in markdown. Input format, output format and constraints stay separate fields (one bullet each, shown under their own headings), and samples come from its test cases. Keep them out of the statement. Editorials and hints are markdown too.
+- Rendered by `components/markdown.tsx` (react-markdown with GitHub tables, lists and code). Raw HTML is shown as text, never run, so organizations can write problems safely. Don't add `rehype-raw`.
+- Edited with `components/markdown-editor.tsx`: toolbar, Ctrl/⌘ + B, I, K, and a live preview using the same renderer.
+- Images: the editor's image button, paste or drag-and-drop uploads to `POST /api/v1/uploads` (staff and people who teach; PNG, JPEG, GIF or WebP checked by their bytes, 2 MB, 300 a day each) and inserts `![name](/api/v1/uploads/<id>)`. Stored in Postgres (`uploads`, deduplicated by hash) so every replica serves them; served with `nosniff` and a sandboxing CSP. SVG is refused: it can carry scripts.
+- Problems from before markdown kept their `statement` blocks; `db:migrate` turns any with an empty description into markdown (`statementToMarkdown`), and API callers that still send `statement` get the same conversion.
+
+## Problem code per language
+
+- Seeded problems carry editorials, hints, and starter code plus a reference solution in all five languages (`seed-data/content.json`); `e2e/full.mjs` judges every reference solution in the sandbox. Problems about Python features still have them in every language, printing exactly what Python prints (lists as `[1, 2]`, dicts as `{'a': 1}`).
+
+- A problem's `code` holds, per language, optional starter code (exactly what the student's editor starts with, as normal code they can change: input reading, or an empty function plus the lines that call it) and a reference solution (a complete program, shown in the Editorial tab under the editorial's rules, never in page data). `solution` mirrors the Python solution for older callers; `code.python.solution` wins.
+- There is no separate driver code: what's in the student's editor is exactly what runs. Older problems and API callers that send `driver` get it folded into the starter (`joinStarter`; migration 0017 for stored rows).
+- "Generate from the reference solution" fills a language's starter code (`starterFromSolution` in `packages/judge/src/starter.ts`): input reading and imports stay, functions keep their signatures with empty bodies (Java gets a default `return` so it compiles), the logic becomes "Your code here". It's a draft for the teacher to review. Every generated starter for the seeded problems compiles.
+- The editor treats an untouched blank file (the language's default, or empty) as no code, so a problem's starter replaces it; a new problem opens in the language last chosen.
+- The Editorial tab sits beside Notes and fetches the editorial and solutions only when asked.
 
 ## Assignments (grading rules)
 
@@ -66,6 +85,24 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Only graded submissions from `opensAt` on count. Per problem: the best on-time result, or a better late one minus the penalty when late work is allowed. Partial credit comes from IOI-style scores.
 - Only published problems can be assigned, because students solve them on the normal problem pages.
 - The gradebook lists every active student, including those who haven't started. CSV fields are quoted and defused against spreadsheet formulas.
+- Rubrics: each assignment problem may have up to 20 criteria marked by hand (`assignment_problems.rubric`); a problem is out of its test points plus the rubric's. Marks are stored per student (`rubric_marks`), clamped to each criterion (`rubricEarned`), and unknown criteria are refused. Marks are given in the gradebook's student panel.
+- Line comments (`submission_comments`) go on a line that exists in that student's submission, from the same panel by selecting a line number. Teachers keep reusable comments (`feedback_snippets`, `/me/snippets`).
+- "Hold feedback" (`assignments.hold_feedback`) keeps rubric marks and comments from students, and out of their totals, until the gradebook's "Release feedback". Released comments show under the lines on the student's submission page; rubric marks on the assignment page.
+
+## Lab exams
+
+- An assignment with `exam` settings (`ExamSettings` in `packages/judge/src/exam.ts`, pure rules with unit tests) is taken in one sitting per student (`exam_sessions`). Start fixes its end: the time limit or the due time, whichever is first. Starting again returns the same sitting; once it's over there's no second one. Exams take no late work.
+- Grading counts only submissions made during the student's sitting (`duringSitting`), none without one. Its problems stay hidden until the student starts; editorials and solutions for them are refused (`exam_running`) while a sitting is in progress, and the page hides hints (hints are in the cached public page data, so that part is a deterrent).
+- Networks: optional addresses or IPv4 ranges. Starting, and submitting an exam's problems during a sitting, need an address inside them; the list itself is never sent to students. The address comes from `clientIp()`: the last `X-Forwarded-For` entry, which Caddy appends. `TRUSTED_PROXIES` (default 1) must match the proxies in front; with no proxy the header can be forged.
+- The browser reports leaving the tab or window, leaving fullscreen and pasting text not copied on the page (`exam_events`, at most 500 per sitting, only during it). These are records for the teacher, not proof, and only come from the exam's own pages. Fullscreen is requested from the Start click; leaving it covers the page until the student returns.
+- The gradebook shows each student's sitting and warning count (also in the CSV); the student panel lists the events, where it started from, marks submissions outside the sitting, and gives more time (`extend`: reopens a finished sitting, may pass the due time, keeps their work).
+
+## Course and program outcomes (CO–PO)
+
+- Program outcomes (`program_outcomes`) belong to an organization and are edited under Manage › Outcomes with an organization-wide "Change settings" grant ("Start from NBA's PO1–PO12" fills a template to edit). The same page sets attainment rules (`organizations.attainment`; default: a student reaches a CO at 60%, levels 1/2/3 at 50/60/70% of students).
+- Course outcomes (`course_outcomes`) belong to a class (a group), set on its Outcomes tab by whoever may set assignments for it, each mapped to POs at strength 1–3. Editing keeps ids, so tags and mappings follow an outcome; removing a CO strips it from tagged problems.
+- Assignment problems are tagged with COs (`assignment_problems.outcomes`) from the assignment form; only the organization's own COs are accepted.
+- Attainment is computed, never stored (`packages/judge/src/outcomes.ts`, unit-tested; `classOutcomes` in `features/classes/server.ts`): per CO, each student's marks on tagged problems in published assignments reaching the class, counting only students those assignments are for; then the share reaching the threshold gives the level; a PO is its COs' levels weighted by mapping strength. Teachers who can see the class's grades get the report and a CSV; students don't see it.
 
 ## Organizations and permissions
 
@@ -96,8 +133,18 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Built-in roles take their permissions from code (`rolePermissions`), so new permissions reach existing organizations without a migration.
 - Reports count activity from the organization's own assignments and contests, and general practice only for members who chose to share it. Gradebooks and reports leave out people with teaching permissions.
 
+## Classes (the LMS view)
+
+- A class is a group someone teaches, at any level. `/orgs/[slug]/classes/[groupId]` gathers everything about it in tabs: Stream (class notices, logged classes, new work), Classwork (assignments and contests reaching it, syllabus), People, Grades, Syllabus and log (with attendance) and Insights. Teachers of the group see all of it; students sitting in it or a group inside it see their side; everyone else gets 404. `features/classes/server.ts` holds the rules.
+- Content reaches a class when one of its conditions names the class, a group above it ("From CSE") or a group inside it; organization-wide content reaches every class. Students still only see what `accessTo` lets them take part in.
+- "New assignment" and "New contest" from a class open the form with `?for=<group>`: aimed at the class, and back to it after saving.
+- Notices can be aimed at a class (`notes.audience`). A notice for the whole organization needs organization-wide "Post notices"; a class teacher posts from the class page and can remove only notices for groups they cover.
+- Attendance is marked when logging a class, for people in that class only (`attendance` table). Below 75% shows red to the teacher and the student.
+- Teach (`/teach`) lists a teacher's classes per organization as the group tree, with "Due this week" and "Behind the syllabus" first. Students' `/classes` lists the last-level groups they sit in. Assignments and contests link to the classes they're for (`classLinks`).
+
 ## Privacy of student data
 
+- Drafts: a signed-in student's code is saved to their account (`drafts`, every few seconds while typing and at once when leaving, running or submitting), so it follows them to any computer; the editor takes whichever copy changed last. Each change is kept as a snapshot (`draft_snapshots`, the latest 2000 per problem and language) for playback. Only the student and teachers who can already see that student's graded work on an assignment (`studentAttempts`) see them: the gradebook's Working copy (live) and Playback tabs. The editor's save indicator tells students this.
 - Notes and personal lists are private to their owner; a list is only visible to others if it's a published study plan. Other people's private lists answer 404, not 403.
 - Profiles and the leaderboard need sign-in and show names and handles, never emails.
 - Editorials and solutions are unlocked by solving the problem when `practice.solutions_after_solve` is on, and are never in public page data.
@@ -123,6 +170,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - Styling rules are in `README.md`.
 - UI controls come from shadcn in `packages/ui` (Base UI style "base-vega"): Button, Input, Textarea, NativeSelect, Checkbox, Switch, RadioGroup, Slider, Dialog, AlertDialog, DropdownMenu, Popover, Collapsible, Label. Don't use native `<button>`, `<input>`, `<select>`, `<textarea>`, `<details>` or hand-made popups. Need another one? `pnpm exec shadcn add <name>` in `packages/ui` (answer no to overwriting `button.tsx`), then change its `cn` import to `@workspace/ui/lib/utils`, which knows the type scale. `components/form.tsx` wraps them for forms (TextInput, SelectInput, TextArea, Check, Field).
 - Every destructive action (delete, remove, leave, suspend, block, reset, decline, revoke) asks first in an AlertDialog with a red button naming the action: use `ConfirmButton` or `ConfirmDialog` from `components/confirm.tsx`. Tests confirm in the `alertdialog`.
+- shadcn's base-vega DropdownMenu shipped with a forced `dark` class and a see-through background, which made menus dark-on-dark in light mode; it now uses `bg-popover`. Check new registry components in both themes.
 - Tests find a checkbox by role (`getByRole("checkbox", { name })`): Base UI pairs it with a hidden native input that a wrapping label also names.
 
 ## Testing
@@ -131,8 +179,8 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `pnpm test:e2e`: everything against a throwaway database and real gVisor: queue guarantees, 16 hostile programs, API security, every seeded solution, contests, the browser UI. Run it before merging anything touching the sandbox, queue, auth or the API.
 - `e2e/stack.sh` with `e2e/load.mjs` and `e2e/resilience.mjs`: load and failure tests on the production shape. See `docs/scaling.md`.
 - `e2e/features.mjs`: library, daily, streaks, notes, lists, study plans, profiles, leaderboard, hints, editorials, integrity, editor extras and their switches.
-- `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; and the pages.
-- `e2e/assignments.mjs`: grading rules, late penalties, gradebook and CSV, privacy, the switch and the pages.
+- `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
+- `e2e/assignments.mjs`: grading rules, late penalties, gradebook and CSV, privacy, drafts and playback, rubrics, line comments and releasing feedback, lab exams (sittings, networks, events, more time), the switch and the pages.
 - `e2e/flows.mjs`: Run vs Submit, history and creating a contest, as a person uses them. Included in `pnpm test:e2e`.
 - After a mutation, invalidate every query that shows that data. Stale contest data was the cause of several real bugs: "not registered" after registering, and old results after submitting.
 - Check that a test actually ran. A filter or quoting mistake has twice produced output that looked like a result.
@@ -157,11 +205,16 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Organizations (part 3): teacher home across organizations, per-group syllabus and class log with progress and "behind" warnings, organization reports with CSV
 - [x] Organizations (part 4): members-only problems on members' pages; student code from the gradebook; anonymous class ratings; per-organization languages and paste blocking for its contests; Excel (.xlsx) import
 - [x] HackerRank-style integrity: plagiarism similarity checks (winnowing, rename-proof)
+- [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
+- [x] Feedback: rubrics per assignment problem, line comments with saved comments, feedback held until released
+- [x] Lab exams: timed single sittings, lab network limits, tab/fullscreen/paste records, more time per student
+- [x] Outcomes: program outcomes per organization, course outcomes per class mapped to them, problems tagged with COs, CO and PO attainment with CSV
+- [x] Classes: class pages (stream, classwork, people, grades, syllabus and log, insights), class notices, attendance, teacher class tree with today's work, student My classes, Learn/Teach modes, organization switcher
 - [x] Scale: replicas, load balancer, connection pooling, queue priorities, load shedding, crash recovery, metrics, containers
 
 Next, roughly in order of value for a college deployment:
 
-0. Organizations, next: per-organization time and memory limits; attendance from logged classes; class feedback reminders; members-only problems inside study plans.
+0. Organizations, next: per-organization time and memory limits; class feedback reminders; members-only problems inside study plans; tagging assignments with syllabus topics; a server-paged members list for very large organizations.
 0. From the LeetCode/HackerRank research, not built yet: discussion and solution posts with votes and moderation; contest ratings (Elo-style, newcomers rated separately) and contest history; virtual contests; contest code replay; test-case groups; company/position filters (n/a for a college); AI help (needs a policy decision first).
 
 1. A separate, least-privilege database role for runners.
@@ -178,7 +231,6 @@ Next, roughly in order of value for a college deployment:
 
 ### Known limits
 
-- Files are stored in the browser until submitted, so unsubmitted work doesn't follow a student to another computer.
 - Memory measurements come from inside the sandbox and are informational; time limits are enforced by `timeout` with a host-side backstop.
 - Under gVisor a fork bomb can stop the whole sandbox rather than just failing `fork`. It is contained and reported as a failed run, and any remaining tests are not judged.
 - Scale-out across machines is designed and tested for correctness, but its throughput has only been measured on one laptop.

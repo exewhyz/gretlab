@@ -1,5 +1,8 @@
 import {
   assignmentProblems,
+  courseOutcomes,
+  rubricMarks,
+  submissionComments,
   assignments,
   getDb,
   groupMembers,
@@ -19,12 +22,31 @@ import {
   ancestry,
   gradeProblem,
   inAudience,
+  rubricEarned,
+  rubricTotal,
+  duringSitting,
+  sittingClosesAt,
   type Grade,
   type GradedAttempt,
+  type RubricCriterion,
 } from "@workspace/judge"
 
+import { draftHistory, latestDraft } from "@/features/drafts/server"
+import { extendSitting } from "@/features/exams/server"
+import {
+  eventsOf,
+  presentSitting,
+  sittingsOn,
+  warningCounts,
+  type Sitting,
+} from "@/features/exams/sittings"
 import { ApiError, notFound } from "@/lib/api/route"
-import { accessTo, rolePermissions, viewpoint } from "@/features/orgs/access"
+import {
+  accessTo,
+  classLinks,
+  rolePermissions,
+  viewpoint,
+} from "@/features/orgs/access"
 import { getSettings, requireFeature } from "@/features/settings/server"
 
 import type { AssignmentInput } from "../problems/schemas"
@@ -46,6 +68,8 @@ interface Item {
   title: string
   level: string
   points: number
+  rubric: RubricCriterion[]
+  outcomes: string[]
   membersOnly: boolean
   orgSlug: string | null
 }
@@ -60,6 +84,8 @@ async function itemsOf(assignmentIds: string[]): Promise<Item[]> {
       title: problems.title,
       level: problems.level,
       points: assignmentProblems.points,
+      rubric: assignmentProblems.rubric,
+      outcomes: assignmentProblems.outcomes,
       membersOnly: problems.membersOnly,
       orgSlug: organizations.slug,
     })
@@ -101,34 +127,86 @@ async function attemptsOn(
   return rows.filter((row): row is Attempt => row.problemId !== null)
 }
 
-/** One student's marks on each problem of one assignment, from their attempts. */
-function grade(assignment: Assignment, items: Item[], attempts: Attempt[]) {
-  const cells = items.map((item) => ({
-    problemId: item.problemId,
-    ...gradeProblem(
+/** Hand marks by problem, for one student on one assignment. */
+type Marks = Map<string, Record<string, number>>
+
+/**
+ * One student's marks on each problem of one assignment: the tests' marks from their
+ * attempts, plus any rubric marks a teacher gave (`marks`; leave it out while feedback is
+ * held). A problem is out of its test points plus its rubric's.
+ */
+function grade(
+  assignment: Assignment,
+  items: Item[],
+  attempts: Attempt[],
+  marks?: Marks,
+  /** For an exam, the student's sitting: only work during it counts, none without one. */
+  sitting?: Sitting
+) {
+  const counted = assignment.exam ? duringSitting(attempts, sitting) : attempts
+  // A sitting can run past the due time when a teacher gives more time.
+  const rules =
+    assignment.exam && sitting
+      ? { ...assignment, dueAt: sittingClosesAt(sitting), allowLate: false }
+      : assignment
+  const cells = items.map((item) => {
+    const tests = gradeProblem(
       item.points,
-      attempts.filter((a) => a.problemId === item.problemId),
-      assignment
-    ),
-  }))
+      counted.filter((a) => a.problemId === item.problemId),
+      rules
+    )
+    const byHand = rubricEarned(item.rubric, marks?.get(item.problemId))
+    return {
+      problemId: item.problemId,
+      ...tests,
+      tests: tests.earned,
+      byHand,
+      earned: round(tests.earned + (byHand ?? 0)),
+      max: item.points + rubricTotal(item.rubric),
+    }
+  })
   return {
     cells,
     earned: round(cells.reduce((sum, cell) => sum + cell.earned, 0)),
-    total: items.reduce((sum, item) => sum + item.points, 0),
+    total: cells.reduce((sum, cell) => sum + cell.max, 0),
     solved: cells.filter((cell) => cell.status === "solved").length,
   }
+}
+
+/** Rubric marks on these assignments, for one student or everyone, by student then problem. */
+async function marksOn(assignmentIds: string[], userId?: string) {
+  const byUser = new Map<string, Map<string, Marks>>()
+  if (assignmentIds.length === 0) return byUser
+  const rows = await getDb()
+    .select()
+    .from(rubricMarks)
+    .where(
+      and(
+        inArray(rubricMarks.assignmentId, assignmentIds),
+        userId ? eq(rubricMarks.userId, userId) : undefined
+      )
+    )
+  for (const row of rows) {
+    const byAssignment = byUser.get(row.userId) ?? new Map<string, Marks>()
+    const marks = byAssignment.get(row.assignmentId) ?? new Map()
+    marks.set(row.problemId, row.marks)
+    byAssignment.set(row.assignmentId, marks)
+    byUser.set(row.userId, byAssignment)
+  }
+  return byUser
 }
 
 const round = (value: number) => Math.round(value * 100) / 100
 
 /** The assignment and what this person may do with it; one they can't take is not found. */
-async function findAssignment(slug: string, viewer: User) {
+export async function findAssignment(slug: string, viewer: User) {
   const [assignment] = await getDb()
     .select()
     .from(assignments)
     .where(eq(assignments.slug, slug))
+  const vp = await viewpoint(viewer)
   const access = assignment
-    ? accessTo(await viewpoint(viewer), assignment, "assignments.manage")
+    ? accessTo(vp, assignment, "assignments.manage")
     : "none"
   if (
     !assignment ||
@@ -137,7 +215,7 @@ async function findAssignment(slug: string, viewer: User) {
   ) {
     throw notFound("Assignment not found")
   }
-  return { assignment, access }
+  return { assignment, access, vp }
 }
 
 /* ---------- students ---------- */
@@ -172,18 +250,38 @@ export async function listAssignments(viewer: User) {
     (min, a) => (!min || a.opensAt < min ? a.opensAt : min),
     null
   )
-  const attempts = earliest
-    ? await attemptsOn(
-        [...new Set(items.map((i) => i.problemId))],
-        earliest,
-        viewer.id
-      )
-    : []
+  const [attempts, marks, sittings] = await Promise.all([
+    earliest
+      ? attemptsOn(
+          [...new Set(items.map((i) => i.problemId))],
+          earliest,
+          viewer.id
+        )
+      : [],
+    marksOn(
+      rows.map((a) => a.id),
+      viewer.id
+    ),
+    sittingsOn(
+      rows.filter((a) => a.exam).map((a) => a.id),
+      viewer.id
+    ),
+  ])
 
   return rows.map((assignment) => {
     const own = items.filter((i) => i.assignmentId === assignment.id)
-    const { earned, total, solved } = grade(assignment, own, attempts)
+    const { earned, total, solved } = grade(
+      assignment,
+      own,
+      attempts,
+      // Held feedback counts once it's released.
+      assignment.holdFeedback
+        ? undefined
+        : marks.get(viewer.id)?.get(assignment.id),
+      sittings.get(assignment.id)?.get(viewer.id)
+    )
     return {
+      exam: Boolean(assignment.exam),
       slug: assignment.slug,
       title: assignment.title,
       org: orgOf.get(assignment.id) ?? null,
@@ -203,17 +301,37 @@ export async function listAssignments(viewer: User) {
 
 export async function getAssignment(slug: string, viewer: User) {
   await requireFeature("assignments.enabled")
-  const { assignment, access } = await findAssignment(slug, viewer)
+  const { assignment, access, vp } = await findAssignment(slug, viewer)
   const phase = phaseOf(assignment)
-  // Before it opens, students learn when, not what.
-  const visible = phase !== "upcoming" || access === "manage"
+  const classes = await classLinks(vp, assignment, access === "manage")
+  const sitting = assignment.exam
+    ? (await sittingsOn([assignment.id], viewer.id))
+        .get(assignment.id)
+        ?.get(viewer.id)
+    : undefined
+  // Before it opens, students learn when, not what; an exam's problems show once started.
+  const visible =
+    access === "manage" ||
+    (phase !== "upcoming" && (!assignment.exam || sitting !== undefined))
   const items = visible ? await itemsOf([assignment.id]) : []
-  const attempts = await attemptsOn(
-    items.map((i) => i.problemId),
-    assignment.opensAt,
-    viewer.id
+  const [attempts, marks] = await Promise.all([
+    attemptsOn(
+      items.map((i) => i.problemId),
+      assignment.opensAt,
+      viewer.id
+    ),
+    marksOn([assignment.id], viewer.id),
+  ])
+  const own = assignment.holdFeedback
+    ? undefined
+    : marks.get(viewer.id)?.get(assignment.id)
+  const { cells, earned, total, solved } = grade(
+    assignment,
+    items,
+    attempts,
+    own,
+    sitting
   )
-  const { cells, earned, total, solved } = grade(assignment, items, attempts)
 
   return {
     slug: assignment.slug,
@@ -227,6 +345,8 @@ export async function getAssignment(slug: string, viewer: User) {
     earned,
     total,
     solved,
+    /** The classes it's for, linked. */
+    classes,
     problems: items.map((item, index) => ({
       slug: item.slug,
       // Members-only problems are solved on their organization's pages.
@@ -237,10 +357,38 @@ export async function getAssignment(slug: string, viewer: User) {
       title: item.title,
       level: item.level,
       points: item.points,
+      max: cells[index]!.max,
       earned: cells[index]!.earned,
+      tests: cells[index]!.tests,
       status: cells[index]!.status,
+      /** Each criterion with the mark given, once feedback is out. */
+      rubric: item.rubric.map((c) => ({
+        ...c,
+        mark: own?.get(item.problemId)?.[c.id] ?? null,
+      })),
     })),
+    /** Rubric marks and line comments wait until the teacher releases them. */
+    feedbackHeld: assignment.holdFeedback,
+    /** How many problems, so an exam can say so before it starts. */
+    problemCount: visible ? items.length : await countProblems(assignment.id),
+    exam: assignment.exam
+      ? {
+          minutes: assignment.exam.minutes,
+          fullscreen: assignment.exam.fullscreen,
+          /** Whether it must be taken from certain networks (which ones stays private). */
+          restricted: assignment.exam.networks.length > 0,
+          sitting: presentSitting(sitting),
+        }
+      : null,
   }
+}
+
+async function countProblems(assignmentId: string) {
+  const [row] = await getDb()
+    .select({ n: sql.count() })
+    .from(assignmentProblems)
+    .where(eq(assignmentProblems.assignmentId, assignmentId))
+  return row?.n ?? 0
 }
 
 /** Open assignments for this person that include this problem, for its page. */
@@ -260,6 +408,10 @@ export async function assignmentsForProblem(slug: string, viewer: User) {
       .where(and(eq(problems.slug, slug), eq(assignments.published, true))),
     viewpoint(viewer),
   ])
+  const sittings = await sittingsOn(
+    rows.filter((r) => r.assignment.exam).map((r) => r.assignment.id),
+    viewer.id
+  )
   return rows
     .filter(
       ({ assignment }) =>
@@ -272,6 +424,15 @@ export async function assignmentsForProblem(slug: string, viewer: User) {
       title: assignment.title,
       dueAt: assignment.dueAt,
       phase,
+      exam: assignment.exam
+        ? {
+            fullscreen: assignment.exam.fullscreen,
+            sitting: presentSitting(
+              sittings.get(assignment.id)?.get(viewer.id),
+              now
+            ),
+          }
+        : null,
     }))
 }
 
@@ -309,7 +470,12 @@ export async function getAssignmentForStaff(id: string, orgId: string | null) {
   const items = await itemsOf([id])
   return {
     ...assignment,
-    problems: items.map(({ problemId, points }) => ({ problemId, points })),
+    problems: items.map(({ problemId, points, rubric, outcomes }) => ({
+      problemId,
+      points,
+      rubric,
+      outcomes,
+    })),
   }
 }
 
@@ -350,6 +516,28 @@ export async function saveAssignment(
       "Only published problems can be assigned. Publish the drafts first."
     )
   }
+  const tagged = [...new Set(chosen.flatMap((c) => c.outcomes))]
+  if (tagged.length > 0) {
+    // Only the organization's own course outcomes; the platform has none.
+    const known = orgId
+      ? await getDb()
+          .select({ id: courseOutcomes.id })
+          .from(courseOutcomes)
+          .where(
+            and(
+              eq(courseOutcomes.orgId, orgId),
+              inArray(courseOutcomes.id, tagged)
+            )
+          )
+      : []
+    if (known.length !== tagged.length) {
+      throw new ApiError(
+        400,
+        "unknown_outcome",
+        "A chosen course outcome no longer exists."
+      )
+    }
+  }
   const values = { ...fields, orgId, audience: orgId ? fields.audience : [] }
 
   return getDb().transaction(async (tx) => {
@@ -369,6 +557,8 @@ export async function saveAssignment(
         assignmentId: assignment.id,
         problemId: item.problemId,
         points: item.points,
+        rubric: item.rubric,
+        outcomes: item.outcomes,
         position,
       }))
     )
@@ -391,6 +581,7 @@ export interface GradebookRow {
   cells: (Grade & { problemId: string })[]
   earned: number
   late: number
+  exam: (ReturnType<typeof presentSitting> & { warnings: number }) | null
 }
 
 /** The people an assignment is for: everyone's students, or an organization's audience. */
@@ -477,21 +668,34 @@ export async function getGradebook(
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
   if (!assignment) throw notFound("Assignment not found")
   const items = await itemsOf([id])
-  const [students, attempts] = await Promise.all([
+  const [students, attempts, marks] = await Promise.all([
     studentsOf(assignment, scope),
     attemptsOn(
       items.map((i) => i.problemId),
       assignment.opensAt
     ),
+    // Teachers see rubric marks whether or not they're released yet.
+    marksOn([id]),
   ])
+  const [sittings, warnings] = assignment.exam
+    ? await Promise.all([sittingsOn([id]), warningCounts(id)])
+    : [new Map<string, Map<string, Sitting>>(), new Map<string, number>()]
 
   const rows: GradebookRow[] = students.map((student) => {
     const { cells, earned } = grade(
       assignment,
       items,
-      attempts.filter((a) => a.userId === student.id)
+      attempts.filter((a) => a.userId === student.id),
+      marks.get(student.id)?.get(id),
+      sittings.get(id)?.get(student.id)
     )
     return {
+      exam: assignment.exam
+        ? {
+            ...presentSitting(sittings.get(id)?.get(student.id)),
+            warnings: warnings.get(student.id) ?? 0,
+          }
+        : null,
       name: student.name,
       email: student.email,
       handle: student.handle,
@@ -500,7 +704,10 @@ export async function getGradebook(
       late: cells.filter((c) => c.status === "late").length,
     }
   })
-  const total = items.reduce((sum, i) => sum + i.points, 0)
+  const total = items.reduce(
+    (sum, i) => sum + i.points + rubricTotal(i.rubric),
+    0
+  )
   const started = rows.filter((r) =>
     r.cells.some((c) => c.status !== "missing")
   )
@@ -512,12 +719,18 @@ export async function getGradebook(
       title: assignment.title,
       dueAt: assignment.dueAt,
       phase: phaseOf(assignment),
+      holdFeedback: assignment.holdFeedback,
+      exam: assignment.exam,
     },
-    problems: items.map(({ problemId, slug, title, points }) => ({
+    problems: items.map(({ problemId, slug, title, points, rubric, outcomes }) => ({
       problemId,
       slug,
       title,
-      points,
+      outcomes,
+      // Out of the tests' points and the rubric's.
+      points: points + rubricTotal(rubric),
+      tests: points,
+      rubric,
     })),
     total,
     summary: {
@@ -532,11 +745,8 @@ export async function getGradebook(
   }
 }
 
-/**
- * One student's graded submissions on one problem of an assignment, with their code, for
- * whoever may see that student's grades. Anyone outside the gradebook isn't found.
- */
-export async function studentAttempts(
+/** An assignment, one of its problems and one of its students, or not found. */
+async function gradebookStudent(
   id: string,
   orgId: string | null,
   scope: "all" | Set<string>,
@@ -554,6 +764,201 @@ export async function studentAttempts(
     (s) => s.email === email
   )
   if (!item || !student) throw notFound("Not in this gradebook")
+  return { assignment, item, student }
+}
+
+/** More time on an exam for one student in this gradebook. */
+export async function extendStudentSitting(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string>,
+  input: { student: string; minutes: number }
+) {
+  const [assignment] = await getDb()
+    .select()
+    .from(assignments)
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+  if (!assignment?.exam) throw notFound("Exam not found")
+  const student = (await studentsOf(assignment, scope)).find(
+    (s) => s.email === input.student
+  )
+  if (!student) throw notFound("Not in this gradebook")
+  return extendSitting(id, student.id, input.minutes)
+}
+
+/** Line comments on these submissions, given in this assignment. */
+async function commentsOn(assignmentId: string, submissionIds: string[]) {
+  if (submissionIds.length === 0) return []
+  return getDb()
+    .select({
+      id: submissionComments.id,
+      submissionId: submissionComments.submissionId,
+      path: submissionComments.path,
+      line: submissionComments.line,
+      body: submissionComments.body,
+      createdAt: submissionComments.createdAt,
+      author: users.name,
+      authorEmail: users.email,
+    })
+    .from(submissionComments)
+    .leftJoin(users, eq(submissionComments.authorId, users.id))
+    .where(
+      and(
+        eq(submissionComments.assignmentId, assignmentId),
+        inArray(submissionComments.submissionId, submissionIds)
+      )
+    )
+    .orderBy(asc(submissionComments.line), asc(submissionComments.createdAt))
+}
+
+/** A teacher's rubric marks for one student on one problem. Unknown criteria are refused. */
+export async function setRubricMarks(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string>,
+  input: { student: string; problemId: string; marks: Record<string, number> },
+  graderId: string
+) {
+  const { item, student } = await gradebookStudent(
+    id,
+    orgId,
+    scope,
+    input.student,
+    input.problemId
+  )
+  for (const [criterion, mark] of Object.entries(input.marks)) {
+    const c = item.rubric.find((r) => r.id === criterion)
+    if (!c)
+      throw new ApiError(400, "unknown_criterion", "That isn't on this rubric.")
+    if (mark < 0 || mark > c.points) {
+      throw new ApiError(
+        400,
+        "out_of_range",
+        `"${c.label}" is out of ${c.points}.`
+      )
+    }
+  }
+  const now = new Date()
+  await getDb()
+    .insert(rubricMarks)
+    .values({
+      assignmentId: id,
+      problemId: input.problemId,
+      userId: student.id,
+      marks: input.marks,
+      graderId,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [
+        rubricMarks.assignmentId,
+        rubricMarks.problemId,
+        rubricMarks.userId,
+      ],
+      set: { marks: input.marks, graderId, updatedAt: now },
+    })
+  return { byHand: rubricEarned(item.rubric, input.marks) }
+}
+
+/** A comment on one line of a student's submission to this assignment. */
+export async function addLineComment(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string>,
+  input: {
+    student: string
+    submissionId: string
+    path: string
+    line: number
+    body: string
+  },
+  authorId: string
+) {
+  const [submission] = await getDb()
+    .select({
+      problemId: submissions.problemId,
+      userId: submissions.userId,
+      files: submissions.files,
+    })
+    .from(submissions)
+    .where(eq(submissions.id, input.submissionId))
+  if (!submission?.problemId) throw notFound("Submission not found")
+  const { student } = await gradebookStudent(
+    id,
+    orgId,
+    scope,
+    input.student,
+    submission.problemId
+  )
+  if (submission.userId !== student.id) throw notFound("Submission not found")
+  const file = submission.files.find((f) => f.path === input.path)
+  if (!file || input.line > file.content.split("\n").length) {
+    throw new ApiError(
+      400,
+      "no_such_line",
+      "That line isn't in the submission."
+    )
+  }
+  const [comment] = await getDb()
+    .insert(submissionComments)
+    .values({ ...input, assignmentId: id, authorId })
+    .returning()
+  return comment
+}
+
+/** Removes a line comment from this assignment, for whoever may give its feedback. */
+export async function deleteLineComment(
+  id: string,
+  orgId: string | null,
+  commentId: string
+) {
+  const [assignment] = await getDb()
+    .select({ id: assignments.id })
+    .from(assignments)
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+  if (!assignment) throw notFound("Assignment not found")
+  const removed = await getDb()
+    .delete(submissionComments)
+    .where(
+      and(
+        eq(submissionComments.id, commentId),
+        eq(submissionComments.assignmentId, id)
+      )
+    )
+    .returning({ id: submissionComments.id })
+  if (removed.length === 0) throw notFound("Comment not found")
+}
+
+/** Shows held rubric marks and line comments to students. */
+export async function releaseFeedback(id: string, orgId: string | null) {
+  const updated = await getDb()
+    .update(assignments)
+    .set({ holdFeedback: false })
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+    .returning({ id: assignments.id })
+  if (updated.length === 0) throw notFound("Assignment not found")
+}
+
+/**
+ * One student's graded submissions on one problem of an assignment, with their code, for
+ * whoever may see that student's grades. Anyone outside the gradebook isn't found.
+ */
+export async function studentAttempts(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string>,
+  email: string,
+  problemId: string,
+  /** Also every snapshot of the student's code, for playback. */
+  withHistory = false
+) {
+  const { assignment, item, student } = await gradebookStudent(
+    id,
+    orgId,
+    scope,
+    email,
+    problemId
+  )
   const rows = await getDb()
     .select({
       id: submissions.id,
@@ -578,15 +983,42 @@ export async function studentAttempts(
     )
     .orderBy(desc(submissions.createdAt))
     .limit(50)
+  // Who may see the graded work may also see the code being written: live, and as it grew.
+  const [draft, history, marks, comments, events, sittings] = await Promise.all([
+    latestDraft(student.id, problemId),
+    withHistory ? draftHistory(student.id, problemId) : null,
+    marksOn([id], student.id),
+    commentsOn(
+      id,
+      rows.map((r) => r.id)
+    ),
+    assignment.exam ? eventsOf(id, student.id) : [],
+    assignment.exam ? sittingsOn([id], student.id) : null,
+  ])
+  const sitting = sittings?.get(id)?.get(student.id)
   return {
+    exam: assignment.exam
+      ? { ...presentSitting(sitting), ip: sitting?.ip ?? null, events }
+      : null,
     student: { name: student.name, email: student.email },
-    problem: { title: item.title, points: item.points },
-    attempts: rows.map((r) => ({ ...r, late: r.createdAt > assignment.dueAt })),
+    problem: { title: item.title, points: item.points, rubric: item.rubric },
+    marks: marks.get(student.id)?.get(id)?.get(problemId) ?? {},
+    holdFeedback: assignment.holdFeedback,
+    attempts: rows.map((r) => ({
+      ...r,
+      late: r.createdAt > assignment.dueAt,
+      /** For an exam: made outside the student's sitting, so it doesn't count. */
+      outside:
+        assignment.exam !== null && duringSitting([r], sitting).length === 0,
+      comments: comments.filter((c) => c.submissionId === r.id),
+    })),
+    draft,
+    ...(history ? { history } : {}),
   }
 }
 
 /** Quotes a CSV field, and stops spreadsheets running it as a formula. */
-function csvField(value: string | number | null) {
+export function csvField(value: string | number | null) {
   let text = value === null ? "" : String(value)
   if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`
   return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
@@ -605,6 +1037,7 @@ export async function gradebookCsv(
     ...book.problems.map((p) => `${p.title} (${p.points})`),
     `Total (${book.total})`,
     "Problems late",
+    ...(book.assignment.exam ? ["Exam", "Exam warnings"] : []),
   ]
   const lines = [
     header,
@@ -615,6 +1048,18 @@ export async function gradebookCsv(
       ...row.cells.map((c) => c.earned),
       row.earned,
       row.late,
+      ...(row.exam
+        ? [
+            row.exam.status === "finished"
+              ? row.exam.finishedEarly
+                ? "Finished"
+                : "Time ran out"
+              : row.exam.status === "in_progress"
+                ? "In progress"
+                : "Not started",
+            row.exam.warnings,
+          ]
+        : []),
     ]),
   ].map((fields) => fields.map(csvField).join(","))
   return {

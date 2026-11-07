@@ -10,6 +10,7 @@ import {
 import {
   createContext,
   use,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -27,6 +28,7 @@ import {
   readWorkspace,
   renameFile,
   resetWorkspace,
+  adoptSavedDraft,
   restoreWorkspace,
   selectLanguage,
   setEntry,
@@ -134,6 +136,13 @@ function queueMessage(position: number | null) {
     : `Waiting in the queue: ${position} ahead of you…`
 }
 
+/** Saved this long after the last keystroke… */
+const SAVE_AFTER_TYPING_MS = 1000
+/** …and at least this often during non-stop typing. */
+const SAVE_AT_LEAST_EVERY_MS = 5000
+/** Saved to the account at most this often while typing (and at once when leaving). */
+const SAVE_TO_ACCOUNT_EVERY_MS = 5000
+
 function useSessionState({
   question,
   detail: givenDetail,
@@ -161,12 +170,21 @@ function useSessionState({
 
   const engine = usePythonEngine(mode === "browser")
 
-  const languages = (viewer?.languages ?? []).filter(
-    (language) =>
-      (mode !== "browser" || language.id === "python") &&
-      (!detail?.allowedLanguages ||
-        detail.allowedLanguages.includes(language.id))
-  )
+  // Wait for the problem itself: its own starter code decides what a new editor holds,
+  // and saving the language's blank file meanwhile would hide it.
+  const ready = isPlayground || Boolean(detail)
+  const languages = (ready ? (viewer?.languages ?? []) : [])
+    .filter(
+      (language) =>
+        (mode !== "browser" || language.id === "python") &&
+        (!detail?.allowedLanguages ||
+          detail.allowedLanguages.includes(language.id))
+    )
+    // The problem's own starter code, where it sets one.
+    .map((language) => ({
+      ...language,
+      starter: detail?.starters?.[language.id] ?? language.starter,
+    }))
   const workspaces = useLocalStore(workspaceStore, (value) => value)
   const languageId = currentLanguageId(workspaces, question.id, languages)
   const language = languages.find((item) => item.id === languageId)
@@ -182,8 +200,111 @@ function useSessionState({
   const [testRun, setTestRun] = useState<TestRun | null>(null)
   const [runError, setRunError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Code is kept in memory on every keystroke and written to the browser's storage a
+  // moment after typing stops, at least every few seconds while it doesn't, and at once
+  // when the page is hidden or closed, the problem changes, or code is run.
   const [saving, setSaving] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const unsavedSince = useRef<number | null>(null)
+  // Signed in, the code is also saved to the account (every few seconds, and at once when
+  // leaving), so it follows the student to any computer and their teacher can see it.
+  const syncsToAccount = Boolean(viewer?.user) && !isPlayground
+  const account = useRef({
+    on: syncsToAccount,
+    slug: question.id,
+    changed: new Set<string>(),
+    sentAt: 0,
+    timer: undefined as ReturnType<typeof setTimeout> | undefined,
+  })
+  account.current.on = syncsToAccount
+  account.current.slug = question.id
+  const pushDrafts = useCallback((leaving: boolean) => {
+    const sync = account.current
+    clearTimeout(sync.timer)
+    sync.timer = undefined
+    if (!sync.on || sync.changed.size === 0) return
+    sync.sentAt = Date.now()
+    for (const id of sync.changed) {
+      const code = workspaceStore.get()[sync.slug]?.byLanguage[id]
+      if (!code) continue
+      void fetch(`/api/v1/problems/${encodeURIComponent(sync.slug)}/draft`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          language: id,
+          files: code.files,
+          entry: code.entry,
+        }),
+        // Finishes even as the page closes.
+        keepalive: leaving,
+      }).catch(() => {
+        // Offline: it's in this browser, and goes up with the next change.
+      })
+    }
+    sync.changed.clear()
+  }, [])
+
+  const flushSave = useCallback(
+    (leaving = false) => {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = undefined
+      if (unsavedSince.current !== null) {
+        unsavedSince.current = null
+        workspaceStore.persist()
+        setSaving(false)
+      }
+      const sync = account.current
+      const wait = sync.sentAt + SAVE_TO_ACCOUNT_EVERY_MS - Date.now()
+      if (leaving || wait <= 0) pushDrafts(leaving)
+      else if (!sync.timer && sync.changed.size > 0)
+        sync.timer = setTimeout(() => pushDrafts(false), wait)
+    },
+    [pushDrafts]
+  )
+  useEffect(() => {
+    const leave = () => flushSave(true)
+    const onHidden = () => {
+      if (document.visibilityState === "hidden") leave()
+    }
+    window.addEventListener("pagehide", leave)
+    window.addEventListener("beforeunload", leave)
+    document.addEventListener("visibilitychange", onHidden)
+    return () => {
+      window.removeEventListener("pagehide", leave)
+      window.removeEventListener("beforeunload", leave)
+      document.removeEventListener("visibilitychange", onHidden)
+      // Leaving this problem (or the page) saves what's typed.
+      leave()
+    }
+  }, [flushSave])
+
+  // Opening a problem: take the account's copy of any language that's newer than this
+  // browser's, written on another computer.
+  const adopted = useRef(false)
+  const languageIds = languages.map((l) => l.id).join()
+  useEffect(() => {
+    if (!syncsToAccount || !detail || adopted.current || !languageIds) return
+    adopted.current = true
+    void api<{
+      drafts: {
+        language: string
+        files: SourceFile[]
+        entry: string
+        updatedAt: string
+      }[]
+    }>(`/problems/${encodeURIComponent(question.id)}/draft`)
+      .then(({ drafts }) => {
+        for (const draft of drafts) {
+          const lang = languages.find((l) => l.id === draft.language)
+          if (lang) adoptSavedDraft(question.id, lang, draft)
+        }
+      })
+      .catch(() => {
+        // Not reachable (signed out meanwhile, offline): this browser's copy stands.
+      })
+    // languages is rebuilt each render; languageIds says when it really changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncsToAccount, detail, languageIds, question.id])
 
   // The session is keyed by question: a run that finishes after the student has
   // moved on must not touch this question's state.
@@ -198,13 +319,17 @@ function useSessionState({
   function setCode(value: string) {
     if (!language) return
     editFile(question.id, language, value)
-    setSaving(true)
+    account.current.changed.add(language.id)
+    if (unsavedSince.current === null) {
+      unsavedSince.current = Date.now()
+      setSaving(true)
+    }
     clearTimeout(saveTimer.current)
-    // Not cleared on unmount, so a quick question change still saves.
-    saveTimer.current = setTimeout(() => {
-      workspaceStore.persist()
-      setSaving(false)
-    }, 400)
+    const wait = Math.min(
+      SAVE_AFTER_TYPING_MS,
+      unsavedSince.current + SAVE_AT_LEAST_EVERY_MS - Date.now()
+    )
+    saveTimer.current = setTimeout(() => flushSave(), Math.max(0, wait))
   }
 
   function openTab(next: OutputTab) {
@@ -290,6 +415,8 @@ function useSessionState({
   /** Tries the code on the cases in the panel. Nothing is graded or recorded as a submission. */
   async function runOnce() {
     if (!canRun || !workspace) return
+    // Running or submitting is a moment worth saving everywhere.
+    flushSave(true)
     setBusy(true)
     setRunError(null)
     openTab("result")
@@ -321,6 +448,8 @@ function useSessionState({
   /** Grades the code against every test, and records it in the student's submissions. */
   async function submitForGrading() {
     if (!canRun || !workspace || mode !== "server") return
+    // Running or submitting is a moment worth saving everywhere.
+    flushSave(true)
     setBusy(true)
     setRunError(null)
     openTab("result")

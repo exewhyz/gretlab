@@ -136,8 +136,15 @@ export function EditorPane({
             </NativeSelectOption>
           ))}
         </NativeSelect>
-        <span className="text-xs text-body" title="Saved in this browser">
-          {session.saving ? "Saving…" : "Saved"}
+        <span
+          className="text-xs text-body"
+          title={
+            session.viewer?.user && !session.isPlayground
+              ? "Saved to your account a moment after you stop typing, so it's there on any computer. For assignment problems your teacher can see it, and how it changed."
+              : "Kept in this browser: saved a moment after you stop typing, and whenever you leave or run your code"
+          }
+        >
+          {session.saving ? "Edited" : "Saved"}
         </span>
         <span className="flex-1" />
         <Stopwatch />

@@ -65,6 +65,8 @@ interface Handler<A extends Access, B> {
   body: B
   params: Record<string, string>
   query: URLSearchParams
+  /** The raw request, for bodies that aren't JSON (file uploads). */
+  request: NextRequest
 }
 
 /**
@@ -112,6 +114,7 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
         body: body as z.infer<S>,
         params: (await context.params) as Record<string, string>,
         query: request.nextUrl.searchParams,
+        request,
       })
       // A handler may answer with its own Response, for downloads such as CSV.
       if (data instanceof Response) return data

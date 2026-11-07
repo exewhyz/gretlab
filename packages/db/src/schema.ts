@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm"
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -13,7 +14,14 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core"
-import type { SourceFile, Verdict } from "@workspace/judge"
+import type {
+  ProblemCode,
+  RubricCriterion,
+  ExamSettings,
+  AttainmentRules,
+  SourceFile,
+  Verdict,
+} from "@workspace/judge"
 
 const id = () => uuid("id").primaryKey().defaultRandom()
 const createdAt = () =>
@@ -79,6 +87,9 @@ export const problems = pgTable(
     position: integer("position").notNull().default(0),
     title: text("title").notNull(),
     level: problemLevel("level").notNull().default("easy"),
+    /** The problem as markdown: statement, input and output format, constraints. */
+    description: text("description").notNull().default(""),
+    /** The structured form problems were first written in; `description` replaces it. */
     statement: jsonb("statement").$type<(string | string[][])[]>().notNull(),
     inputFormat: jsonb("input_format").$type<string[]>().notNull().default([]),
     outputFormat: jsonb("output_format")
@@ -86,8 +97,17 @@ export const problems = pgTable(
       .notNull()
       .default([]),
     constraints: jsonb("constraints").$type<string[]>().notNull().default([]),
-    /** Never sent to students unless show_solutions allows it. */
+    /** The Python reference solution, kept in step with `code.python.solution`. */
     solution: text("solution").notNull().default(""),
+    /**
+     * Per language: starter code students begin with, the reference solution (same
+     * visibility rules as the editorial). Older rows may also hold driver code, which the
+     * migrations fold into the starter.
+     */
+    code: jsonb("code")
+      .$type<Record<string, ProblemCode>>()
+      .notNull()
+      .default({}),
     /** Revealed one at a time, so a stuck student can take as little help as they need. */
     hints: jsonb("hints").$type<string[]>().notNull().default([]),
     /** The explanation behind the solution. Same visibility rules as the solution. */
@@ -229,6 +249,11 @@ export const notes = pgTable("notes", {
     onDelete: "cascade",
   }),
   text: text("text").notNull(),
+  /** For an organization's notice: who it's for, like contests and assignments. */
+  audience: jsonb("audience").$type<string[][]>().notNull().default([]),
+  authorId: uuid("author_id").references((): AnyPgColumn => users.id, {
+    onDelete: "set null",
+  }),
   createdAt: createdAt(),
 })
 
@@ -265,6 +290,10 @@ export const assignments = pgTable("assignments", {
   opensAt: timestamp("opens_at", { withTimezone: true }).notNull(),
   dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
   allowLate: boolean("allow_late").notNull().default(false),
+  /** Rubric marks and line comments stay hidden from students until released. */
+  holdFeedback: boolean("hold_feedback").notNull().default(false),
+  /** A lab exam: one timed sitting per student. Null for ordinary assignments. */
+  exam: jsonb("exam").$type<ExamSettings | null>(),
   /** Percent taken off marks earned after the due time. */
   latePenaltyPercent: integer("late_penalty_percent").notNull().default(0),
   published: boolean("published").notNull().default(false),
@@ -285,9 +314,69 @@ export const assignmentProblems = pgTable(
       .notNull()
       .references(() => problems.id, { onDelete: "restrict" }),
     position: integer("position").notNull().default(0),
+    /** Marks from the tests. */
     points: integer("points").notNull().default(100),
+    /** Criteria a teacher marks by hand, on top of the tests: "Readable code, 5". */
+    rubric: jsonb("rubric").$type<RubricCriterion[]>().notNull().default([]),
+    /** Course outcomes this problem assesses (ids in `course_outcomes`). */
+    outcomes: jsonb("outcomes").$type<string[]>().notNull().default([]),
   },
   (table) => [primaryKey({ columns: [table.assignmentId, table.problemId] })]
+)
+
+/** A teacher's marks for one student on one assignment problem, by rubric criterion id. */
+export const rubricMarks = pgTable(
+  "rubric_marks",
+  {
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    problemId: uuid("problem_id")
+      .notNull()
+      .references(() => problems.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    marks: jsonb("marks").$type<Record<string, number>>().notNull().default({}),
+    graderId: uuid("grader_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.assignmentId, table.problemId, table.userId] })]
+)
+
+/** A teacher's comment on one line of a submitted file, given in an assignment. */
+export const submissionComments = pgTable(
+  "submission_comments",
+  {
+    id: id(),
+    submissionId: uuid("submission_id")
+      .notNull()
+      .references(() => submissions.id, { onDelete: "cascade" }),
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    path: text("path").notNull(),
+    /** 1-based. */
+    line: integer("line").notNull(),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("submission_comments_submission").on(table.submissionId)]
+)
+
+/** Comments a teacher saves to reuse: "Use a dictionary here". */
+export const feedbackSnippets = pgTable(
+  "feedback_snippets",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("feedback_snippets_user").on(table.userId)]
 )
 
 export type Assignment = typeof assignments.$inferSelect
@@ -471,6 +560,8 @@ export const organizations = pgTable("organizations", {
   languages: jsonb("languages").$type<string[] | null>(),
   /** false blocks pasting code in its contests (a deterrent, not a guarantee). */
   allowPaste: boolean("allow_paste").notNull().default(true),
+  /** How course outcome attainment is judged; null for the defaults (60%; 50/60/70). */
+  attainment: jsonb("attainment").$type<AttainmentRules | null>(),
   createdAt: createdAt(),
 })
 
@@ -674,6 +765,165 @@ export const sessionFeedback = pgTable(
     createdAt: createdAt(),
   },
   (table) => [primaryKey({ columns: [table.sessionId, table.userId] })]
+)
+
+/** Who was at a logged class. A student with no row wasn't marked either way. */
+export const attendance = pgTable(
+  "attendance",
+  {
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => teachingSessions.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    present: boolean("present").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.userId] }),
+    index("attendance_user").on(table.userId),
+  ]
+)
+
+/**
+ * A student's code on a problem in one language, saved as they type, so it follows them to
+ * any computer. Teachers who can see the student's graded work for an assignment can also
+ * see this, live.
+ */
+export const drafts = pgTable(
+  "drafts",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    problemId: uuid("problem_id")
+      .notNull()
+      .references(() => problems.id, { onDelete: "cascade" }),
+    language: text("language").notNull(),
+    files: jsonb("files").$type<SourceFile[]>().notNull(),
+    entry: text("entry").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.problemId, table.language] }),
+    index("drafts_problem").on(table.problemId),
+  ]
+)
+
+/** The draft as it changed, every few seconds while typing: replayed to see how code was written. */
+export const draftSnapshots = pgTable(
+  "draft_snapshots",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    problemId: uuid("problem_id")
+      .notNull()
+      .references(() => problems.id, { onDelete: "cascade" }),
+    language: text("language").notNull(),
+    files: jsonb("files").$type<SourceFile[]>().notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("draft_snapshots_by").on(table.userId, table.problemId, table.at)]
+)
+
+/** What a program's graduates should be able to do (PO1..PO12, PSOs): one list per organization. */
+export const programOutcomes = pgTable(
+  "program_outcomes",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    title: text("title").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [index("program_outcomes_by_org").on(table.orgId, table.position)]
+)
+
+/** What a course (a group someone teaches) sets out to teach, and the POs it supports. */
+export const courseOutcomes = pgTable(
+  "course_outcomes",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    title: text("title").notNull(),
+    position: integer("position").notNull().default(0),
+    /** Program outcome id → strength 1 (low), 2 (medium) or 3 (high). */
+    mapping: jsonb("mapping").$type<Record<string, number>>().notNull().default({}),
+  },
+  (table) => [index("course_outcomes_by_group").on(table.groupId, table.position)]
+)
+
+/** A student's one sitting of a lab exam. */
+export const examSessions = pgTable(
+  "exam_sessions",
+  {
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    /** The time limit or the due time, fixed when it started. */
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    /** Set when the student finishes early. */
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    /** Where it was started from. */
+    ip: text("ip"),
+  },
+  (table) => [primaryKey({ columns: [table.assignmentId, table.userId] })]
+)
+
+/** Things the browser noticed during a sitting: leaving the tab or fullscreen, pasting. */
+export const examEvents = pgTable(
+  "exam_events",
+  {
+    id: id(),
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    detail: text("detail").notNull().default(""),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("exam_events_by").on(table.assignmentId, table.userId, table.at)]
+)
+
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" })
+
+/**
+ * Images in problem statements, editorials and notices. Kept in Postgres so every web
+ * replica serves them without shared storage. Content-addressed: the same image uploaded
+ * twice is stored once.
+ */
+export const uploads = pgTable(
+  "uploads",
+  {
+    id: id(),
+    /** SHA-256 of the bytes. */
+    hash: text("hash").notNull().unique(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull(),
+    data: bytea("data").notNull(),
+    uploadedBy: uuid("uploaded_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("uploads_by").on(table.uploadedBy, table.createdAt)]
 )
 
 export type Organization = typeof organizations.$inferSelect

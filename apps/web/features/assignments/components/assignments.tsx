@@ -8,14 +8,23 @@ import { cn } from "@workspace/ui/lib/utils"
 import { RichText } from "@/components/rich-text"
 import { Loading, Table } from "@/features/admin/components/shell"
 import { Difficulty } from "@/features/catalog/components/difficulty"
+import { useContentScope } from "@/features/account/scope"
+import { ScopeNote } from "@/features/account/scope-switcher"
+import { ClassChips } from "@/features/classes/components/class-chips"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import {
+  ExamGuard,
+  ExamPanel,
+  type SittingView,
+} from "@/features/exams/components/exam"
 
 export type AssignmentPhase = "upcoming" | "open" | "late" | "closed"
 export type GradeStatus =
   "solved" | "late" | "partial" | "attempted" | "missing"
 
 interface AssignmentSummary {
+  exam: boolean
   slug: string
   title: string
   org: { name: string; slug: string } | null
@@ -32,6 +41,7 @@ interface AssignmentSummary {
 }
 
 interface AssignmentDetail {
+  classes: { name: string; href: string }[]
   slug: string
   title: string
   description: string
@@ -48,10 +58,22 @@ interface AssignmentDetail {
     href: string
     title: string
     level: string
+    /** Test points; `max` adds the rubric. */
     points: number
+    max: number
     earned: number
+    tests: number
     status: GradeStatus
+    rubric: { id: string; label: string; points: number; mark: number | null }[]
   }[]
+  feedbackHeld: boolean
+  problemCount: number
+  exam: {
+    minutes: number | null
+    fullscreen: boolean
+    restricted: boolean
+    sitting: SittingView
+  } | null
 }
 
 const PHASE: Record<AssignmentPhase, { label: string; tone: string }> = {
@@ -133,11 +155,13 @@ function Progress({ earned, total }: { earned: number; total: number }) {
 }
 
 export function AssignmentList() {
-  const { data, error } = useQuery({
+  const { data: all, error } = useQuery({
     queryKey: ["assignments"],
     queryFn: () => api<AssignmentSummary[]>("/assignments"),
   })
-  if (!data) return <Loading error={error} />
+  const { shows } = useContentScope()
+  if (!all) return <Loading error={error} />
+  const data = all.filter((a) => shows(a.org?.slug))
 
   const current = data.filter((a) => a.phase === "open" || a.phase === "late")
   const upcoming = data.filter((a) => a.phase === "upcoming")
@@ -158,6 +182,11 @@ export function AssignmentList() {
           )}
         </span>
         <span className="flex items-center gap-2">
+          {a.exam && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+              Exam
+            </span>
+          )}
           {!a.published && (
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-body">
               Draft
@@ -181,7 +210,8 @@ export function AssignmentList() {
   return (
     <>
       <h1 className="mb-4 text-display-lg text-ink">Assignments</h1>
-      {data.length === 0 && (
+      <ScopeNote hidden={all.length - data.length} />
+      {all.length === 0 && (
         <p className="text-body-sm text-body">
           No assignments yet. When your teacher sets one, it will show up here
           with its due date.
@@ -228,13 +258,34 @@ export function AssignmentView({ slug }: { slug: string }) {
         <h1 className="text-display-lg text-ink">{data.title}</h1>
         <PhaseBadge phase={data.phase} />
       </div>
-      <p className="mb-4 text-body-sm text-body">{dueLine(data)}</p>
+      <p className="mb-2 text-body-sm text-body">{dueLine(data)}</p>
+      <ClassChips classes={data.classes} className="mb-4" />
       {data.description && (
         <div className="mb-4 text-body-sm text-body">
           <RichText text={data.description} />
         </div>
       )}
-      {data.phase === "upcoming" && data.problems.length === 0 ? (
+      {data.exam && (
+        <ExamPanel
+          slug={data.slug}
+          title={data.title}
+          exam={data.exam}
+          problemCount={data.problemCount}
+          dueAt={data.dueAt}
+          phase={data.phase}
+        />
+      )}
+      {data.exam?.sitting.status === "in_progress" &&
+        data.exam.sitting.endsAt && (
+          <ExamGuard
+            slug={data.slug}
+            title={data.title}
+            fullscreen={data.exam.fullscreen}
+            endsAt={data.exam.sitting.endsAt}
+          />
+        )}
+      {data.exam && data.problems.length === 0 ? null : data.phase === "upcoming" &&
+        data.problems.length === 0 ? (
         <p className="text-body-sm text-body">
           The problems appear here when it opens.
         </p>
@@ -245,6 +296,9 @@ export function AssignmentView({ slug }: { slug: string }) {
             <span className="text-caption text-body">
               Open a problem, solve it there and press Submit. Your marks here
               update by themselves.
+              {data.feedbackHeld &&
+                data.problems.some((p) => p.rubric.length > 0) &&
+                " Your teacher's rubric marks and comments appear once they release them."}
             </span>
           </div>
           <Table headers={["Problem", "Difficulty", "Status", "Points"]}>
@@ -265,7 +319,24 @@ export function AssignmentView({ slug }: { slug: string }) {
                   {STATUS[problem.status].label}
                 </td>
                 <td className="tabular-nums">
-                  {problem.earned} / {problem.points}
+                  {problem.earned} / {problem.max}
+                  {problem.rubric.length > 0 && (
+                    <ul
+                      className="mt-1 grid gap-0.5 text-caption text-body"
+                      data-testid="rubric-breakdown"
+                    >
+                      <li>
+                        Tests: {problem.tests} / {problem.points}
+                      </li>
+                      {problem.rubric.map((c) => (
+                        <li key={c.id}>
+                          {c.label}:{" "}
+                          {c.mark === null ? "not marked yet" : c.mark} /{" "}
+                          {c.points}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </td>
               </tr>
             ))}

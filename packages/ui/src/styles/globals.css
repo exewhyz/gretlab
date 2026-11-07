@@ -166,6 +166,13 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Code shows != and == as typed, never joined into symbols such as ≠. */
+  code,
+  pre,
+  kbd,
+  samp {
+    font-variant-ligatures: none;
+  }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
