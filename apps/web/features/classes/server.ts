@@ -62,7 +62,7 @@ import { notify } from "@/features/notifications/server"
 const { and, desc, eq, inArray } = sql
 
 /** Holding any of these for a group makes someone its teacher. */
-const TEACHING: Permission[] = [
+export const TEACHING: Permission[] = [
   "teaching.log",
   "assignments.manage",
   "contests.manage",
@@ -171,8 +171,32 @@ export async function studentsIn(cc: ClassContext) {
     .sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email))
 }
 
-/** People with a teaching role covering this class, named for its page. */
-async function teachersOf(cc: ClassContext) {
+/** People with a teaching role covering this class, named for its page and its discussion. */
+/**
+ * Of these people, who runs this class: any teaching permission covering it, owners and
+ * admins included (unlike `teachersOf`, which names only people given teaching).
+ */
+export async function runsClass(cc: ClassContext, userIds: string[]) {
+  if (userIds.length === 0) return new Set<string>()
+  const rows = await getDb()
+    .select({
+      userId: roleAssignments.userId,
+      groupId: roleAssignments.groupId,
+      systemKey: orgRoles.systemKey,
+      permissions: orgRoles.permissions,
+    })
+    .from(roleAssignments)
+    .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
+    .where(and(eq(roleAssignments.orgId, cc.ctx.org.id), inArray(roleAssignments.userId, userIds)))
+  const above = groupChain(cc.ctx, cc.groupId)
+  return new Set(
+    rows
+      .filter((r) => (!r.groupId || above.includes(r.groupId)) && TEACHING.some((p) => rolePermissions(r).includes(p)))
+      .map((r) => r.userId)
+  )
+}
+
+export async function teachersOf(cc: ClassContext) {
   const rows = await getDb()
     .select({
       id: users.id,

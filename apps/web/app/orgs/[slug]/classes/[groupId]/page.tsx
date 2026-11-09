@@ -12,17 +12,17 @@ export default async function Page({
   searchParams,
 }: {
   params: Promise<{ slug: string; groupId: string }>
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; thread?: string }>
 }) {
   const { slug, groupId } = await params
-  const { tab } = await searchParams
+  const { tab, thread } = await searchParams
   if (!(await getCurrentUser()))
     redirect(`/sign-in?callbackUrl=/orgs/${slug}/classes/${groupId}`)
   return (
     <div className="min-h-dvh">
       <PageHeader />
       <main className="mx-auto max-w-6xl p-4">
-        <ClassPage slug={slug} groupId={groupId} tab={tab} />
+        <ClassPage slug={slug} groupId={groupId} tab={tab} thread={thread} />
       </main>
     </div>
   )

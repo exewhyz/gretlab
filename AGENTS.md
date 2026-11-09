@@ -197,6 +197,18 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Attendance is marked when logging a class, for people in that class only (`attendance` table). Below 75% shows red to the teacher and the student.
 - Teach (`/teach`) lists a teacher's classes per organization as the group tree, with "Due this week" and "Behind the syllabus" first. Students' `/classes` lists the last-level groups they sit in. Assignments and contests link to the classes they're for (`classLinks`).
 
+## Class discussions
+
+- Each class has a Discussion tab (`features/discussions`, `discussion_posts` threads and replies, `discussion_votes`): everyone sitting in the class or teaching it reads and posts; other classes and outsiders get 404. Markdown with code blocks; 30 posts an hour each.
+- Students may post anonymously: classmates see "Anonymous", teachers and the author see the name. Teachers always post as themselves, marked Teacher (anyone with a teaching permission covering the class, owners and admins included: `runsClass`).
+- Teachers pin, lock (no more student replies), hide (only teachers and the author see it) and mark one reply as the answer (shown first); authors edit and delete their own. A thread with replies is kept as "Deleted post" so they make sense. Hiding and deleting others' posts go in the activity log.
+- A reply notifies the thread's author (`discussion_reply`), linking to `?tab=discussion&thread=<id>`, which opens the thread. +1 votes, not on your own posts.
+
+## Early warnings
+
+- A class's Grades tab starts with **Needs attention** for teachers who see its grades (`features/classes/warnings.ts`): each student flagged and why. Rules (`packages/judge/src/warnings.ts`, unit-tested, defaults in `WARNING_RULES`): missed work (a finished assignment set for them with nothing submitted and no quiz answer), under 40% on finished work once two have finished (weighted by points), nothing submitted for 7 days while they have unfinished open work, attendance under 75% once four classes are marked. One reason is "watch"; two or more, or two missed, "at risk". Due times count each student's extension. Computed on each request, never stored.
+- Teachers tick students and **Send a note**: a `teacher_note` notification (and email) to each of them, from the teacher; only the class's students. The activity log records that a note was sent, not its words.
+
 ## Notifications
 
 - Events are stored per person (`notifications`) when they happen: an assignment or exam first published (its students), rubric marks and line comments (unless feedback is held), feedback released, an extension, a class notice. `notify()` in `features/notifications/server.ts` never fails the action that caused it.
@@ -246,6 +258,8 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
 - `e2e/assignments.mjs`: grading rules, late penalties, gradebook and CSV, privacy, drafts and playback, rubrics, line comments and releasing feedback, lab exams (sittings, networks, events, more time, the site-wide lock, start window, edits after starting), problem import and assessment-only problems, the switch and the pages.
 - `e2e/library.mjs`: sharing the platform's content (every college, chosen colleges or teachers, staff only), what each college sees and can pick, copying, collections and the pages.
+- `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.
+- `e2e/warnings.mjs`: who needs attention and why (missed, low marks, quiet, attendance), who may see it, notes to students, and the page.
 - `e2e/templates.mjs`: writing templates, sharing them, using one for several classes with their own dates, edits reaching unopened uses only, stale saves, a college's own and copied templates, saving an assignment as a template, deleting, and the pages.
 - `e2e/courses.mjs`: writing outlines (what a course may hold, stale saves), sharing courses, a college's own and copied courses, giving one to a class, release by day and by the module before, practice answers, teacher progress, deleting, and the pages.
 - `e2e/platform.mjs`: platform roles, custom roles, the no-escalation rules, ADMIN_EMAILS owners, blocking, the activity log and the menu per role.
@@ -276,6 +290,8 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
 - [x] Quizzes: a question bank (single/multiple choice, short and written answers) with import, used in assignments, exams, contests and the daily challenge alone or with coding problems; teacher marks override; results after the due time or on release
 - [x] Platform staff and roles: permissions, built-in and custom roles, no escalation, activity log
+- [x] Class discussions: threads and replies per class, anonymous to classmates, votes, teacher moderation and answers, reply notifications
+- [x] Early warnings: students who need attention per class (missed work, low marks, gone quiet, attendance) with reasons, and notes to them
 - [x] Templates: assignments and exams written once, shared from the platform or a college's own, used for many classes with their own dates; edits reach uses until they open
 - [x] Courses: modules of library problems and questions with release rules, shared from the platform or a college's own, given to classes from a start day, practice and progress on the class's Course tab
 - [x] One library with sharing: per-owner Library pages, collections, sharing platform content with all or chosen colleges and teachers, copying to adapt

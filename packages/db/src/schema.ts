@@ -1349,3 +1349,58 @@ export const templates = pgTable(
   },
   (table) => [index("templates_by_org").on(table.orgId)]
 )
+
+/**
+ * A class's discussion: threads (no parent) and their replies. Anonymous posts hide the
+ * author from classmates, never from teachers. Teachers pin, lock, hide and mark answers.
+ */
+export const discussionPosts = pgTable(
+  "discussion_posts",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id").references((): AnyPgColumn => discussionPosts.id, {
+      onDelete: "cascade",
+    }),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    /** Threads only. */
+    title: text("title").notNull().default(""),
+    body: text("body").notNull(),
+    anonymous: boolean("anonymous").notNull().default(false),
+    pinned: boolean("pinned").notNull().default(false),
+    locked: boolean("locked").notNull().default(false),
+    /** Hidden by a teacher: only teachers and the author see it. */
+    hidden: boolean("hidden").notNull().default(false),
+    /** Deleted with replies under it: kept as "deleted" so the replies make sense. */
+    deleted: boolean("deleted").notNull().default(false),
+    /** Threads: the reply a teacher marked as the answer. */
+    answerId: uuid("answer_id"),
+    createdAt: createdAt(),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    /** Threads: when it or a reply was last posted, for ordering. */
+    activityAt: timestamp("activity_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("discussion_threads").on(table.groupId, table.activityAt),
+    index("discussion_replies").on(table.parentId, table.createdAt),
+  ]
+)
+
+/** One person's +1 on a post. */
+export const discussionVotes = pgTable(
+  "discussion_votes",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => discussionPosts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.postId, table.userId] })]
+)

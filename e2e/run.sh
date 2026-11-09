@@ -36,6 +36,8 @@ node e2e/platform.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/library.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/courses.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/templates.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+node e2e/warnings.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+node e2e/discussions.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 
 kill $RUNNER 2>/dev/null
 lsof -ti:3100 | xargs kill 2>/dev/null

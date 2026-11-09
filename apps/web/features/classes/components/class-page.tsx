@@ -8,6 +8,8 @@ import {
   TrophyIcon,
 } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { NeedsAttention } from "@/features/classes/components/needs-attention"
+import { Discussion } from "@/features/discussions/components/discussion"
 import { ClassCourses } from "@/features/courses/components/class-courses"
 import { ClassOutcomes } from "@/features/outcomes/components/class-outcomes"
 import Link from "next/link"
@@ -145,6 +147,7 @@ const TABS = [
   "stream",
   "classwork",
   "course",
+  "discussion",
   "people",
   "grades",
   "classes",
@@ -157,10 +160,13 @@ export function ClassPage({
   slug,
   groupId,
   tab: initialTab,
+  thread,
 }: {
   slug: string
   groupId: string
   tab?: string
+  /** A discussion thread to open, from a notification's link. */
+  thread?: string
 }) {
   const base = `/orgs/${slug}/classes/${groupId}`
   const { data, error } = useQuery({
@@ -177,6 +183,7 @@ export function ClassPage({
     ["stream", "Stream"],
     ["classwork", "Classwork"],
     ["course", "Course"],
+    ["discussion", "Discussion"],
     ["people", "People"],
     ["grades", "Grades"],
     ["classes", teacher ? "Syllabus and log" : "Syllabus"],
@@ -290,6 +297,9 @@ export function ClassPage({
         <TabsContent value="course" className="pt-3">
           <ClassCourses slug={slug} groupId={groupId} />
         </TabsContent>
+        <TabsContent value="discussion" className="pt-3">
+          <Discussion slug={slug} groupId={groupId} initialThread={thread ?? null} />
+        </TabsContent>
         <TabsContent value="people" className="pt-3">
           {teacher && data.can.people ? (
             <TeacherPeople
@@ -303,7 +313,10 @@ export function ClassPage({
         </TabsContent>
         <TabsContent value="grades" className="pt-3">
           {teacher && data.can.grades ? (
-            <ClassGrades slug={slug} groupId={groupId} />
+            <div className="grid gap-4">
+              <NeedsAttention slug={slug} groupId={groupId} />
+              <ClassGrades slug={slug} groupId={groupId} />
+            </div>
           ) : (
             <MyGrades slug={slug} groupId={groupId} />
           )}
