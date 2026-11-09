@@ -183,6 +183,13 @@
       "when": 1794230717253,
       "tag": "0025_extensions",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794231440764,
+      "tag": "0026_notifications",
+      "breakpoints": true
     }
   ]
 }

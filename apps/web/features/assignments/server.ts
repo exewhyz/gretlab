@@ -39,6 +39,7 @@ import {
 } from "@workspace/judge"
 
 import { draftHistory, latestDraft } from "@/features/drafts/server"
+import { notify } from "@/features/notifications/server"
 import { extendSitting } from "@/features/exams/server"
 import {
   dbNow,
@@ -717,9 +718,17 @@ export async function saveAssignment(
     }
   }
   if (id) await guardStartedExam(id, input)
+  const wasPublished = id
+    ? ((
+        await getDb()
+          .select({ published: assignments.published })
+          .from(assignments)
+          .where(eq(assignments.id, id))
+      )[0]?.published ?? false)
+    : false
   const values = { ...fields, orgId, audience: orgId ? fields.audience : [] }
 
-  return getDb().transaction(async (tx) => {
+  const saved = await getDb().transaction(async (tx) => {
     const [assignment] = id
       ? await tx
           .update(assignments)
@@ -757,6 +766,22 @@ export async function saveAssignment(
     )
     return assignment
   })
+  // Students hear about it when it's first published.
+  if (saved.published && !wasPublished) {
+    const students = await studentsOf(saved, "all")
+    await notify(
+      students.map((s) => s.id),
+      {
+        kind: saved.exam ? "new_exam" : "new_assignment",
+        title: `${saved.exam ? "New exam" : "New assignment"}: ${saved.title}`,
+        body: saved.exam
+          ? "Read its rules before you start: one sitting, timed."
+          : `${chosen.length} ${chosen.length === 1 ? "problem" : "problems"}. Open it to see when it's due.`,
+        href: `/assignments/${saved.slug}`,
+      }
+    )
+  }
+  return saved
 }
 
 /**
@@ -1106,6 +1131,14 @@ export async function setExtension(
       target: [assignmentExtensions.assignmentId, assignmentExtensions.userId],
       set: values,
     })
+  await notify([student.id], {
+    kind: "extension",
+    title: `More time on ${assignment.title}`,
+    body: values.problemIds.length
+      ? "Some of its problems are open again for you. Open it to see until when."
+      : "Your teacher moved your due time. Open it to see the new one.",
+    href: `/assignments/${assignment.slug}`,
+  })
   return { student: student.email, ...values }
 }
 
@@ -1222,6 +1255,17 @@ export async function setRubricMarks(
       ],
       set: { marks: input.marks, graderId, updatedAt: now },
     })
+  const [assignment] = await getDb()
+    .select({ title: assignments.title, slug: assignments.slug, hold: assignments.holdFeedback })
+    .from(assignments)
+    .where(eq(assignments.id, id))
+  if (assignment && !assignment.hold) {
+    await notify([student.id], {
+      kind: "marks",
+      title: `Your teacher marked ${item.title} in ${assignment.title}`,
+      href: `/assignments/${assignment.slug}`,
+    })
+  }
   return { byHand: rubricEarned(item.rubric, input.marks) }
 }
 
@@ -1268,6 +1312,18 @@ export async function addLineComment(
     .insert(submissionComments)
     .values({ ...input, assignmentId: id, authorId })
     .returning()
+  const [assignment] = await getDb()
+    .select({ title: assignments.title, hold: assignments.holdFeedback })
+    .from(assignments)
+    .where(eq(assignments.id, id))
+  if (assignment && !assignment.hold) {
+    await notify([student.id], {
+      kind: "comment",
+      title: `A comment on your code in ${assignment.title}`,
+      body: input.body.slice(0, 300),
+      href: `/submissions/${input.submissionId}`,
+    })
+  }
   return comment
 }
 
@@ -1300,8 +1356,29 @@ export async function releaseFeedback(id: string, orgId: string | null) {
     .update(assignments)
     .set({ holdFeedback: false })
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
-    .returning({ id: assignments.id })
+    .returning({ id: assignments.id, title: assignments.title, slug: assignments.slug })
   if (updated.length === 0) throw notFound("Assignment not found")
+  // Everyone who has marks or comments waiting hears that they're out.
+  const [marked, commented] = await Promise.all([
+    getDb()
+      .select({ userId: rubricMarks.userId })
+      .from(rubricMarks)
+      .where(eq(rubricMarks.assignmentId, id)),
+    getDb()
+      .select({ userId: submissions.userId })
+      .from(submissionComments)
+      .innerJoin(submissions, eq(submissionComments.submissionId, submissions.id))
+      .where(eq(submissionComments.assignmentId, id)),
+  ])
+  await notify(
+    [...marked, ...commented].map((r) => r.userId),
+    {
+      kind: "feedback",
+      title: `Feedback on ${updated[0]!.title} is ready`,
+      body: "Rubric marks and comments on your code.",
+      href: `/assignments/${updated[0]!.slug}`,
+    }
+  )
 }
 
 /**

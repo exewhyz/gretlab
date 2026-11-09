@@ -49,6 +49,7 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 import { notFound } from "@/lib/api/route"
+import { notify } from "@/features/notifications/server"
 
 /*
  * A class is a group someone teaches, at any level: "CSE", "CSE › 2026-A" or a lab. Its
@@ -441,6 +442,16 @@ export async function postClassNotice(
     ctx,
     "notice.create",
     `Posted a notice to ${nameOf(ctx, groupId)}`
+  )
+  const cc = await classContext(slug, user, groupId)
+  await notify(
+    (await studentsIn(cc)).map((s) => s.id),
+    {
+      kind: "notice",
+      title: `New notice in ${nameOf(ctx, groupId)}`,
+      body: text.slice(0, 300),
+      href: `/orgs/${slug}/classes/${groupId}`,
+    }
   )
   return note
 }

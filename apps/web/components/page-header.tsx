@@ -14,6 +14,7 @@ import { ScopeSwitcher } from "@/features/account/scope-switcher"
 import { useViewer } from "@/features/account/use-viewer"
 import { Brand } from "@/features/lab/components/brand"
 import { ExamHeader, useExamLock } from "@/features/exams/components/exam-lock"
+import { NotificationBell } from "@/features/notifications/components/bell"
 
 const DEFAULT_TITLE = "Python Practice Lab"
 
@@ -34,6 +35,7 @@ export function PageHeader({ children }: { children?: ReactNode }) {
       <PrimaryNav />
       {children}
       <span className="flex-1" />
+      <NotificationBell />
       <ThemeToggle />
       <AccountMenu />
       <MobileNav />

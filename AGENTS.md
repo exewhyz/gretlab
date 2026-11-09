@@ -155,6 +155,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Attendance is marked when logging a class, for people in that class only (`attendance` table). Below 75% shows red to the teacher and the student.
 - Teach (`/teach`) lists a teacher's classes per organization as the group tree, with "Due this week" and "Behind the syllabus" first. Students' `/classes` lists the last-level groups they sit in. Assignments and contests link to the classes they're for (`classLinks`).
 
+## Notifications
+
+- Events are stored per person (`notifications`) when they happen: an assignment or exam first published (its students), rubric marks and line comments (unless feedback is held), feedback released, an extension, a class notice. `notify()` in `features/notifications/server.ts` never fails the action that caused it.
+- Reminders that depend on the clock are worked out when read, never stored: work due within a day and not finished, a contest starting within a day, attendance below 75% in a class with four or more marked classes. No scheduler needed.
+- Email: when `SMTP_URL` (and `MAIL_FROM`) are set, stored notifications are also emailed, unless the person turned it off in the bell. Without SMTP nothing is sent.
+- The header's bell shows unread plus reminders; it's replaced by the exam header during a sitting.
+
 ## Privacy of student data
 
 - Drafts: a signed-in student's code is saved to their account (`drafts`, every few seconds while typing and at once when leaving, running or submitting), so it follows them to any computer; the editor takes whichever copy changed last. Each change is kept as a snapshot (`draft_snapshots`, the latest 2000 per problem and language) for playback. Only the student and teachers who can already see that student's graded work on an assignment (`studentAttempts`) see them: the gradebook's Working copy (live) and Playback tabs. The editor's save indicator tells students this.
@@ -221,6 +228,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Organizations (part 4): members-only problems on members' pages; student code from the gradebook; anonymous class ratings; per-organization languages and paste blocking for its contests; Excel (.xlsx) import
 - [x] HackerRank-style integrity: plagiarism similarity checks (winnowing, rename-proof)
 - [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
+- [x] Notifications: in-app bell with stored events and computed reminders, optional email
 - [x] Extensions and resubmission: a later due time for one student, whole assignment or reopened problems; lets an absent student sit an exam later
 - [x] Feedback: rubrics per assignment problem, line comments with saved comments, feedback held until released
 - [x] Lab exams: timed single sittings, start window, lab network limits (IPv4/IPv6), site-wide lock during a sitting, tab/fullscreen/paste records, more time per student, forgetting addresses

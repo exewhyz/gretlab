@@ -50,6 +50,8 @@ export const users = pgTable("users", {
   handle: text("handle").unique(),
   role: userRole("role").notNull().default("student"),
   disabled: boolean("disabled").notNull().default(false),
+  /** Notifications also by email, when the server has SMTP set up. */
+  emailNotifications: boolean("email_notifications").notNull().default(true),
   createdAt: createdAt(),
 })
 
@@ -860,6 +862,28 @@ export const assignmentExtensions = pgTable(
     createdAt: createdAt(),
   },
   (table) => [primaryKey({ columns: [table.assignmentId, table.userId] })]
+)
+
+/**
+ * Things that happened for someone: new work, feedback released, an extension, a class
+ * notice. Reminders that depend on time (due tomorrow) are worked out when read instead.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    /** Where it leads, a path on this site. */
+    href: text("href").notNull().default(""),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("notifications_by_user").on(table.userId, table.createdAt)]
 )
 
 /** What a program's graduates should be able to do (PO1..PO12, PSOs): one list per organization. */
