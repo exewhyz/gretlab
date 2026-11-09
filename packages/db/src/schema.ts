@@ -56,6 +56,29 @@ export const users = pgTable("users", {
   createdAt: createdAt(),
 })
 
+/** A custom platform role: a name and a set of platform permissions. Built-in ones live in code. */
+export const platformRoles = pgTable("platform_roles", {
+  id: id(),
+  name: text("name").notNull().unique(),
+  description: text("description").notNull().default(""),
+  permissions: jsonb("permissions").$type<string[]>().notNull().default([]),
+  createdAt: createdAt(),
+})
+
+/**
+ * Platform staff and their role: a built-in one (`systemRole`) or a custom one (`roleId`).
+ * People not listed fall back to their account role (admin: Owner, teacher: Content admin).
+ */
+export const platformStaff = pgTable("platform_staff", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  systemRole: text("system_role"),
+  roleId: uuid("role_id").references(() => platformRoles.id, { onDelete: "restrict" }),
+  addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+})
+
 /** Overrides of the defaults in packages/judge/src/features.ts. */
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
@@ -131,6 +154,13 @@ export const problems = pgTable(
      * pages; reachable only through the assignments and contests that use it.
      */
     listed: boolean("listed").notNull().default(true),
+    /**
+     * Who else may use it: "everyone" (every college; the platform's default), "selected"
+     * (the colleges and teachers in content_shares) or "owner" (its owner's staff only).
+     */
+    sharing: text("sharing").$type<Sharing>().notNull().default("everyone"),
+    /** The item it was copied from, when a college copied it to adapt. */
+    copiedFrom: uuid("copied_from"),
     /** The organization that wrote it, credited in the library. null: the platform's. */
     orgId: uuid("org_id").references((): AnyPgColumn => organizations.id, {
       onDelete: "set null",
@@ -883,10 +913,59 @@ export const questions = pgTable(
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     /** Ready to use; drafts only for their writers. */
     published: boolean("published").notNull().default(true),
+    /** As on problems: everyone, selected or owner. */
+    sharing: text("sharing").$type<Sharing>().notNull().default("everyone"),
+    copiedFrom: uuid("copied_from"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [index("questions_by_org").on(table.orgId)]
+)
+
+export type Sharing = "everyone" | "selected" | "owner"
+
+/** The colleges and teachers an item shared with "selected" reaches. */
+export const contentShares = pgTable(
+  "content_shares",
+  {
+    id: id(),
+    itemType: text("item_type").$type<"problem" | "question">().notNull(),
+    itemId: uuid("item_id").notNull(),
+    /** A college (all its staff)… */
+    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+    /** …or one teacher. */
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("content_shares_by_item").on(table.itemType, table.itemId)]
+)
+
+/** A named folder of library items, for an owner (the platform or a college). */
+export const collections = pgTable(
+  "collections",
+  {
+    id: id(),
+    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (table) => [index("collections_by_org").on(table.orgId)]
+)
+
+/** What a collection holds. An item can be in several collections. */
+export const collectionItems = pgTable(
+  "collection_items",
+  {
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => collections.id, { onDelete: "cascade" }),
+    itemType: text("item_type").$type<"problem" | "question">().notNull(),
+    itemId: uuid("item_id").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.collectionId, table.itemType, table.itemId] })]
 )
 
 /** A bank question in an assignment or exam, with its points there. */

@@ -190,11 +190,11 @@ if (phase === "all" || phase === "api") {
   check("blocked user is signed out at once", (await ben("/me")).json.user === null)
   await admin(`/admin/users/${banUser.id}`, { method: "PATCH", body: { disabled: false } })
   const me = (await admin("/me")).json.user
-  check("admin can't change own role", (await admin(`/admin/users/${me.id}`, { method: "PATCH", body: { role: "student" } })).status === 400)
+  check("admin can't block themselves", (await admin(`/admin/users/${me.id}`, { method: "PATCH", body: { disabled: true } })).status === 400)
   const demote = (await admin("/admin/users?search=teach")).json[0]
-  await admin(`/admin/users/${demote.id}`, { method: "PATCH", body: { role: "student" } })
+  await admin(`/admin/staff/${demote.id}`, { method: "DELETE" })
   check("demotion applies at once", (await teach("/admin/problems")).status === 403)
-  await admin(`/admin/users/${demote.id}`, { method: "PATCH", body: { role: "teacher" } })
+  await admin("/admin/staff", { method: "PUT", body: { email: demote.email, role: "content_admin" } })
 
   // ---- every seeded solution through gVisor with concurrency
   const started = Date.now()

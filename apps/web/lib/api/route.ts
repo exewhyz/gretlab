@@ -2,7 +2,10 @@ import type { User } from "@workspace/db"
 import { NextResponse, type NextRequest } from "next/server"
 import { z, type ZodType } from "zod"
 
+import { isPlatformPermission, type PlatformPermission } from "@workspace/judge"
+
 import { getCurrentUser } from "@/features/auth/current-user"
+import { platformCan } from "@/features/platform/access"
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024
 
@@ -21,8 +24,11 @@ export class ApiError extends Error {
 export const notFound = (what = "Not found") =>
   new ApiError(404, "not_found", what)
 
-/** Who may call a route. Each level includes the ones after it: admin > teacher > user. */
-export type Access = "public" | "user" | "teacher" | "admin"
+/**
+ * Who may call a route: anyone, any signed-in person, platform staff by account role
+ * (admin > teacher), or whoever holds one platform permission (features/platform/access.ts).
+ */
+export type Access = "public" | "user" | "teacher" | "admin" | PlatformPermission
 
 const ROLE_RANK = { student: 0, teacher: 1, admin: 2 } as const
 const REQUIRED_RANK = { user: 0, teacher: 1, admin: 2 } as const
@@ -31,9 +37,15 @@ export function isStaff(user: User | null): boolean {
   return user?.role === "teacher" || user?.role === "admin"
 }
 
-function authorize(user: User | null, access: Access) {
+async function authorize(user: User | null, access: Access) {
   if (access === "public") return
   if (!user) throw new ApiError(401, "unauthenticated", "Please sign in.")
+  if (isPlatformPermission(access)) {
+    if (!(await platformCan(user, access))) {
+      throw new ApiError(403, "forbidden", "You don't have access to this.")
+    }
+    return
+  }
   if (ROLE_RANK[user.role] < REQUIRED_RANK[access]) {
     throw new ApiError(403, "forbidden", "You don't have access to this.")
   }
@@ -81,7 +93,7 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
     try {
       assertSameOrigin(request)
       const user = await getCurrentUser()
-      authorize(user, options.access)
+      await authorize(user, options.access)
 
       let body: unknown
       if (options.body) {

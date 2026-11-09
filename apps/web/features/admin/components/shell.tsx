@@ -7,12 +7,15 @@ import type { ReactNode } from "react"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { PageHeader } from "@/components/page-header"
+import type { PlatformPermission } from "@workspace/judge"
+
 import { useViewer } from "@/features/account/use-viewer"
 
 interface NavItem {
   href: string
   label: string
-  adminOnly?: boolean
+  /** Shown to people holding any of these; always shown without. */
+  needs?: PlatformPermission[]
 }
 
 /** Grouped by the job a teacher is doing, so each page is easy to find. */
@@ -21,30 +24,37 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Content",
     items: [
-      { href: "/admin/problems", label: "Problems" },
-      { href: "/admin/questions", label: "Questions" },
-      { href: "/admin/units", label: "Units" },
-      { href: "/admin/assignments", label: "Assignments" },
-      { href: "/admin/contests", label: "Contests" },
-      { href: "/admin/daily", label: "Daily challenge" },
-      { href: "/admin/study-plans", label: "Study plans" },
-      { href: "/admin/notes", label: "Notices" },
+      { href: "/admin/library", label: "Library", needs: ["platform.library.manage"] },
+      { href: "/admin/problems", label: "Problems", needs: ["platform.library.manage"] },
+      { href: "/admin/questions", label: "Questions", needs: ["platform.library.manage"] },
+      { href: "/admin/units", label: "Units", needs: ["platform.library.manage"] },
+      {
+        href: "/admin/assignments",
+        label: "Assignments",
+        needs: ["platform.work.manage", "platform.gradebook.view"],
+      },
+      { href: "/admin/contests", label: "Contests", needs: ["platform.work.manage"] },
+      { href: "/admin/daily", label: "Daily challenge", needs: ["platform.library.manage"] },
+      { href: "/admin/study-plans", label: "Study plans", needs: ["platform.library.manage"] },
+      { href: "/admin/notes", label: "Notices", needs: ["platform.library.manage"] },
     ],
   },
   {
     title: "Students",
     items: [
-      { href: "/admin/users", label: "Users", adminOnly: true },
-      { href: "/admin/submissions", label: "Submissions" },
-      { href: "/admin/integrity", label: "Plagiarism check" },
+      { href: "/admin/users", label: "Users", needs: ["platform.users.manage"] },
+      { href: "/admin/submissions", label: "Submissions", needs: ["platform.submissions.view"] },
+      { href: "/admin/integrity", label: "Plagiarism check", needs: ["platform.submissions.view"] },
     ],
   },
   {
     title: "Setup",
     items: [
-      { href: "/admin/organizations", label: "Organizations", adminOnly: true },
-      { href: "/admin/languages", label: "Languages" },
-      { href: "/admin/settings", label: "Settings", adminOnly: true },
+      { href: "/admin/organizations", label: "Organizations", needs: ["platform.orgs.manage"] },
+      { href: "/admin/staff", label: "Staff and roles", needs: ["platform.roles.manage"] },
+      { href: "/admin/activity", label: "Activity", needs: ["platform.audit.view"] },
+      { href: "/admin/languages", label: "Languages", needs: ["platform.settings.manage"] },
+      { href: "/admin/settings", label: "Settings", needs: ["platform.settings.manage"] },
     ],
   },
 ]
@@ -52,7 +62,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { data: viewer } = useViewer()
-  const isAdmin = viewer?.user?.role === "admin"
+  const held = viewer?.user?.platform.permissions ?? []
 
   return (
     <div className="min-h-dvh">
@@ -64,7 +74,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         >
           {GROUPS.map((group) => {
             const items = group.items.filter(
-              (item) => !item.adminOnly || isAdmin
+              (item) => !item.needs || item.needs.some((p) => held.includes(p))
             )
             if (items.length === 0) return null
             return (

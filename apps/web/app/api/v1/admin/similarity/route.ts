@@ -5,7 +5,7 @@ import { findSimilarSubmissions } from "@/features/catalog/server"
 
 export const POST = route(
   {
-    access: "teacher",
+    access: "platform.submissions.view",
     body: z.object({
       problemSlug: z.string(),
       contestSlug: z.string().nullable(),

@@ -16,6 +16,7 @@ import {
 } from "@workspace/db"
 import { computeLeaderboard, freezeTime, markQuestion } from "@workspace/judge"
 import { usableQuestions } from "@/features/questions/server"
+import { usableIds } from "@/features/library/sharing"
 import { requireFeature } from "@/features/settings/server"
 
 import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
@@ -479,15 +480,13 @@ export async function checkUsableProblems(
       "A chosen problem no longer exists."
     )
   }
-  if (
-    found.some(
-      (p) => (!p.published || p.membersOnly || !p.listed) && p.orgId !== orgId
-    )
-  ) {
+  // Its own (drafts included), or published ones shared with it.
+  const usable = await usableIds("problem", problemIds, orgId)
+  if (found.some((p) => !usable.has(p.id))) {
     throw new ApiError(
       400,
       "draft_problem",
-      "Drafts can only be used by whoever wrote them. Pick published problems or your own."
+      "That problem isn't shared with you. Pick your own, or ones shared with you."
     )
   }
 }

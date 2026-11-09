@@ -128,6 +128,20 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Assignment problems are tagged with COs (`assignment_problems.outcomes`) from the assignment form; only the organization's own COs are accepted.
 - Attainment is computed, never stored (`packages/judge/src/outcomes.ts`, unit-tested; `classOutcomes` in `features/classes/server.ts`): per CO, each student's marks on tagged problems in published assignments reaching the class, counting only students those assignments are for; then the share reaching the threshold gives the level; a PO is its COs' levels weighted by mapping strength. Teachers who can see the class's grades get the report and a CSV; students don't see it.
 
+## Platform staff and roles
+
+- The platform dashboard is run by staff with platform roles, like organizations' roles: a fixed permission list (`packages/judge/src/platform.ts`: library, sharing, work, grades, submissions, colleges, users, settings, roles, activity log), built-in roles (Owner, Content admin, Reviewer, Support) that can't be changed, and custom roles (`platform_roles`). Who holds what: `platform_staff`.
+- `platformAccess()` (`features/platform/access.ts`) reads it on every request: ADMIN_EMAILS are always owners; staff have their role; anyone else falls back to their account role (admin: Owner, teacher: Content admin), which is how the platform worked before roles. Giving a role sets the account role to match (owner → admin, others → teacher; removing → student), so older "is staff" checks stay right.
+- Every platform route names the permission it needs (`route({ access: "platform.…" })`); dashboard pages need some platform role and the menu shows only what the role allows. Roles are given on Staff and roles, never on the Users page (which only blocks and unblocks).
+- Rules: nobody gives or makes a role with permissions they don't hold; only owners make or change owners; the platform keeps at least one owner; ADMIN_EMAILS owners can't be removed in the app; nobody blocks someone with more access. Platform changes (staff, roles, settings, languages, colleges, blocking) go in the activity log (`audit_log` with no organization), shown on Activity.
+
+## The library (one place for content, shared)
+
+- Problems and questions are written once and reused. Each owner (the platform, or one college) has a Library page (Dashboard › Library, Manage › Library: `features/library`) listing its own items and what reaches it, with search, filters (source, difficulty or type, status) and collections (`collections`, `collection_items`: folders that only group items, per owner).
+- The platform's items have `sharing`: `everyone` (every college), `selected` (colleges and teachers in `content_shares`) or `owner` (platform staff only). Set from the Library's Share dialog with the `platform.library.share` permission; audited. A college's own items are always `owner`: nobody else sees them.
+- `usableBy` / `usableIds` (`features/library/sharing.ts`) is the one rule for what an owner may use: its own items, or published items shared with it. The pickers, assignment, contest and daily saves, the library and collections all use it. Public library practice is separate and unchanged (`isPublicProblem`).
+- A college copies an item it can use to adapt it (`copyToLibrary`): the copy is its own, private, remembers `copied_from`, and a copied problem starts as a draft with its tests.
+
 ## Organizations and permissions
 
 - Platform roles (`users.role`: student, teacher, admin) still run the platform dashboard. Inside an organization, access comes only from organization roles.
@@ -214,6 +228,8 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/features.mjs`: library, daily (problem and question), streaks, notes, lists, study plans, profiles, leaderboard, hints, editorials, integrity, editor extras and their switches.
 - `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
 - `e2e/assignments.mjs`: grading rules, late penalties, gradebook and CSV, privacy, drafts and playback, rubrics, line comments and releasing feedback, lab exams (sittings, networks, events, more time, the site-wide lock, start window, edits after starting), problem import and assessment-only problems, the switch and the pages.
+- `e2e/library.mjs`: sharing the platform's content (every college, chosen colleges or teachers, staff only), what each college sees and can pick, copying, collections and the pages.
+- `e2e/platform.mjs`: platform roles, custom roles, the no-escalation rules, ADMIN_EMAILS owners, blocking, the activity log and the menu per role.
 - `e2e/flows.mjs`: Run vs Submit, history and creating a contest, as a person uses them. Included in `pnpm test:e2e`.
 - After a mutation, invalidate every query that shows that data. Stale contest data was the cause of several real bugs: "not registered" after registering, and old results after submitting.
 - Check that a test actually ran. A filter or quoting mistake has twice produced output that looked like a result.
@@ -240,6 +256,8 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] HackerRank-style integrity: plagiarism similarity checks (winnowing, rename-proof)
 - [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
 - [x] Quizzes: a question bank (single/multiple choice, short and written answers) with import, used in assignments, exams, contests and the daily challenge alone or with coding problems; teacher marks override; results after the due time or on release
+- [x] Platform staff and roles: permissions, built-in and custom roles, no escalation, activity log
+- [x] One library with sharing: per-owner Library pages, collections, sharing platform content with all or chosen colleges and teachers, copying to adapt
 - [x] Notifications: in-app bell with stored events and computed reminders, optional email
 - [x] Extensions and resubmission: a later due time for one student, whole assignment or reopened problems; lets an absent student sit an exam later
 - [x] Feedback: rubrics per assignment problem, line comments with saved comments, feedback held until released

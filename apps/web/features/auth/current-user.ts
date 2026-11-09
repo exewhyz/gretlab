@@ -2,6 +2,8 @@ import { getDb, sql, users, type User } from "@workspace/db"
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
 
+import { platformAccess } from "@/features/platform/access"
+
 import { authOptions } from "./options"
 
 /**
@@ -22,7 +24,8 @@ export async function getCurrentUser(): Promise<User | null> {
 /** For pages. Call at the top of the page, not in a layout: layouts don't re-run on navigation. */
 export async function requireStaffPage(callbackPath: string): Promise<User> {
   const user = await getCurrentUser()
-  if (user?.role !== "teacher" && user?.role !== "admin") {
+  // Anyone with a platform role; each page's data is checked against its own permission.
+  if (!user || (await platformAccess(user)).permissions.length === 0) {
     redirect(`/sign-in?callbackUrl=${encodeURIComponent(callbackPath)}`)
   }
   return user

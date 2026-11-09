@@ -118,6 +118,11 @@ export function ManageShell({
           show: has("contests.manage"),
         },
         {
+          href: `${base}/library`,
+          label: "Library",
+          show: has("problems.manage", "assignments.manage", "contests.manage"),
+        },
+        {
           href: `${base}/problems`,
           label: "Problems",
           show: has("problems.manage"),

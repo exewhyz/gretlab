@@ -4,6 +4,6 @@ import { importQuestions } from "@/features/questions/server"
 
 /** Questions from a question file (docs/question-format.md). */
 export const POST = route(
-  { access: "teacher", body: questionImportSchema },
+  { access: "platform.library.manage", body: questionImportSchema },
   ({ body }) => importQuestions(null, body.file, body.published)
 )

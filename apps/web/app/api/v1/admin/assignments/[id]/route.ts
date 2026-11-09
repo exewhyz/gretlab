@@ -6,15 +6,15 @@ import {
 } from "@/features/assignments/server"
 import { assignmentInputSchema } from "@/features/problems/schemas"
 
-export const GET = route({ access: "teacher" }, ({ params }) =>
+export const GET = route({ access: "platform.work.manage" }, ({ params }) =>
   getAssignmentForStaff(params.id ?? "", null)
 )
 
 export const PUT = route(
-  { access: "teacher", body: assignmentInputSchema },
+  { access: "platform.work.manage", body: assignmentInputSchema },
   ({ params, body }) => saveAssignment(params.id ?? "", body, null)
 )
 
-export const DELETE = route({ access: "teacher" }, ({ params }) =>
+export const DELETE = route({ access: "platform.work.manage" }, ({ params }) =>
   deleteAssignment(params.id ?? "", null)
 )

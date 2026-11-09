@@ -45,6 +45,7 @@ import {
 import { draftHistory, latestDraft } from "@/features/drafts/server"
 import { notify } from "@/features/notifications/server"
 import { usableQuestions } from "@/features/questions/server"
+import { usableIds } from "@/features/library/sharing"
 import { extendSitting } from "@/features/exams/server"
 import {
   dbNow,
@@ -880,11 +881,12 @@ export async function saveAssignment(
       "A chosen problem no longer exists."
     )
   }
-  if (found.some((p) => (p.membersOnly || !p.listed) && p.orgId !== orgId)) {
+  const usable = await usableIds("problem", ids, orgId)
+  if (found.some((p) => p.orgId !== orgId && !usable.has(p.id))) {
     throw new ApiError(
       400,
       "private_problem",
-      "That problem is only for another organization's members."
+      "That problem isn't shared with you."
     )
   }
   if (found.some((p) => !p.published)) {

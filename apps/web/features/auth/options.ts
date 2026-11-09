@@ -6,14 +6,8 @@ import GoogleProvider, { type GoogleProfile } from "next-auth/providers/google"
 
 import { freeHandle } from "@/features/catalog/server"
 import { getSettings } from "@/features/settings/server"
+import { isAdminEmail } from "@/lib/admin-emails"
 
-/** ADMIN_EMAILS always get in and are made admins. It's how the first admin exists. */
-function isAdminEmail(email: string): boolean {
-  return (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .includes(email)
-}
 
 /** Sign in as anyone without a password, so never available in a production build. */
 export const DEV_LOGIN_ENABLED =

@@ -4,6 +4,7 @@ import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
 import { ApiError, notFound } from "@/lib/api/route"
 
 import { readQuestionFile } from "./import"
+import { usableBy, usableIds } from "@/features/library/sharing"
 import { marksItself, type QuestionInput } from "./schemas"
 
 /*
@@ -18,15 +19,15 @@ const ownedBy = (orgId: string | null) =>
   orgId === null ? isNull(questions.orgId) : eq(questions.orgId, orgId)
 
 /** An owner's questions; with `picker`, also the platform's published ones to reuse. */
-export async function listQuestionsForStaff(orgId: string | null, picker = false) {
+export async function listQuestionsForStaff(
+  orgId: string | null,
+  picker = false,
+  userId?: string
+) {
   const rows = await getDb()
     .select()
     .from(questions)
-    .where(
-      picker && orgId !== null
-        ? or(ownedBy(orgId), and(isNull(questions.orgId), eq(questions.published, true)))
-        : ownedBy(orgId)
-    )
+    .where(picker ? usableBy(questions, "question", orgId, userId) : ownedBy(orgId))
     .orderBy(asc(questions.title))
   return rows.map(({ correct: _c, accepted: _a, ...q }) => ({
     ...q,
@@ -52,6 +53,8 @@ export async function saveQuestion(
   const values = {
     ...fields,
     orgId,
+    // A college's questions are its own; the platform's sharing is set in the Library.
+    ...(orgId ? { sharing: "owner" as const } : {}),
     // Only choice questions have options; only short answers accepted answers.
     options: fields.kind === "single" || fields.kind === "multiple" ? fields.options : [],
     correct: fields.kind === "single" || fields.kind === "multiple" ? fields.correct : [],
@@ -110,7 +113,14 @@ export async function importQuestions(
   if (found.length === 0) return { created: [] }
   const rows = await getDb()
     .insert(questions)
-    .values(found.map(({ expectedUpdatedAt: _, ...q }) => ({ ...q, published, orgId })))
+    .values(
+      found.map(({ expectedUpdatedAt: _, ...q }) => ({
+        ...q,
+        published,
+        orgId,
+        sharing: orgId ? ("owner" as const) : ("everyone" as const),
+      }))
+    )
     .returning({ id: questions.id, title: questions.title, kind: questions.kind })
   return { created: rows }
 }
@@ -133,10 +143,10 @@ export async function usableQuestions(
   if (rows.length !== new Set(ids).size) {
     throw new ApiError(400, "unknown_question", "A chosen question no longer exists.")
   }
+  const usable = await usableIds("question", ids, orgId)
   for (const q of rows) {
-    const own = q.orgId === orgId
-    if (!own && (q.orgId !== null || !q.published)) {
-      throw new ApiError(400, "private_question", `"${q.title}" belongs to someone else.`)
+    if (!usable.has(q.id)) {
+      throw new ApiError(400, "private_question", `"${q.title}" isn't shared with you.`)
     }
     if (needsAutoMark && !marksItself(q)) {
       throw new ApiError(

@@ -5,11 +5,12 @@ import {
 } from "@/features/assignments/server"
 import { assignmentInputSchema } from "@/features/problems/schemas"
 
-export const GET = route({ access: "teacher" }, () =>
+// Reviewers see the list too, to reach gradebooks.
+export const GET = route({ access: "platform.gradebook.view" }, () =>
   listAssignmentsForStaff(null)
 )
 
 export const POST = route(
-  { access: "teacher", body: assignmentInputSchema },
+  { access: "platform.work.manage", body: assignmentInputSchema },
   ({ body }) => saveAssignment(null, body, null)
 )

@@ -33,6 +33,7 @@ import {
 import type { z } from "zod"
 
 import { ApiError, notFound } from "@/lib/api/route"
+import { platformCan } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
 
 import { rolePermissions } from "./access"
@@ -287,12 +288,13 @@ async function giveRole(
 
 /* ---------- platform ---------- */
 
-function requirePlatformAdmin(user: User) {
-  if (user.role !== "admin") throw forbidden()
+/** Running colleges from the platform: the "Manage colleges" permission. */
+async function requirePlatformAdmin(user: User) {
+  if (!(await platformCan(user, "platform.orgs.manage"))) throw forbidden()
 }
 
 export async function listAllOrganizations(user: User) {
-  requirePlatformAdmin(user)
+  await requirePlatformAdmin(user)
   const db = getDb()
   const [rows, members] = await Promise.all([
     db.select().from(organizations).orderBy(asc(organizations.name)),
@@ -312,7 +314,7 @@ export async function createOrganization(
   user: User,
   input: z.infer<typeof orgCreateSchema>
 ) {
-  requirePlatformAdmin(user)
+  await requirePlatformAdmin(user)
   return getDb().transaction(async (tx) => {
     const [org] = await tx
       .insert(organizations)
@@ -352,7 +354,7 @@ export async function setOrganizationActive(
   id: string,
   active: boolean
 ) {
-  requirePlatformAdmin(user)
+  await requirePlatformAdmin(user)
   const [org] = await getDb()
     .update(organizations)
     .set({ active })

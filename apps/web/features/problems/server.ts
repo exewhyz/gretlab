@@ -29,6 +29,7 @@ import {
 
 import type { ProblemInput } from "./schemas"
 import { readProblemFile, slugFor, toProblemInput } from "./import"
+import { usableBy } from "@/features/library/sharing"
 import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
 
 const { and, asc, count, desc, eq, gt, inArray, isNull, lte, or } = sql
@@ -268,14 +269,16 @@ const ownedBy = (orgId: string | null) =>
  */
 export async function listProblemsForStaff(
   orgId: string | null,
-  picker = false
+  picker = false,
+  /** Who's picking, for content shared with them personally. */
+  userId?: string
 ) {
   const db = getDb()
   const [rows, unitRows, testCounts] = await Promise.all([
     db
       .select()
       .from(problems)
-      .where(picker ? or(ownedBy(orgId), isPublicProblem) : ownedBy(orgId))
+      .where(picker ? usableBy(problems, "problem", orgId, userId) : ownedBy(orgId))
       .orderBy(asc(problems.position), asc(problems.slug)),
     db.select().from(units).orderBy(asc(units.position)),
     db
@@ -329,7 +332,23 @@ export async function saveProblem(
     throw new ApiError(400, "no_description", "Describe the problem first.")
   }
   // Units are the platform's course outline; organizations' problems stand alone.
-  const values = { ...fields, orgId, unitId: orgId ? null : fields.unitId }
+  const values = {
+    ...fields,
+    orgId,
+    unitId: orgId ? null : fields.unitId,
+    // A college's problem reaches other colleges only while it's public in the library; the
+    // platform's library problems reach every college (its sharing is set in the Library).
+    ...(orgId
+      ? {
+          sharing:
+            fields.published && fields.listed && !fields.membersOnly
+              ? ("everyone" as const)
+              : ("owner" as const),
+        }
+      : id
+        ? {}
+        : { sharing: fields.listed ? ("everyone" as const) : ("owner" as const) }),
+  }
   const saved = await getDb().transaction(async (tx) => {
     const [row] = id
       ? await tx

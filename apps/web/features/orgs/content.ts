@@ -229,7 +229,7 @@ export async function orgProblems(slug: string, user: User, picker: boolean) {
       "assignments.manage"
     )
   else needAnywhere(ctx, "problems.manage")
-  return listProblemsForStaff(ctx.org.id, picker)
+  return listProblemsForStaff(ctx.org.id, picker, user.id)
 }
 
 export async function orgProblem(slug: string, user: User, id: string) {
@@ -243,7 +243,7 @@ export async function orgQuestions(slug: string, user: User, picker: boolean) {
   // Picking needs the right to set work; the bank itself, to write problems.
   if (picker) needAnywhere(ctx, "assignments.manage", "contests.manage", "problems.manage")
   else needAnywhere(ctx, "problems.manage")
-  return listQuestionsForStaff(ctx.org.id, picker)
+  return listQuestionsForStaff(ctx.org.id, picker, user.id)
 }
 
 export async function orgQuestion(slug: string, user: User, id: string) {

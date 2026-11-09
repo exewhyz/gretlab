@@ -13,7 +13,7 @@ import {
  */
 export const PATCH = route(
   {
-    access: "teacher",
+    access: "platform.library.manage",
     body: z.object({
       name: z.string().trim().min(1, "Name the unit").max(200).optional(),
       problemIds: z.array(z.uuid()).max(1000).optional(),
@@ -28,6 +28,6 @@ export const PATCH = route(
 )
 
 /** ?moveTo=<unit id>: where its problems go; without it they go to no unit. */
-export const DELETE = route({ access: "teacher" }, ({ params, query }) =>
+export const DELETE = route({ access: "platform.library.manage" }, ({ params, query }) =>
   deleteUnit(params.id ?? "", query.get("moveTo") || null)
 )

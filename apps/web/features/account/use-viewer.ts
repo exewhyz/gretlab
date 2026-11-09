@@ -2,6 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query"
 
+import type { PlatformPermission } from "@workspace/judge"
+
 import { api } from "@/lib/api/client"
 import type { EffectiveLanguage } from "@/features/settings/server"
 
@@ -14,6 +16,7 @@ export interface Viewer {
     name: string | null
     role: "student" | "teacher" | "admin"
     teaches: boolean
+    platform: { permissions: PlatformPermission[]; role: string | null; owner: boolean }
   } | null
   features: {
     serverExecution: boolean

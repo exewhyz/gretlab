@@ -6,15 +6,15 @@ import {
   saveProblem,
 } from "@/features/problems/server"
 
-export const GET = route({ access: "teacher" }, ({ params }) =>
+export const GET = route({ access: "platform.library.manage" }, ({ params }) =>
   getProblemForStaff(params.id ?? "", null)
 )
 
 export const PUT = route(
-  { access: "teacher", body: problemInputSchema },
+  { access: "platform.library.manage", body: problemInputSchema },
   ({ params, body }) => saveProblem(params.id ?? "", body, null)
 )
 
-export const DELETE = route({ access: "teacher" }, ({ params }) =>
+export const DELETE = route({ access: "platform.library.manage" }, ({ params }) =>
   deleteProblem(params.id ?? "", null)
 )

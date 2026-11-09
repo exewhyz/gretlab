@@ -13,6 +13,8 @@ import {
 import { z } from "zod"
 
 import { ApiError, notFound } from "@/lib/api/route"
+import { platformAccess } from "@/features/platform/access"
+import { writePlatformAudit } from "@/features/platform/staff"
 import { invalidateLanguages } from "@/features/settings/server"
 
 const { and, asc, count, desc, eq, gte, ilike, lt, or } = sql
@@ -34,9 +36,9 @@ export async function updateLanguage(
   invalidateLanguages()
 }
 
+/** Blocking and unblocking. Platform roles are given on the Staff page, under its rules. */
 export const userUpdateSchema = z.object({
-  role: z.enum(["student", "teacher", "admin"]).optional(),
-  disabled: z.boolean().optional(),
+  disabled: z.boolean(),
 })
 
 export async function listUsers(search: string | null) {
@@ -61,13 +63,27 @@ export async function updateUser(
   if (actor.id === id) {
     throw new ApiError(400, "self_change", "You can't change your own account.")
   }
+  const [target] = await getDb().select().from(users).where(eq(users.id, id))
+  if (!target) throw notFound("User not found")
+  // Blocking staff takes their access away: only for people whose access you hold.
+  const [mine, theirs] = await Promise.all([platformAccess(actor), platformAccess(target)])
+  if (
+    (theirs.owner && !mine.owner) ||
+    !theirs.permissions.every((p) => mine.permissions.includes(p))
+  ) {
+    throw new ApiError(403, "forbidden", "You can't block someone with more access than you.")
+  }
   const [user] = await getDb()
     .update(users)
-    .set(input)
+    .set({ disabled: input.disabled })
     .where(eq(users.id, id))
     .returning()
-  if (!user) throw notFound("User not found")
-  return user
+  await writePlatformAudit(
+    actor,
+    input.disabled ? "user.block" : "user.unblock",
+    `${input.disabled ? "Blocked" : "Unblocked"} ${target.email}`
+  )
+  return user!
 }
 
 /** A runner silent for longer than this is treated as down. */

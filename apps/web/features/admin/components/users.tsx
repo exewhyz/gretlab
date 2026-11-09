@@ -6,7 +6,9 @@ import type { User } from "@workspace/db"
 import { useState } from "react"
 
 import { ConfirmDialog } from "@/components/confirm"
-import { SelectInput, TextInput } from "@/components/form"
+import Link from "next/link"
+
+import { TextInput } from "@/components/form"
 import { useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
 
@@ -59,23 +61,14 @@ export function AdminUsers() {
               <tr key={user.id}>
                 <td>{user.email}</td>
                 <td>{user.name ?? "—"}</td>
-                <td>
-                  <SelectInput
-                    aria-label={`Role for ${user.email}`}
-                    className="w-32 py-1"
-                    value={user.role}
-                    disabled={isSelf}
-                    onChange={(event) =>
-                      update.mutate({
-                        id: user.id,
-                        role: event.target.value as User["role"],
-                      })
-                    }
-                  >
-                    <option value="student">Student</option>
-                    <option value="teacher">Teacher</option>
-                    <option value="admin">Admin</option>
-                  </SelectInput>
+                <td className="text-body">
+                  {user.role === "student" ? (
+                    "Student"
+                  ) : (
+                    <Link href="/admin/staff" className="underline-offset-2 hover:underline">
+                      Platform staff
+                    </Link>
+                  )}
                 </td>
                 <td>
                   <label className="flex items-center gap-2">
