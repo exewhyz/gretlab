@@ -29,3 +29,11 @@ export const examEventSchema = z.object({
   kind: z.enum(BROWSER_EXAM_EVENTS),
   detail: z.string().max(200).optional(),
 })
+
+export const extensionSchema = z.object({
+  student: z.email(),
+  dueAt: z.coerce.date({ error: "Choose the new due time" }),
+  /** Problems it reopens; empty for the whole assignment. */
+  problemIds: z.array(z.uuid()).max(50).default([]),
+  reason: z.string().trim().max(500).default(""),
+})

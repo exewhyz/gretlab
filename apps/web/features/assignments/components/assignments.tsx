@@ -63,6 +63,7 @@ interface AssignmentDetail {
     rubric: { id: string; label: string; points: number; mark: number | null }[]
   }[]
   feedbackHeld: boolean
+  extension: { dueAt: string; problems: string[]; whole: boolean } | null
   problemCount: number
   exam: {
     minutes: number | null
@@ -258,6 +259,15 @@ export function AssignmentView({ slug }: { slug: string }) {
         <PhaseBadge phase={data.phase} />
       </div>
       <p className="mb-2 text-body-sm text-body">{dueLine(data)}</p>
+      {data.extension && (
+        <p
+          data-testid="my-extension"
+          className="mb-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-body-sm text-ink"
+        >
+          Your teacher gave you until {formatDateTime(data.extension.dueAt)}
+          {data.extension.whole ? "." : ` for ${data.extension.problems.join(", ")}.`}
+        </p>
+      )}
       <ClassChips classes={data.classes} className="mb-4" />
       {data.description && (
         <div className="mb-4 text-body-sm text-body">

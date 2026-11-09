@@ -96,6 +96,26 @@ await t(`/admin/assignments/${late.json.id}`, { method: "PUT", body: body({ titl
 const closed = (await a("/assignments/asg-old")).json
 check("no late work: closed and nothing counts", closed.phase === "closed" && closed.earned === 0)
 
+// ---------- extensions: one student's later due time, or reopening some problems
+const oldId = late.json.id
+const extend = (api, over) => api(`/admin/assignments/${oldId}/extensions`, { method: "PUT", body: { student: "asg-a@example.com", dueAt: hours(24), problemIds: [], reason: "Was ill", ...over } })
+check("students can't extend", (await extend(a)).status === 403)
+check("an extension must be later than the due time", (await extend(t, { dueAt: hours(-3) })).json?.error?.code === "not_later")
+check("the teacher extends for one student", (await extend(t)).status === 200)
+const extendedOld = (await a("/assignments/asg-old")).json
+check("their work before the new time is on time, in full", extendedOld.phase === "open" && extendedOld.earned === 10 && extendedOld.extension?.whole === true, JSON.stringify({ phase: extendedOld.phase, earned: extendedOld.earned, ext: extendedOld.extension }))
+check("others keep the assignment's own due time", (await b("/assignments/asg-old")).json.phase === "closed")
+const oldBook = (await t(`/admin/assignments/${oldId}/gradebook`)).json
+check("the gradebook shows the extension and its marks", oldBook.rows.find((r) => r.email === "asg-a@example.com")?.extension?.reason === "Was ill" && oldBook.rows.find((r) => r.email === "asg-a@example.com")?.earned === 10)
+check("removing it grades against the due time again", (await t(`/admin/assignments/${oldId}/extensions?student=asg-a@example.com`, { method: "DELETE" })).status === 200 && (await a("/assignments/asg-old")).json.phase === "closed")
+// Reopening one problem after feedback.
+const reopen = await t("/admin/assignments", { body: body({ title: "Reopen", slug: "asg-reopen", opensAt: hours(-3), dueAt: hours(-2), allowLate: false, published: true, problems: [{ problemId: id("p1"), points: 10 }, { problemId: id("p10"), points: 10 }] }) })
+await t(`/admin/assignments/${reopen.json.id}/extensions`, { method: "PUT", body: { student: "asg-a@example.com", dueAt: hours(24), problemIds: [id("p10")] } })
+const leap = 'year = int(input())\nif year % 400 == 0 or (year % 4 == 0 and year % 100 != 0):\n    print("Leap year")\n    print("February has 29 days")\nelse:\n    print("Not a leap year")\n    print("February has 28 days")\n'
+check("a reopened problem can be resubmitted", (await submit(a, "p10", leap)).verdict === "AC")
+const reopened = (await a("/assignments/asg-reopen")).json
+check("only the reopened problem counts after the due time", reopened.earned === 10 && reopened.problems.find((p) => p.slug === "p10").earned === 10 && reopened.problems.find((p) => p.slug === "p1").earned === 0 && reopened.extension.problems.join() === "Q2 Leap Year", JSON.stringify(reopened.extension))
+
 // Opens tomorrow: students learn when, not what.
 await t("/admin/assignments", { body: body({ title: "Later", slug: "asg-later", opensAt: hours(20), dueAt: hours(40), published: true }) })
 const later = (await a("/assignments/asg-later")).json
@@ -246,6 +266,9 @@ check("the CSV has the exam and its warnings", examCsv.includes("Exam,Exam warni
 check("forgetting the addresses", (await t(examBase + "/forget-addresses", { method: "POST" })).status === 200 && (await t(`${examBase}/attempts?student=asg-a@example.com&problem=${id("p1")}`)).json.exam.ip === null)
 const windowExam = await t("/admin/assignments", { body: body({ title: "Window exam", slug: "asg-exam-window", allowLate: false, published: true, opensAt: hours(-2), exam: { minutes: 30, fullscreen: false, networks: [], startWithin: 15 } }) })
 check("an exam can limit when students start", windowExam.status === 200 && (await a("/assignments/asg-exam-window/exam", { method: "POST" })).json?.error?.code === "exam_start_closed")
+await t(`/admin/assignments/${windowExam.json.id}/extensions`, { method: "PUT", body: { student: "asg-a@example.com", dueAt: hours(48) } })
+check("an extension lets an absent student sit it later", (await a("/assignments/asg-exam-window/exam", { method: "POST" })).json?.status === "in_progress")
+await a("/assignments/asg-exam-window/exam/finish", { method: "POST" })
 // Problems of its own: imported for the assessment, never in the library.
 const imported = await t("/admin/problems/import", { body: { file: JSON.parse(readFileSync(ROOT + "apps/web/public/problem-template.json", "utf8")), listed: false, published: true } })
 check("problems import from the template file", imported.status === 200 && imported.json.created.length === 1, JSON.stringify(imported.json).slice(0, 150))
@@ -360,6 +383,13 @@ check("gradebook page with a CSV download", await tp.getByRole("link", { name: "
 await tp.goto(`${BASE}/admin/assignments/${week1.json.id}/grades`)
 await tp.getByTestId("grade-row").first().waitFor({ timeout: 15000 })
 check("gradebook page shows marks", await tp.getByTestId("grade-row").filter({ hasText: "asg-a@example.com" }).getByRole("cell", { name: "100" }).first().isVisible())
+await tp.getByRole("button", { name: "Extend for asg-b@example.com" }).click()
+await tp.getByRole("dialog").getByRole("checkbox", { name: /Q2\./ }).click()
+await tp.getByRole("dialog").getByRole("button", { name: "Save extension" }).click()
+await tp.getByTestId("grade-row").filter({ hasText: "asg-b@example.com" }).getByTestId("extension-chip").waitFor({ timeout: 15000 })
+check("the gradebook extends one student's problems", (await tp.getByTestId("grade-row").filter({ hasText: "asg-b@example.com" }).getByTestId("extension-chip").innerText()).includes("Q2"))
+check("and the student is told", (await b("/assignments/asg-week-1")).json.extension?.whole === false)
+await tp.screenshot({ path: SHOTS + "extension.png", fullPage: true })
 await tp.screenshot({ path: SHOTS + "gradebook.png", fullPage: true })
 // Code saved on one computer is there on another.
 const elsewhere = await open("asg-a@example.com")

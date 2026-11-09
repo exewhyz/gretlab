@@ -839,6 +839,29 @@ export const draftSnapshots = pgTable(
   (table) => [index("draft_snapshots_by").on(table.userId, table.problemId, table.at)]
 )
 
+/**
+ * A later due date for one student: for the whole assignment, or only some of its
+ * problems (reopening them after feedback is how resubmission works).
+ */
+export const assignmentExtensions = pgTable(
+  "assignment_extensions",
+  {
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    /** Problem ids it covers; empty for the whole assignment. */
+    problemIds: jsonb("problem_ids").$type<string[]>().notNull().default([]),
+    reason: text("reason").notNull().default(""),
+    grantedBy: uuid("granted_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [primaryKey({ columns: [table.assignmentId, table.userId] })]
+)
+
 /** What a program's graduates should be able to do (PO1..PO12, PSOs): one list per organization. */
 export const programOutcomes = pgTable(
   "program_outcomes",

@@ -176,6 +176,13 @@
       "when": 1794230345294,
       "tag": "0024_rejudge_system_errors",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794230717253,
+      "tag": "0025_extensions",
+      "breakpoints": true
     }
   ]
 }

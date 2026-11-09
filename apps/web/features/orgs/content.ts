@@ -8,6 +8,8 @@ import {
   extendStudentSitting,
   forgetExamAddresses,
   rejudgeSystemErrors,
+  setExtension,
+  removeExtension,
   setRubricMarks,
   listAssignments,
   getAssignmentForStaff,
@@ -469,6 +471,31 @@ export async function orgExtendSitting(
     minutes: input.minutes,
   })
   return sitting
+}
+
+export async function orgSetExtension(
+  slug: string,
+  user: User,
+  id: string,
+  input: Parameters<typeof setExtension>[3]
+) {
+  const { ctx, scope } = await feedbackContext(slug, user)
+  const result = await setExtension(id, ctx.org.id, scope, input, user.id)
+  await writeAudit(ctx, "assignment.extension", `Extended an assignment for ${input.student}`, {
+    assignment: id,
+    student: input.student,
+    dueAt: input.dueAt.toISOString(),
+    problems: input.problemIds.length,
+  })
+  return result
+}
+
+export async function orgRemoveExtension(slug: string, user: User, id: string, email: string) {
+  const { ctx, scope } = await feedbackContext(slug, user)
+  await removeExtension(id, ctx.org.id, scope, email)
+  await writeAudit(ctx, "assignment.extension_removed", `Removed ${email}'s extension`, {
+    assignment: id,
+  })
 }
 
 export async function orgRejudgeSystemErrors(slug: string, user: User, id: string) {

@@ -89,3 +89,29 @@ export function rubricEarned(
 
 export const rubricTotal = (rubric: readonly RubricCriterion[]) =>
   rubric.reduce((total, c) => total + c.points, 0)
+
+/** A later due date for one student: the whole assignment, or only the listed problems. */
+export interface Extension {
+  dueAt: Date
+  /** Empty for the whole assignment. */
+  problemIds: readonly string[]
+}
+
+/** A problem's due time for this student. An extension never makes it earlier. */
+export function extendedDue(
+  dueAt: Date,
+  extension: Extension | null | undefined,
+  problemId: string
+): Date {
+  if (!extension || extension.dueAt <= dueAt) return dueAt
+  const covers =
+    extension.problemIds.length === 0 ||
+    extension.problemIds.includes(problemId)
+  return covers ? extension.dueAt : dueAt
+}
+
+/** The latest due time of any of this student's problems: when their assignment closes. */
+export const personalDue = (
+  dueAt: Date,
+  extension: Extension | null | undefined
+) => (extension && extension.dueAt > dueAt ? extension.dueAt : dueAt)

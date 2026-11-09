@@ -763,6 +763,7 @@ interface Gradebook {
     earned: number
     late: number
     exam: (SittingView & { warnings: number }) | null
+    extension: { dueAt: string; problemIds: string[]; reason: string } | null
   }[]
 }
 
@@ -917,6 +918,14 @@ export function AssignmentGradebook({ id }: { id: string }) {
             <td>
               <div className="text-ink">{row.name ?? row.handle}</div>
               <div className="text-xs">{row.email}</div>
+              <ExtensionControl
+                assignmentId={id}
+                student={row.email}
+                name={row.name ?? row.handle ?? row.email}
+                dueAt={data.assignment.dueAt}
+                problems={data.problems}
+                extension={row.extension}
+              />
             </td>
             {row.exam && (
               <td className="text-caption" data-testid="exam-cell">
@@ -1576,6 +1585,148 @@ function OutcomeTagger({
           <DialogFooter>
             <Button type="button" onClick={() => setOpen(false)}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+/** A later due date for one student, or reopening some problems after feedback. */
+function ExtensionControl({
+  assignmentId,
+  student,
+  name,
+  dueAt,
+  problems,
+  extension,
+}: {
+  assignmentId: string
+  student: string
+  name: string
+  dueAt: string
+  problems: { problemId: string; title: string }[]
+  extension: { dueAt: string; problemIds: string[]; reason: string } | null
+}) {
+  const owner = useOwner()
+  const client = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const suggested = new Date(
+    Math.max(new Date(dueAt).getTime(), Date.now()) + 3 * 86_400_000
+  )
+  const [until, setUntil] = useState(
+    toLocalInput(extension?.dueAt ?? suggested.toISOString())
+  )
+  const [chosen, setChosen] = useState<string[]>(extension?.problemIds ?? [])
+  const [reason, setReason] = useState(extension?.reason ?? "")
+  const [message, setMessage] = useState<string | null>(null)
+  const path = owner.api(`/assignments/${assignmentId}/extensions`)
+  const refresh = () =>
+    client.invalidateQueries({ queryKey: owner.key("gradebook", assignmentId) })
+  const save = useMutation({
+    mutationFn: () =>
+      api(path, {
+        method: "PUT",
+        body: { student, dueAt: new Date(until).toISOString(), problemIds: chosen, reason },
+      }),
+    onSuccess: () => {
+      setOpen(false)
+      void refresh()
+    },
+    onError: (e) => setMessage(e.message),
+  })
+  const labelOf = (id: string) => {
+    const index = problems.findIndex((p) => p.problemId === id)
+    return index < 0 ? "" : `Q${index + 1}`
+  }
+  return (
+    <>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        {extension && (
+          <span
+            data-testid="extension-chip"
+            className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
+            title={extension.reason || undefined}
+          >
+            Until {formatDateTime(extension.dueAt)}
+            {extension.problemIds.length > 0 &&
+              ` · ${extension.problemIds.map(labelOf).join(", ")}`}
+          </span>
+        )}
+        <Button
+          type="button"
+          variant="link"
+          size="xs"
+          className="h-auto p-0 text-xs"
+          aria-label={`Extend for ${student}`}
+          onClick={() => setOpen(true)}
+        >
+          {extension ? "Change" : "Extend"}
+        </Button>
+        {extension && (
+          <ConfirmButton
+            variant="link"
+            size="xs"
+            className="h-auto p-0 text-xs text-destructive"
+            title={`Remove ${name}'s extension?`}
+            description="Their work is graded against the assignment's own due time again."
+            confirmLabel="Remove extension"
+            onConfirm={() =>
+              void api(`${path}?student=${encodeURIComponent(student)}`, {
+                method: "DELETE",
+              }).then(refresh)
+            }
+          >
+            Remove
+          </ConfirmButton>
+        )}
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Extend for {name}</DialogTitle>
+            <DialogDescription>
+              A later due time for this student only. Choose problems to reopen just those,
+              for example after feedback; choose none for the whole assignment.
+            </DialogDescription>
+          </DialogHeader>
+          <Field label="New due time">
+            <TextInput
+              type="datetime-local"
+              value={until}
+              onChange={(event) => setUntil(event.target.value)}
+            />
+          </Field>
+          <div className="grid gap-1.5">
+            <div className="text-caption font-medium text-ink">Problems</div>
+            {problems.map((p, index) => (
+              <label key={p.problemId} className="inline-flex items-center gap-2 text-body-sm">
+                <Checkbox
+                  checked={chosen.includes(p.problemId)}
+                  onCheckedChange={(checked) =>
+                    setChosen((all) =>
+                      checked ? [...all, p.problemId] : all.filter((x) => x !== p.problemId)
+                    )
+                  }
+                />
+                Q{index + 1}. {p.title}
+              </label>
+            ))}
+            <p className="text-caption">
+              {chosen.length === 0 ? "None chosen: the whole assignment." : "Only these reopen."}
+            </p>
+          </div>
+          <Field label="Reason (optional, for your records)">
+            <TextInput value={reason} onChange={(event) => setReason(event.target.value)} />
+          </Field>
+          {message && <FormMessage message={{ text: message, kind: "err" }} />}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={save.isPending} onClick={() => save.mutate()}>
+              Save extension
             </Button>
           </DialogFooter>
         </DialogContent>

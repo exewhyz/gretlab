@@ -10,11 +10,12 @@ import {
 import {
   examEndsAt,
   ipAllowed,
+  personalDue,
   sittingClosesAt,
   type ExamEventKind,
 } from "@workspace/judge"
 
-import { findAssignment } from "@/features/assignments/server"
+import { extensionsOn, findAssignment } from "@/features/assignments/server"
 import { requireFeature } from "@/features/settings/server"
 import { ApiError, notFound } from "@/lib/api/route"
 
@@ -41,10 +42,15 @@ async function examFor(slug: string, user: User) {
 export async function startExam(slug: string, user: User, ip: string | null) {
   const { assignment, exam } = await examFor(slug, user)
   const now = await dbNow()
+  // An extension lets a student who missed it (illness, a clash) sit it later.
+  const extension = (await extensionsOn([assignment.id], user.id))
+    .get(assignment.id)
+    ?.get(user.id)
+  const dueAt = personalDue(assignment.dueAt, extension)
   if (now < assignment.opensAt) {
     throw new ApiError(409, "exam_not_open", "The exam hasn't opened yet.")
   }
-  if (now >= assignment.dueAt) {
+  if (now >= dueAt) {
     throw new ApiError(409, "exam_over", "The exam has closed.")
   }
   const existing = (await sittingsOn([assignment.id], user.id))
@@ -62,6 +68,7 @@ export async function startExam(slug: string, user: User, ip: string | null) {
   }
   // Everyone starts within a window, so nobody can brief a late starter.
   if (
+    !extension &&
     exam.startWithin &&
     now.getTime() > assignment.opensAt.getTime() + exam.startWithin * 60_000
   ) {
@@ -84,7 +91,7 @@ export async function startExam(slug: string, user: User, ip: string | null) {
       assignmentId: assignment.id,
       userId: user.id,
       startedAt: now,
-      endsAt: examEndsAt(now, assignment.dueAt, exam.minutes),
+      endsAt: examEndsAt(now, dueAt, exam.minutes),
       ip,
     })
     // Two tabs pressing Start at once both get the one sitting.

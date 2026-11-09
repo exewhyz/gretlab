@@ -85,6 +85,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Only graded submissions from `opensAt` on count. Per problem: the best on-time result, or a better late one minus the penalty when late work is allowed. Partial credit comes from IOI-style scores.
 - Only published problems can be assigned, because students solve them on the normal problem pages.
 - The gradebook lists every active student, including those who haven't started. CSV fields are quoted and defused against spreadsheet formulas.
+- Extensions (`assignment_extensions`): a later due time for one student, for the whole assignment or only some problems (reopening them after feedback is resubmission). Grading uses `extendedDue` per problem; the student's phase and due line use `personalDue`. For an exam it lets an absent student start later (the start window is waived). Given from the gradebook's Extend; audited for organizations.
 - Rubrics: each assignment problem may have up to 20 criteria marked by hand (`assignment_problems.rubric`); a problem is out of its test points plus the rubric's. Marks are stored per student (`rubric_marks`), clamped to each criterion (`rubricEarned`), and unknown criteria are refused. Marks are given in the gradebook's student panel.
 - Line comments (`submission_comments`) go on a line that exists in that student's submission, from the same panel by selecting a line number. Teachers keep reusable comments (`feedback_snippets`, `/me/snippets`).
 - "Hold feedback" (`assignments.hold_feedback`) keeps rubric marks and comments from students, and out of their totals, until the gradebook's "Release feedback". Released comments show under the lines on the student's submission page; rubric marks on the assignment page.
@@ -220,6 +221,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Organizations (part 4): members-only problems on members' pages; student code from the gradebook; anonymous class ratings; per-organization languages and paste blocking for its contests; Excel (.xlsx) import
 - [x] HackerRank-style integrity: plagiarism similarity checks (winnowing, rename-proof)
 - [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
+- [x] Extensions and resubmission: a later due time for one student, whole assignment or reopened problems; lets an absent student sit an exam later
 - [x] Feedback: rubrics per assignment problem, line comments with saved comments, feedback held until released
 - [x] Lab exams: timed single sittings, start window, lab network limits (IPv4/IPv6), site-wide lock during a sitting, tab/fullscreen/paste records, more time per student, forgetting addresses
 - [x] Problems of an assignment, exam or contest: written or imported in their forms, kept out of the library; one import file format; assignment problems solved on the assignment's own pages

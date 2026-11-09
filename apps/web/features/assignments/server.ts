@@ -1,6 +1,7 @@
 import {
   assignmentProblems,
   courseOutcomes,
+  assignmentExtensions,
   examEvents,
   examSessions,
   rubricMarks,
@@ -26,6 +27,9 @@ import {
   inAudience,
   rubricEarned,
   rubricTotal,
+  extendedDue,
+  personalDue,
+  type Extension,
   duringSitting,
   sittingClosesAt,
   QUEUE_CHANNEL,
@@ -150,7 +154,9 @@ function grade(
   attempts: Attempt[],
   marks?: Marks,
   /** For an exam, the student's sitting: only work during it counts, none without one. */
-  sitting?: Sitting
+  sitting?: Sitting,
+  /** A later due date for this student, for some or all problems. */
+  extension?: Extension
 ) {
   const counted = assignment.exam ? duringSitting(attempts, sitting) : attempts
   // A sitting can run past the due time when a teacher gives more time.
@@ -162,7 +168,10 @@ function grade(
     const tests = gradeProblem(
       item.points,
       counted.filter((a) => a.problemId === item.problemId),
-      rules
+      // An exam's time is its sitting; elsewhere an extension moves the due time.
+      assignment.exam
+        ? rules
+        : { ...rules, dueAt: extendedDue(rules.dueAt, extension, item.problemId) }
     )
     // An exam nobody sat earns nothing, hand marks included.
     const byHand =
@@ -185,6 +194,33 @@ function grade(
     solved: cells.filter((cell) => cell.status === "solved").length,
   }
 }
+
+/** Extensions on these assignments, for one student or everyone, by assignment then student. */
+export async function extensionsOn(assignmentIds: string[], userId?: string) {
+  const byAssignment = new Map<string, Map<string, Extension & { reason: string }>>()
+  if (assignmentIds.length === 0) return byAssignment
+  const rows = await getDb()
+    .select()
+    .from(assignmentExtensions)
+    .where(
+      and(
+        inArray(assignmentExtensions.assignmentId, assignmentIds),
+        userId ? eq(assignmentExtensions.userId, userId) : undefined
+      )
+    )
+  for (const row of rows) {
+    const own = byAssignment.get(row.assignmentId) ?? new Map()
+    own.set(row.userId, row)
+    byAssignment.set(row.assignmentId, own)
+  }
+  return byAssignment
+}
+
+/** The assignment as one student sees it: closing at their extended due time. */
+const personally = (assignment: Assignment, extension?: Extension) => ({
+  ...assignment,
+  dueAt: personalDue(assignment.dueAt, extension),
+})
 
 /** Rubric marks on these assignments, for one student or everyone, by student then problem. */
 async function marksOn(assignmentIds: string[], userId?: string) {
@@ -280,9 +316,15 @@ export async function listAssignments(viewer: User) {
       viewer.id
     ),
   ])
+  const extensions = await extensionsOn(
+    rows.map((a) => a.id),
+    viewer.id
+  )
 
   return rows.map((assignment) => {
     const own = items.filter((i) => i.assignmentId === assignment.id)
+    const extension = extensions.get(assignment.id)?.get(viewer.id)
+    const mine = personally(assignment, extension)
     const { earned, total, solved } = grade(
       assignment,
       own,
@@ -291,7 +333,8 @@ export async function listAssignments(viewer: User) {
       assignment.holdFeedback
         ? undefined
         : marks.get(viewer.id)?.get(assignment.id),
-      sittings.get(assignment.id)?.get(viewer.id)
+      sittings.get(assignment.id)?.get(viewer.id),
+      extension
     )
     return {
       exam: Boolean(assignment.exam),
@@ -299,11 +342,12 @@ export async function listAssignments(viewer: User) {
       title: assignment.title,
       org: orgOf.get(assignment.id) ?? null,
       opensAt: assignment.opensAt,
-      dueAt: assignment.dueAt,
+      dueAt: mine.dueAt,
+      extended: Boolean(extension),
       allowLate: assignment.allowLate,
       latePenaltyPercent: assignment.latePenaltyPercent,
       published: assignment.published,
-      phase: phaseOf(assignment),
+      phase: phaseOf(mine),
       problemCount: own.length,
       solved,
       earned,
@@ -315,7 +359,10 @@ export async function listAssignments(viewer: User) {
 export async function getAssignment(slug: string, viewer: User) {
   await requireFeature("assignments.enabled")
   const { assignment, access, vp } = await findAssignment(slug, viewer)
-  const phase = phaseOf(assignment)
+  const extension = (await extensionsOn([assignment.id], viewer.id))
+    .get(assignment.id)
+    ?.get(viewer.id)
+  const phase = phaseOf(personally(assignment, extension))
   const classes = await classLinks(vp, assignment, access === "manage")
   const sitting = assignment.exam
     ? (await sittingsOn([assignment.id], viewer.id))
@@ -344,7 +391,8 @@ export async function getAssignment(slug: string, viewer: User) {
     items,
     attempts,
     own,
-    sitting
+    sitting,
+    extension
   )
 
   return {
@@ -352,7 +400,20 @@ export async function getAssignment(slug: string, viewer: User) {
     title: assignment.title,
     description: assignment.description,
     opensAt: assignment.opensAt,
-    dueAt: assignment.dueAt,
+    dueAt: personalDue(assignment.dueAt, extension),
+    /** This student's extension: until when, and which problems (all when empty). */
+    extension: extension
+      ? {
+          dueAt: extension.dueAt,
+          problems: items
+            .map((item, index) => ({ item, label: `Q${index + 1}` }))
+            .filter(({ item }) =>
+              extension.problemIds.length === 0 || extension.problemIds.includes(item.problemId)
+            )
+            .map(({ item, label }) => `${label} ${item.title}`),
+          whole: extension.problemIds.length === 0,
+        }
+      : null,
     allowLate: assignment.allowLate,
     latePenaltyPercent: assignment.latePenaltyPercent,
     phase,
@@ -809,6 +870,7 @@ export interface GradebookRow {
   earned: number
   late: number
   exam: (ReturnType<typeof presentSitting> & { warnings: number }) | null
+  extension: { dueAt: Date; problemIds: readonly string[]; reason: string } | null
 }
 
 /** The people an assignment is for: everyone's students, or an organization's audience. */
@@ -907,6 +969,7 @@ export async function getGradebook(
   const [sittings, warnings] = assignment.exam
     ? await Promise.all([sittingsOn([id]), warningCounts(id)])
     : [new Map<string, Map<string, Sitting>>(), new Map<string, number>()]
+  const extensions = (await extensionsOn([id])).get(id)
 
   const rows: GradebookRow[] = students.map((student) => {
     const { cells, earned } = grade(
@@ -914,9 +977,18 @@ export async function getGradebook(
       items,
       attempts.filter((a) => a.userId === student.id),
       marks.get(student.id)?.get(id),
-      sittings.get(id)?.get(student.id)
+      sittings.get(id)?.get(student.id),
+      extensions?.get(student.id)
     )
+    const extension = extensions?.get(student.id)
     return {
+      extension: extension
+        ? {
+            dueAt: extension.dueAt,
+            problemIds: extension.problemIds,
+            reason: extension.reason,
+          }
+        : null,
       exam: assignment.exam
         ? {
             ...presentSitting(sittings.get(id)?.get(student.id)),
@@ -992,6 +1064,72 @@ async function gradebookStudent(
   )
   if (!item || !student) throw notFound("Not in this gradebook")
   return { assignment, item, student }
+}
+
+/**
+ * A later due date for one student in this gradebook: for the whole assignment, or only
+ * some problems (reopening them after feedback). For an exam it lets them start later.
+ */
+export async function setExtension(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string>,
+  input: { student: string; dueAt: Date; problemIds: string[]; reason: string },
+  grantedBy: string
+) {
+  const [assignment] = await getDb()
+    .select()
+    .from(assignments)
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+  if (!assignment) throw notFound("Assignment not found")
+  const student = (await studentsOf(assignment, scope)).find(
+    (s) => s.email === input.student
+  )
+  if (!student) throw notFound("Not in this gradebook")
+  if (input.dueAt <= assignment.dueAt) {
+    throw new ApiError(400, "not_later", "Pick a time after the assignment's due time.")
+  }
+  const items = await itemsOf([id])
+  if (input.problemIds.some((p) => !items.some((i) => i.problemId === p))) {
+    throw new ApiError(400, "unknown_problem", "That problem isn't in this assignment.")
+  }
+  const values = {
+    dueAt: input.dueAt,
+    problemIds: [...new Set(input.problemIds)],
+    reason: input.reason,
+    grantedBy,
+  }
+  await getDb()
+    .insert(assignmentExtensions)
+    .values({ assignmentId: id, userId: student.id, ...values })
+    .onConflictDoUpdate({
+      target: [assignmentExtensions.assignmentId, assignmentExtensions.userId],
+      set: values,
+    })
+  return { student: student.email, ...values }
+}
+
+export async function removeExtension(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string>,
+  email: string
+) {
+  const [assignment] = await getDb()
+    .select()
+    .from(assignments)
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+  if (!assignment) throw notFound("Assignment not found")
+  const student = (await studentsOf(assignment, scope)).find((s) => s.email === email)
+  if (!student) throw notFound("Not in this gradebook")
+  await getDb()
+    .delete(assignmentExtensions)
+    .where(
+      and(
+        eq(assignmentExtensions.assignmentId, id),
+        eq(assignmentExtensions.userId, student.id)
+      )
+    )
 }
 
 /** More time on an exam for one student in this gradebook. */
@@ -1211,6 +1349,7 @@ export async function studentAttempts(
     .orderBy(desc(submissions.createdAt))
     .limit(50)
   // Who may see the graded work may also see the code being written: live, and as it grew.
+  const extensionNow = (await extensionsOn([id], student.id)).get(id)?.get(student.id)
   const [draft, history, marks, comments, events, sittings] = await Promise.all([
     latestDraft(student.id, problemId),
     withHistory ? draftHistory(student.id, problemId) : null,
@@ -1224,6 +1363,7 @@ export async function studentAttempts(
   ])
   const sitting = sittings?.get(id)?.get(student.id)
   return {
+    extension: extensionNow ?? null,
     exam: assignment.exam
       ? { ...presentSitting(sitting), ip: sitting?.ip ?? null, events }
       : null,
@@ -1233,7 +1373,9 @@ export async function studentAttempts(
     holdFeedback: assignment.holdFeedback,
     attempts: rows.map((r) => ({
       ...r,
-      late: r.createdAt > assignment.dueAt,
+      late:
+        r.createdAt >
+        extendedDue(assignment.dueAt, extensionNow, problemId),
       /** For an exam: made outside the student's sitting, so it doesn't count. */
       outside:
         assignment.exam !== null && duringSitting([r], sitting).length === 0,
