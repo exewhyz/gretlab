@@ -8,6 +8,7 @@ import {
   TrophyIcon,
 } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { ClassCourses } from "@/features/courses/components/class-courses"
 import { ClassOutcomes } from "@/features/outcomes/components/class-outcomes"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -143,6 +144,7 @@ type StreamItem =
 const TABS = [
   "stream",
   "classwork",
+  "course",
   "people",
   "grades",
   "classes",
@@ -174,6 +176,7 @@ export function ClassPage({
   const shown: [Tab, string][] = [
     ["stream", "Stream"],
     ["classwork", "Classwork"],
+    ["course", "Course"],
     ["people", "People"],
     ["grades", "Grades"],
     ["classes", teacher ? "Syllabus and log" : "Syllabus"],
@@ -283,6 +286,9 @@ export function ClassPage({
             teacher={teacher}
             can={data.can}
           />
+        </TabsContent>
+        <TabsContent value="course" className="pt-3">
+          <ClassCourses slug={slug} groupId={groupId} />
         </TabsContent>
         <TabsContent value="people" className="pt-3">
           {teacher && data.can.people ? (

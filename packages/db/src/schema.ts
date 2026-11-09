@@ -929,7 +929,7 @@ export const contentShares = pgTable(
   "content_shares",
   {
     id: id(),
-    itemType: text("item_type").$type<"problem" | "question">().notNull(),
+    itemType: text("item_type").$type<"problem" | "question" | "course">().notNull(),
     itemId: uuid("item_id").notNull(),
     /** A college (all its staff)… */
     orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
@@ -1215,3 +1215,100 @@ export type Problem = typeof problems.$inferSelect
 export type TestCase = typeof testCases.$inferSelect
 export type Contest = typeof contests.$inferSelect
 export type Submission = typeof submissions.$inferSelect
+
+/**
+ * A course: an ordered outline of modules, each with problems and questions, written once
+ * by an owner (the platform or a college) and used by any number of classes.
+ */
+export const courses = pgTable(
+  "courses",
+  {
+    id: id(),
+    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    published: boolean("published").notNull().default(false),
+    /** Like the library's: the platform's courses reach every college, chosen ones, or staff. */
+    sharing: text("sharing").$type<Sharing>().notNull().default("owner"),
+    copiedFrom: uuid("copied_from"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("courses_by_org").on(table.orgId)]
+)
+
+/**
+ * A module of a course. Release rules: `openAfterDays` after the class starts the course,
+ * and/or `afterPrevious` (once the student has finished the module before it).
+ */
+export const courseModules = pgTable(
+  "course_modules",
+  {
+    id: id(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    position: integer("position").notNull().default(0),
+    openAfterDays: integer("open_after_days"),
+    afterPrevious: boolean("after_previous").notNull().default(false),
+  },
+  (table) => [index("course_modules_by_course").on(table.courseId, table.position)]
+)
+
+/** A problem or question in a module, in order. */
+export const courseItems = pgTable(
+  "course_items",
+  {
+    moduleId: uuid("module_id")
+      .notNull()
+      .references(() => courseModules.id, { onDelete: "cascade" }),
+    itemType: text("item_type").$type<"problem" | "question">().notNull(),
+    itemId: uuid("item_id").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.moduleId, table.itemType, table.itemId] }),
+    index("course_items_by_item").on(table.itemType, table.itemId),
+  ]
+)
+
+/** A course taught to a class, starting on a day (module release counts from it). */
+export const courseClasses = pgTable(
+  "course_classes",
+  {
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    /** YYYY-MM-DD */
+    startsOn: text("starts_on").notNull(),
+    addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.courseId, table.groupId] }),
+    index("course_classes_by_group").on(table.groupId),
+  ]
+)
+
+/** A student's latest answer to a course's practice question; they may try again. */
+export const practiceAnswers = pgTable(
+  "practice_answers",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    answer: jsonb("answer").$type<string[] | string>().notNull(),
+    correct: boolean("correct").notNull(),
+    tries: integer("tries").notNull().default(1),
+    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.questionId] })]
+)

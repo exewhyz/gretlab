@@ -71,7 +71,7 @@ const TEACHING: Permission[] = [
   "reports.view",
 ]
 
-interface ClassContext {
+export interface ClassContext {
   ctx: OrgContext
   groupId: string
   teaches: boolean
@@ -81,7 +81,7 @@ interface ClassContext {
   inside: string[]
 }
 
-async function classContext(
+export async function classContext(
   slug: string,
   user: User,
   groupId: string
@@ -145,7 +145,7 @@ export function relation(ctx: OrgContext, audience: Audience, groupId: string) {
 }
 
 /** Members sitting in a class (any group inside it), without people who teach. */
-async function studentsIn(cc: ClassContext) {
+export async function studentsIn(cc: ClassContext) {
   const db = getDb()
   const rows = await db
     .selectDistinct({

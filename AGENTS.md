@@ -142,6 +142,15 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - `usableBy` / `usableIds` (`features/library/sharing.ts`) is the one rule for what an owner may use: its own items, or published items shared with it. The pickers, assignment, contest and daily saves, the library and collections all use it. Public library practice is separate and unchanged (`isPublicProblem`).
 - A college copies an item it can use to adapt it (`copyToLibrary`): the copy is its own, private, remembers `copied_from`, and a copied problem starts as a draft with its tests.
 
+## Courses
+
+- A course (`courses`, `features/courses`) is written once by an owner (the platform or a college) under Courses: an ordered outline of modules (`course_modules`), each an ordered list of library problems and questions (`course_items`). The list is compact; each module is edited in a dialog, and the outline is saved as a whole (`saveOutline`, which keeps module ids so progress follows them; stale saves get `edited_elsewhere`).
+- A course holds practice nobody marks: public library problems (always allowed, shared or not), other ready listed problems the owner may use (members-only ones only its own), and ready questions that mark themselves. Drafts, assessment-only problems and written questions are refused.
+- Platform courses are shared like library items (`content_shares` with `item_type = 'course'`; new ones reach every college). A college gives its own or shared ready courses to classes, or copies a shared one to change it (`copyCourse`; items stay the shared ones).
+- A class gets a course from a start day (`course_classes`) on its Course tab, by whoever may set assignments for it; groups inside the class get it too. Release rules (`packages/judge/src/course.ts`, unit-tested): a module opens `openAfterDays` after the start, and with `afterPrevious` only once the student finished the module before. Teachers see every module and how many students finished each; students see modules as they open.
+- Progress is computed: a problem is done with an accepted graded submission, a question with a right practice answer (`practice_answers`, one row per student and question; tries again allowed, a right answer stays right; the answer and explanation show once right or after 3 tries). Practice is never graded. A course in use can't be deleted (`course_in_use`); taking it off a class keeps students' work.
+- The platform's units became its first course, "Programming fundamentals" (migration 0031 and the seed).
+
 ## Organizations and permissions
 
 - Platform roles (`users.role`: student, teacher, admin) still run the platform dashboard. Inside an organization, access comes only from organization roles.
@@ -229,6 +238,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
 - `e2e/assignments.mjs`: grading rules, late penalties, gradebook and CSV, privacy, drafts and playback, rubrics, line comments and releasing feedback, lab exams (sittings, networks, events, more time, the site-wide lock, start window, edits after starting), problem import and assessment-only problems, the switch and the pages.
 - `e2e/library.mjs`: sharing the platform's content (every college, chosen colleges or teachers, staff only), what each college sees and can pick, copying, collections and the pages.
+- `e2e/courses.mjs`: writing outlines (what a course may hold, stale saves), sharing courses, a college's own and copied courses, giving one to a class, release by day and by the module before, practice answers, teacher progress, deleting, and the pages.
 - `e2e/platform.mjs`: platform roles, custom roles, the no-escalation rules, ADMIN_EMAILS owners, blocking, the activity log and the menu per role.
 - `e2e/flows.mjs`: Run vs Submit, history and creating a contest, as a person uses them. Included in `pnpm test:e2e`.
 - After a mutation, invalidate every query that shows that data. Stale contest data was the cause of several real bugs: "not registered" after registering, and old results after submitting.
@@ -257,6 +267,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
 - [x] Quizzes: a question bank (single/multiple choice, short and written answers) with import, used in assignments, exams, contests and the daily challenge alone or with coding problems; teacher marks override; results after the due time or on release
 - [x] Platform staff and roles: permissions, built-in and custom roles, no escalation, activity log
+- [x] Courses: modules of library problems and questions with release rules, shared from the platform or a college's own, given to classes from a start day, practice and progress on the class's Course tab
 - [x] One library with sharing: per-owner Library pages, collections, sharing platform content with all or chosen colleges and teachers, copying to adapt
 - [x] Notifications: in-app bell with stored events and computed reminders, optional email
 - [x] Extensions and resubmission: a later due time for one student, whole assignment or reopened problems; lets an absent student sit an exam later

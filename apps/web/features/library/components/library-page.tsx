@@ -481,11 +481,11 @@ function CollectionDialog({
 }
 
 /** How far some of the platform's items reach. */
-function ShareDialog({
+export function ShareDialog({
   items,
   onDone,
 }: {
-  items: { kind: Kind; id: string; title: string }[]
+  items: { kind: Kind | "course"; id: string; title: string }[]
   onDone: () => void
 }) {
   const single = items.length === 1 ? items[0]! : null
@@ -524,8 +524,9 @@ function ShareDialog({
         <DialogHeader>
           <DialogTitle>Share {single ? single.title : `${items.length} items`}</DialogTitle>
           <DialogDescription>
-            Who may use {single ? "it" : "them"} in their own assignments, exams, contests and
-            daily challenges. Public library problems stay free to practise either way.
+            {items.every((i) => i.kind === "course")
+              ? "Which colleges may give this course to their classes or copy it."
+              : `Who may use ${single ? "it" : "them"} in their own assignments, exams, contests and daily challenges. Public library problems stay free to practise either way.`}
           </DialogDescription>
         </DialogHeader>
         {!data ? (

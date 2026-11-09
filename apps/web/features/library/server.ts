@@ -2,6 +2,7 @@ import {
   collectionItems,
   collections,
   contentShares,
+  courses,
   getDb,
   organizations,
   problems,
@@ -18,7 +19,10 @@ import {
 import { ApiError, notFound } from "@/lib/api/route"
 import { saveProblem } from "@/features/problems/server"
 
-import { sourceOf, usableBy, usableIds } from "./sharing"
+import { sourceOf, usableBy, usableIds, type ShareKind } from "./sharing"
+
+const tableOf = (kind: ShareKind) =>
+  kind === "problem" ? problems : kind === "question" ? questions : courses
 
 /*
  * The library: one place for an owner's content (the platform's, or one college's) and
@@ -185,7 +189,7 @@ export async function changeCollection(
 /* ---------- sharing (the platform's content) ---------- */
 
 /** Who an item reaches: everyone, chosen colleges and teachers, or the owner only. */
-export async function getSharing(kind: Kind, id: string) {
+export async function getSharing(kind: ShareKind, id: string) {
   const rows = await getDb()
     .select({ orgId: contentShares.orgId, userId: contentShares.userId, email: users.email })
     .from(contentShares)
@@ -203,14 +207,14 @@ export async function getSharing(kind: Kind, id: string) {
  */
 export async function setSharing(
   actor: User,
-  items: { kind: Kind; id: string }[],
+  items: { kind: ShareKind; id: string }[],
   input: { sharing: Sharing; orgIds: string[]; emails: string[] }
 ) {
   const db = getDb()
-  for (const kind of ["problem", "question"] as const) {
+  for (const kind of ["problem", "question", "course"] as const) {
     const ids = items.filter((i) => i.kind === kind).map((i) => i.id)
     if (ids.length === 0) continue
-    const table = kind === "problem" ? problems : questions
+    const table = tableOf(kind)
     const own = await db
       .select({ id: table.id })
       .from(table)
@@ -231,7 +235,7 @@ export async function setSharing(
   }
   await db.transaction(async (tx) => {
     for (const item of items) {
-      const table = item.kind === "problem" ? problems : questions
+      const table = tableOf(item.kind)
       await tx.update(table).set({ sharing: input.sharing }).where(eq(table.id, item.id))
       await tx
         .delete(contentShares)

@@ -8,7 +8,7 @@ import { writePlatformAudit } from "@/features/platform/staff"
 
 /** ?kind=problem&id=…: who it's shared with; without them, the colleges to choose from. */
 export const GET = route({ access: "platform.library.share" }, async ({ query }) => {
-  const kind = z.enum(["problem", "question"]).safeParse(query.get("kind"))
+  const kind = z.enum(["problem", "question", "course"]).safeParse(query.get("kind"))
   const id = query.get("id")
   const colleges = await getDb()
     .select({ id: organizations.id, name: organizations.name })

@@ -18,29 +18,39 @@ export interface DailyQuestionData {
   kind: "single" | "multiple" | "short" | "written"
   prompt: string
   options: { id: string; text: string }[]
-  answer: { value: string[] | string; correct: boolean } | null
+  answer: { value: string[] | string; correct: boolean; tries?: number } | null
   solution: { correct: string[]; accepted: string[]; explanation: string } | null
 }
 
-/** One of today's questions: one answer, marked at once, with the explanation after. */
+/**
+ * One of today's questions: one answer, marked at once, with the explanation after. Also
+ * a course's practice question (`endpoint`, `retry`): wrong answers can be tried again.
+ */
 export function DailyQuestion({
   q,
   number,
   signedIn,
+  endpoint = "/daily/answer",
+  queryKey = ["daily"],
+  retry = false,
 }: {
   q: DailyQuestionData
   number: number
   signedIn: boolean
+  endpoint?: string
+  queryKey?: unknown[]
+  retry?: boolean
 }) {
   const client = useQueryClient()
   const [value, setValue] = useState<string[] | string>(
     q.answer?.value ?? (q.kind === "short" ? "" : [])
   )
   const answer = useMutation({
-    mutationFn: () => api("/daily/answer", { body: { questionId: q.id, answer: value } }),
-    onSuccess: () => client.invalidateQueries({ queryKey: ["daily"] }),
+    mutationFn: () => api(endpoint, { body: { questionId: q.id, answer: value } }),
+    onSuccess: () => client.invalidateQueries({ queryKey }),
   })
-  const locked = q.answer !== null || !signedIn
+  const again = retry && q.answer !== null && !q.answer.correct
+  const locked = (q.answer !== null && !again) || !signedIn
   const chosen = Array.isArray(value) ? value : []
   const empty = Array.isArray(value) ? value.length === 0 : value.trim() === ""
   const tone = (id: string) =>
@@ -100,14 +110,14 @@ export function DailyQuestion({
           onChange={(event) => setValue(event.target.value)}
         />
       )}
-      {!q.answer && signedIn && (
+      {(!q.answer || again) && signedIn && (
         <Button
           size="sm"
           className="justify-self-start"
           disabled={empty || answer.isPending}
           onClick={() => answer.mutate()}
         >
-          Answer
+          {again ? "Try again" : "Answer"}
         </Button>
       )}
       {!signedIn && <p className="text-caption">Sign in to answer.</p>}

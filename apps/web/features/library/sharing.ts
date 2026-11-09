@@ -1,4 +1,4 @@
-import { contentShares, getDb, problems, questions, sql } from "@workspace/db"
+import { contentShares, courses, getDb, problems, questions, sql } from "@workspace/db"
 
 /*
  * Who may use library content in their own work (assignments, exams, contests, the daily
@@ -9,13 +9,14 @@ import { contentShares, getDb, problems, questions, sql } from "@workspace/db"
 
 const { and, eq, isNull, or } = sql
 
-type Item = typeof problems | typeof questions
+type Item = typeof problems | typeof questions | typeof courses
+export type ShareKind = "problem" | "question" | "course"
 
 const ownedBy = (table: Item, orgId: string | null) =>
   orgId === null ? isNull(table.orgId) : eq(table.orgId, orgId)
 
 /** Shared with this college or this person. */
-function sharedTo(table: Item, kind: "problem" | "question", orgId: string | null, userId?: string) {
+function sharedTo(table: Item, kind: ShareKind, orgId: string | null, userId?: string) {
   const targets = [
     orgId ? sql.sql`${contentShares.orgId} = ${orgId}` : null,
     userId ? sql.sql`${contentShares.userId} = ${userId}` : null,
@@ -27,7 +28,7 @@ function sharedTo(table: Item, kind: "problem" | "question", orgId: string | nul
 /** A where-condition: items this owner (and person) may use. */
 export function usableBy(
   table: Item,
-  kind: "problem" | "question",
+  kind: ShareKind,
   orgId: string | null,
   userId?: string
 ) {
@@ -51,13 +52,13 @@ export function sourceOf(itemOrgId: string | null, ownerOrgId: string | null) {
 
 /** Which of these items this owner (and person) may use. */
 export async function usableIds(
-  kind: "problem" | "question",
+  kind: ShareKind,
   ids: string[],
   orgId: string | null,
   userId?: string
 ) {
   if (ids.length === 0) return new Set<string>()
-  const table = kind === "problem" ? problems : questions
+  const table = kind === "problem" ? problems : kind === "question" ? questions : courses
   const rows = await getDb()
     .select({ id: table.id })
     .from(table)

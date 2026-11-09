@@ -123,6 +123,11 @@ export function ManageShell({
           show: has("problems.manage", "assignments.manage", "contests.manage"),
         },
         {
+          href: `${base}/courses`,
+          label: "Courses",
+          show: has("problems.manage", "assignments.manage", "contests.manage"),
+        },
+        {
           href: `${base}/problems`,
           label: "Problems",
           show: has("problems.manage"),
