@@ -1,0 +1,2 @@
+ALTER TABLE "assignments" ADD COLUMN "updated_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+ALTER TABLE "contests" ADD COLUMN "updated_at" timestamp with time zone DEFAULT now() NOT NULL;

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -34,11 +34,12 @@ import {
   TextInput,
 } from "@/components/form"
 import { ConfirmButton } from "@/components/confirm"
+import { SaveConflict } from "@/components/save-conflict"
 import { useViewer } from "@/features/account/use-viewer"
 import { usePythonEngine } from "@/features/lab/hooks/use-python-engine"
 import { MarkdownEditor } from "@/components/markdown-editor"
 import { slugify, type ProblemInput } from "@/features/problems/schemas"
-import { api } from "@/lib/api/client"
+import { api, ApiRequestError } from "@/lib/api/client"
 import { useOwner } from "@/features/admin/owner"
 
 import type { StaffProblemList } from "./problems"
@@ -201,6 +202,12 @@ function ProblemEditor({
     kind?: "ok" | "err"
   } | null>(null)
   const [newUnit, setNewUnit] = useState("")
+  // A save over a version saved elsewhere since this opened is refused (lib/api/conflict.ts).
+  const [version, setVersion] = useState(
+    (initial as { updatedAt?: string }).updatedAt
+  )
+  const [conflict, setConflict] = useState(false)
+  const overwrite = useRef(false)
 
   // Filling expected outputs runs the reference solution locally, in Python only.
   const [useEngine, setUseEngine] = useState(false)
@@ -244,8 +251,11 @@ function ProblemEditor({
 
   const save = useMutation({
     mutationFn: () => {
+      const expectedUpdatedAt = overwrite.current ? undefined : version
+      overwrite.current = false
       const body: ProblemInput = {
         ...form,
+        expectedUpdatedAt: expectedUpdatedAt as unknown as Date | undefined,
         // Everything is in `code` now; the old single field would bring back a deleted
         // Python solution.
         solution: "",
@@ -270,19 +280,26 @@ function ProblemEditor({
         })),
       }
       return id
-        ? api<{ id: string }>(owner.api(`/problems/${id}`), {
+        ? api<{ id: string; updatedAt: string }>(owner.api(`/problems/${id}`), {
             method: "PUT",
             body,
           })
-        : api<{ id: string }>(owner.api("/problems"), { body })
+        : api<{ id: string; updatedAt: string }>(owner.api("/problems"), { body })
     },
     onSuccess: (saved) => {
+      setVersion(saved.updatedAt)
+      setConflict(false)
       void queryClient.invalidateQueries({ queryKey: ["admin"] })
       setMessage({ text: "Saved.", kind: "ok" })
       if (onSaved) onSaved({ id: saved.id, title: form.title })
       else if (!id) router.push(owner.page(`/problems/${saved.id}`))
     },
-    onError: (error) => setMessage({ text: error.message, kind: "err" }),
+    onError: (error) => {
+      if (error instanceof ApiRequestError && error.code === "edited_elsewhere") {
+        setConflict(true)
+      }
+      setMessage({ text: error.message, kind: "err" })
+    },
   })
 
   const remove = useMutation({
@@ -622,6 +639,14 @@ function ProblemEditor({
           </div>
         </div>
 
+        {conflict && (
+          <SaveConflict
+            onKeepMine={() => {
+              overwrite.current = true
+              save.mutate()
+            }}
+          />
+        )}
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-3.5">
           <label className="inline-flex items-center gap-2 text-ink">
             <Checkbox

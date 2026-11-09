@@ -252,6 +252,17 @@ const ownAsg = await t("/admin/assignments", { body: body({ title: "Own problems
 check("an assignment uses it", ownAsg.status === 200)
 check("and its students solve it there", (await submit(a, own.slug, "a = int(input())\nb = int(input())\nprint(a + b)\n")).verdict === "AC" && (await a("/assignments/asg-own")).json.earned === 10)
 check("the template is served", (await fetch(BASE + "/problem-template.json")).status === 200)
+// Save conflicts: a form saved over a newer version is refused, unless the teacher means it.
+const opened = (await t(`/admin/assignments/${ownAsg.json.id}`)).json
+const putAsg = (expectedUpdatedAt, title) => t(`/admin/assignments/${ownAsg.json.id}`, { method: "PUT", body: body({ title, slug: "asg-own", allowLate: false, published: true, problems: [{ problemId: own.id, points: 10 }], expectedUpdatedAt }) })
+const firstSave = await putAsg(opened.updatedAt, "Own problems (tab 1)")
+check("saving the version you opened works", firstSave.status === 200 && firstSave.json.updatedAt !== opened.updatedAt)
+check("saving over someone else's newer save is refused", (await putAsg(opened.updatedAt, "Own problems (tab 2)")).json?.error?.code === "edited_elsewhere")
+check("and nothing of it was saved", (await t(`/admin/assignments/${ownAsg.json.id}`)).json.title === "Own problems (tab 1)")
+check("\"keep mine\" saves without the check", (await putAsg(undefined, "Own problems (tab 2)")).status === 200)
+const ownProblem = (await t(`/admin/problems/${own.id}`)).json
+const putProblem = (expectedUpdatedAt) => t(`/admin/problems/${own.id}`, { method: "PUT", body: { ...ownProblem, expectedUpdatedAt } })
+check("problems check the version too", (await putProblem(ownProblem.updatedAt)).status === 200 && (await putProblem(ownProblem.updatedAt)).json?.error?.code === "edited_elsewhere")
 // For the pages: an exam without a network rule.
 const exam2 = await t("/admin/assignments", { body: body({ title: "Quiz exam", slug: "asg-exam2", allowLate: false, published: true, exam: { minutes: 20, fullscreen: true, networks: [] }, problems: [{ problemId: id("p1"), points: 10 }] }) })
 
@@ -317,6 +328,18 @@ await tp.getByText("Published: students can see this assignment.").waitFor({ tim
 await tp.screenshot({ path: SHOTS + "assignment-editor.png", fullPage: true })
 const madeProblem = (await t("/assignments/asg-ui-made")).json?.problems?.[0]
 check("publishing from the form works, rubric included", madeProblem?.points === 40 && madeProblem.rubric?.[0]?.label === "Readable names", JSON.stringify(madeProblem))
+// Someone else saves while this form is open: saving it again warns instead of overwriting.
+const uiMade = (await t("/admin/assignments")).json.find((x) => x.slug === "asg-ui-made")
+const uiStored = (await t(`/admin/assignments/${uiMade.id}`)).json
+await t(`/admin/assignments/${uiMade.id}`, { method: "PUT", body: { ...uiStored, title: "Asg UI made (other tab)", problems: uiStored.problems } })
+await tp.getByRole("button", { name: "Save changes" }).click()
+await tp.getByTestId("save-conflict").waitFor({ timeout: 15000 })
+check("a stale form warns instead of overwriting", (await t(`/admin/assignments/${uiMade.id}`)).json.title === "Asg UI made (other tab)")
+await tp.screenshot({ path: SHOTS + "save-conflict.png" })
+await tp.getByTestId("save-conflict").getByRole("button", { name: "Keep mine" }).click()
+await tp.getByRole("alertdialog").getByRole("button", { name: "Keep mine" }).click()
+await tp.getByText("Published. Students can see it under Assignments.").waitFor({ timeout: 15000 })
+check("and \"keep mine\" saves on purpose", (await t(`/admin/assignments/${uiMade.id}`)).json.title === "Asg UI made")
 await tp.getByRole("link", { name: "Gradebook" }).click()
 await tp.getByTestId("grade-row").first().waitFor({ timeout: 15000 })
 check("gradebook page with a CSV download", await tp.getByRole("link", { name: "Download CSV" }).isVisible())

@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState, type ReactNode } from "react"
+import { useMemo, useRef, useState, type ReactNode } from "react"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
@@ -17,6 +17,7 @@ import {
   TextInput,
 } from "@/components/form"
 import { ConfirmButton } from "@/components/confirm"
+import { SaveConflict } from "@/components/save-conflict"
 import { PhaseBadge } from "@/features/contests/components/contest-list"
 import { contestInputSchema, slugify } from "@/features/problems/schemas"
 import { api, ApiRequestError } from "@/lib/api/client"
@@ -146,6 +147,7 @@ interface StoredContest extends Omit<
   ContestForm,
   "penaltyMinutes" | "freezeMinutes"
 > {
+  updatedAt: string
   penaltyMinutes: number
   freezeMinutes: number
 }
@@ -205,6 +207,7 @@ export function ContestEditorPage({
     <ContestEditor
       key={id ?? "new"}
       id={id}
+      version={data?.updatedAt}
       forClass={forClass}
       initial={initial}
       problems={problems.data.problems}
@@ -438,17 +441,24 @@ export function ProblemPicker({
 
 function ContestEditor({
   id,
+  version: openedAt,
   forClass,
   initial,
   problems,
 }: {
   id: string | null
+  /** When the saved version was last changed; a save over a newer one is refused. */
+  version?: string
   forClass: string | null
   initial: ContestForm
   problems: StaffProblemList["problems"]
 }) {
   const owner = useOwner()
   const router = useRouter()
+  const [version, setVersion] = useState(openedAt)
+  const [conflict, setConflict] = useState(false)
+  // "Keep mine" saves once without the version check.
+  const overwrite = useRef(false)
   const queryClient = useQueryClient()
   const [form, setForm] = useState(initial)
   // The address follows the title until someone types their own.
@@ -502,14 +512,19 @@ function ContestEditor({
   }
 
   const save = useMutation({
-    mutationFn: (body: NonNullable<ReturnType<typeof validated>>) =>
-      id
-        ? api<{ id: string }>(owner.api(`/contests/${id}`), {
+    mutationFn: (body: NonNullable<ReturnType<typeof validated>>) => {
+      const expectedUpdatedAt = overwrite.current ? undefined : version
+      overwrite.current = false
+      return id
+        ? api<{ id: string; updatedAt: string }>(owner.api(`/contests/${id}`), {
             method: "PUT",
-            body,
+            body: { ...body, expectedUpdatedAt },
           })
-        : api<{ id: string }>(owner.api("/contests"), { body }),
+        : api<{ id: string; updatedAt: string }>(owner.api("/contests"), { body })
+    },
     onSuccess: (saved, body) => {
+      setVersion(saved.updatedAt)
+      setConflict(false)
       void queryClient.invalidateQueries({ queryKey: ["admin"] })
       void queryClient.invalidateQueries({ queryKey: ["contests"] })
       setForm((current) => ({ ...current, published: body.published }))
@@ -524,6 +539,9 @@ function ContestEditor({
       else if (!id) router.push(owner.page(`/contests/${saved.id}`))
     },
     onError: (error) => {
+      if (error instanceof ApiRequestError && error.code === "edited_elsewhere") {
+        setConflict(true)
+      }
       if (error instanceof ApiRequestError && error.code === "conflict") {
         setErrors({ slug: "Another contest already uses this address." })
       }
@@ -720,6 +738,14 @@ function ContestEditor({
           Registration open
         </label>
 
+        {conflict && (
+          <SaveConflict
+            onKeepMine={() => {
+              overwrite.current = true
+              submit(form.published)
+            }}
+          />
+        )}
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-3.5">
           <span className="min-w-45 flex-1">
             {message ? (

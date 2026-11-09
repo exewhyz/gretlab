@@ -13,6 +13,7 @@ import {
 } from "@workspace/db"
 import { computeLeaderboard, freezeTime } from "@workspace/judge"
 
+import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
 import { ApiError, notFound } from "@/lib/api/route"
 import {
   accessTo,
@@ -430,7 +431,7 @@ export async function saveContest(
   input: ContestInput,
   orgId: string | null
 ) {
-  const { problemIds, ...fields } = input
+  const { problemIds, expectedUpdatedAt, ...fields } = input
   await checkUsableProblems(problemIds, orgId)
   const values = { ...fields, orgId, audience: orgId ? fields.audience : [] }
   if (id) refreshLeaderboard(id)
@@ -439,10 +440,24 @@ export async function saveContest(
       ? await tx
           .update(contests)
           .set(values)
-          .where(and(eq(contests.id, id), ownedBy(orgId)))
+          .where(
+            and(
+              eq(contests.id, id),
+              ownedBy(orgId),
+              unchangedSince(contests.updatedAt, expectedUpdatedAt)
+            )
+          )
           .returning()
       : await tx.insert(contests).values(values).returning()
-    if (!contest) throw notFound("Contest not found")
+    if (!contest) {
+      const [exists] = id
+        ? await tx
+            .select({ id: contests.id })
+            .from(contests)
+            .where(and(eq(contests.id, id), ownedBy(orgId)))
+        : []
+      throw exists ? editedElsewhere() : notFound("Contest not found")
+    }
     await tx
       .delete(contestProblems)
       .where(eq(contestProblems.contestId, contest.id))

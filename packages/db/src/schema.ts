@@ -283,6 +283,8 @@ export const contests = pgTable("contests", {
   /** Who it's for: conditions that must all hold, each any of its groups. Empty: everyone. */
   audience: jsonb("audience").$type<string[][]>().notNull().default([]),
   createdAt: createdAt(),
+  /** For save conflicts: a form saved over a newer version is refused. */
+  updatedAt: updatedAt(),
 })
 
 /** A set of problems with a due date. Grades are computed from submissions, never stored. */
@@ -307,6 +309,8 @@ export const assignments = pgTable("assignments", {
   }),
   audience: jsonb("audience").$type<string[][]>().notNull().default([]),
   createdAt: createdAt(),
+  /** For save conflicts: a form saved over a newer version is refused. */
+  updatedAt: updatedAt(),
 })
 
 export const assignmentProblems = pgTable(

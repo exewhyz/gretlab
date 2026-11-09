@@ -44,6 +44,7 @@ import {
   type Sitting,
 } from "@/features/exams/sittings"
 import { ApiError, notFound } from "@/lib/api/route"
+import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
 import { buildDetail, type ProblemSummary } from "@/features/problems/server"
 import {
   accessTo,
@@ -590,7 +591,7 @@ export async function saveAssignment(
   input: AssignmentInput,
   orgId: string | null
 ) {
-  const { problems: chosen, ...fields } = input
+  const { problems: chosen, expectedUpdatedAt, ...fields } = input
   const ids = chosen.map((c) => c.problemId)
   const found = await getDb()
     .select({
@@ -653,10 +654,24 @@ export async function saveAssignment(
       ? await tx
           .update(assignments)
           .set(values)
-          .where(and(eq(assignments.id, id), ownedBy(orgId)))
+          .where(
+            and(
+              eq(assignments.id, id),
+              ownedBy(orgId),
+              unchangedSince(assignments.updatedAt, expectedUpdatedAt)
+            )
+          )
           .returning()
       : await tx.insert(assignments).values(values).returning()
-    if (!assignment) throw notFound("Assignment not found")
+    if (!assignment) {
+      const [exists] = id
+        ? await tx
+            .select({ id: assignments.id })
+            .from(assignments)
+            .where(and(eq(assignments.id, id), ownedBy(orgId)))
+        : []
+      throw exists ? editedElsewhere() : notFound("Assignment not found")
+    }
     await tx
       .delete(assignmentProblems)
       .where(eq(assignmentProblems.assignmentId, assignment.id))

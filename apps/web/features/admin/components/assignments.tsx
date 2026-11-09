@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
@@ -29,6 +29,7 @@ import {
 } from "@workspace/ui/components/tabs"
 
 import { ConfirmButton } from "@/components/confirm"
+import { SaveConflict } from "@/components/save-conflict"
 import { Field, FormMessage, TextArea, TextInput } from "@/components/form"
 import {
   PhaseBadge,
@@ -156,6 +157,7 @@ interface AssignmentForm {
 }
 
 interface StoredAssignment {
+  updatedAt: string
   slug: string
   title: string
   description: string
@@ -251,6 +253,7 @@ export function AssignmentEditorPage({
     <AssignmentEditor
       key={id ?? "new"}
       id={id}
+      version={data?.updatedAt}
       forClass={forClass}
       initial={initial}
       // Students reach problems through the practice pages, so drafts can't be assigned.
@@ -263,17 +266,24 @@ type FieldErrors = Partial<Record<keyof AssignmentForm | "problems", string>>
 
 function AssignmentEditor({
   id,
+  version: openedAt,
   forClass,
   initial,
   problems,
 }: {
   id: string | null
+  /** When the saved version was last changed; a save over a newer one is refused. */
+  version?: string
   forClass: string | null
   initial: AssignmentForm
   problems: StaffProblemList["problems"]
 }) {
   const owner = useOwner()
   const router = useRouter()
+  const [version, setVersion] = useState(openedAt)
+  const [conflict, setConflict] = useState(false)
+  // "Keep mine" saves once without the version check.
+  const overwrite = useRef(false)
   const queryClient = useQueryClient()
   const [form, setForm] = useState(initial)
   const [slugTouched, setSlugTouched] = useState(Boolean(id))
@@ -355,14 +365,19 @@ function AssignmentEditor({
   }
 
   const save = useMutation({
-    mutationFn: (body: NonNullable<ReturnType<typeof validated>>) =>
-      id
-        ? api<{ id: string }>(owner.api(`/assignments/${id}`), {
+    mutationFn: (body: NonNullable<ReturnType<typeof validated>>) => {
+      const expectedUpdatedAt = overwrite.current ? undefined : version
+      overwrite.current = false
+      return id
+        ? api<{ id: string; updatedAt: string }>(owner.api(`/assignments/${id}`), {
             method: "PUT",
-            body,
+            body: { ...body, expectedUpdatedAt },
           })
-        : api<{ id: string }>(owner.api("/assignments"), { body }),
+        : api<{ id: string; updatedAt: string }>(owner.api("/assignments"), { body })
+    },
     onSuccess: (saved, body) => {
+      setVersion(saved.updatedAt)
+      setConflict(false)
       void queryClient.invalidateQueries({ queryKey: ["admin"] })
       void queryClient.invalidateQueries({ queryKey: ["assignments"] })
       void queryClient.invalidateQueries({ queryKey: ["assignment"] })
@@ -378,6 +393,9 @@ function AssignmentEditor({
       else if (!id) router.push(owner.page(`/assignments/${saved.id}`))
     },
     onError: (error) => {
+      if (error instanceof ApiRequestError && error.code === "edited_elsewhere") {
+        setConflict(true)
+      }
       if (error instanceof ApiRequestError && error.code === "conflict") {
         setErrors({ slug: "Another assignment already uses this address." })
       }
@@ -663,6 +681,14 @@ function AssignmentEditor({
           )}
         </div>
 
+        {conflict && (
+          <SaveConflict
+            onKeepMine={() => {
+              overwrite.current = true
+              submit(form.published)
+            }}
+          />
+        )}
         <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-3.5">
           <span className="min-w-45 flex-1">
             {message ? (

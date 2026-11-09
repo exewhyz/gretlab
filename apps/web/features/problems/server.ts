@@ -29,6 +29,7 @@ import {
 
 import type { ProblemInput } from "./schemas"
 import { readProblemFile, slugFor, toProblemInput } from "./import"
+import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
 
 const { and, asc, count, eq, gt, inArray, isNull, lte, or } = sql
 
@@ -314,7 +315,7 @@ export async function saveProblem(
   input: ProblemInput,
   orgId: string | null
 ) {
-  const { tests, tags: tagNames, ...given } = input
+  const { tests, tags: tagNames, expectedUpdatedAt, ...given } = input
   const fields = {
     ...given,
     ...problemCode(given.code, given.solution),
@@ -334,10 +335,24 @@ export async function saveProblem(
       ? await tx
           .update(problems)
           .set(values)
-          .where(and(eq(problems.id, id), ownedBy(orgId)))
+          .where(
+            and(
+              eq(problems.id, id),
+              ownedBy(orgId),
+              unchangedSince(problems.updatedAt, expectedUpdatedAt)
+            )
+          )
           .returning()
       : await tx.insert(problems).values(values).returning()
-    if (!row) throw notFound("Problem not found")
+    if (!row) {
+      const [exists] = id
+        ? await tx
+            .select({ id: problems.id })
+            .from(problems)
+            .where(and(eq(problems.id, id), ownedBy(orgId)))
+        : []
+      throw exists ? editedElsewhere() : notFound("Problem not found")
+    }
     await tx.delete(testCases).where(eq(testCases.problemId, row.id))
     await tx.insert(testCases).values(
       tests.map((test, position) => ({

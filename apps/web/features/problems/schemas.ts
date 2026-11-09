@@ -1,6 +1,8 @@
 import { isNetwork, LANGUAGES } from "@workspace/judge"
 import { z } from "zod"
 
+import { expectedUpdatedAt } from "@/lib/api/version"
+
 /** A readable address from a title: "Midterm 2026!" becomes "midterm-2026". */
 export function slugify(title: string) {
   return title
@@ -19,6 +21,8 @@ const slug = z
   )
 
 export const problemInputSchema = z.object({
+  /** The version the form was opened at; see lib/api/conflict.ts. */
+  expectedUpdatedAt,
   slug,
   title: z.string().trim().min(1, "Give the problem a title").max(200),
   unitId: z.uuid().nullable(),
@@ -80,6 +84,7 @@ const audienceSchema = z
 
 export const contestInputSchema = z
   .object({
+    expectedUpdatedAt,
     title: z.string().trim().min(1, "Give the contest a title").max(200),
     slug,
     description: z.string().max(20_000),
@@ -124,6 +129,7 @@ export type ContestInput = z.infer<typeof contestInputSchema>
 
 export const assignmentInputSchema = z
   .object({
+    expectedUpdatedAt,
     title: z.string().trim().min(1, "Give the assignment a title").max(200),
     slug,
     description: z.string().max(20_000),
