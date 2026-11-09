@@ -235,6 +235,19 @@ export const assignmentInputSchema = z
     /** Quiz questions from the bank, beside or instead of the problems. */
     questions: chosenQuestions,
     audience: audienceSchema,
+    /** Students review each other's work after the due time. */
+    peerReview: z
+      .object({
+        reviews: z
+          .number({ error: "Enter how many" })
+          .int()
+          .min(1, "At least 1 review")
+          .max(5, "At most 5 reviews"),
+        anonymous: z.boolean(),
+        dueAt: z.string().datetime({ offset: true }).nullable(),
+      })
+      .nullable()
+      .default(null),
   })
   .refine((a) => a.problems.length + a.questions.length > 0, {
     message: "Add at least one problem or question",
@@ -243,6 +256,18 @@ export const assignmentInputSchema = z
   .refine((a) => a.dueAt > a.opensAt, {
     message: "The due time must be after it opens",
     path: ["dueAt"],
+  })
+  .refine((a) => !(a.exam && a.peerReview), {
+    message: "Exams don't have peer review",
+    path: ["peerReview"],
+  })
+  .refine((a) => !a.peerReview || a.problems.length > 0, {
+    message: "Peer review needs at least one problem",
+    path: ["peerReview"],
+  })
+  .refine((a) => !a.peerReview?.dueAt || new Date(a.peerReview.dueAt) > a.dueAt, {
+    message: "Reviews are due after the assignment",
+    path: ["peerReview"],
   })
   .refine((a) => !(a.exam && a.allowLate), {
     message: "An exam ends at its due time: turn off late submissions",

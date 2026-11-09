@@ -197,6 +197,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Attendance is marked when logging a class, for people in that class only (`attendance` table). Below 75% shows red to the teacher and the student.
 - Teach (`/teach`) lists a teacher's classes per organization as the group tree, with "Due this week" and "Behind the syllabus" first. Students' `/classes` lists the last-level groups they sit in. Assignments and contests link to the classes they're for (`classLinks`).
 
+## Peer review
+
+- An assignment (not an exam) may have peer review (`assignments.peer_review`: reviews per student, anonymous, an optional review due time after the assignment's), set in its form. Students review classmates' final code; it never changes marks.
+- After the due time a teacher presses **Start peer review** in the gradebook (once; `startPeerReview`): per problem, everyone with a graded submission from when it opened reviews `reviews` others, in a seeded shuffled ring (`packages/judge/src/peer.ts`, unit-tested): never themselves, everyone gives and gets the same number. Reviews point at the submission as it was then (`peer_reviews`). Reviewers are notified.
+- A review scores each of the problem's rubric criteria (or one Overall out of 5), comments on lines of the code (checked to exist) and sums up; drafts may be partial, handing in needs every score and a summary. Changeable until the review due time (`reviews_closed` after).
+- Authors see handed-in reviews of their work (notified on the first); anonymous means reviewers are "Classmate N" and "Reviewer N" both ways. Teachers see every review with names and scores, read summaries, and hide one from its author.
+
 ## Class discussions
 
 - Each class has a Discussion tab (`features/discussions`, `discussion_posts` threads and replies, `discussion_votes`): everyone sitting in the class or teaching it reads and posts; other classes and outsiders get 404. Markdown with code blocks; 30 posts an hour each.
@@ -258,6 +265,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
 - `e2e/assignments.mjs`: grading rules, late penalties, gradebook and CSV, privacy, drafts and playback, rubrics, line comments and releasing feedback, lab exams (sittings, networks, events, more time, the site-wide lock, start window, edits after starting), problem import and assessment-only problems, the switch and the pages.
 - `e2e/library.mjs`: sharing the platform's content (every college, chosen colleges or teachers, staff only), what each college sees and can pick, copying, collections and the pages.
+- `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.
 - `e2e/warnings.mjs`: who needs attention and why (missed, low marks, quiet, attendance), who may see it, notes to students, and the page.
 - `e2e/templates.mjs`: writing templates, sharing them, using one for several classes with their own dates, edits reaching unopened uses only, stale saves, a college's own and copied templates, saving an assignment as a template, deleting, and the pages.
@@ -290,6 +298,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
 - [x] Quizzes: a question bank (single/multiple choice, short and written answers) with import, used in assignments, exams, contests and the daily challenge alone or with coding problems; teacher marks override; results after the due time or on release
 - [x] Platform staff and roles: permissions, built-in and custom roles, no escalation, activity log
+- [x] Peer code review: students review classmates' final code against the rubric with line comments, anonymously if chosen; teachers start, read and hide reviews
 - [x] Class discussions: threads and replies per class, anonymous to classmates, votes, teacher moderation and answers, reply notifications
 - [x] Early warnings: students who need attention per class (missed work, low marks, gone quiet, attendance) with reasons, and notes to them
 - [x] Templates: assignments and exams written once, shared from the platform or a college's own, used for many classes with their own dates; edits reach uses until they open

@@ -18,6 +18,7 @@ import type {
   ProblemCode,
   RubricCriterion,
   ExamSettings,
+  PeerReviewSettings,
   QuestionKind,
   AttainmentRules,
   SourceFile,
@@ -353,6 +354,8 @@ export const assignments = pgTable("assignments", {
     onDelete: "cascade",
   }),
   audience: jsonb("audience").$type<string[][]>().notNull().default([]),
+  /** Students review each other's work after the due time. Null: no peer review. */
+  peerReview: jsonb("peer_review").$type<PeerReviewSettings | null>(),
   /** Made from this template; until it opens, the template's edits reach it. */
   templateId: uuid("template_id").references((): AnyPgColumn => templates.id, {
     onDelete: "set null",
@@ -1403,4 +1406,43 @@ export const discussionVotes = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
   },
   (table) => [primaryKey({ columns: [table.postId, table.userId] })]
+)
+
+/**
+ * One student's review of a classmate's final submission for an assignment problem.
+ * Written against the problem's rubric (or one overall score); never changes marks.
+ */
+export const peerReviews = pgTable(
+  "peer_reviews",
+  {
+    id: id(),
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    problemId: uuid("problem_id")
+      .notNull()
+      .references(() => problems.id, { onDelete: "cascade" }),
+    reviewerId: uuid("reviewer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The author's work as it was when reviews were handed out. */
+    submissionId: uuid("submission_id").references(() => submissions.id, { onDelete: "set null" }),
+    scores: jsonb("scores").$type<Record<string, number>>().notNull().default({}),
+    comment: text("comment").notNull().default(""),
+    lineComments: jsonb("line_comments")
+      .$type<{ path: string; line: number; body: string }[]>()
+      .notNull()
+      .default([]),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    /** Hidden by a teacher: its author doesn't see it. */
+    hidden: boolean("hidden").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("peer_reviews_pair").on(table.assignmentId, table.problemId, table.reviewerId, table.authorId),
+    index("peer_reviews_reviewer").on(table.reviewerId),
+  ]
 )

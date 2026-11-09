@@ -1190,7 +1190,7 @@ export interface GradebookRow {
 }
 
 /** The people an assignment is for: everyone's students, or an organization's audience. */
-async function studentsOf(
+export async function studentsOf(
   assignment: Assignment,
   /** Which groups the viewer may see grades for; "all" for everyone. */
   scope: "all" | Set<string>

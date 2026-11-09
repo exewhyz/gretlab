@@ -225,6 +225,8 @@ async function bringChanges(t: typeof templates.$inferSelect) {
           : null,
         published: use.published,
         audience: use.audience,
+        // Its own: review dates belong to each use.
+        peerReview: use.peerReview,
         problems: t.content.problems.map((p) => ({
           ...p,
           // Course outcomes are the class's: kept for problems still in it.
@@ -341,6 +343,7 @@ export async function applyTemplate(
         exam: t.content.exam ? { ...t.content.exam, startWithin: t.content.exam.startWithin ?? null } : null,
         published: input.published,
         audience: use.groupId ? [[use.groupId]] : [],
+        peerReview: null,
         problems: t.content.problems.map((p) => ({ ...p, outcomes: [] })),
         questions: t.content.questions,
       },

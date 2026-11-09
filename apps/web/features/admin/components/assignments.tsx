@@ -55,6 +55,7 @@ import {
   CommentedCode,
   type LineComment,
 } from "@/features/feedback/components/commented-code"
+import { PeerReviewPanel } from "@/features/peer/components/peer"
 import { AudiencePicker } from "./audience"
 
 import { FieldError, ProblemPicker, toLocalInput } from "./contests"
@@ -164,6 +165,12 @@ interface AssignmentForm {
   /** Minutes after opening to press Start; empty for any time. */
   examStartWithin: string
   audience: string[][]
+  /** Peer review after the due time, as typed. */
+  peer: boolean
+  peerReviews: string
+  peerAnonymous: boolean
+  /** Empty: no end. */
+  peerDueAt: string
 }
 
 interface StoredAssignment {
@@ -179,6 +186,7 @@ interface StoredAssignment {
   published: boolean
   holdFeedback: boolean
   exam: ExamSettings | null
+  peerReview?: { reviews: number; anonymous: boolean; dueAt: string | null } | null
   audience?: string[][]
   /** Made from a template (assignments). */
   templateId?: string | null
@@ -218,6 +226,10 @@ function blankForm(forClass: string | null): AssignmentForm {
     examFullscreen: true,
     examNetworks: "",
     examStartWithin: "",
+    peer: false,
+    peerReviews: "2",
+    peerAnonymous: true,
+    peerDueAt: "",
   }
 }
 
@@ -280,6 +292,10 @@ export function AssignmentEditorPage({
             : "60",
         examFullscreen: data.exam?.fullscreen ?? true,
         examNetworks: (data.exam?.networks ?? []).join("\n"),
+        peer: Boolean(data.peerReview),
+        peerReviews: String(data.peerReview?.reviews ?? 2),
+        peerAnonymous: data.peerReview?.anonymous ?? true,
+        peerDueAt: data.peerReview?.dueAt ? toLocalInput(data.peerReview.dueAt) : "",
         examStartWithin: data.exam?.startWithin
           ? String(data.exam.startWithin)
           : "",
@@ -306,7 +322,7 @@ export function AssignmentEditorPage({
   )
 }
 
-type FieldErrors = Partial<Record<keyof AssignmentForm | "problems", string>>
+type FieldErrors = Partial<Record<keyof AssignmentForm | "problems" | "peerReview", string>>
 
 function AssignmentEditor({
   id,
@@ -407,6 +423,14 @@ function AssignmentEditor({
         rubric: rubricOf(problemId),
         outcomes: form.outcomes[problemId] ?? [],
       })),
+      peerReview:
+        form.peer && !form.exam && !template
+          ? {
+              reviews: form.peerReviews.trim() === "" ? NaN : Number(form.peerReviews),
+              anonymous: form.peerAnonymous,
+              dueAt: form.peerDueAt ? new Date(form.peerDueAt).toISOString() : null,
+            }
+          : null,
       questions: form.questions.map((q) => ({
         questionId: q.questionId,
         points: q.points.trim() === "" ? NaN : Number(q.points),
@@ -830,6 +854,48 @@ function AssignmentEditor({
           )}
         </div>
 
+        {!template && !form.exam && (
+          <div className="grid gap-3 rounded-md border border-hairline p-3" data-testid="peer-settings">
+            <label className="inline-flex items-center gap-2 self-start text-ink">
+              <Checkbox checked={form.peer} onCheckedChange={(checked) => set("peer", checked)} />
+              Peer review: after the due time, students review classmates&apos; final code
+            </label>
+            {form.peer && (
+              <div className="grid gap-3 min-[901px]:grid-cols-3">
+                <Field label="Reviews each student writes" help="Per problem; they get as many on their own work.">
+                  <TextInput
+                    type="number"
+                    min={1}
+                    max={5}
+                    value={form.peerReviews}
+                    onChange={(event) => set("peerReviews", event.target.value)}
+                  />
+                </Field>
+                <Field label="Reviews due (optional)" help="Empty: they can review any time.">
+                  <TextInput
+                    type="datetime-local"
+                    value={form.peerDueAt}
+                    onChange={(event) => set("peerDueAt", event.target.value)}
+                  />
+                </Field>
+                <label className="inline-flex items-center gap-2 self-center text-ink">
+                  <Checkbox
+                    checked={form.peerAnonymous}
+                    onCheckedChange={(checked) => set("peerAnonymous", checked)}
+                  />
+                  Anonymous (teachers still see names)
+                </label>
+                <p className="text-caption min-[901px]:col-span-3">
+                  Start it from the gradebook once the assignment is due. Students score each
+                  problem on its rubric (or one overall score) and comment; it never changes
+                  marks.
+                </p>
+              </div>
+            )}
+            <FieldError message={errors.peerReview} />
+          </div>
+        )}
+
         {conflict && (
           <SaveConflict
             onKeepMine={() => {
@@ -1063,6 +1129,9 @@ export function AssignmentGradebook({ id }: { id: string }) {
           " Results are held: students don't see quiz marks, rubric marks or comments yet."}
         {rejudged && <span data-testid="rejudge-result"> {rejudged}</span>}
       </p>
+      <div className="mb-3">
+        <PeerReviewPanel id={id} />
+      </div>
       <div className="mb-4 grid grid-cols-2 gap-3 min-[901px]:grid-cols-4">
         {stats.map(([label, value]) => (
           <Card key={label}>

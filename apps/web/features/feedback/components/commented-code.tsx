@@ -81,14 +81,14 @@ export function CommentedCode({
               >
                 <div className="flex flex-wrap items-center gap-x-2 text-caption text-body">
                   <span>{c.author ?? "Teacher"}</span>
-                  <span>{formatDateTime(c.createdAt)}</span>
+                  {c.createdAt && <span>{formatDateTime(c.createdAt)}</span>}
                   {onDelete && (
                     <ConfirmButton
                       variant="ghost"
                       size="xs"
                       className="ml-auto"
                       title="Delete this comment?"
-                      description="The student won't see it any more."
+                      description="It's removed from the code."
                       confirmLabel="Delete comment"
                       onConfirm={() => onDelete(c.id)}
                     >

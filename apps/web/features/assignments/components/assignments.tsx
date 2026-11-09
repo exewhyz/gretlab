@@ -10,6 +10,7 @@ import { Loading, Table } from "@/features/admin/components/shell"
 import { Difficulty } from "@/features/catalog/components/difficulty"
 import { useContentScope } from "@/features/account/scope"
 import { ScopeNote } from "@/features/account/scope-switcher"
+import { StudentPeerReview } from "@/features/peer/components/peer"
 import { ClassChips } from "@/features/classes/components/class-chips"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
@@ -281,6 +282,9 @@ export function AssignmentView({ slug }: { slug: string }) {
         </p>
       )}
       <ClassChips classes={data.classes} className="mb-4" />
+      <div className="mb-4 empty:hidden">
+        <StudentPeerReview slug={data.slug} />
+      </div>
       {data.description && (
         <div className="mb-4 text-body-sm text-body">
           <RichText text={data.description} />
