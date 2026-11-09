@@ -473,6 +473,8 @@ export const submissions = pgTable(
     memoryLimitMb: integer("memory_limit_mb").notNull(),
 
     status: submissionStatus("status").notNull().default("queued"),
+    /** Times a "System error" was sent back to be judged again (runner housekeeping). */
+    rejudges: integer("rejudges").notNull().default(0),
     verdict: text("verdict").$type<Verdict>(),
     score: integer("score"),
     maxScore: integer("max_score"),

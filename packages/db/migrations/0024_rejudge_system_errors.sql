@@ -1,0 +1,1 @@
+ALTER TABLE "submissions" ADD COLUMN "rejudges" integer DEFAULT 0 NOT NULL;

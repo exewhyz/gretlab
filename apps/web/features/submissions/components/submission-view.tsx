@@ -102,6 +102,12 @@ export function SubmissionDetailView({
               : "Unknown"
             : "Still running…"}
         </div>
+        {status === "done" && verdict === "SE" && submission.kind === "submit" && (
+          <p className="mt-1 text-caption" data-testid="system-error-note">
+            Our judge failed, not your code. It&apos;s judged again automatically in a few
+            minutes, and counts from when you pressed Submit.
+          </p>
+        )}
         <div className="mt-1 text-caption">
           {formatDateTime(submission.createdAt)} · {language}
           {submission.problem && (

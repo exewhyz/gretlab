@@ -28,6 +28,7 @@ import {
   rubricTotal,
   duringSitting,
   sittingClosesAt,
+  QUEUE_CHANNEL,
   type Grade,
   type GradedAttempt,
   type RubricCriterion,
@@ -45,6 +46,7 @@ import {
 } from "@/features/exams/sittings"
 import { ApiError, notFound } from "@/lib/api/route"
 import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
+import { canVerifyAddresses } from "@/lib/api/client-ip"
 import { buildDetail, type ProblemSummary } from "@/features/problems/server"
 import {
   accessTo,
@@ -624,6 +626,13 @@ export async function saveAssignment(
       "Only published problems can be assigned. Publish the drafts first."
     )
   }
+  if (fields.exam?.networks.length && !canVerifyAddresses()) {
+    throw new ApiError(
+      400,
+      "addresses_unverifiable",
+      "This server can't confirm where students connect from, so an exam can't be limited to a network yet. An administrator sets PROXY_SECRET (see docs/deploy-exams.md)."
+    )
+  }
   const tagged = [...new Set(chosen.flatMap((c) => c.outcomes))]
   if (tagged.length > 0) {
     // Only the organization's own course outcomes; the platform has none.
@@ -718,6 +727,54 @@ async function guardStartedExam(id: string, input: AssignmentInput) {
       "Students have started this exam, so its problems can't change. Points and rubrics can."
     )
   }
+}
+
+/**
+ * After a runner outage: every graded submission of this assignment's students on its
+ * problems that ended in "System error" is judged again. They keep the time they were
+ * submitted, so work done in time (an exam's last submission) counts.
+ */
+export async function rejudgeSystemErrors(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string> = "all"
+) {
+  const [assignment] = await getDb()
+    .select()
+    .from(assignments)
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+  if (!assignment) throw notFound("Assignment not found")
+  const [items, students] = await Promise.all([
+    itemsOf([id]),
+    studentsOf(assignment, scope),
+  ])
+  if (items.length === 0 || students.length === 0) return { queued: 0 }
+  const queued = await getDb().transaction(async (tx) => {
+    const rows = await tx
+      .update(submissions)
+      .set({
+        status: "queued",
+        verdict: null,
+        attempts: 0,
+        lockedBy: null,
+        lockedUntil: null,
+        finishedAt: null,
+      })
+      .where(
+        and(
+          eq(submissions.kind, "submit"),
+          eq(submissions.status, "done"),
+          eq(submissions.verdict, "SE"),
+          inArray(submissions.problemId, items.map((i) => i.problemId)),
+          inArray(submissions.userId, students.map((s) => s.id)),
+          gte(submissions.createdAt, assignment.opensAt)
+        )
+      )
+      .returning({ id: submissions.id })
+    if (rows.length) await tx.execute(sql.sql`SELECT pg_notify(${QUEUE_CHANNEL}, '')`)
+    return rows.length
+  })
+  return { queued }
 }
 
 /** Drops the network addresses an exam recorded: where each sitting started, and refused submissions. */

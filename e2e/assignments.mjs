@@ -170,8 +170,10 @@ check("teachers save comments to reuse", (await t("/me/snippets", { body: { body
 check("students have no saved comments", (await a("/me/snippets")).status === 403)
 
 // ---------- lab exams: one timed sitting, from the lab's network
-const LAB = { "x-forwarded-for": "10.9.1.2" }
-const HOME = { "x-forwarded-for": "8.8.8.8" }
+// What Caddy adds in production (deploy/Caddyfile); run.sh starts the app with this secret.
+const PROXY_SECRET = "e2e-proxy-secret-0123456789"
+const LAB = { "x-proxy-secret": PROXY_SECRET, "x-client-ip": "10.9.1.2" }
+const HOME = { "x-proxy-secret": PROXY_SECRET, "x-client-ip": "8.8.8.8" }
 const EXAM = { minutes: 30, fullscreen: true, networks: ["10.9.0.0/16"] }
 check("an exam can't take late work", (await t("/admin/assignments", { body: body({ slug: "asg-exam-bad", exam: EXAM }) })).status === 400)
 check("exam networks must be addresses", (await t("/admin/assignments", { body: body({ slug: "asg-exam-bad", allowLate: false, exam: { ...EXAM, networks: ["lab"] } }) })).status === 400)
@@ -184,6 +186,8 @@ check("the networks themselves stay private", !JSON.stringify(before).includes("
 check("earlier solutions don't count for an exam", (await a("/assignments")).json.find((x) => x.slug === "asg-exam")?.earned === 0)
 const start = (headers) => a("/assignments/asg-exam/exam", { method: "POST", headers })
 check("can't start from outside the lab", (await start(HOME)).json?.error?.code === "exam_network")
+check("a visitor can't claim the lab's address themselves", (await start({ "x-client-ip": "10.9.1.2", "x-forwarded-for": "10.9.1.2" })).json?.error?.code === "exam_network")
+check("nor with a wrong secret", (await start({ "x-proxy-secret": "guessed-secret-0000000000", "x-client-ip": "10.9.1.2" })).json?.error?.code === "exam_network")
 const started = await start(LAB)
 check("starts from the lab's network", started.status === 200 && started.json.status === "in_progress", JSON.stringify(started.json))
 const endsIn = new Date(started.json.endsAt).getTime() - Date.now()
@@ -193,7 +197,8 @@ check("its problems show once started", (await a("/assignments/asg-exam")).json.
 check("editorials are closed during the exam", (await a("/problems/p1/solution")).json?.error?.code === "exam_running")
 check("the problem page knows the exam is on", (await a("/problems/p1/assignments")).json.find((x) => x.slug === "asg-exam")?.exam?.sitting.status === "in_progress")
 check("submitting from outside the lab is refused", (await a("/submissions", { headers: HOME, body: { kind: "submit", language: "python", entry: "main.py", files: [{ path: "main.py", content: SI }], problemSlug: "p1" } })).json?.error?.code === "exam_network")
-check("solved from the lab", (await submit(a, "p1", SI, LAB)).verdict === "AC")
+const examSolve = await submit(a, "p1", SI, LAB)
+check("solved from the lab", examSolve.verdict === "AC")
 check("work during the sitting counts", (await a("/assignments/asg-exam")).json.earned === 100)
 // The whole site is locked to the exam while it runs.
 const runCode = (headers, extra = {}) => a("/submissions", { headers, body: { kind: "run", language: "python", entry: "main.py", files: [{ path: "main.py", content: "print(1)\n" }], inputs: [""], ...extra } })
@@ -263,6 +268,15 @@ check("\"keep mine\" saves without the check", (await putAsg(undefined, "Own pro
 const ownProblem = (await t(`/admin/problems/${own.id}`)).json
 const putProblem = (expectedUpdatedAt) => t(`/admin/problems/${own.id}`, { method: "PUT", body: { ...ownProblem, expectedUpdatedAt } })
 check("problems check the version too", (await putProblem(ownProblem.updatedAt)).status === 200 && (await putProblem(ownProblem.updatedAt)).json?.error?.code === "edited_elsewhere")
+// A runner failure on the exam's submission: re-judged after the exam, it still counts.
+const beforeFailure = (await a("/assignments/asg-exam")).json.earned
+psql(`update submissions set verdict = 'SE', score = 0, passed_tests = 0 where id = '${examSolve.id}'`)
+check("a system error costs the marks", (await a("/assignments/asg-exam")).json.earned === beforeFailure - 100, beforeFailure)
+check("the student is told it'll be judged again", (await a(`/submissions/${examSolve.id}`)).json.verdict === "SE")
+check("students can't re-judge", (await a(examBase + "/rejudge", { method: "POST" })).status === 403)
+const rejudged = await t(examBase + "/rejudge", { method: "POST" })
+check("the teacher re-judges system errors", rejudged.json?.queued === 1, JSON.stringify(rejudged.json))
+check("judged again, it keeps its time and counts after the exam closed", (await settle(a, examSolve.id)).verdict === "AC" && (await a("/assignments/asg-exam")).json.earned === beforeFailure)
 // For the pages: an exam without a network rule.
 const exam2 = await t("/admin/assignments", { body: body({ title: "Quiz exam", slug: "asg-exam2", allowLate: false, published: true, exam: { minutes: 20, fullscreen: true, networks: [] }, problems: [{ problemId: id("p1"), points: 10 }] }) })
 

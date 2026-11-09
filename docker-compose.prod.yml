@@ -12,6 +12,8 @@ services:
     environment:
       # A real domain gets HTTPS automatically. ":8080" serves plain HTTP, for testing.
       SITE_ADDRESS: ${SITE_ADDRESS:?set to your domain}
+      # Vouches for visitors' addresses to the app (lab exams limited to a network).
+      PROXY_SECRET: ${PROXY_SECRET:-}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -35,6 +37,9 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
+      # The same secret as Caddy's; at least 16 characters. Without it, exams can't be
+      # limited to a network.
+      PROXY_SECRET: ${PROXY_SECRET:-}
 
   # Web replicas share a small number of real database connections through this.
   pgbouncer:

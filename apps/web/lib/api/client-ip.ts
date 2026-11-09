@@ -1,17 +1,35 @@
+import { timingSafeEqual } from "node:crypto"
+
 import type { NextRequest } from "next/server"
 
-/**
- * The visitor's address, as the reverse proxy saw it. Caddy appends the address it received
- * the request from to X-Forwarded-For, so the last entry is the one a visitor can't forge;
- * earlier entries came from the visitor. TRUSTED_PROXIES says how many proxies sit in front
- * (default 1, Caddy); with none, there is no trustworthy header and the answer is null.
+/*
+ * The visitor's network address, for lab exams limited to a network.
+ *
+ * Any request header can be written by a visitor who reaches the app directly, so an
+ * address is believed only when the request also carries PROXY_SECRET: Caddy
+ * (deploy/Caddyfile) sets X-Client-IP to the address it saw and X-Proxy-Secret to that
+ * secret, replacing whatever the visitor sent. Without the secret configured, or without a
+ * matching header, the address is unknown (null), and network-limited exams refuse rather
+ * than trust it.
  */
+
+const MIN_SECRET_LENGTH = 16
+
+/** Whether this server can tell where requests come from. */
+export const canVerifyAddresses = () =>
+  (process.env.PROXY_SECRET ?? "").length >= MIN_SECRET_LENGTH
+
+function sameSecret(given: string, expected: string) {
+  const a = Buffer.from(given)
+  const b = Buffer.from(expected)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
 export function clientIp(request: NextRequest): string | null {
-  const hops = Number(process.env.TRUSTED_PROXIES ?? 1)
-  if (!Number.isInteger(hops) || hops < 1) return null
-  const chain = (request.headers.get("x-forwarded-for") ?? "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-  return chain[chain.length - hops] ?? null
+  const secret = process.env.PROXY_SECRET ?? ""
+  if (secret.length < MIN_SECRET_LENGTH) return null
+  const given = request.headers.get("x-proxy-secret") ?? ""
+  if (!sameSecret(given, secret)) return null
+  const ip = request.headers.get("x-client-ip")?.trim()
+  return ip || null
 }

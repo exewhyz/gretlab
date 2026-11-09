@@ -1,3 +1,11 @@
+{
+	# If a load balancer or CDN sits in front of Caddy, list its addresses here so
+	# {client_ip} is the visitor's address rather than the balancer's, e.g.:
+	# servers {
+	# 	trusted_proxies static 10.0.0.0/8
+	# }
+}
+
 {$SITE_ADDRESS} {
 	encode zstd gzip
 	reverse_proxy {
@@ -9,5 +17,9 @@
 		lb_retries 2
 		health_uri /api/health
 		health_interval 5s
+		# The visitor's address, vouched for by a secret only Caddy and the app know
+		# (apps/web/lib/api/client-ip.ts). Both replace anything the visitor sent.
+		header_up X-Client-IP {client_ip}
+		header_up X-Proxy-Secret "{$PROXY_SECRET}"
 	}
 }

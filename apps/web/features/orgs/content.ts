@@ -7,6 +7,7 @@ import {
   releaseFeedback,
   extendStudentSitting,
   forgetExamAddresses,
+  rejudgeSystemErrors,
   setRubricMarks,
   listAssignments,
   getAssignmentForStaff,
@@ -468,6 +469,16 @@ export async function orgExtendSitting(
     minutes: input.minutes,
   })
   return sitting
+}
+
+export async function orgRejudgeSystemErrors(slug: string, user: User, id: string) {
+  const { ctx, scope } = await feedbackContext(slug, user)
+  const result = await rejudgeSystemErrors(id, ctx.org.id, scope)
+  await writeAudit(ctx, "assignment.rejudge", "Re-judged an assignment's system errors", {
+    assignment: id,
+    queued: result.queued,
+  })
+  return result
 }
 
 export async function orgForgetExamAddresses(slug: string, user: User, id: string) {

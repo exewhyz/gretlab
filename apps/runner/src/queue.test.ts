@@ -12,6 +12,7 @@ import {
   heartbeat,
   processSubmission,
   releaseExpired,
+  retrySystemErrors,
 } from "./queue.ts"
 import type { SandboxBackend } from "./sandbox/types.ts"
 
@@ -205,4 +206,49 @@ test("a late result from a runner that lost its lease is ignored", async () => {
     .where(sql.eq(submissions.id, job.id))
   assert.equal(row?.lockedBy, "fast")
   assert.equal(row?.status, "running")
+})
+
+test("a system error is judged again later, keeping when it was submitted", async () => {
+  await clear()
+  const submitted = new Date(Date.now() - 10 * 60_000)
+  const failed = await enqueue({
+    kind: "submit",
+    status: "done",
+    verdict: "SE",
+    createdAt: submitted,
+    finishedAt: new Date(Date.now() - 5 * 60_000),
+  })
+  const recent = await enqueue({
+    kind: "submit",
+    status: "done",
+    verdict: "SE",
+    finishedAt: new Date(),
+  })
+  const run = await enqueue({
+    kind: "run",
+    status: "done",
+    verdict: "SE",
+    finishedAt: new Date(Date.now() - 5 * 60_000),
+  })
+  assert.equal(await retrySystemErrors(db), 1)
+  const rows = await db.select().from(submissions)
+  const by = (id: string) => rows.find((r) => r.id === id)!
+  assert.equal(by(failed.id).status, "queued")
+  assert.equal(by(failed.id).rejudges, 1)
+  assert.equal(by(failed.id).createdAt.getTime(), submitted.getTime())
+  // Just failed: wait a little first. A plain run: nothing graded to save.
+  assert.equal(by(recent.id).status, "done")
+  assert.equal(by(run.id).status, "done")
+})
+
+test("re-judging gives up after a few rounds", async () => {
+  await clear()
+  await enqueue({
+    kind: "submit",
+    status: "done",
+    verdict: "SE",
+    rejudges: 3,
+    finishedAt: new Date(Date.now() - 5 * 60_000),
+  })
+  assert.equal(await retrySystemErrors(db), 0)
 })

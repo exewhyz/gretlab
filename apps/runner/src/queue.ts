@@ -110,6 +110,44 @@ export async function releaseExpired(db: Database) {
   if (returned.length) await notifyQueue(db)
 }
 
+/** Rounds of re-judging a "System error", and how long to wait before each. */
+const MAX_REJUDGES = 3
+const REJUDGE_AFTER_MS = 2 * 60_000
+const REJUDGE_WITHIN_MS = 7 * 86_400_000
+
+/**
+ * A graded submission that ended in "System error" failed because of us, not the student:
+ * a while later it's judged again, keeping the time it was submitted, so it still counts
+ * where it was in time (an exam's last submission, a contest). A few rounds at most.
+ */
+export async function retrySystemErrors(db: Database) {
+  const now = Date.now()
+  const retried = await db
+    .update(submissions)
+    .set({
+      status: "queued",
+      verdict: null,
+      attempts: 0,
+      rejudges: sql.sql`${submissions.rejudges} + 1`,
+      lockedBy: null,
+      lockedUntil: null,
+      finishedAt: null,
+    })
+    .where(
+      and(
+        eq(submissions.kind, "submit"),
+        eq(submissions.status, "done"),
+        eq(submissions.verdict, "SE"),
+        lt(submissions.rejudges, MAX_REJUDGES),
+        lt(submissions.finishedAt, new Date(now - REJUDGE_AFTER_MS)),
+        sql.gt(submissions.createdAt, new Date(now - REJUDGE_WITHIN_MS))
+      )
+    )
+    .returning({ id: submissions.id })
+  if (retried.length) await notifyQueue(db)
+  return retried.length
+}
+
 export async function notifyQueue(db: Database) {
   await db.execute(sql.sql`SELECT pg_notify(${QUEUE_CHANNEL}, '')`)
 }

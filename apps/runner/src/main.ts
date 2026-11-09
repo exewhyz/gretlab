@@ -12,6 +12,7 @@ import {
   LEASE_MS,
   processSubmission,
   pruneOldRuns,
+  retrySystemErrors,
   releaseExpired,
 } from "./queue.ts"
 import { backendFromEnv } from "./sandbox/docker.ts"
@@ -31,6 +32,7 @@ const POLL_MS = Number(process.env.RUNNER_POLL_MS ?? 1000)
 const HEARTBEAT_MS = Math.max(1000, Math.floor(LEASE_MS / 3))
 const RECOVERY_MS = Math.max(1000, Math.floor(LEASE_MS / 2))
 const HOUSEKEEPING_MS = 60 * 60_000
+const REJUDGE_CHECK_MS = 60_000
 const SHUTDOWN_GRACE_MS = 5 * 60_000
 
 const runnerId = `${hostname()}-${randomUUID().slice(0, 8)}`
@@ -98,6 +100,11 @@ const recovery = setInterval(() => {
     console.error("[runner] recovery error:", error)
   )
 }, RECOVERY_MS)
+const rejudging = setInterval(() => {
+  retrySystemErrors(db).catch((error) =>
+    console.error("[runner] re-judging error:", error)
+  )
+}, REJUDGE_CHECK_MS)
 const housekeeping = setInterval(() => {
   void (async () => {
     const rows = await db.select().from(settingsTable)
@@ -143,6 +150,7 @@ while (running.size && Date.now() < giveUpAt) {
 clearInterval(heartbeats)
 clearInterval(recovery)
 clearInterval(housekeeping)
+clearInterval(rejudging)
 await deregister(db, runnerId)
 await listener.end({ timeout: 2 })
 console.log("[runner] stopped")

@@ -169,6 +169,13 @@
       "when": 1794229434567,
       "tag": "0023_updated_at_for_conflicts",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794230345294,
+      "tag": "0024_rejudge_system_errors",
+      "breakpoints": true
     }
   ]
 }

@@ -775,6 +775,22 @@ export function AssignmentGradebook({ id }: { id: string }) {
   const [now] = useState(() => Date.now())
   const [search, setSearch] = useState("")
   const client = useQueryClient()
+  const [rejudged, setRejudged] = useState<string | null>(null)
+  const rejudge = useMutation({
+    mutationFn: () =>
+      api<{ queued: number }>(owner.api(`/assignments/${id}/rejudge`), {
+        method: "POST",
+      }),
+    onSuccess: ({ queued }) => {
+      setRejudged(
+        queued
+          ? `${queued} ${queued === 1 ? "submission is" : "submissions are"} being judged again. Marks update as they finish.`
+          : "No system errors to re-judge."
+      )
+      void client.invalidateQueries({ queryKey: owner.key("gradebook", id) })
+    },
+    onError: (e) => setRejudged(e.message),
+  })
   const release = useMutation({
     mutationFn: () =>
       api(owner.api(`/assignments/${id}/release`), { method: "POST" }),
@@ -807,6 +823,15 @@ export function AssignmentGradebook({ id }: { id: string }) {
       <PageTitle
         action={
           <span className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={rejudge.isPending}
+              title="After a runner outage: judge every submission that ended in a system error again, keeping when it was submitted."
+              onClick={() => rejudge.mutate()}
+            >
+              Re-judge system errors
+            </Button>
             {data.assignment.exam && (
               <ConfirmButton
                 size="sm"
@@ -862,6 +887,7 @@ export function AssignmentGradebook({ id }: { id: string }) {
         submit.
         {data.assignment.holdFeedback &&
           " Rubric marks and comments are held: students don't see them yet."}
+        {rejudged && <span data-testid="rejudge-result"> {rejudged}</span>}
       </p>
       <div className="mb-4 grid grid-cols-2 gap-3 min-[901px]:grid-cols-4">
         {stats.map(([label, value]) => (
