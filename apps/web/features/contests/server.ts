@@ -1,7 +1,10 @@
 import {
+  contestAnswers,
   contestParticipants,
   contestProblems,
+  contestQuestions,
   contests,
+  questions,
   getDb,
   organizations,
   problems,
@@ -11,7 +14,9 @@ import {
   type Contest,
   type User,
 } from "@workspace/db"
-import { computeLeaderboard, freezeTime } from "@workspace/judge"
+import { computeLeaderboard, freezeTime, markQuestion } from "@workspace/judge"
+import { usableQuestions } from "@/features/questions/server"
+import { requireFeature } from "@/features/settings/server"
 
 import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
 import { ApiError, notFound } from "@/lib/api/route"
@@ -157,7 +162,38 @@ export async function getContestView(slug: string, viewer: User | null) {
           status: status[problem.slug] ?? null,
         }))
       : [],
+    questions: canSeeProblems ? await viewQuestions(contest.id, phase, viewer) : [],
   }
+}
+
+/** The contest's questions with the viewer's answer; right answers once it has ended. */
+async function viewQuestions(contestId: string, phase: string, viewer: User | null) {
+  const [rows, mine] = await Promise.all([
+    contestQuestionRows(contestId),
+    viewer
+      ? getDb()
+          .select()
+          .from(contestAnswers)
+          .where(and(eq(contestAnswers.contestId, contestId), eq(contestAnswers.userId, viewer.id)))
+      : [],
+  ])
+  const ended = phase === "ended"
+  return rows.map((q) => {
+    const answer = mine.find((a) => a.questionId === q.id)
+    return {
+      id: q.id,
+      label: q.label,
+      title: q.title,
+      kind: q.kind,
+      prompt: q.prompt,
+      options: q.options,
+      points: q.points,
+      answer: answer ? { value: answer.answer, correct: answer.correct } : null,
+      solution: ended
+        ? { correct: q.correct, accepted: q.accepted, explanation: q.explanation }
+        : null,
+    }
+  })
 }
 
 /** The viewer's own result per problem in this contest. Practice attempts don't count here. */
@@ -285,8 +321,13 @@ export async function getLeaderboard(slug: string, viewer: User | null) {
 
 async function computeBoard(contest: Contest, staff: boolean) {
   const db = getDb()
-  const rows = await contestProblemRows(contest.id)
+  const [rows, questionRows, answers] = await Promise.all([
+    contestProblemRows(contest.id),
+    contestQuestionRows(contest.id),
+    db.select().from(contestAnswers).where(eq(contestAnswers.contestId, contest.id)),
+  ])
   const labelOf = new Map(rows.map((row) => [row.problem.id, row.link.label]))
+  const questionOf = new Map(questionRows.map((q) => [q.id, q]))
   const [participants, attempts] = await Promise.all([
     db
       .select({ id: users.id, name: users.name })
@@ -320,7 +361,8 @@ async function computeBoard(contest: Contest, staff: boolean) {
     endsAt: contest.endsAt,
     penaltyMinutes: contest.penaltyMinutes,
     freezeMinutes: contest.freezeMinutes,
-    problemLabels: rows.map((row) => row.link.label),
+    // Questions are columns too, after the problems.
+    problemLabels: [...rows.map((row) => row.link.label), ...questionRows.map((q) => q.label)],
   }
   const cutoff = freezeTime(config)
   return {
@@ -334,20 +376,37 @@ async function computeBoard(contest: Contest, staff: boolean) {
         // Display names only: other students' email addresses are never exposed.
         user: { id: person.id, name: person.name ?? "Student" },
       })),
-      attempts.flatMap((attempt) => {
-        const label = attempt.problemId && labelOf.get(attempt.problemId)
-        return label
-          ? [
-              {
-                userId: attempt.userId,
-                problemLabel: label,
-                verdict: attempt.verdict,
-                score: attempt.score,
-                createdAt: attempt.createdAt,
-              },
-            ]
-          : []
-      }),
+      [
+        ...attempts.flatMap((attempt) => {
+          const label = attempt.problemId && labelOf.get(attempt.problemId)
+          return label
+            ? [
+                {
+                  userId: attempt.userId,
+                  problemLabel: label,
+                  verdict: attempt.verdict,
+                  score: attempt.score,
+                  createdAt: attempt.createdAt,
+                },
+              ]
+            : []
+        }),
+        // A right answer is a solve (ICPC) worth the question's points (IOI).
+        ...answers.flatMap((a) => {
+          const q = questionOf.get(a.questionId)
+          return q
+            ? [
+                {
+                  userId: a.userId,
+                  problemLabel: q.label,
+                  verdict: (a.correct ? "AC" : "WA") as "AC" | "WA",
+                  score: a.correct ? q.points : 0,
+                  createdAt: a.answeredAt,
+                },
+              ]
+            : []
+        }),
+      ],
       frozen
     ),
   }
@@ -387,8 +446,15 @@ export async function getContestForStaff(id: string, orgId: string | null) {
     .from(contests)
     .where(and(eq(contests.id, id), ownedBy(orgId)))
   if (!contest) throw notFound("Contest not found")
-  const rows = await contestProblemRows(id)
-  return { ...contest, problemIds: rows.map((row) => row.problem.id) }
+  const [rows, questionRows] = await Promise.all([
+    contestProblemRows(id),
+    contestQuestionRows(id),
+  ])
+  return {
+    ...contest,
+    problemIds: rows.map((row) => row.problem.id),
+    questions: questionRows.map((q) => ({ questionId: q.id, points: q.points })),
+  }
 }
 
 /** Problems an owner may use: published ones, and its own drafts. */
@@ -431,8 +497,14 @@ export async function saveContest(
   input: ContestInput,
   orgId: string | null
 ) {
-  const { problemIds, expectedUpdatedAt, ...fields } = input
-  await checkUsableProblems(problemIds, orgId)
+  const { problemIds, expectedUpdatedAt, questions: chosenQuestions, ...fields } = input
+  if (problemIds.length) await checkUsableProblems(problemIds, orgId)
+  // Contests are marked as they go, so only questions that mark themselves.
+  await usableQuestions(
+    chosenQuestions.map((q) => q.questionId),
+    orgId,
+    true
+  )
   const values = { ...fields, orgId, audience: orgId ? fields.audience : [] }
   if (id) refreshLeaderboard(id)
   return getDb().transaction(async (tx) => {
@@ -461,16 +533,90 @@ export async function saveContest(
     await tx
       .delete(contestProblems)
       .where(eq(contestProblems.contestId, contest.id))
-    await tx.insert(contestProblems).values(
-      problemIds.map((problemId, position) => ({
-        contestId: contest.id,
-        problemId,
-        position,
-        label: String.fromCharCode(65 + position),
-      }))
-    )
+    if (problemIds.length) {
+      await tx.insert(contestProblems).values(
+        problemIds.map((problemId, position) => ({
+          contestId: contest.id,
+          problemId,
+          position,
+          label: String.fromCharCode(65 + position),
+        }))
+      )
+    }
+    await tx.delete(contestQuestions).where(eq(contestQuestions.contestId, contest.id))
+    if (chosenQuestions.length) {
+      await tx.insert(contestQuestions).values(
+        chosenQuestions.map((q, position) => ({
+          contestId: contest.id,
+          questionId: q.questionId,
+          points: q.points,
+          position,
+          label: `Q${position + 1}`,
+        }))
+      )
+    }
     return contest
   })
+}
+
+/** A contest's questions, in order, with their points there. */
+function contestQuestionRows(contestId: string) {
+  return getDb()
+    .select({
+      id: questions.id,
+      label: contestQuestions.label,
+      points: contestQuestions.points,
+      title: questions.title,
+      kind: questions.kind,
+      prompt: questions.prompt,
+      options: questions.options,
+      correct: questions.correct,
+      accepted: questions.accepted,
+      explanation: questions.explanation,
+    })
+    .from(contestQuestions)
+    .innerJoin(questions, eq(contestQuestions.questionId, questions.id))
+    .where(eq(contestQuestions.contestId, contestId))
+    .orderBy(asc(contestQuestions.position))
+}
+
+/**
+ * A contestant's one answer to a contest question, marked at once. Only while the contest
+ * runs, for registered contestants; it counts on the board like a solved problem.
+ */
+export async function answerContestQuestion(
+  slug: string,
+  questionId: string,
+  user: User,
+  answer: string[] | string
+) {
+  await requireFeature("contests.enabled")
+  const contest = await contestFor(slug, user)
+  if (phaseOf(contest) !== "live") {
+    throw new ApiError(403, "contest_not_live", "Answers count only while the contest runs.")
+  }
+  if (!(await isRegistered(contest.id, user.id))) {
+    throw new ApiError(403, "not_registered", "Register for the contest first.")
+  }
+  const q = (await contestQuestionRows(contest.id)).find((x) => x.id === questionId)
+  if (!q) throw notFound("Question not found")
+  if ((q.kind === "single" || q.kind === "multiple") && Array.isArray(answer)) {
+    const valid = q.options.map((o) => o.id)
+    if (answer.some((id) => !valid.includes(id))) {
+      throw new ApiError(400, "bad_answer", "Choose from the options.")
+    }
+  }
+  const correct = markQuestion(q, answer).earned === q.points
+  const [saved] = await getDb()
+    .insert(contestAnswers)
+    .values({ contestId: contest.id, questionId, userId: user.id, answer, correct })
+    .onConflictDoNothing()
+    .returning()
+  if (!saved) {
+    throw new ApiError(409, "already_answered", "You've already answered this question.")
+  }
+  refreshLeaderboard(contest.id)
+  return { correct }
 }
 
 function refreshLeaderboard(contestId: string) {

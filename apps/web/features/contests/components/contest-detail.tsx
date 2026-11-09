@@ -17,6 +17,7 @@ import { ClassChips } from "@/features/classes/components/class-chips"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 
+import { ContestQuestions, type ContestQuestion } from "./contest-questions"
 import { Countdown } from "./countdown"
 import { PhaseBadge } from "./contest-list"
 
@@ -42,6 +43,7 @@ interface ContestView {
     level: string
     status: "solved" | "tried" | null
   }[]
+  questions: ContestQuestion[]
 }
 
 interface Leaderboard {
@@ -252,10 +254,12 @@ function ProblemsTab({
   slug: string
   contest: ContestView
 }) {
-  if (contest.problems.length === 0) {
+  if (contest.problems.length === 0 && contest.questions.length === 0) {
     return <p>Problems appear when the contest starts.</p>
   }
   return (
+    <>
+    {contest.problems.length > 0 && (
     <Table headers={["", "Problem", "Level", "Your result"]}>
       {contest.problems.map((problem) => (
         <tr key={problem.label}>
@@ -281,6 +285,13 @@ function ProblemsTab({
         </tr>
       ))}
     </Table>
+    )}
+    <ContestQuestions
+      slug={slug}
+      questions={contest.questions}
+      canAnswer={contest.phase === "live" && contest.registered}
+    />
+    </>
   )
 }
 

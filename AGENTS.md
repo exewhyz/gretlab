@@ -69,6 +69,11 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Images: the editor's image button, paste or drag-and-drop uploads to `POST /api/v1/uploads` (staff and people who teach; PNG, JPEG, GIF or WebP checked by their bytes, 2 MB, 300 a day each) and inserts `![name](/api/v1/uploads/<id>)`. Stored in Postgres (`uploads`, deduplicated by hash) so every replica serves them; served with `nosniff` and a sandboxing CSP. SVG is refused: it can carry scripts.
 - Problems from before markdown kept their `statement` blocks; `db:migrate` turns any with an empty description into markdown (`statementToMarkdown`), and API callers that still send `statement` get the same conversion.
 
+## Units
+
+- Units are the platform's course outline for the library (Unit 1 · Basics, …); organizations' problems stand alone. Dashboard › Units (`features/admin/components/units.tsx`): add, reorder (↑ ↓), delete (asking where its problems go: another unit, or none). A unit's Edit dialog renames it and sets exactly which problems are in it and their order: add from any unit (it moves), move a problem to another unit or to none, undo before saving (`setUnitProblems`, one transaction). The problem editor can also set a problem's unit. Reordering units lists every unit once (`bad_order` otherwise).
+- Admin lists that could grow (units, the daily challenge's days) stay one line per row, with the details edited in a dialog.
+
 ## Problem code per language
 
 - Seeded problems carry editorials, hints, and starter code plus a reference solution in all five languages (`seed-data/content.json`); `e2e/full.mjs` judges every reference solution in the sandbox. Problems about Python features still have them in every language, printing exactly what Python prints (lists as `[1, 2]`, dicts as `{'a': 1}`).
@@ -85,6 +90,12 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Only graded submissions from `opensAt` on count. Per problem: the best on-time result, or a better late one minus the penalty when late work is allowed. Partial credit comes from IOI-style scores.
 - Only published problems can be assigned, because students solve them on the normal problem pages.
 - The gradebook lists every active student, including those who haven't started. CSV fields are quoted and defused against spreadsheet formulas.
+- Quiz questions live in a bank (`questions`), owned like problems (platform or an organization; Dashboard › Questions), written in the question editor or imported (`docs/question-format.md`, template `/question-template.json`). Kinds: single and multiple choice (marked automatically; multiple needs exactly the right set), short answer (marked automatically only when it matches an accepted answer, ignoring case, spacing and a final full stop; otherwise a teacher marks it), written (always a teacher). Rules: `packages/judge/src/quiz.ts`, unit-tested. A question used anywhere can't be deleted.
+- Assignments and exams pick questions with the question picker beside the problem picker (`assignment_questions`, each with its own points): problems, questions, or both. Organizations can also pick the platform's ready questions. Write a question and Import questions are in the picker, so the form stays short.
+- Contests pick questions that mark themselves (`contest_questions`, labelled Q1, Q2 after the problems). A registered contestant answers each once while it runs, marked at once (`contest_answers`); on the board a right answer is a solve (ICPC) worth its points (IOI). Right answers show after the contest.
+- The daily challenge is a problem, a question (the platform's, marking itself), or both (`daily_challenges.question_id`; a day with only a question has no problem). One answer a day (`daily_answers`), shown right or wrong with the explanation at once; a right answer keeps the streak.
+- Students' answers (`quiz_responses`) save as they type and can be changed until their time is up (personal due time; an exam: their sitting); whatever is saved then counts. No submit step. Teachers and admins can replace any mark from the gradebook's Quiz column (null goes back to automatic); they see marks at once.
+- Students see quiz marks, right answers and explanations after their due time (an exam: after their sitting), unless the form's "Hold results until I release them" is on; then at **Release results**, which also covers rubric marks and comments and notifies them. Right answers are never in the data before that.
 - Extensions (`assignment_extensions`): a later due time for one student, for the whole assignment or only some problems (reopening them after feedback is resubmission). Grading uses `extendedDue` per problem; the student's phase and due line use `personalDue`. For an exam it lets an absent student start later (the start window is waived). Given from the gradebook's Extend; audited for organizations.
 - Rubrics: each assignment problem may have up to 20 criteria marked by hand (`assignment_problems.rubric`); a problem is out of its test points plus the rubric's. Marks are stored per student (`rubric_marks`), clamped to each criterion (`rubricEarned`), and unknown criteria are refused. Marks are given in the gradebook's student panel.
 - Line comments (`submission_comments`) go on a line that exists in that student's submission, from the same panel by selecting a line number. Teachers keep reusable comments (`feedback_snippets`, `/me/snippets`).
@@ -200,7 +211,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `pnpm test`: fast unit tests (leaderboard, file names, settings).
 - `pnpm test:e2e`: everything against a throwaway database and real gVisor: queue guarantees, 16 hostile programs, API security, every seeded solution, contests, the browser UI. Run it before merging anything touching the sandbox, queue, auth or the API.
 - `e2e/stack.sh` with `e2e/load.mjs` and `e2e/resilience.mjs`: load and failure tests on the production shape. See `docs/scaling.md`.
-- `e2e/features.mjs`: library, daily, streaks, notes, lists, study plans, profiles, leaderboard, hints, editorials, integrity, editor extras and their switches.
+- `e2e/features.mjs`: library, daily (problem and question), streaks, notes, lists, study plans, profiles, leaderboard, hints, editorials, integrity, editor extras and their switches.
 - `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
 - `e2e/assignments.mjs`: grading rules, late penalties, gradebook and CSV, privacy, drafts and playback, rubrics, line comments and releasing feedback, lab exams (sittings, networks, events, more time, the site-wide lock, start window, edits after starting), problem import and assessment-only problems, the switch and the pages.
 - `e2e/flows.mjs`: Run vs Submit, history and creating a contest, as a person uses them. Included in `pnpm test:e2e`.
@@ -228,6 +239,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Organizations (part 4): members-only problems on members' pages; student code from the gradebook; anonymous class ratings; per-organization languages and paste blocking for its contests; Excel (.xlsx) import
 - [x] HackerRank-style integrity: plagiarism similarity checks (winnowing, rename-proof)
 - [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
+- [x] Quizzes: a question bank (single/multiple choice, short and written answers) with import, used in assignments, exams, contests and the daily challenge alone or with coding problems; teacher marks override; results after the due time or on release
 - [x] Notifications: in-app bell with stored events and computed reminders, optional email
 - [x] Extensions and resubmission: a later due time for one student, whole assignment or reopened problems; lets an absent student sit an exam later
 - [x] Feedback: rubrics per assignment problem, line comments with saved comments, feedback held until released

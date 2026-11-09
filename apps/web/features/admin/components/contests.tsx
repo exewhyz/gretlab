@@ -26,6 +26,7 @@ import { useOwner } from "@/features/admin/owner"
 import { AudiencePicker } from "./audience"
 
 import { NewProblemDialog } from "./problem-editor"
+import { QuestionPicker } from "@/features/questions/components/question-picker"
 import { ImportProblemsDialog } from "./problem-import"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle, Table } from "./shell"
@@ -139,14 +140,17 @@ interface ContestForm {
   published: boolean
   registrationOpen: boolean
   problemIds: string[]
+  /** Bank questions that mark themselves, with points as typed. */
+  questions: { questionId: string; points: string }[]
   /** Organization groups it's for; empty for everyone. */
   audience: string[][]
 }
 
 interface StoredContest extends Omit<
   ContestForm,
-  "penaltyMinutes" | "freezeMinutes"
+  "penaltyMinutes" | "freezeMinutes" | "questions"
 > {
+  questions: { questionId: string; points: number }[]
   updatedAt: string
   penaltyMinutes: number
   freezeMinutes: number
@@ -168,6 +172,7 @@ function blankForm(forClass: string | null): ContestForm {
     published: false,
     registrationOpen: true,
     problemIds: [],
+    questions: [],
     audience: forClass ? [[forClass]] : [],
   }
 }
@@ -201,6 +206,10 @@ export function ContestEditorPage({
         endsAt: toLocalInput(data.endsAt),
         penaltyMinutes: String(data.penaltyMinutes),
         freezeMinutes: String(data.freezeMinutes),
+        questions: (data.questions ?? []).map((q) => ({
+          questionId: q.questionId,
+          points: String(q.points),
+        })),
       }
     : blankForm(forClass)
   return (
@@ -488,6 +497,10 @@ function ContestEditor({
       scoring: form.scoring,
       registrationOpen: form.registrationOpen,
       problemIds: form.problemIds,
+      questions: form.questions.map((q) => ({
+        questionId: q.questionId,
+        points: q.points.trim() === "" ? NaN : Number(q.points),
+      })),
       audience: form.audience.filter((c) => c.length > 0),
       published,
       penaltyMinutes:
@@ -676,6 +689,13 @@ function ContestEditor({
           selected={form.problemIds}
           onChange={(ids) => set("problemIds", ids)}
           error={errors.problemIds}
+        />
+
+        <QuestionPicker
+          selected={form.questions}
+          onChange={(questions) => set("questions", questions)}
+          autoOnly
+          label="Quiz questions (answered once, marked at once)"
         />
 
         <div className="grid gap-3 min-[901px]:grid-cols-3">

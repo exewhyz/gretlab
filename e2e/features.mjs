@@ -111,6 +111,54 @@ check("solving it marks today done and starts a streak", after.solvedToday === t
 const yesterday = new Date(Date.parse(today.day + "T12:00:00Z") - 86_400_000).toISOString().slice(0, 10)
 psql(`update submissions set created_at = '${yesterday}T12:00:00Z' where id = (select id from submissions where user_id=(select id from users where email='feat-a@example.com') and verdict='AC' and problem_id=(select id from problems where slug='p2') limit 1)`)
 check("a solve yesterday extends the streak to 2", (await a("/daily")).json.streak === 2, (await a("/daily")).json.streak)
+// Questions for the day, several, beside the problem or alone.
+const mkq = async (title, kind, extra) => (await admin("/admin/questions", { body: { title, kind, prompt: `${title}?`, points: 1, explanation: "Count them.", ...extra } })).json
+const dq1 = await mkq("feat daily q1", "single", { options: [{ id: "a", text: "3" }, { id: "b", text: "4" }], correct: ["b"] })
+const dq2 = await mkq("feat daily q2", "short", { accepted: ["seven"] })
+const written = await mkq("feat daily written", "written", {})
+check("daily questions must mark themselves", (await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: "p1", questionIds: [dq1.id, written.id] } })).json?.error?.code === "needs_marking")
+check("at most ten a day", (await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: "p1", questionIds: Array(11).fill(dq1.id).map((_, i) => `00000000-0000-4000-8000-00000000000${i % 10}`) } })).status === 400)
+await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: "p1", questionIds: [dq1.id, dq2.id] } })
+const withQ = (await b("/daily")).json
+check("a day can have a problem and several questions", withQ.problem?.slug === "p1" && withQ.questions.map((q) => q.title).join() === "feat daily q1,feat daily q2" && withQ.questions.every((q) => q.solution === null))
+const dailyAnswer = (await b("/daily/answer", { body: { questionId: dq1.id, answer: ["b"] } })).json
+check("answering shows right or wrong and why, at once", dailyAnswer.correct === true && dailyAnswer.solution.explanation === "Count them.")
+check("once per question", (await b("/daily/answer", { body: { questionId: dq1.id, answer: ["a"] } })).json?.error?.code === "already_answered")
+check("each question answered on its own", (await b("/daily/answer", { body: { questionId: dq2.id, answer: "Seven." } })).json?.correct === true)
+check("only today's questions", (await b("/daily/answer", { body: { questionId: written.id, answer: "x" } })).status === 404)
+check("a right answer keeps the streak", (await b("/daily")).json.streak >= 1)
+await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: null, questionIds: [dq2.id] } })
+const qOnly = (await c("/daily")).json
+check("or questions alone", qOnly.problem === null && qOnly.questions.length === 1)
+await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: "p1" } })
+psql(`delete from daily_answers where question_id in ('${dq1.id}','${dq2.id}','${written.id}')`)
+psql(`delete from questions where id in ('${dq1.id}','${dq2.id}','${written.id}')`)
+// ---------- units: the library's outline
+const unitsBefore = (await admin("/admin/units")).json
+check("students can't manage units", (await a("/admin/units")).status === 403)
+const ua = (await admin("/admin/units", { body: { name: "feat unit a" } })).json
+const ub = (await admin("/admin/units", { body: { name: "feat unit b" } })).json
+const ids = (await admin("/admin/units")).json.units.map((u) => u.id)
+check("new units go last", ids.at(-2) === ua.id && ids.at(-1) === ub.id)
+check("reordering lists every unit", (await admin("/admin/units", { method: "PUT", body: { ids: [ub.id, ua.id] } })).json?.error?.code === "bad_order")
+await admin("/admin/units", { method: "PUT", body: { ids: [...ids.slice(0, -2), ub.id, ua.id] } })
+check("units reorder", (await admin("/admin/units")).json.units.map((u) => u.id).slice(-2).join() === `${ub.id},${ua.id}` && (await admin("/admin/units")).json.units.length === unitsBefore.units.length + 2)
+check("units rename", (await admin(`/admin/units/${ua.id}`, { method: "PATCH", body: { name: "feat unit A" } })).status === 200 && (await admin("/admin/units")).json.units.some((u) => u.name === "feat unit A"))
+const two = (await admin("/admin/problems/import", { body: { file: [1, 2].map((n) => ({ title: `feat unit problem ${n}`, statement: "Print 1.", samples: [{ input: "", output: "1" }] })), listed: true, published: false } })).json.created
+psql(`update problems set unit_id = '${ua.id}' where id in ('${two[0].id}','${two[1].id}')`)
+check("a unit's problems keep their order", (await admin(`/admin/units/${ua.id}`, { method: "PATCH", body: { problemIds: [two[1].id, two[0].id] } })).status === 200 && (await admin("/admin/units")).json.units.find((u) => u.id === ua.id).problems.map((p) => p.id).join() === `${two[1].id},${two[0].id}`)
+await admin(`/admin/units/${ua.id}`, { method: "PATCH", body: { problemIds: [two[0].id], moves: { [two[1].id]: ub.id } } })
+const afterMove = (await admin("/admin/units")).json.units
+check("a problem moves to another unit", afterMove.find((u) => u.id === ua.id).problems.length === 1 && afterMove.find((u) => u.id === ub.id).problems[0]?.id === two[1].id)
+await admin(`/admin/units/${ua.id}`, { method: "PATCH", body: { problemIds: [two[0].id, two[1].id] } })
+check("adding a problem from another unit takes it out of that one", (await admin("/admin/units")).json.units.find((u) => u.id === ub.id).problems.length === 0 && (await admin("/admin/units")).json.units.find((u) => u.id === ua.id).problems.length === 2)
+await admin(`/admin/units/${ua.id}`, { method: "PATCH", body: { problemIds: [two[0].id] } })
+check("left out without a destination: no unit", psql(`select unit_id is null from problems where id = '${two[1].id}'`) === "t")
+await admin(`/admin/units/${ua.id}`, { method: "PATCH", body: { problemIds: [two[0].id, two[1].id] } })
+check("only the platform's problems go in units", (await admin(`/admin/units/${ua.id}`, { method: "PATCH", body: { problemIds: ["00000000-0000-4000-8000-000000000000"] } })).json?.error?.code === "unknown_problem")
+check("deleting a unit moves its problems where you say", (await admin(`/admin/units/${ua.id}?moveTo=${ub.id}`, { method: "DELETE" })).status === 200 && (await admin("/admin/units")).json.units.find((u) => u.id === ub.id).problems.length === 2)
+check("or to no unit", (await admin(`/admin/units/${ub.id}`, { method: "DELETE" })).status === 200 && psql(`select count(*) from problems where id in ('${two[0].id}','${two[1].id}') and unit_id is null`) === "2")
+psql(`delete from problems where id in ('${two[0].id}','${two[1].id}')`)
 check("an invalid timezone is refused", (await admin("/admin/settings", { method: "PATCH", body: { "site.timezone": "Mars/Base" } })).status === 400)
 
 // ---------- notes stay private

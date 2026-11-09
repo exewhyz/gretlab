@@ -22,6 +22,8 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Content",
     items: [
       { href: "/admin/problems", label: "Problems" },
+      { href: "/admin/questions", label: "Questions" },
+      { href: "/admin/units", label: "Units" },
       { href: "/admin/assignments", label: "Assignments" },
       { href: "/admin/contests", label: "Contests" },
       { href: "/admin/daily", label: "Daily challenge" },

@@ -1,4 +1,11 @@
 import { getDb, notes, problems, sql, type User } from "@workspace/db"
+import {
+  deleteQuestion,
+  getQuestionForStaff,
+  importQuestions,
+  listQuestionsForStaff,
+  saveQuestion,
+} from "@/features/questions/server"
 
 import {
   addLineComment,
@@ -8,6 +15,8 @@ import {
   extendStudentSitting,
   forgetExamAddresses,
   rejudgeSystemErrors,
+  setQuizMarks,
+  studentQuiz,
   setExtension,
   removeExtension,
   setRubricMarks,
@@ -227,6 +236,52 @@ export async function orgProblem(slug: string, user: User, id: string) {
   const ctx = await orgContext(slug, user)
   needAnywhere(ctx, "problems.manage")
   return getProblemForStaff(id, ctx.org.id)
+}
+
+export async function orgQuestions(slug: string, user: User, picker: boolean) {
+  const ctx = await orgContext(slug, user)
+  // Picking needs the right to set work; the bank itself, to write problems.
+  if (picker) needAnywhere(ctx, "assignments.manage", "contests.manage", "problems.manage")
+  else needAnywhere(ctx, "problems.manage")
+  return listQuestionsForStaff(ctx.org.id, picker)
+}
+
+export async function orgQuestion(slug: string, user: User, id: string) {
+  const ctx = await orgContext(slug, user)
+  needAnywhere(ctx, "problems.manage")
+  return getQuestionForStaff(id, ctx.org.id)
+}
+
+export async function saveOrgQuestion(
+  slug: string,
+  user: User,
+  id: string | null,
+  input: Parameters<typeof saveQuestion>[1]
+) {
+  const ctx = await orgContext(slug, user)
+  needAnywhere(ctx, "problems.manage")
+  const saved = await saveQuestion(id, input, ctx.org.id)
+  await writeAudit(ctx, id ? "question.update" : "question.create", `${id ? "Changed" : "Created"} question ${input.title}`)
+  return saved
+}
+
+export async function deleteOrgQuestion(slug: string, user: User, id: string) {
+  const ctx = await orgContext(slug, user)
+  needAnywhere(ctx, "problems.manage")
+  await deleteQuestion(id, ctx.org.id)
+  await writeAudit(ctx, "question.delete", "Deleted a question", { question: id })
+}
+
+export async function orgImportQuestions(
+  slug: string,
+  user: User,
+  input: { file: unknown; published: boolean }
+) {
+  const ctx = await orgContext(slug, user)
+  needAnywhere(ctx, "problems.manage")
+  const result = await importQuestions(ctx.org.id, input.file, input.published)
+  await writeAudit(ctx, "question.import", `Imported ${result.created.length} questions`)
+  return result
 }
 
 export async function orgImportProblems(
@@ -496,6 +551,26 @@ export async function orgRemoveExtension(slug: string, user: User, id: string, e
   await writeAudit(ctx, "assignment.extension_removed", `Removed ${email}'s extension`, {
     assignment: id,
   })
+}
+
+export async function orgStudentQuiz(slug: string, user: User, id: string, email: string) {
+  const ctx = await orgContext(slug, user)
+  needAnywhere(ctx, "gradebook.view")
+  return studentQuiz(id, ctx.org.id, groupsFor(ctx, "gradebook.view"), email)
+}
+
+export async function orgSetQuizMarks(
+  slug: string,
+  user: User,
+  id: string,
+  input: Parameters<typeof setQuizMarks>[3]
+) {
+  const { ctx, scope } = await feedbackContext(slug, user)
+  const result = await setQuizMarks(id, ctx.org.id, scope, input)
+  await writeAudit(ctx, "assignment.quiz_marks", `Marked ${input.student}'s answers`, {
+    assignment: id,
+  })
+  return result
 }
 
 export async function orgRejudgeSystemErrors(slug: string, user: User, id: string) {

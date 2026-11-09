@@ -6,6 +6,11 @@ import { useMemo, useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@workspace/ui/components/collapsible"
 
 import { SelectInput, TextInput } from "@/components/form"
 import { useViewer } from "@/features/account/use-viewer"
@@ -15,6 +20,7 @@ import { ScopeNote } from "@/features/account/scope-switcher"
 import { api } from "@/lib/api/client"
 
 import type { CatalogProblem } from "../server"
+import { DailyQuestion, type DailyQuestionData } from "./daily-question"
 import { Difficulty, TagChip } from "./difficulty"
 
 interface Catalog {
@@ -24,11 +30,10 @@ interface Catalog {
 
 interface Daily {
   day: string
-  slug: string
-  title: string
-  level: string
+  problem: { slug: string; title: string; level: string } | null
   solvedToday: boolean
   streak: number
+  questions: DailyQuestionData[]
 }
 
 interface ListSummary {
@@ -44,30 +49,56 @@ const LEVEL_ORDER = { easy: 0, medium: 1, hard: 2 } as const
 type Sort =
   "default" | "title" | "difficulty" | "acceptance-high" | "acceptance-low"
 
-function DailyCard({ daily }: { daily: Daily }) {
+function DailyCard({ daily, signedIn }: { daily: Daily; signedIn: boolean }) {
   return (
-    <Link
-      href={`/problems/${daily.slug}`}
-      className="block rounded-lg border border-hairline bg-card p-4 hover:border-hairline-strong"
+    <div
+      className="grid gap-2 rounded-lg border border-hairline bg-card p-4"
+      data-testid="daily-card"
     >
-      <div className="text-caption-upper text-body uppercase">
-        Daily challenge · {daily.day}
-      </div>
-      <div className="mt-1 text-title-md text-ink">{daily.title}</div>
-      <div className="mt-1 flex items-center gap-3 text-caption">
-        <Difficulty level={daily.level} />
-        {daily.solvedToday ? (
-          <span className="text-success">Solved today</span>
-        ) : (
-          <span>Not solved yet today</span>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-caption-upper text-body uppercase">
+          Daily challenge · {daily.day}
+        </div>
         {daily.streak > 0 && (
-          <span data-testid="streak" className="text-ink">
+          <span data-testid="streak" className="text-caption text-ink">
             🔥 {daily.streak}-day streak
           </span>
         )}
       </div>
-    </Link>
+      {daily.problem && (
+        <Link href={`/problems/${daily.problem.slug}`} className="group block">
+          <div className="text-title-md text-ink group-hover:underline">
+            {daily.problem.title}
+          </div>
+          <div className="mt-1 flex items-center gap-3 text-caption">
+            <Difficulty level={daily.problem.level} />
+            {daily.solvedToday ? (
+              <span className="text-success">Solved today</span>
+            ) : (
+              <span>Not solved yet today</span>
+            )}
+          </div>
+        </Link>
+      )}
+      {daily.questions.length > 0 && (
+        <Collapsible
+          className="grid gap-2"
+          defaultOpen={daily.questions.some((q) => !q.answer)}
+          data-testid="daily-questions"
+        >
+          <CollapsibleTrigger className="justify-self-start text-caption text-body hover:text-ink">
+            {daily.questions.length} {daily.questions.length === 1 ? "question" : "questions"} today ·{" "}
+            {daily.questions.filter((q) => q.answer?.correct).length} right of{" "}
+            {daily.questions.filter((q) => q.answer).length} answered
+          </CollapsibleTrigger>
+          <CollapsibleContent className="grid gap-2">
+            {daily.questions.map((q, index) => (
+              <DailyQuestion key={q.id} q={q} number={index + 1} signedIn={signedIn} />
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
   )
 }
 
@@ -385,7 +416,7 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
             </div>
           </Link>
         )}
-        {daily && <DailyCard daily={daily} />}
+        {daily && <DailyCard daily={daily} signedIn={Boolean(viewer?.user)} />}
         {solvedCount === 0 && (
           <div className="rounded-lg border border-hairline bg-card p-4 text-body-sm text-body">
             <h2 className="mb-2 text-title-sm text-ink">How it works</h2>

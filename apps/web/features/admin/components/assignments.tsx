@@ -30,7 +30,14 @@ import {
 
 import { ConfirmButton } from "@/components/confirm"
 import { SaveConflict } from "@/components/save-conflict"
-import { Field, FormMessage, TextArea, TextInput } from "@/components/form"
+import { Markdown } from "@/components/markdown"
+import {
+  Field,
+  FormMessage,
+  SelectInput,
+  TextArea,
+  TextInput,
+} from "@/components/form"
 import {
   PhaseBadge,
   STATUS,
@@ -38,6 +45,7 @@ import {
   type GradeStatus,
 } from "@/features/assignments/components/assignments"
 import { assignmentInputSchema, slugify } from "@/features/problems/schemas"
+import { QuestionPicker } from "@/features/questions/components/question-picker"
 import { api, ApiRequestError } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 import { useOwner } from "@/features/admin/owner"
@@ -144,6 +152,8 @@ interface AssignmentForm {
   rubric: Record<string, RubricCriterion[]>
   /** Course outcomes each problem assesses. */
   outcomes: Record<string, string[]>
+  /** Bank questions, beside or instead of the problems, with points as typed. */
+  questions: { questionId: string; points: string }[]
   holdFeedback: boolean
   /** A lab exam, with its settings as typed. */
   exam: boolean
@@ -175,6 +185,7 @@ interface StoredAssignment {
     rubric: RubricCriterion[]
     outcomes: string[]
   }[]
+  questions: { questionId: string; points: number }[]
 }
 
 /** A new one; made from a class page, it's for that class. */
@@ -195,6 +206,7 @@ function blankForm(forClass: string | null): AssignmentForm {
     points: {},
     rubric: {},
     outcomes: {},
+    questions: [],
     holdFeedback: false,
     exam: false,
     examMinutes: "60",
@@ -242,6 +254,10 @@ export function AssignmentEditorPage({
         outcomes: Object.fromEntries(
           data.problems.map((p) => [p.problemId, p.outcomes ?? []])
         ),
+        questions: (data.questions ?? []).map((q) => ({
+          questionId: q.questionId,
+          points: String(q.points),
+        })),
         exam: data.exam !== null,
         examMinutes: data.exam?.minutes ? String(data.exam.minutes) : data.exam ? "" : "60",
         examFullscreen: data.exam?.fullscreen ?? true,
@@ -348,6 +364,10 @@ function AssignmentEditor({
           pointsOf(problemId).trim() === "" ? NaN : Number(pointsOf(problemId)),
         rubric: rubricOf(problemId),
         outcomes: form.outcomes[problemId] ?? [],
+      })),
+      questions: form.questions.map((q) => ({
+        questionId: q.questionId,
+        points: q.points.trim() === "" ? NaN : Number(q.points),
       })),
     })
     if (parsed.success) {
@@ -565,6 +585,12 @@ function AssignmentEditor({
           )}
         />
 
+        <QuestionPicker
+          selected={form.questions}
+          onChange={(questions) => set("questions", questions)}
+          error={errors.questions}
+        />
+
         <div className="grid gap-3 rounded-md border border-hairline p-3">
           <label className="inline-flex items-center gap-2 self-start text-ink">
             <Checkbox
@@ -657,7 +683,8 @@ function AssignmentEditor({
               checked={form.holdFeedback}
               onCheckedChange={(checked) => set("holdFeedback", checked)}
             />
-            Hold rubric marks and comments until I release them
+            Hold results until I release them (quiz marks and answers, rubric
+            marks, comments)
           </label>
           {form.allowLate && (
             <div className="grid content-start gap-1.5">
@@ -738,6 +765,7 @@ interface Gradebook {
     phase: AssignmentPhase
     holdFeedback: boolean
     exam: ExamSettings | null
+    quiz: { questions: number; points: number } | null
   }
   /** `points` is tests plus rubric. */
   problems: {
@@ -764,6 +792,7 @@ interface Gradebook {
     late: number
     exam: (SittingView & { warnings: number }) | null
     extension: { dueAt: string; problemIds: string[]; reason: string } | null
+    quiz: { earned: number; max: number; answered: boolean; needsMarking: number } | null
   }[]
 }
 
@@ -774,6 +803,7 @@ export function AssignmentGradebook({ id }: { id: string }) {
     problemId: string
   } | null>(null)
   const [now] = useState(() => Date.now())
+  const [marking, setMarking] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const client = useQueryClient()
   const [rejudged, setRejudged] = useState<string | null>(null)
@@ -855,13 +885,13 @@ export function AssignmentGradebook({ id }: { id: string }) {
               <ConfirmButton
                 size="sm"
                 disabled={release.isPending}
-                title="Release feedback?"
-                description="Every student sees their rubric marks and line comments for this assignment. New feedback shows at once from then on."
-                confirmLabel="Release feedback"
+                title="Release results?"
+                description="Every student sees their marks: quiz answers with the right answers, rubric marks and comments. New marks show at once from then on."
+                confirmLabel="Release results"
                 tone="default"
                 onConfirm={() => release.mutate()}
               >
-                Release feedback
+                Release results
               </ConfirmButton>
             )}
             <Link
@@ -887,7 +917,7 @@ export function AssignmentGradebook({ id }: { id: string }) {
         Due {formatDateTime(data.assignment.dueAt)}. Marks update as students
         submit.
         {data.assignment.holdFeedback &&
-          " Rubric marks and comments are held: students don't see them yet."}
+          " Results are held: students don't see quiz marks, rubric marks or comments yet."}
         {rejudged && <span data-testid="rejudge-result"> {rejudged}</span>}
       </p>
       <div className="mb-4 grid grid-cols-2 gap-3 min-[901px]:grid-cols-4">
@@ -910,6 +940,7 @@ export function AssignmentGradebook({ id }: { id: string }) {
           "Student",
           ...(data.assignment.exam ? ["Exam"] : []),
           ...data.problems.map((p) => `${p.title} (${p.points})`),
+          ...(data.assignment.quiz ? [`Quiz (${data.assignment.quiz.points})`] : []),
           `Total (${data.total})`,
         ]}
       >
@@ -986,6 +1017,28 @@ export function AssignmentGradebook({ id }: { id: string }) {
                 )}
               </td>
             ))}
+            {data.assignment.quiz && (
+              <td className="tabular-nums" data-testid="quiz-cell">
+                {row.quiz?.answered ? (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 font-normal text-inherit"
+                    aria-label={`Mark ${row.email}'s answers`}
+                    onClick={() => setMarking(row.email)}
+                  >
+                    {row.quiz.earned}
+                  </Button>
+                ) : (
+                  "—"
+                )}
+                {(row.quiz?.needsMarking ?? 0) > 0 && (
+                  <div className="text-xs text-primary">
+                    {row.quiz!.needsMarking} to mark
+                  </div>
+                )}
+              </td>
+            )}
             <td className="font-semibold text-ink tabular-nums">
               {row.earned}
             </td>
@@ -994,6 +1047,14 @@ export function AssignmentGradebook({ id }: { id: string }) {
       </Table>
       {rows.length === 0 && (
         <p className="mt-3 text-body-sm text-body">No students match.</p>
+      )}
+      {marking && (
+        <QuizMarking
+          key={marking}
+          assignmentId={id}
+          student={marking}
+          onClose={() => setMarking(null)}
+        />
       )}
       {viewing && (
         <StudentCode
@@ -1732,5 +1793,164 @@ function ExtensionControl({
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+interface StudentQuiz {
+  student: { name: string | null; email: string }
+  savedAt: string | null
+  earned: number
+  max: number
+  held: boolean
+  questions: {
+    id: string
+    kind: "single" | "multiple" | "short" | "written"
+    prompt: string
+    options: { id: string; text: string }[]
+    correct: string[]
+    accepted: string[]
+    points: number
+    answer: string[] | string | null
+    earned: number | null
+    needsMarking: boolean
+    byTeacher: boolean
+    automatic: number | null
+  }[]
+}
+
+/** One student's answers: the automatic marks, and a teacher's mark to replace any of them. */
+function QuizMarking({
+  assignmentId,
+  student,
+  onClose,
+}: {
+  assignmentId: string
+  student: string
+  onClose: () => void
+}) {
+  const owner = useOwner()
+  const client = useQueryClient()
+  const path = `${owner.api(`/assignments/${assignmentId}/quiz`)}?student=${encodeURIComponent(student)}`
+  const { data, error } = useQuery({
+    queryKey: ["quiz-marking", path],
+    queryFn: () => api<StudentQuiz>(path),
+  })
+  const [given, setGiven] = useState<Record<string, string>>({})
+  const [message, setMessage] = useState<{ text: string; kind: "ok" | "err" } | null>(null)
+  const save = useMutation({
+    mutationFn: () => {
+      const marks: Record<string, number | null> = {}
+      for (const [id, text] of Object.entries(given)) {
+        marks[id] = text.trim() === "" ? null : Number(text)
+      }
+      return api(owner.api(`/assignments/${assignmentId}/quiz`), {
+        method: "PUT",
+        body: { student, marks },
+      })
+    },
+    onSuccess: () => {
+      setMessage({ text: "Saved.", kind: "ok" })
+      setGiven({})
+      void client.invalidateQueries({ queryKey: ["quiz-marking", path] })
+      void client.invalidateQueries({ queryKey: owner.key("gradebook", assignmentId) })
+    },
+    onError: (e) => setMessage({ text: e.message, kind: "err" }),
+  })
+  const show = (q: StudentQuiz["questions"][number]) => {
+    if (q.answer === null) return "No answer"
+    if (Array.isArray(q.answer)) {
+      return (
+        q.answer
+          .map((id) => q.options.find((o) => o.id === id)?.text ?? id)
+          .join(", ") || "No answer"
+      )
+    }
+    return q.answer.trim() || "No answer"
+  }
+  return (
+    <div data-testid="quiz-marking">
+      <Card className="mt-4 grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-title-sm text-ink">
+            {data ? `${data.student.name ?? data.student.email}: quiz` : "Quiz"}
+            {data && (
+              <span className="ml-2 text-caption tabular-nums">
+                {data.earned} / {data.max}
+              </span>
+            )}
+          </h2>
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+        {!data && <Loading error={error} />}
+        {data?.questions.map((q, index) => (
+          <div key={q.id} className="grid gap-1.5 border-t border-hairline pt-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-body-sm font-semibold text-ink">Q{index + 1}</span>
+              <span className="text-caption">
+                {q.needsMarking
+                  ? "Needs marking"
+                  : q.byTeacher
+                    ? `Marked ${q.earned} (automatic: ${q.automatic ?? "none"})`
+                    : `Automatic: ${q.earned}`}{" "}
+                / {q.points}
+              </span>
+            </div>
+            <div className="text-body-sm text-body">
+              <Markdown text={q.prompt} />
+            </div>
+            <div className="rounded-md bg-canvas-soft p-2 font-sans text-body-sm whitespace-pre-wrap text-ink">
+              {show(q)}
+            </div>
+            {(q.kind === "single" || q.kind === "multiple") && (
+              <p className="text-caption">
+                Right:{" "}
+                {q.correct
+                  .map((id) => q.options.find((o) => o.id === id)?.text ?? id)
+                  .join(", ")}
+              </p>
+            )}
+            {q.kind === "short" && q.accepted.length > 0 && (
+              <p className="text-caption">Accepted: {q.accepted.join(" · ")}</p>
+            )}
+            <label className="flex items-center gap-2 text-caption">
+              Your mark
+              <TextInput
+                type="number"
+                min={0}
+                max={q.points}
+                aria-label={`Mark for Q${index + 1}`}
+                placeholder={q.byTeacher ? String(q.earned) : "automatic"}
+                className="w-24 py-0.5"
+                value={given[q.id] ?? (q.byTeacher ? String(q.earned) : "")}
+                onChange={(event) => {
+                  setGiven((g) => ({ ...g, [q.id]: event.target.value }))
+                  setMessage(null)
+                }}
+              />
+              / {q.points} (empty: automatic)
+            </label>
+          </div>
+        ))}
+        {data && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              disabled={save.isPending || Object.keys(given).length === 0}
+              onClick={() => save.mutate()}
+            >
+              Save marks
+            </Button>
+            {message && <FormMessage message={message} />}
+            {data.held && (
+              <span className="text-caption">
+                Held: the student sees these once you release results.
+              </span>
+            )}
+          </div>
+        )}
+      </Card>
+    </div>
   )
 }

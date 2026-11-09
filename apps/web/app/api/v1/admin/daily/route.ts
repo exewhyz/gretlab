@@ -11,7 +11,9 @@ export const PUT = route(
     body: z.object({
       day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       problemSlug: z.string().nullable(),
+      /** Questions from the platform's bank that mark themselves, in order. */
+      questionIds: z.array(z.uuid()).max(10).default([]),
     }),
   },
-  ({ body }) => scheduleDaily(body.day, body.problemSlug)
+  ({ body }) => scheduleDaily(body.day, body.problemSlug, body.questionIds)
 )

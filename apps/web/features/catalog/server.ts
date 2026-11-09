@@ -3,6 +3,9 @@ import {
   contestParticipants,
   contests,
   dailyChallenges,
+  dailyAnswers,
+  dailyQuestions,
+  questions,
   getDb,
   problemListItems,
   problemLists,
@@ -21,6 +24,7 @@ import {
   earnedBadges,
   findSimilarPairs,
   pickDaily,
+  markQuestion,
   streaks,
 } from "@workspace/judge"
 
@@ -28,9 +32,11 @@ import { ApiError, isStaff, notFound } from "@/lib/api/route"
 import { cached, invalidate } from "@/lib/ttl-cache"
 import { isPublicProblem } from "@/features/problems/server"
 import { slugify } from "@/features/problems/schemas"
+import { marksItself } from "@/features/questions/schemas"
+import { usableQuestions } from "@/features/questions/server"
 import { getSettings, requireFeature } from "@/features/settings/server"
 
-const { and, asc, count, desc, eq, gte, inArray, sql: raw } = sql
+const { and, asc, count, desc, eq, gte, inArray, isNull, sql: raw } = sql
 
 /* ---------- the problem library ---------- */
 
@@ -194,13 +200,25 @@ export async function today() {
   return dayIn((await getSettings())["site.timezone"])
 }
 
+async function dailyRow(day: string) {
+  const [row] = await getDb()
+    .select()
+    .from(dailyChallenges)
+    .where(eq(dailyChallenges.day, day))
+  return row ?? null
+}
+
 async function dailyProblemId(day: string): Promise<string | null> {
   const db = getDb()
-  const [scheduled] = await db
-    .select({ problemId: dailyChallenges.problemId })
-    .from(dailyChallenges)
-    .innerJoin(problems, eq(dailyChallenges.problemId, problems.id))
-    .where(and(eq(dailyChallenges.day, day), isPublicProblem))
+  const row = await dailyRow(day)
+  // A day set to questions alone has no problem.
+  if (row && !row.problemId) return null
+  const [scheduled] = row?.problemId
+    ? await db
+        .select({ problemId: problems.id })
+        .from(problems)
+        .where(and(eq(problems.id, row.problemId), isPublicProblem))
+    : []
   if (scheduled) return scheduled.problemId
   const pool = await cached("daily-pool", 60_000, () =>
     db
@@ -212,48 +230,146 @@ async function dailyProblemId(day: string): Promise<string | null> {
   return pickDaily(day, pool)?.id ?? null
 }
 
+/** Most questions a day can have. */
+export const MAX_DAILY_QUESTIONS = 10
+
+/** The day's questions, in order: the platform's, ready, marking themselves. */
+async function dailyQuestionsOf(day: string) {
+  const rows = await getDb()
+    .select({ question: questions })
+    .from(dailyQuestions)
+    .innerJoin(questions, eq(dailyQuestions.questionId, questions.id))
+    .where(
+      and(
+        eq(dailyQuestions.day, day),
+        isNull(questions.orgId),
+        eq(questions.published, true)
+      )
+    )
+    .orderBy(asc(dailyQuestions.position))
+  return rows.map((r) => r.question).filter((q) => marksItself(q))
+}
+
 export async function getDaily(viewer: User | null) {
   await requireFeature("daily.enabled")
   const day = await today()
-  const problemId = await dailyProblemId(day)
-  if (!problemId) return null
-  const [problem] = await getDb()
-    .select({
-      slug: problems.slug,
-      title: problems.title,
-      level: problems.level,
-    })
-    .from(problems)
-    .where(eq(problems.id, problemId))
-  if (!problem) return null
+  const [problemId, qs] = await Promise.all([dailyProblemId(day), dailyQuestionsOf(day)])
+  if (!problemId && qs.length === 0) return null
+  const [problem] = problemId
+    ? await getDb()
+        .select({
+          slug: problems.slug,
+          title: problems.title,
+          level: problems.level,
+        })
+        .from(problems)
+        .where(eq(problems.id, problemId))
+    : []
   let solvedToday = false
   let streak = 0
+  let answers: (typeof dailyAnswers.$inferSelect)[] = []
   if (viewer) {
     const activity = await activityOf(viewer.id)
-    solvedToday = activity.solvedOn(day, problemId)
+    solvedToday = problemId ? activity.solvedOn(day, problemId) : false
     streak = streaks(activity.days, day).current
+    if (qs.length) {
+      answers = await getDb()
+        .select()
+        .from(dailyAnswers)
+        .where(and(eq(dailyAnswers.day, day), eq(dailyAnswers.userId, viewer.id)))
+    }
   }
-  return { day, ...problem, solvedToday, streak }
+  return {
+    day,
+    // The day's problem, when there is one (kept at the top level for older clients).
+    ...(problem ?? {}),
+    problem: problem ?? null,
+    solvedToday,
+    streak,
+    questions: qs.map((q) => {
+      const answered = answers.find((a) => a.questionId === q.id)
+      return {
+        id: q.id,
+        title: q.title,
+        kind: q.kind,
+        prompt: q.prompt,
+        options: q.options,
+        answer: answered ? { value: answered.answer, correct: answered.correct } : null,
+        // Once answered, the right answer and why.
+        solution: answered
+          ? { correct: q.correct, accepted: q.accepted, explanation: q.explanation }
+          : null,
+      }
+    }),
+  }
 }
 
-export async function scheduleDaily(day: string, problemSlug: string | null) {
+/** A student's one answer to one of today's questions; a right one keeps their streak. */
+export async function answerDaily(
+  viewer: User,
+  questionId: string,
+  answer: string[] | string
+) {
+  await requireFeature("daily.enabled")
+  const day = await today()
+  const q = (await dailyQuestionsOf(day)).find((x) => x.id === questionId)
+  if (!q) throw notFound("That isn't one of today's questions")
+  const correct = markQuestion(q, answer).earned === q.points
+  const [saved] = await getDb()
+    .insert(dailyAnswers)
+    .values({ day, userId: viewer.id, questionId: q.id, answer, correct })
+    .onConflictDoNothing()
+    .returning()
+  if (!saved) {
+    throw new ApiError(409, "already_answered", "You've already answered this question today.")
+  }
+  return { correct, solution: { correct: q.correct, accepted: q.accepted, explanation: q.explanation } }
+}
+
+/**
+ * Sets a day: a problem, questions, or both. With neither, the day goes back to the
+ * automatic problem. Questions must be the platform's and mark themselves.
+ */
+export async function scheduleDaily(
+  day: string,
+  problemSlug: string | null,
+  questionIds: string[] = []
+) {
   const db = getDb()
-  if (!problemSlug) {
+  const ids = [...new Set(questionIds)]
+  if (ids.length > MAX_DAILY_QUESTIONS) {
+    throw new ApiError(400, "too_many", `At most ${MAX_DAILY_QUESTIONS} questions a day.`)
+  }
+  if (!problemSlug && ids.length === 0) {
     await db.delete(dailyChallenges).where(eq(dailyChallenges.day, day))
+    await db.delete(dailyQuestions).where(eq(dailyQuestions.day, day))
     return
   }
-  const [problem] = await db
-    .select({ id: problems.id })
-    .from(problems)
-    .where(eq(problems.slug, problemSlug))
-  if (!problem) throw notFound("Problem not found")
-  await db
-    .insert(dailyChallenges)
-    .values({ day, problemId: problem.id })
-    .onConflictDoUpdate({
-      target: dailyChallenges.day,
-      set: { problemId: problem.id },
-    })
+  let problemId: string | null = null
+  if (problemSlug) {
+    const [problem] = await db
+      .select({ id: problems.id })
+      .from(problems)
+      .where(eq(problems.slug, problemSlug))
+    if (!problem) throw notFound("Problem not found")
+    problemId = problem.id
+  }
+  const usable = await usableQuestions(ids, null, true)
+  if (usable.some((q) => q.orgId !== null)) {
+    throw new ApiError(400, "private_question", "The daily challenge uses the platform's questions.")
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(dailyChallenges)
+      .values({ day, problemId })
+      .onConflictDoUpdate({ target: dailyChallenges.day, set: { problemId } })
+    await tx.delete(dailyQuestions).where(eq(dailyQuestions.day, day))
+    if (ids.length) {
+      await tx
+        .insert(dailyQuestions)
+        .values(ids.map((questionId, position) => ({ day, questionId, position })))
+    }
+  })
 }
 
 export async function getDailySchedule(days: number) {
@@ -262,19 +378,32 @@ export async function getDailySchedule(days: number) {
   const schedule = []
   for (let offset = 0; offset < days; offset++) {
     const day = dayIn(timezone, new Date(start.getTime() + offset * 86_400_000))
-    const [row] = await getDb()
-      .select({ slug: problems.slug, title: problems.title })
-      .from(dailyChallenges)
-      .innerJoin(problems, eq(dailyChallenges.problemId, problems.id))
-      .where(eq(dailyChallenges.day, day))
-    const automatic = row ? null : await dailyProblemId(day)
+    const set = await dailyRow(day)
+    const [row] = set?.problemId
+      ? await getDb()
+          .select({ slug: problems.slug, title: problems.title })
+          .from(problems)
+          .where(eq(problems.id, set.problemId))
+      : []
+    const dayQuestions = await getDb()
+      .select({ id: questions.id, title: questions.title })
+      .from(dailyQuestions)
+      .innerJoin(questions, eq(dailyQuestions.questionId, questions.id))
+      .where(eq(dailyQuestions.day, day))
+      .orderBy(asc(dailyQuestions.position))
+    const automatic = set ? null : await dailyProblemId(day)
     const [auto] = automatic
       ? await getDb()
           .select({ slug: problems.slug, title: problems.title })
           .from(problems)
           .where(eq(problems.id, automatic))
       : []
-    schedule.push({ day, scheduled: row ?? null, automatic: auto ?? null })
+    schedule.push({
+      day,
+      scheduled: row ?? null,
+      questions: dayQuestions,
+      automatic: auto ?? null,
+    })
   }
   return schedule
 }
@@ -312,6 +441,12 @@ async function activityOf(userId: string) {
       acceptedOn.add(`${day}|${row.problemId}`)
     }
   }
+  // A right answer to the day's question keeps the streak too.
+  const answeredRight = await getDb()
+    .select({ day: dailyAnswers.day })
+    .from(dailyAnswers)
+    .where(and(eq(dailyAnswers.userId, userId), eq(dailyAnswers.correct, true)))
+  for (const a of answeredRight) days.add(a.day)
   return {
     days,
     perDay,

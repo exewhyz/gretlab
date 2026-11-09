@@ -2,6 +2,9 @@ import {
   assignmentProblems,
   courseOutcomes,
   assignmentExtensions,
+  assignmentQuestions,
+  questions as questionBank,
+  quizResponses,
   examEvents,
   examSessions,
   rubricMarks,
@@ -28,6 +31,7 @@ import {
   rubricEarned,
   rubricTotal,
   extendedDue,
+  markQuestion,
   personalDue,
   type Extension,
   duringSitting,
@@ -40,6 +44,7 @@ import {
 
 import { draftHistory, latestDraft } from "@/features/drafts/server"
 import { notify } from "@/features/notifications/server"
+import { usableQuestions } from "@/features/questions/server"
 import { extendSitting } from "@/features/exams/server"
 import {
   dbNow,
@@ -65,7 +70,7 @@ import { getSettings, requireFeature } from "@/features/settings/server"
 
 import type { AssignmentInput } from "../problems/schemas"
 
-const { and, asc, desc, eq, gte, inArray, isNull, ne } = sql
+const { and, asc, desc, eq, gte, inArray, isNull, ne, notInArray } = sql
 
 export type AssignmentPhase = "upcoming" | "open" | "late" | "closed"
 
@@ -196,6 +201,38 @@ function grade(
   }
 }
 
+type Question = Awaited<ReturnType<typeof questionsOf>>[number]
+type QuizResponse = typeof quizResponses.$inferSelect
+
+/** A student's quiz marks: each question, the total, and how many wait for the teacher. */
+function gradeQuiz(questions: Question[], response?: QuizResponse) {
+  const per = questions.map((q) => ({
+    questionId: q.id,
+    ...markQuestion(q, response?.answers[q.id], response?.marks[q.id]),
+  }))
+  return {
+    per,
+    earned: round(per.reduce((t, m) => t + (m.earned ?? 0), 0)),
+    max: questions.reduce((t, q) => t + q.points, 0),
+    needsMarking: per.filter((m) => m.needsMarking).length,
+  }
+}
+
+/**
+ * When a student sees their quiz marks and the right answers: once their time is up (an
+ * exam: their sitting ended), unless the teacher holds results to release them later.
+ */
+function quizResultsOut(
+  assignment: Assignment,
+  now: Date,
+  extension?: Extension,
+  sitting?: Sitting
+) {
+  if (assignment.holdFeedback) return false
+  if (assignment.exam && sitting) return now >= sittingClosesAt(sitting)
+  return now > personalDue(assignment.dueAt, extension)
+}
+
 /** Extensions on these assignments, for one student or everyone, by assignment then student. */
 export async function extensionsOn(assignmentIds: string[], userId?: string) {
   const byAssignment = new Map<string, Map<string, Extension & { reason: string }>>()
@@ -317,10 +354,18 @@ export async function listAssignments(viewer: User) {
       viewer.id
     ),
   ])
-  const extensions = await extensionsOn(
-    rows.map((a) => a.id),
-    viewer.id
-  )
+  const [extensions, allQuestions, responses] = await Promise.all([
+    extensionsOn(
+      rows.map((a) => a.id),
+      viewer.id
+    ),
+    questionsOf(rows.map((a) => a.id)),
+    responsesOn(
+      rows.map((a) => a.id),
+      viewer.id
+    ),
+  ])
+  const now = new Date()
 
   return rows.map((assignment) => {
     const own = items.filter((i) => i.assignmentId === assignment.id)
@@ -337,8 +382,17 @@ export async function listAssignments(viewer: User) {
       sittings.get(assignment.id)?.get(viewer.id),
       extension
     )
+    const questions = allQuestions.filter((q) => q.assignmentId === assignment.id)
+    const quiz = gradeQuiz(questions, responses.get(assignment.id)?.get(viewer.id))
+    const quizOut = quizResultsOut(
+      assignment,
+      now,
+      extension,
+      sittings.get(assignment.id)?.get(viewer.id)
+    )
     return {
       exam: Boolean(assignment.exam),
+      questionCount: questions.length,
       slug: assignment.slug,
       title: assignment.title,
       org: orgOf.get(assignment.id) ?? null,
@@ -351,10 +405,83 @@ export async function listAssignments(viewer: User) {
       phase: phaseOf(mine),
       problemCount: own.length,
       solved,
-      earned,
-      total,
+      earned: round(earned + (quizOut ? quiz.earned : 0)),
+      total: total + quiz.max,
     }
   })
+}
+
+/** Whether a student can still change their answers: open, before their time is up. */
+function quizAnswersOpen(
+  assignment: Assignment,
+  now: Date,
+  extension?: Extension,
+  sitting?: Sitting
+) {
+  if (now < assignment.opensAt) return false
+  if (assignment.exam) return Boolean(sitting) && now < sittingClosesAt(sitting!)
+  return now <= personalDue(assignment.dueAt, extension)
+}
+
+/**
+ * A student's answers, saved as they type. They can change them until their time is up
+ * (an exam: during their sitting); whatever is saved then counts.
+ */
+export async function saveQuizAnswers(
+  slug: string,
+  viewer: User,
+  answers: Record<string, string[] | string>
+) {
+  await requireFeature("assignments.enabled")
+  const { assignment } = await findAssignment(slug, viewer)
+  const now = await dbNow()
+  const [extension, sitting, questions] = await Promise.all([
+    extensionsOn([assignment.id], viewer.id).then((m) =>
+      m.get(assignment.id)?.get(viewer.id)
+    ),
+    assignment.exam
+      ? sittingsOn([assignment.id], viewer.id).then((m) =>
+          m.get(assignment.id)?.get(viewer.id)
+        )
+      : Promise.resolve(undefined),
+    questionsOf([assignment.id]),
+  ])
+  if (!quizAnswersOpen(assignment, now, extension, sitting)) {
+    throw new ApiError(
+      403,
+      "answers_closed",
+      assignment.exam && !sitting
+        ? "Start the exam to answer."
+        : "Answers can't be changed any more."
+    )
+  }
+  const clean: Record<string, string[] | string> = {}
+  for (const [questionId, answer] of Object.entries(answers)) {
+    const q = questions.find((x) => x.id === questionId)
+    if (!q) throw new ApiError(400, "unknown_question", "That question isn't here.")
+    if (q.kind === "single" || q.kind === "multiple") {
+      const ids = Array.isArray(answer) ? answer : [answer]
+      const valid = q.options.map((o) => o.id)
+      if (ids.some((id) => !valid.includes(id)) || (q.kind === "single" && ids.length > 1)) {
+        throw new ApiError(400, "bad_answer", "Choose from the options.")
+      }
+      clean[questionId] = [...new Set(ids)]
+    } else {
+      const text = Array.isArray(answer) ? answer.join("\n") : answer
+      if (text.length > 20_000) {
+        throw new ApiError(400, "too_long", "That answer is too long.")
+      }
+      clean[questionId] = text
+    }
+  }
+  await getDb()
+    .insert(quizResponses)
+    .values({ assignmentId: assignment.id, userId: viewer.id, answers: clean, updatedAt: now })
+    .onConflictDoUpdate({
+      target: [quizResponses.assignmentId, quizResponses.userId],
+      set: { answers: clean, updatedAt: now },
+    })
+  return { savedAt: now }
 }
 
 export async function getAssignment(slug: string, viewer: User) {
@@ -395,6 +522,16 @@ export async function getAssignment(slug: string, viewer: User) {
     sitting,
     extension
   )
+  const [questions, response] = visible
+    ? await Promise.all([
+        questionsOf([assignment.id]),
+        responsesOn([assignment.id], viewer.id).then((r) =>
+          r.get(assignment.id)?.get(viewer.id)
+        ),
+      ])
+    : [[], undefined]
+  const quiz = gradeQuiz(questions, response)
+  const quizOut = quizResultsOut(assignment, examNow, extension, sitting)
 
   return {
     slug: assignment.slug,
@@ -418,8 +555,8 @@ export async function getAssignment(slug: string, viewer: User) {
     allowLate: assignment.allowLate,
     latePenaltyPercent: assignment.latePenaltyPercent,
     phase,
-    earned,
-    total,
+    earned: round(earned + (quizOut ? quiz.earned : 0)),
+    total: total + quiz.max,
     solved,
     /** The classes it's for, linked. */
     classes,
@@ -442,8 +579,33 @@ export async function getAssignment(slug: string, viewer: User) {
     })),
     /** Rubric marks and line comments wait until the teacher releases them. */
     feedbackHeld: assignment.holdFeedback,
+    /** Quiz questions with this student's answers; marks and right answers once results are out. */
+    questions: questions.map((q, index) => {
+      const mark = quiz.per[index]!
+      return {
+        id: q.id,
+        kind: q.kind,
+        prompt: q.prompt,
+        options: q.options,
+        points: q.points,
+        answer: response?.answers[q.id] ?? null,
+        result: quizOut
+          ? {
+              earned: mark.earned,
+              needsMarking: mark.needsMarking,
+              correct: q.correct,
+              accepted: q.accepted,
+              explanation: q.explanation,
+            }
+          : null,
+      }
+    }),
+    /** Whether answers can still be changed now. */
+    answersOpen: quizAnswersOpen(assignment, examNow, extension, sitting),
+    quizResultsOut: quizOut,
     /** How many problems, so an exam can say so before it starts. */
     problemCount: visible ? items.length : await countProblems(assignment.id),
+    questionCount: visible ? questions.length : (await questionsOf([assignment.id])).length,
     exam: assignment.exam
       ? {
           minutes: assignment.exam.minutes,
@@ -638,7 +800,7 @@ export async function getAssignmentForStaff(id: string, orgId: string | null) {
     .from(assignments)
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
   if (!assignment) throw notFound("Assignment not found")
-  const items = await itemsOf([id])
+  const [items, questions] = await Promise.all([itemsOf([id]), questionsOf([id])])
   return {
     ...assignment,
     problems: items.map(({ problemId, points, rubric, outcomes }) => ({
@@ -647,7 +809,51 @@ export async function getAssignmentForStaff(id: string, orgId: string | null) {
       rubric,
       outcomes,
     })),
+    questions: questions.map((q) => ({ questionId: q.id, points: q.points })),
   }
+}
+
+/** Quiz questions of these assignments, in order, with their points there. */
+export function questionsOf(assignmentIds: string[]) {
+  if (assignmentIds.length === 0) return Promise.resolve([])
+  return getDb()
+    .select({
+      assignmentId: assignmentQuestions.assignmentId,
+      id: questionBank.id,
+      title: questionBank.title,
+      kind: questionBank.kind,
+      prompt: questionBank.prompt,
+      options: questionBank.options,
+      correct: questionBank.correct,
+      accepted: questionBank.accepted,
+      explanation: questionBank.explanation,
+      points: assignmentQuestions.points,
+    })
+    .from(assignmentQuestions)
+    .innerJoin(questionBank, eq(assignmentQuestions.questionId, questionBank.id))
+    .where(inArray(assignmentQuestions.assignmentId, assignmentIds))
+    .orderBy(asc(assignmentQuestions.position))
+}
+
+/** Students' answers on these assignments, for one student or everyone, by assignment then student. */
+export async function responsesOn(assignmentIds: string[], userId?: string) {
+  const out = new Map<string, Map<string, typeof quizResponses.$inferSelect>>()
+  if (assignmentIds.length === 0) return out
+  const rows = await getDb()
+    .select()
+    .from(quizResponses)
+    .where(
+      and(
+        inArray(quizResponses.assignmentId, assignmentIds),
+        userId ? eq(quizResponses.userId, userId) : undefined
+      )
+    )
+  for (const row of rows) {
+    const own = out.get(row.assignmentId) ?? new Map()
+    own.set(row.userId, row)
+    out.set(row.assignmentId, own)
+  }
+  return out
 }
 
 export async function saveAssignment(
@@ -655,7 +861,7 @@ export async function saveAssignment(
   input: AssignmentInput,
   orgId: string | null
 ) {
-  const { problems: chosen, expectedUpdatedAt, ...fields } = input
+  const { problems: chosen, expectedUpdatedAt, questions, ...fields } = input
   const ids = chosen.map((c) => c.problemId)
   const found = await getDb()
     .select({
@@ -717,6 +923,10 @@ export async function saveAssignment(
       )
     }
   }
+  await usableQuestions(
+    questions.map((q) => q.questionId),
+    orgId
+  )
   if (id) await guardStartedExam(id, input)
   const wasPublished = id
     ? ((
@@ -754,16 +964,32 @@ export async function saveAssignment(
     await tx
       .delete(assignmentProblems)
       .where(eq(assignmentProblems.assignmentId, assignment.id))
-    await tx.insert(assignmentProblems).values(
-      chosen.map((item, position) => ({
-        assignmentId: assignment.id,
-        problemId: item.problemId,
-        points: item.points,
-        rubric: item.rubric,
-        outcomes: item.outcomes,
-        position,
-      }))
-    )
+    if (chosen.length) {
+      await tx.insert(assignmentProblems).values(
+        chosen.map((item, position) => ({
+          assignmentId: assignment.id,
+          problemId: item.problemId,
+          points: item.points,
+          rubric: item.rubric,
+          outcomes: item.outcomes,
+          position,
+        }))
+      )
+    }
+    // Answers are kept by bank question, so they stay with a question across edits.
+    await tx
+      .delete(assignmentQuestions)
+      .where(eq(assignmentQuestions.assignmentId, assignment.id))
+    if (questions.length) {
+      await tx.insert(assignmentQuestions).values(
+        questions.map((q, position) => ({
+          assignmentId: assignment.id,
+          questionId: q.questionId,
+          points: q.points,
+          position,
+        }))
+      )
+    }
     return assignment
   })
   // Students hear about it when it's first published.
@@ -776,7 +1002,12 @@ export async function saveAssignment(
         title: `${saved.exam ? "New exam" : "New assignment"}: ${saved.title}`,
         body: saved.exam
           ? "Read its rules before you start: one sitting, timed."
-          : `${chosen.length} ${chosen.length === 1 ? "problem" : "problems"}. Open it to see when it's due.`,
+          : `${[
+              chosen.length && `${chosen.length} ${chosen.length === 1 ? "problem" : "problems"}`,
+              questions.length && `${questions.length} ${questions.length === 1 ? "question" : "questions"}`,
+            ]
+              .filter(Boolean)
+              .join(" and ")}. Open it to see when it's due.`,
         href: `/assignments/${saved.slug}`,
       }
     )
@@ -811,6 +1042,15 @@ async function guardStartedExam(id: string, input: AssignmentInput) {
       409,
       "exam_started",
       "Students have started this exam, so its problems can't change. Points and rubrics can."
+    )
+  }
+  const asked = (await questionsOf([id])).map((q) => q.id)
+  const asking = input.questions.map((q) => q.questionId)
+  if (asked.length !== asking.length || asked.some((q, i) => q !== asking[i])) {
+    throw new ApiError(
+      409,
+      "exam_started",
+      "Students have started this exam, so its questions can't be added, removed or reordered."
     )
   }
 }
@@ -896,6 +1136,7 @@ export interface GradebookRow {
   late: number
   exam: (ReturnType<typeof presentSitting> & { warnings: number }) | null
   extension: { dueAt: Date; problemIds: readonly string[]; reason: string } | null
+  quiz: { earned: number; max: number; answered: boolean; needsMarking: number } | null
 }
 
 /** The people an assignment is for: everyone's students, or an organization's audience. */
@@ -995,6 +1236,10 @@ export async function getGradebook(
     ? await Promise.all([sittingsOn([id]), warningCounts(id)])
     : [new Map<string, Map<string, Sitting>>(), new Map<string, number>()]
   const extensions = (await extensionsOn([id])).get(id)
+  const [questions, responses] = await Promise.all([
+    questionsOf([id]),
+    responsesOn([id]).then((r) => r.get(id)),
+  ])
 
   const rows: GradebookRow[] = students.map((student) => {
     const { cells, earned } = grade(
@@ -1006,7 +1251,18 @@ export async function getGradebook(
       extensions?.get(student.id)
     )
     const extension = extensions?.get(student.id)
+    const response = responses?.get(student.id)
+    const quiz = gradeQuiz(questions, response)
     return {
+      /** Teachers see quiz marks at once, held or not. */
+      quiz: questions.length
+        ? {
+            earned: quiz.earned,
+            max: quiz.max,
+            answered: Boolean(response),
+            needsMarking: quiz.needsMarking,
+          }
+        : null,
       extension: extension
         ? {
             dueAt: extension.dueAt,
@@ -1024,16 +1280,15 @@ export async function getGradebook(
       email: student.email,
       handle: student.handle,
       cells,
-      earned,
+      earned: round(earned + quiz.earned),
       late: cells.filter((c) => c.status === "late").length,
     }
   })
-  const total = items.reduce(
-    (sum, i) => sum + i.points + rubricTotal(i.rubric),
-    0
-  )
-  const started = rows.filter((r) =>
-    r.cells.some((c) => c.status !== "missing")
+  const total =
+    items.reduce((sum, i) => sum + i.points + rubricTotal(i.rubric), 0) +
+    questions.reduce((sum, q) => sum + q.points, 0)
+  const started = rows.filter(
+    (r) => r.cells.some((c) => c.status !== "missing") || r.quiz?.answered
   )
 
   return {
@@ -1045,6 +1300,10 @@ export async function getGradebook(
       phase: phaseOf(assignment),
       holdFeedback: assignment.holdFeedback,
       exam: assignment.exam,
+      /** The quiz part, when there is one. */
+      quiz: questions.length
+        ? { questions: questions.length, points: questions.reduce((t, q) => t + q.points, 0) }
+        : null,
     },
     problems: items.map(({ problemId, slug, title, points, rubric, outcomes }) => ({
       problemId,
@@ -1089,6 +1348,96 @@ async function gradebookStudent(
   )
   if (!item || !student) throw notFound("Not in this gradebook")
   return { assignment, item, student }
+}
+
+/** One student's answers to the quiz, with the automatic marks, for marking. */
+export async function studentQuiz(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string>,
+  email: string
+) {
+  const [assignment] = await getDb()
+    .select()
+    .from(assignments)
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+  if (!assignment) throw notFound("Assignment not found")
+  const student = (await studentsOf(assignment, scope)).find((s) => s.email === email)
+  if (!student) throw notFound("Not in this gradebook")
+  const [questions, response] = await Promise.all([
+    questionsOf([id]),
+    responsesOn([id], student.id).then((r) => r.get(id)?.get(student.id)),
+  ])
+  const quiz = gradeQuiz(questions, response)
+  return {
+    student: { name: student.name, email: student.email },
+    savedAt: response?.updatedAt ?? null,
+    earned: quiz.earned,
+    max: quiz.max,
+    held: assignment.holdFeedback,
+    questions: questions.map((q, index) => ({
+      id: q.id,
+      kind: q.kind,
+      prompt: q.prompt,
+      options: q.options,
+      correct: q.correct,
+      accepted: q.accepted,
+      points: q.points,
+      answer: response?.answers[q.id] ?? null,
+      ...quiz.per[index]!,
+      /** What it would earn without the teacher's mark. */
+      automatic: markQuestion(q, response?.answers[q.id]).earned,
+    })),
+  }
+}
+
+/** Teacher marks on a student's answers; null takes a mark back to the automatic one. */
+export async function setQuizMarks(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string>,
+  input: { student: string; marks: Record<string, number | null> }
+) {
+  const [assignment] = await getDb()
+    .select()
+    .from(assignments)
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+  if (!assignment) throw notFound("Assignment not found")
+  const student = (await studentsOf(assignment, scope)).find(
+    (s) => s.email === input.student
+  )
+  if (!student) throw notFound("Not in this gradebook")
+  const questions = await questionsOf([id])
+  const current =
+    (await responsesOn([id], student.id)).get(id)?.get(student.id)?.marks ?? {}
+  const next = { ...current }
+  for (const [questionId, mark] of Object.entries(input.marks)) {
+    const q = questions.find((x) => x.id === questionId)
+    if (!q) throw new ApiError(400, "unknown_question", "That question isn't here.")
+    if (mark === null) {
+      delete next[questionId]
+      continue
+    }
+    if (mark < 0 || mark > q.points) {
+      throw new ApiError(400, "out_of_range", `Marks for that question are 0 to ${q.points}.`)
+    }
+    next[questionId] = mark
+  }
+  await getDb()
+    .insert(quizResponses)
+    .values({ assignmentId: id, userId: student.id, marks: next })
+    .onConflictDoUpdate({
+      target: [quizResponses.assignmentId, quizResponses.userId],
+      set: { marks: next },
+    })
+  if (!assignment.holdFeedback) {
+    await notify([student.id], {
+      kind: "marks",
+      title: `Your teacher marked your answers in ${assignment.title}`,
+      href: `/assignments/${assignment.slug}`,
+    })
+  }
+  return { marks: next }
 }
 
 /**
@@ -1370,12 +1719,16 @@ export async function releaseFeedback(id: string, orgId: string | null) {
       .innerJoin(submissions, eq(submissionComments.submissionId, submissions.id))
       .where(eq(submissionComments.assignmentId, id)),
   ])
+  const answered = await getDb()
+    .select({ userId: quizResponses.userId })
+    .from(quizResponses)
+    .where(eq(quizResponses.assignmentId, id))
   await notify(
-    [...marked, ...commented].map((r) => r.userId),
+    [...marked, ...commented, ...answered].map((r) => r.userId),
     {
       kind: "feedback",
-      title: `Feedback on ${updated[0]!.title} is ready`,
-      body: "Rubric marks and comments on your code.",
+      title: `Results of ${updated[0]!.title} are out`,
+      body: "Your marks, the right answers and your teacher's comments.",
       href: `/assignments/${updated[0]!.slug}`,
     }
   )
@@ -1481,6 +1834,7 @@ export async function gradebookCsv(
     "Email",
     "Handle",
     ...book.problems.map((p) => `${p.title} (${p.points})`),
+    ...(book.assignment.quiz ? [`Quiz (${book.assignment.quiz.points})`] : []),
     `Total (${book.total})`,
     "Problems late",
     ...(book.assignment.exam ? ["Exam", "Exam warnings"] : []),
@@ -1492,6 +1846,7 @@ export async function gradebookCsv(
       row.email,
       row.handle,
       ...row.cells.map((c) => c.earned),
+      ...(book.assignment.quiz ? [row.quiz?.earned ?? 0] : []),
       row.earned,
       row.late,
       ...(row.exam

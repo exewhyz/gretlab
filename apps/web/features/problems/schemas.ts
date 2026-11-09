@@ -3,6 +3,25 @@ import { z } from "zod"
 
 import { expectedUpdatedAt } from "@/lib/api/version"
 
+/** Bank questions chosen for an assignment or contest, in order, with their points there. */
+export const chosenQuestions = z
+  .array(
+    z.object({
+      questionId: z.uuid(),
+      points: z
+        .number({ error: "Enter the points" })
+        .int()
+        .min(1, "At least 1 point")
+        .max(1000, "At most 1000 points"),
+    })
+  )
+  .max(100, "At most 100 questions")
+  .refine(
+    (items) => new Set(items.map((i) => i.questionId)).size === items.length,
+    "A question is listed twice"
+  )
+  .default([])
+
 /** A readable address from a title: "Midterm 2026!" becomes "midterm-2026". */
 export function slugify(title: string) {
   return title
@@ -103,12 +122,15 @@ export const contestInputSchema = z
       .max(100_000),
     published: z.boolean(),
     registrationOpen: z.boolean(),
-    problemIds: z
-      .array(z.uuid())
-      .min(1, "Add at least one problem")
-      .max(26, "At most 26 problems"),
+    problemIds: z.array(z.uuid()).max(26, "At most 26 problems"),
+    /** Quiz questions from the bank (ones that mark themselves), answered once each. */
+    questions: chosenQuestions,
     /** Organization groups it's for. Ignored for platform contests. */
     audience: audienceSchema,
+  })
+  .refine((c) => c.problemIds.length + c.questions.length > 0, {
+    message: "Add at least one problem or question",
+    path: ["problemIds"],
   })
   .refine((contest) => contest.endsAt > contest.startsAt, {
     message: "The contest must end after it starts",
@@ -205,13 +227,18 @@ export const assignmentInputSchema = z
           outcomes: z.array(z.uuid()).max(20).default([]),
         })
       )
-      .min(1, "Add at least one problem")
       .max(50, "At most 50 problems")
       .refine(
         (items) => new Set(items.map((i) => i.problemId)).size === items.length,
         "A problem is listed twice"
       ),
+    /** Quiz questions from the bank, beside or instead of the problems. */
+    questions: chosenQuestions,
     audience: audienceSchema,
+  })
+  .refine((a) => a.problems.length + a.questions.length > 0, {
+    message: "Add at least one problem or question",
+    path: ["problems"],
   })
   .refine((a) => a.dueAt > a.opensAt, {
     message: "The due time must be after it opens",

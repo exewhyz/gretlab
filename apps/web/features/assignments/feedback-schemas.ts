@@ -37,3 +37,15 @@ export const extensionSchema = z.object({
   problemIds: z.array(z.uuid()).max(50).default([]),
   reason: z.string().trim().max(500).default(""),
 })
+
+export const quizAnswersSchema = z.object({
+  answers: z.record(
+    z.uuid(),
+    z.union([z.array(z.string().max(20)).max(10), z.string().max(20_000)])
+  ),
+})
+
+export const quizMarksSchema = z.object({
+  student: z.email(),
+  marks: z.record(z.uuid(), z.number().min(0).max(1000).nullable()),
+})

@@ -226,6 +226,7 @@ export function ExamPanel({
   title,
   exam,
   problemCount,
+  questionCount = 0,
   dueAt,
   phase,
 }: {
@@ -241,6 +242,7 @@ export function ExamPanel({
     now: string
   }
   problemCount: number
+  questionCount?: number
   dueAt: string
   phase: "upcoming" | "open" | "late" | "closed"
 }) {
@@ -268,7 +270,13 @@ export function ExamPanel({
   }
 
   const rules = [
-    `${problemCount} ${problemCount === 1 ? "problem" : "problems"}`,
+    [
+      problemCount > 0 && `${problemCount} ${problemCount === 1 ? "problem" : "problems"}`,
+      questionCount > 0 &&
+        `${questionCount} ${questionCount === 1 ? "question" : "questions"}`,
+    ]
+      .filter(Boolean)
+      .join(" and "),
     exam.minutes
       ? `${exam.minutes} minutes from when you start (ends by ${formatDateTime(dueAt)} at the latest)`
       : `until ${formatDateTime(dueAt)}`,

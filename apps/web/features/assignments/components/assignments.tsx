@@ -14,6 +14,7 @@ import { ClassChips } from "@/features/classes/components/class-chips"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 import { ExamPanel, type SittingView } from "@/features/exams/components/exam"
+import { QuizSection, type QuizQuestionView } from "./quiz"
 
 export type AssignmentPhase = "upcoming" | "open" | "late" | "closed"
 export type GradeStatus =
@@ -21,6 +22,7 @@ export type GradeStatus =
 
 interface AssignmentSummary {
   exam: boolean
+  questionCount: number
   slug: string
   title: string
   org: { name: string; slug: string } | null
@@ -64,7 +66,11 @@ interface AssignmentDetail {
   }[]
   feedbackHeld: boolean
   extension: { dueAt: string; problems: string[]; whole: boolean } | null
+  questions: QuizQuestionView[]
+  answersOpen: boolean
+  quizResultsOut: boolean
   problemCount: number
+  questionCount: number
   exam: {
     minutes: number | null
     fullscreen: boolean
@@ -200,7 +206,13 @@ export function AssignmentList() {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <Progress earned={a.earned} total={a.total} />
           <span className="text-caption text-body">
-            {a.solved} of {a.problemCount} problems solved
+            {[
+              a.problemCount > 0 && `${a.solved} of ${a.problemCount} problems solved`,
+              a.questionCount > 0 &&
+                `${a.questionCount} ${a.questionCount === 1 ? "question" : "questions"}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </div>
       )}
@@ -280,6 +292,7 @@ export function AssignmentView({ slug }: { slug: string }) {
           title={data.title}
           exam={data.exam}
           problemCount={data.problemCount}
+          questionCount={data.questionCount}
           dueAt={data.dueAt}
           phase={data.phase}
         />
@@ -301,6 +314,7 @@ export function AssignmentView({ slug }: { slug: string }) {
                 " Your teacher's rubric marks and comments appear once they release them."}
             </span>
           </div>
+          {data.problems.length > 0 && (
           <Table headers={["Problem", "Difficulty", "Status", "Points"]}>
             {data.problems.map((problem) => (
               <tr key={problem.slug} data-testid="assignment-problem">
@@ -341,6 +355,17 @@ export function AssignmentView({ slug }: { slug: string }) {
               </tr>
             ))}
           </Table>
+          )}
+          {data.questions.length > 0 && (
+            <QuizSection
+              key={`${data.answersOpen}-${data.quizResultsOut}`}
+              slug={data.slug}
+              questions={data.questions}
+              open={data.answersOpen}
+              resultsOut={data.quizResultsOut}
+              held={data.feedbackHeld}
+            />
+          )}
         </>
       )}
     </>

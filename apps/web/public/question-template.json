@@ -1,0 +1,39 @@
+{
+  "format": "gretlab-questions",
+  "version": 1,
+  "questions": [
+    {
+      "title": "Keyword for a function",
+      "kind": "single",
+      "question": "Which keyword starts a function definition in Python?",
+      "options": ["func", "def", "function", "lambda"],
+      "answer": "B",
+      "explanation": "`def` starts a function; `lambda` makes a small anonymous one.",
+      "points": 1,
+      "tags": ["python", "functions"]
+    },
+    {
+      "title": "Mutable types",
+      "kind": "multiple",
+      "question": "Which of these are mutable?",
+      "options": ["list", "tuple", "dict", "str"],
+      "answer": ["A", "C"],
+      "points": 2,
+      "tags": ["python"]
+    },
+    {
+      "title": "Merge sort complexity",
+      "kind": "short",
+      "question": "What is the time complexity of merge sort?",
+      "accepted": ["O(n log n)", "n log n"],
+      "explanation": "It halves the list log n times and merges n items at each level.",
+      "points": 2
+    },
+    {
+      "title": "Recursion",
+      "kind": "written",
+      "question": "Explain recursion with an example of your own.",
+      "points": 5
+    }
+  ]
+}

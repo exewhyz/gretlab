@@ -31,7 +31,7 @@ import type { ProblemInput } from "./schemas"
 import { readProblemFile, slugFor, toProblemInput } from "./import"
 import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
 
-const { and, asc, count, eq, gt, inArray, isNull, lte, or } = sql
+const { and, asc, count, desc, eq, gt, inArray, isNull, lte, or } = sql
 
 export interface ProblemSummary {
   id: string
@@ -389,6 +389,139 @@ export async function createUnit(name: string) {
     .values({ name, position: (last?.position ?? -1) + 1 })
     .returning()
   return unit
+}
+
+/*
+ * Units: the platform's course outline (Unit 1 · Basics, …), in order, each with its
+ * problems in the order the library shows them. Organizations' problems stand alone.
+ */
+
+export async function listUnitsForStaff() {
+  const db = getDb()
+  const [unitRows, problemRows] = await Promise.all([
+    db.select().from(units).orderBy(asc(units.position), asc(units.name)),
+    db
+      .select({
+        id: problems.id,
+        slug: problems.slug,
+        title: problems.title,
+        published: problems.published,
+        unitId: problems.unitId,
+      })
+      .from(problems)
+      .where(isNull(problems.orgId))
+      .orderBy(asc(problems.position), asc(problems.slug)),
+  ])
+  return {
+    units: unitRows.map((u) => ({
+      ...u,
+      problems: problemRows.filter((p) => p.unitId === u.id),
+    })),
+    /** Platform problems in no unit. */
+    unplaced: problemRows.filter((p) => !p.unitId).length,
+    /** Every platform problem with its unit, for adding problems to a unit. */
+    problems: problemRows,
+  }
+}
+
+async function unitOrThrow(id: string) {
+  const [unit] = await getDb().select().from(units).where(eq(units.id, id))
+  if (!unit) throw notFound("Unit not found")
+  return unit
+}
+
+export async function renameUnit(id: string, name: string) {
+  await unitOrThrow(id)
+  await getDb().update(units).set({ name }).where(eq(units.id, id))
+  refreshCatalog()
+  refreshPublicPages()
+}
+
+/** Units in this order; every unit must be listed once. */
+export async function reorderUnits(ids: string[]) {
+  const all = await getDb().select({ id: units.id }).from(units)
+  if (ids.length !== all.length || all.some((u) => !ids.includes(u.id))) {
+    throw new ApiError(400, "bad_order", "List every unit once.")
+  }
+  await getDb().transaction(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx.update(units).set({ position }).where(eq(units.id, id))
+    }
+  })
+  refreshCatalog()
+  refreshPublicPages()
+}
+
+/**
+ * A unit's problems: exactly these, in this order. Listed problems join it (from wherever
+ * they were); its problems left out go where `moves` says, or to no unit. One transaction.
+ */
+export async function setUnitProblems(
+  id: string,
+  problemIds: string[],
+  moves: Record<string, string | null> = {}
+) {
+  await unitOrThrow(id)
+  const wanted = [...new Set(problemIds)]
+  const db = getDb()
+  const platform = wanted.length
+    ? await db
+        .select({ id: problems.id })
+        .from(problems)
+        .where(and(inArray(problems.id, wanted), isNull(problems.orgId)))
+    : []
+  if (platform.length !== wanted.length) {
+    throw new ApiError(400, "unknown_problem", "Only the platform's problems go in units.")
+  }
+  const targets = [...new Set(Object.values(moves).filter((u): u is string => Boolean(u)))]
+  for (const target of targets) {
+    if (target === id) throw new ApiError(400, "bad_target", "Pick a different unit.")
+    await unitOrThrow(target)
+  }
+  const current = await db
+    .select({ id: problems.id })
+    .from(problems)
+    .where(and(eq(problems.unitId, id), isNull(problems.orgId)))
+  const leaving = current.filter((p) => !wanted.includes(p.id))
+  await db.transaction(async (tx) => {
+    for (const [position, problemId] of wanted.entries()) {
+      await tx
+        .update(problems)
+        .set({ unitId: id, position })
+        .where(eq(problems.id, problemId))
+    }
+    for (const p of leaving) {
+      const target = moves[p.id] ?? null
+      // Arriving at the end of the unit it moves to.
+      const [last] = target
+        ? await tx
+            .select({ position: problems.position })
+            .from(problems)
+            .where(eq(problems.unitId, target))
+            .orderBy(desc(problems.position))
+            .limit(1)
+        : []
+      await tx
+        .update(problems)
+        .set({ unitId: target, position: (last?.position ?? -1) + 1 })
+        .where(eq(problems.id, p.id))
+    }
+  })
+  refreshCatalog()
+  refreshPublicPages()
+}
+
+/** Deletes a unit; its problems move to another unit, or to none. */
+export async function deleteUnit(id: string, moveTo: string | null) {
+  await unitOrThrow(id)
+  if (moveTo === id) throw new ApiError(400, "bad_target", "Pick a different unit.")
+  if (moveTo) await unitOrThrow(moveTo)
+  await getDb().transaction(async (tx) => {
+    await tx.update(problems).set({ unitId: moveTo }).where(eq(problems.unitId, id))
+    await tx.delete(units).where(eq(units.id, id))
+  })
+  refreshCatalog()
+  refreshPublicPages()
 }
 
 export async function listNotes(orgId: string | null) {

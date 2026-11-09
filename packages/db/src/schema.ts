@@ -18,6 +18,7 @@ import type {
   ProblemCode,
   RubricCriterion,
   ExamSettings,
+  QuestionKind,
   AttainmentRules,
   SourceFile,
   Verdict,
@@ -240,10 +241,22 @@ export const problemListItems = pgTable(
 /** Scheduled daily challenges. A day with no row gets one picked automatically. */
 export const dailyChallenges = pgTable("daily_challenges", {
   day: text("day").primaryKey(),
-  problemId: uuid("problem_id")
-    .notNull()
-    .references(() => problems.id, { onDelete: "cascade" }),
+  /** The day's problem; null on a day of questions alone (see daily_questions). */
+  problemId: uuid("problem_id").references(() => problems.id, { onDelete: "cascade" }),
 })
+
+/** A day's questions, in order: several MCQs and short answers beside or instead of the problem. */
+export const dailyQuestions = pgTable(
+  "daily_questions",
+  {
+    day: text("day").notNull(),
+    questionId: uuid("question_id")
+      .notNull()
+      .references((): AnyPgColumn => questions.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.day, table.questionId] })]
+)
 
 export const notes = pgTable("notes", {
   id: id(),
@@ -839,6 +852,132 @@ export const draftSnapshots = pgTable(
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("draft_snapshots_by").on(table.userId, table.problemId, table.at)]
+)
+
+/**
+ * A quiz question, kept in a bank like problems: written or imported once, used in any
+ * assignment, exam, contest or daily challenge. Rules: packages/judge/src/quiz.ts.
+ */
+export const questions = pgTable(
+  "questions",
+  {
+    id: id(),
+    /** Its owner: an organization, or null for the platform. */
+    orgId: uuid("org_id").references((): AnyPgColumn => organizations.id, {
+      onDelete: "cascade",
+    }),
+    /** A short name for lists and pickers. */
+    title: text("title").notNull(),
+    kind: text("kind").$type<QuestionKind>().notNull(),
+    /** Markdown. */
+    prompt: text("prompt").notNull(),
+    options: jsonb("options").$type<{ id: string; text: string }[]>().notNull().default([]),
+    /** Choice questions: the right option ids. Never sent to students before results. */
+    correct: jsonb("correct").$type<string[]>().notNull().default([]),
+    /** Short answers that mark themselves right. */
+    accepted: jsonb("accepted").$type<string[]>().notNull().default([]),
+    /** Shown with the right answer once results are out. Markdown. */
+    explanation: text("explanation").notNull().default(""),
+    /** Suggested points; each assignment or contest sets its own. */
+    points: integer("points").notNull().default(1),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    /** Ready to use; drafts only for their writers. */
+    published: boolean("published").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("questions_by_org").on(table.orgId)]
+)
+
+/** A bank question in an assignment or exam, with its points there. */
+export const assignmentQuestions = pgTable(
+  "assignment_questions",
+  {
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "restrict" }),
+    points: integer("points").notNull().default(1),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.assignmentId, table.questionId] })]
+)
+
+/** One student's answers to an assignment's questions, and any marks a teacher gave. */
+export const quizResponses = pgTable(
+  "quiz_responses",
+  {
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Question id → chosen option ids, or text. */
+    answers: jsonb("answers").$type<Record<string, string[] | string>>().notNull().default({}),
+    /** Question id → a teacher's mark, replacing the automatic one. */
+    marks: jsonb("marks").$type<Record<string, number>>().notNull().default({}),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.assignmentId, table.userId] })]
+)
+
+/** A bank question in a contest: marked automatically, answered once. */
+export const contestQuestions = pgTable(
+  "contest_questions",
+  {
+    contestId: uuid("contest_id")
+      .notNull()
+      .references(() => contests.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "restrict" }),
+    /** Q1, Q2… beside the problems' A, B. */
+    label: text("label").notNull(),
+    points: integer("points").notNull().default(1),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.contestId, table.questionId] })]
+)
+
+/** A contestant's one answer to a contest question. */
+export const contestAnswers = pgTable(
+  "contest_answers",
+  {
+    contestId: uuid("contest_id")
+      .notNull()
+      .references(() => contests.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    answer: jsonb("answer").$type<string[] | string>().notNull(),
+    correct: boolean("correct").notNull(),
+    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.contestId, table.questionId, table.userId] })]
+)
+
+/** A student's one answer to each of a day's questions. */
+export const dailyAnswers = pgTable(
+  "daily_answers",
+  {
+    day: text("day").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    answer: jsonb("answer").$type<string[] | string>().notNull(),
+    correct: boolean("correct").notNull(),
+    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.day, table.userId, table.questionId] })]
 )
 
 /**
