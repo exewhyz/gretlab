@@ -485,7 +485,7 @@ export function ShareDialog({
   items,
   onDone,
 }: {
-  items: { kind: Kind | "course"; id: string; title: string }[]
+  items: { kind: Kind | "course" | "template"; id: string; title: string }[]
   onDone: () => void
 }) {
   const single = items.length === 1 ? items[0]! : null
@@ -526,6 +526,8 @@ export function ShareDialog({
           <DialogDescription>
             {items.every((i) => i.kind === "course")
               ? "Which colleges may give this course to their classes or copy it."
+              : items.every((i) => i.kind === "template")
+                ? "Which colleges may use this template for their classes, with their own dates, or copy it."
               : `Who may use ${single ? "it" : "them"} in their own assignments, exams, contests and daily challenges. Public library problems stay free to practise either way.`}
           </DialogDescription>
         </DialogHeader>

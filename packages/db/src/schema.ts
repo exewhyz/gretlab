@@ -353,6 +353,10 @@ export const assignments = pgTable("assignments", {
     onDelete: "cascade",
   }),
   audience: jsonb("audience").$type<string[][]>().notNull().default([]),
+  /** Made from this template; until it opens, the template's edits reach it. */
+  templateId: uuid("template_id").references((): AnyPgColumn => templates.id, {
+    onDelete: "set null",
+  }),
   createdAt: createdAt(),
   /** For save conflicts: a form saved over a newer version is refused. */
   updatedAt: updatedAt(),
@@ -929,7 +933,7 @@ export const contentShares = pgTable(
   "content_shares",
   {
     id: id(),
-    itemType: text("item_type").$type<"problem" | "question" | "course">().notNull(),
+    itemType: text("item_type").$type<"problem" | "question" | "course" | "template">().notNull(),
     itemId: uuid("item_id").notNull(),
     /** A college (all its staff)… */
     orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
@@ -1311,4 +1315,37 @@ export const practiceAnswers = pgTable(
     answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.questionId] })]
+)
+
+/** What a template holds: an assignment or exam without its dates, address or audience. */
+export interface TemplateContent {
+  allowLate: boolean
+  latePenaltyPercent: number
+  holdFeedback: boolean
+  /** Lab networks belong to each use, so a template's exam has none. */
+  exam: ExamSettings | null
+  problems: { problemId: string; points: number; rubric: RubricCriterion[] }[]
+  questions: { questionId: string; points: number }[]
+}
+
+/**
+ * An assignment or exam written once and used many times: each use is an ordinary
+ * assignment for a class (or the platform) with its own dates (`assignments.template_id`).
+ */
+export const templates = pgTable(
+  "templates",
+  {
+    id: id(),
+    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    content: jsonb("content").$type<TemplateContent>().notNull(),
+    /** Drafts can't be used yet. */
+    published: boolean("published").notNull().default(true),
+    sharing: text("sharing").$type<Sharing>().notNull().default("owner"),
+    copiedFrom: uuid("copied_from"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("templates_by_org").on(table.orgId)]
 )

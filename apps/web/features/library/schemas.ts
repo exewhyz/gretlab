@@ -14,7 +14,7 @@ export const collectionChangeSchema = z.object({
 
 export const sharingSchema = z.object({
   items: z
-    .array(z.object({ kind: z.enum(["problem", "question", "course"]), id: z.uuid() }))
+    .array(z.object({ kind: z.enum(["problem", "question", "course", "template"]), id: z.uuid() }))
     .min(1)
     .max(500),
   sharing: z.enum(["everyone", "selected", "owner"]),

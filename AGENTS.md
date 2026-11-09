@@ -142,6 +142,14 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - `usableBy` / `usableIds` (`features/library/sharing.ts`) is the one rule for what an owner may use: its own items, or published items shared with it. The pickers, assignment, contest and daily saves, the library and collections all use it. Public library practice is separate and unchanged (`isPublicProblem`).
 - A college copies an item it can use to adapt it (`copyToLibrary`): the copy is its own, private, remembers `copied_from`, and a copied problem starts as a draft with its tests.
 
+## Templates
+
+- A template (`templates`, `features/templates`) is an assignment or exam written once: problems with points and rubrics, questions, late rules, held results, exam settings (without lab networks, which belong to each use). No address, dates or audience. It's edited with the assignment form in template mode (`AssignmentEditorPage template`), and any assignment can be saved as one ("Save as template").
+- Using a template makes one ordinary assignment per class (or one for the platform), each with its own dates, address and gradebook (`applyTemplate`; `assignments.template_id`). Each use needs "Set assignments" for its class (organization-wide for one without a class).
+- Saving a template brings its content to every use that hasn't opened yet (`bringChanges`, by the database clock), keeping each use's dates, class, publish state, lab networks and course-outcome tags; uses that have opened stay as they were. The save says how many it updated and kept.
+- Platform templates are shared like library items (`content_shares` with `item_type = 'template'`, new ones reach every college); colleges use them or copy them to change. Items of a template (even assessment-only platform problems) may go into its uses; they still can't be put into other work. Problems and questions already on an assignment stay allowed when it's edited, and the form shows their titles even if its picker no longer offers them (`chosenProblems`).
+- Changing who an item is shared with isn't an edit: it doesn't change `updated_at`, so open editors don't get a false conflict.
+
 ## Courses
 
 - A course (`courses`, `features/courses`) is written once by an owner (the platform or a college) under Courses: an ordered outline of modules (`course_modules`), each an ordered list of library problems and questions (`course_items`). The list is compact; each module is edited in a dialog, and the outline is saved as a whole (`saveOutline`, which keeps module ids so progress follows them; stale saves get `edited_elsewhere`).
@@ -238,6 +246,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
 - `e2e/assignments.mjs`: grading rules, late penalties, gradebook and CSV, privacy, drafts and playback, rubrics, line comments and releasing feedback, lab exams (sittings, networks, events, more time, the site-wide lock, start window, edits after starting), problem import and assessment-only problems, the switch and the pages.
 - `e2e/library.mjs`: sharing the platform's content (every college, chosen colleges or teachers, staff only), what each college sees and can pick, copying, collections and the pages.
+- `e2e/templates.mjs`: writing templates, sharing them, using one for several classes with their own dates, edits reaching unopened uses only, stale saves, a college's own and copied templates, saving an assignment as a template, deleting, and the pages.
 - `e2e/courses.mjs`: writing outlines (what a course may hold, stale saves), sharing courses, a college's own and copied courses, giving one to a class, release by day and by the module before, practice answers, teacher progress, deleting, and the pages.
 - `e2e/platform.mjs`: platform roles, custom roles, the no-escalation rules, ADMIN_EMAILS owners, blocking, the activity log and the menu per role.
 - `e2e/flows.mjs`: Run vs Submit, history and creating a contest, as a person uses them. Included in `pnpm test:e2e`.
@@ -267,6 +276,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
 - [x] Quizzes: a question bank (single/multiple choice, short and written answers) with import, used in assignments, exams, contests and the daily challenge alone or with coding problems; teacher marks override; results after the due time or on release
 - [x] Platform staff and roles: permissions, built-in and custom roles, no escalation, activity log
+- [x] Templates: assignments and exams written once, shared from the platform or a college's own, used for many classes with their own dates; edits reach uses until they open
 - [x] Courses: modules of library problems and questions with release rules, shared from the platform or a college's own, given to classes from a start day, practice and progress on the class's Course tab
 - [x] One library with sharing: per-owner Library pages, collections, sharing platform content with all or chosen colleges and teachers, copying to adapt
 - [x] Notifications: in-app bell with stored events and computed reminders, optional email

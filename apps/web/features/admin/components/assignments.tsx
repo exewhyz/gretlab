@@ -168,17 +168,22 @@ interface AssignmentForm {
 
 interface StoredAssignment {
   updatedAt: string
-  slug: string
+  /** Templates have no address, dates or audience. */
+  slug?: string
   title: string
   description: string
-  opensAt: string
-  dueAt: string
+  opensAt?: string
+  dueAt?: string
   allowLate: boolean
   latePenaltyPercent: number
   published: boolean
   holdFeedback: boolean
   exam: ExamSettings | null
-  audience: string[][]
+  audience?: string[][]
+  /** Made from a template (assignments). */
+  templateId?: string | null
+  /** Its problems as the picker lists them, for ones the picker no longer offers. */
+  chosenProblems?: Omit<StaffProblemList["problems"][number], "testCount">[]
   problems: {
     problemId: string
     points: number
@@ -219,15 +224,21 @@ function blankForm(forClass: string | null): AssignmentForm {
 export function AssignmentEditorPage({
   id,
   forClass = null,
+  template = false,
 }: {
   id: string | null
   /** Started from a class page: aimed at that class, and back there after saving. */
   forClass?: string | null
+  /** Edits a template: the same form without address, dates or audience. */
+  template?: boolean
 }) {
   const owner = useOwner()
   const { data, error } = useQuery({
-    queryKey: owner.key("assignment", id),
-    queryFn: () => api<StoredAssignment>(owner.api(`/assignments/${id}`)),
+    queryKey: owner.key(template ? "template" : "assignment", id),
+    queryFn: () =>
+      api<StoredAssignment>(
+        owner.api(`/${template ? "templates" : "assignments"}/${id}`)
+      ),
     enabled: id !== null,
   })
   const problems = useQuery({
@@ -238,11 +249,14 @@ export function AssignmentEditorPage({
   if ((id && !data) || !problems.data) {
     return <Loading error={error ?? problems.error} />
   }
+  const blank = blankForm(forClass)
   const initial: AssignmentForm = data
     ? {
         ...data,
-        opensAt: toLocalInput(data.opensAt),
-        dueAt: toLocalInput(data.dueAt),
+        slug: data.slug ?? "",
+        audience: data.audience ?? [],
+        opensAt: data.opensAt ? toLocalInput(data.opensAt) : blank.opensAt,
+        dueAt: data.dueAt ? toLocalInput(data.dueAt) : blank.dueAt,
         latePenaltyPercent: String(data.latePenaltyPercent),
         problemIds: data.problems.map((p) => p.problemId),
         points: Object.fromEntries(
@@ -259,12 +273,18 @@ export function AssignmentEditorPage({
           points: String(q.points),
         })),
         exam: data.exam !== null,
-        examMinutes: data.exam?.minutes ? String(data.exam.minutes) : data.exam ? "" : "60",
+        examMinutes: data.exam?.minutes
+          ? String(data.exam.minutes)
+          : data.exam
+            ? ""
+            : "60",
         examFullscreen: data.exam?.fullscreen ?? true,
         examNetworks: (data.exam?.networks ?? []).join("\n"),
-        examStartWithin: data.exam?.startWithin ? String(data.exam.startWithin) : "",
+        examStartWithin: data.exam?.startWithin
+          ? String(data.exam.startWithin)
+          : "",
       }
-    : blankForm(forClass)
+    : blank
   return (
     <AssignmentEditor
       key={id ?? "new"}
@@ -272,8 +292,16 @@ export function AssignmentEditorPage({
       version={data?.updatedAt}
       forClass={forClass}
       initial={initial}
+      template={template}
+      fromTemplate={Boolean(data?.templateId)}
       // Students reach problems through the practice pages, so drafts can't be assigned.
-      problems={problems.data.problems.filter((p) => p.published)}
+      // Chosen problems the picker doesn't offer (a template's shared ones) still show.
+      problems={[
+        ...problems.data.problems.filter((p) => p.published),
+        ...(data?.chosenProblems ?? [])
+          .filter((c) => !problems.data.problems.some((p) => p.id === c.id))
+          .map((c) => ({ ...c, testCount: 0 })),
+      ]}
     />
   )
 }
@@ -286,7 +314,11 @@ function AssignmentEditor({
   forClass,
   initial,
   problems,
+  template,
+  fromTemplate,
 }: {
+  template: boolean
+  fromTemplate: boolean
   id: string | null
   /** When the saved version was last changed; a save over a newer one is refused. */
   version?: string
@@ -329,9 +361,11 @@ function AssignmentEditor({
 
   /** Checks with the same rules as the server, to show errors beside their fields. */
   function validated(published: boolean) {
+    // A template has no address or dates; placeholders satisfy the shared rules.
+    const placeholderOpens = new Date()
     const parsed = assignmentInputSchema.safeParse({
       title: form.title,
-      slug: form.slug,
+      slug: template ? "template" : form.slug,
       description: form.description,
       allowLate: form.exam ? false : form.allowLate,
       holdFeedback: form.holdFeedback,
@@ -355,9 +389,17 @@ function AssignmentEditor({
         form.latePenaltyPercent.trim() === ""
           ? NaN
           : Number(form.latePenaltyPercent),
-      opensAt: form.opensAt ? new Date(form.opensAt) : undefined,
-      dueAt: form.dueAt ? new Date(form.dueAt) : undefined,
-      audience: form.audience.filter((c) => c.length > 0),
+      opensAt: template
+        ? placeholderOpens
+        : form.opensAt
+          ? new Date(form.opensAt)
+          : undefined,
+      dueAt: template
+        ? new Date(placeholderOpens.getTime() + 3600_000)
+        : form.dueAt
+          ? new Date(form.dueAt)
+          : undefined,
+      audience: template ? [] : form.audience.filter((c) => c.length > 0),
       problems: form.problemIds.map((problemId) => ({
         problemId,
         points:
@@ -384,16 +426,24 @@ function AssignmentEditor({
     return null
   }
 
+  const kind = template ? "templates" : "assignments"
   const save = useMutation({
-    mutationFn: (body: NonNullable<ReturnType<typeof validated>>) => {
+    mutationFn: async (body: NonNullable<ReturnType<typeof validated>>) => {
       const expectedUpdatedAt = overwrite.current ? undefined : version
       overwrite.current = false
-      return id
-        ? api<{ id: string; updatedAt: string }>(owner.api(`/assignments/${id}`), {
-            method: "PUT",
-            body: { ...body, expectedUpdatedAt },
-          })
-        : api<{ id: string; updatedAt: string }>(owner.api("/assignments"), { body })
+      type Saved = { id: string; updatedAt: string }
+      const result = id
+        ? await api<Saved | { template: Saved; updated: number; kept: number }>(
+            owner.api(`/${kind}/${id}`),
+            { method: "PUT", body: { ...body, expectedUpdatedAt } }
+          )
+        : await api<Saved | { template: Saved; updated: number; kept: number }>(
+            owner.api(`/${kind}`),
+            { body }
+          )
+      return "template" in result
+        ? { ...result.template, updated: result.updated, kept: result.kept }
+        : { ...result, updated: 0, kept: 0 }
     },
     onSuccess: (saved, body) => {
       setVersion(saved.updatedAt)
@@ -403,17 +453,34 @@ function AssignmentEditor({
       void queryClient.invalidateQueries({ queryKey: ["assignment"] })
       setForm((current) => ({ ...current, published: body.published }))
       setMessage({
-        text: body.published
-          ? "Published. Students can see it under Assignments."
-          : "Saved as a draft. Only staff can see it.",
+        text: template
+          ? [
+              body.published
+                ? "Saved. Ready to use."
+                : "Saved as a draft: it can't be used yet.",
+              saved.updated > 0 &&
+                `${saved.updated} ${saved.updated === 1 ? "use that hasn't opened has" : "uses that haven't opened have"} the changes.`,
+              saved.kept > 0 &&
+                `${saved.kept} already open ${saved.kept === 1 ? "stays" : "stay"} as ${saved.kept === 1 ? "it was" : "they were"}.`,
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : body.published
+            ? "Published. Students can see it under Assignments."
+            : "Saved as a draft. Only staff can see it.",
         kind: "ok",
       })
-      if (!id && forClass && owner.orgSlug)
+      if (template) {
+        if (!id) router.push(owner.page(`/templates/${saved.id}`))
+      } else if (!id && forClass && owner.orgSlug)
         router.push(`/orgs/${owner.orgSlug}/classes/${forClass}?tab=classwork`)
       else if (!id) router.push(owner.page(`/assignments/${saved.id}`))
     },
     onError: (error) => {
-      if (error instanceof ApiRequestError && error.code === "edited_elsewhere") {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === "edited_elsewhere"
+      ) {
         setConflict(true)
       }
       if (error instanceof ApiRequestError && error.code === "conflict") {
@@ -428,12 +495,19 @@ function AssignmentEditor({
   }
 
   const remove = useMutation({
-    mutationFn: () =>
-      api(owner.api(`/assignments/${id}`), { method: "DELETE" }),
+    mutationFn: () => api(owner.api(`/${kind}/${id}`), { method: "DELETE" }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["admin"] })
-      router.push(owner.page("/assignments"))
+      router.push(owner.page(`/${kind}`))
     },
+    onError: (error) => setMessage({ text: error.message, kind: "err" }),
+  })
+  const asTemplate = useMutation({
+    mutationFn: () =>
+      api<{ id: string }>(owner.api("/templates/from-assignment"), {
+        body: { assignmentId: id },
+      }),
+    onSuccess: (row) => router.push(owner.page(`/templates/${row.id}`)),
     onError: (error) => setMessage({ text: error.message, kind: "err" }),
   })
 
@@ -441,18 +515,54 @@ function AssignmentEditor({
     <>
       <PageTitle
         action={
-          id && (
-            <Link
-              href={owner.page(`/assignments/${id}/grades`)}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              Gradebook
-            </Link>
+          id &&
+          !template && (
+            <span className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={asTemplate.isPending}
+                onClick={() => asTemplate.mutate()}
+              >
+                Save as template
+              </Button>
+              <Link
+                href={owner.page(`/assignments/${id}/grades`)}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" })
+                )}
+              >
+                Gradebook
+              </Link>
+            </span>
           )
         }
       >
-        {id ? "Edit assignment" : "New assignment"}
+        {template
+          ? id
+            ? "Edit template"
+            : "New template"
+          : id
+            ? "Edit assignment"
+            : "New assignment"}
       </PageTitle>
+      {template && (
+        <p className="mb-3 max-w-3xl text-body-sm text-body">
+          A template is an assignment or exam without dates or classes. Use it
+          for any number of classes, each with its own dates. Until a use opens,
+          saving here brings it your changes; once it opens it stays as it was.
+        </p>
+      )}
+      {fromTemplate && (
+        <p
+          className="mb-3 rounded-md border border-hairline bg-card p-2 text-caption"
+          data-testid="from-template"
+        >
+          Made from a template. Until it opens, changes to the template replace
+          its problems, questions and rules here; its dates and classes stay
+          yours.
+        </p>
+      )}
       <Card className="grid gap-5">
         <div className="grid gap-3 min-[901px]:grid-cols-2">
           <div className="grid content-start gap-1.5">
@@ -468,23 +578,25 @@ function AssignmentEditor({
             </Field>
             <FieldError message={errors.title} />
           </div>
-          <div className="grid content-start gap-1.5">
-            <Field
-              label="Address"
-              help={`Its page will be /assignments/${form.slug || "your-address"}`}
-            >
-              <TextInput
-                value={form.slug}
-                placeholder="week-3-loops"
-                aria-invalid={Boolean(errors.slug)}
-                onChange={(event) => {
-                  setSlugTouched(true)
-                  set("slug", event.target.value)
-                }}
-              />
-            </Field>
-            <FieldError message={errors.slug} />
-          </div>
+          {!template && (
+            <div className="grid content-start gap-1.5">
+              <Field
+                label="Address"
+                help={`Its page will be /assignments/${form.slug || "your-address"}`}
+              >
+                <TextInput
+                  value={form.slug}
+                  placeholder="week-3-loops"
+                  aria-invalid={Boolean(errors.slug)}
+                  onChange={(event) => {
+                    setSlugTouched(true)
+                    set("slug", event.target.value)
+                  }}
+                />
+              </Field>
+              <FieldError message={errors.slug} />
+            </div>
+          )}
         </div>
 
         <Field
@@ -498,40 +610,42 @@ function AssignmentEditor({
           />
         </Field>
 
-        <div className="grid gap-1.5">
-          <div className="grid gap-3 min-[901px]:grid-cols-2">
-            <div className="grid content-start gap-1.5">
-              <Field
-                label="Opens"
-                help="Submissions from before this don't count."
-              >
-                <TextInput
-                  type="datetime-local"
-                  value={form.opensAt}
-                  aria-invalid={Boolean(errors.opensAt)}
-                  onChange={(event) => set("opensAt", event.target.value)}
-                />
-              </Field>
-              <FieldError message={errors.opensAt} />
+        {!template && (
+          <div className="grid gap-1.5">
+            <div className="grid gap-3 min-[901px]:grid-cols-2">
+              <div className="grid content-start gap-1.5">
+                <Field
+                  label="Opens"
+                  help="Submissions from before this don't count."
+                >
+                  <TextInput
+                    type="datetime-local"
+                    value={form.opensAt}
+                    aria-invalid={Boolean(errors.opensAt)}
+                    onChange={(event) => set("opensAt", event.target.value)}
+                  />
+                </Field>
+                <FieldError message={errors.opensAt} />
+              </div>
+              <div className="grid content-start gap-1.5">
+                <Field label="Due">
+                  <TextInput
+                    type="datetime-local"
+                    value={form.dueAt}
+                    aria-invalid={Boolean(errors.dueAt)}
+                    onChange={(event) => set("dueAt", event.target.value)}
+                  />
+                </Field>
+                <FieldError message={errors.dueAt} />
+              </div>
             </div>
-            <div className="grid content-start gap-1.5">
-              <Field label="Due">
-                <TextInput
-                  type="datetime-local"
-                  value={form.dueAt}
-                  aria-invalid={Boolean(errors.dueAt)}
-                  onChange={(event) => set("dueAt", event.target.value)}
-                />
-              </Field>
-              <FieldError message={errors.dueAt} />
-            </div>
+            <p className="text-xs">
+              Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+            </p>
           </div>
-          <p className="text-xs">
-            Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-          </p>
-        </div>
+        )}
 
-        {owner.orgSlug && (
+        {owner.orgSlug && !template && (
           <AudiencePicker
             orgSlug={owner.orgSlug}
             value={form.audience}
@@ -548,22 +662,22 @@ function AssignmentEditor({
           marker={(index) => String(index + 1)}
           extra={(problemId) => (
             <span className="flex items-center gap-1.5">
-            <label className="flex items-center gap-1 text-xs">
-              <TextInput
-                type="number"
-                min={1}
-                aria-label="Points"
-                className="w-16 py-0.5"
-                value={pointsOf(problemId)}
-                onChange={(event) =>
-                  set("points", {
-                    ...form.points,
-                    [problemId]: event.target.value,
-                  })
-                }
-              />
-              pts
-            </label>
+              <label className="flex items-center gap-1 text-xs">
+                <TextInput
+                  type="number"
+                  min={1}
+                  aria-label="Points"
+                  className="w-16 py-0.5"
+                  value={pointsOf(problemId)}
+                  onChange={(event) =>
+                    set("points", {
+                      ...form.points,
+                      [problemId]: event.target.value,
+                    })
+                  }
+                />
+                pts
+              </label>
               <RubricEditor
                 title={problems.find((p) => p.id === problemId)?.title ?? ""}
                 rubric={rubricOf(problemId)}
@@ -571,7 +685,7 @@ function AssignmentEditor({
                   set("rubric", { ...form.rubric, [problemId]: rubric })
                 }
               />
-              {owner.orgSlug && (
+              {owner.orgSlug && !template && (
                 <OutcomeTagger
                   orgSlug={owner.orgSlug}
                   title={problems.find((p) => p.id === problemId)?.title ?? ""}
@@ -616,17 +730,21 @@ function AssignmentEditor({
                   onChange={(event) => set("examMinutes", event.target.value)}
                 />
               </Field>
-              <Field
-                label="Lab networks (optional)"
-                help="One address or range per line, such as 10.1.0.0/16. Students can start and submit only from these. Empty allows anywhere."
-              >
-                <TextArea
-                  rows={3}
-                  mono
-                  value={form.examNetworks}
-                  onChange={(event) => set("examNetworks", event.target.value)}
-                />
-              </Field>
+              {!template && (
+                <Field
+                  label="Lab networks (optional)"
+                  help="One address or range per line, such as 10.1.0.0/16. Students can start and submit only from these. Empty allows anywhere."
+                >
+                  <TextArea
+                    rows={3}
+                    mono
+                    value={form.examNetworks}
+                    onChange={(event) =>
+                      set("examNetworks", event.target.value)
+                    }
+                  />
+                </Field>
+              )}
               <Field
                 label="Students must start within (minutes after it opens)"
                 help="Keeps a lab starting together, so nobody who has finished can brief a late starter. Empty allows starting any time before the due time."
@@ -636,7 +754,9 @@ function AssignmentEditor({
                   min={1}
                   max={1440}
                   value={form.examStartWithin}
-                  onChange={(event) => set("examStartWithin", event.target.value)}
+                  onChange={(event) =>
+                    set("examStartWithin", event.target.value)
+                  }
                 />
               </Field>
               <label className="inline-flex items-center gap-2 self-start text-ink">
@@ -653,16 +773,18 @@ function AssignmentEditor({
                   className="rounded-md border border-primary/40 bg-primary/5 p-2 text-caption text-ink min-[901px]:col-span-2"
                   data-testid="exam-library-warning"
                 >
-                  Some of these problems are in the public library, so anyone can practise
-                  them, with hints and editorials, before the exam. For a closed exam, use
-                  &ldquo;Write a problem&rdquo; or &ldquo;Import problems&rdquo; above: those
-                  stay out of the library.
+                  Some of these problems are in the public library, so anyone
+                  can practise them, with hints and editorials, before the exam.
+                  For a closed exam, use &ldquo;Write a problem&rdquo; or
+                  &ldquo;Import problems&rdquo; above: those stay out of the
+                  library.
                 </p>
               )}
               <p className="text-caption min-[901px]:col-span-2">
-                Problems stay hidden until a student starts. Leaving the page or fullscreen
-                and pasting from elsewhere are recorded in the gradebook; editorials are
-                closed during the exam. Only work submitted during their time counts.
+                Problems stay hidden until a student starts. Leaving the page or
+                fullscreen and pasting from elsewhere are recorded in the
+                gradebook; editorials are closed during the exam. Only work
+                submitted during their time counts.
               </p>
             </div>
           )}
@@ -722,9 +844,13 @@ function AssignmentEditor({
               <FormMessage message={message} />
             ) : (
               <span className="text-caption">
-                {form.published
-                  ? "Published: students can see this assignment."
-                  : "Draft: students can't see this assignment yet."}
+                {template
+                  ? form.published
+                    ? "Ready: it can be used for classes."
+                    : "Draft: it can't be used yet."
+                  : form.published
+                    ? "Published: students can see this assignment."
+                    : "Draft: students can't see this assignment yet."}
               </span>
             )}
           </span>
@@ -732,9 +858,13 @@ function AssignmentEditor({
             <ConfirmButton
               variant="destructive"
               disabled={remove.isPending}
-              title={`Delete ${form.title || "this assignment"}?`}
-              description="Its gradebook goes with it; students' submissions stay in their history. This can't be undone."
-              confirmLabel="Delete assignment"
+              title={`Delete ${form.title || (template ? "this template" : "this assignment")}?`}
+              description={
+                template
+                  ? "Assignments made from it stay as they are; they just stop getting its changes."
+                  : "Its gradebook goes with it; students' submissions stay in their history. This can't be undone."
+              }
+              confirmLabel={template ? "Delete template" : "Delete assignment"}
               onConfirm={() => remove.mutate()}
             >
               Delete
@@ -745,10 +875,18 @@ function AssignmentEditor({
             disabled={save.isPending}
             onClick={() => submit(false)}
           >
-            {form.published ? "Unpublish" : "Save draft"}
+            {form.published
+              ? template
+                ? "Back to draft"
+                : "Unpublish"
+              : "Save draft"}
           </Button>
           <Button disabled={save.isPending} onClick={() => submit(true)}>
-            {form.published ? "Save changes" : "Publish"}
+            {template
+              ? "Save template"
+              : form.published
+                ? "Save changes"
+                : "Publish"}
           </Button>
         </div>
       </Card>
@@ -792,7 +930,12 @@ interface Gradebook {
     late: number
     exam: (SittingView & { warnings: number }) | null
     extension: { dueAt: string; problemIds: string[]; reason: string } | null
-    quiz: { earned: number; max: number; answered: boolean; needsMarking: number } | null
+    quiz: {
+      earned: number
+      max: number
+      answered: boolean
+      needsMarking: number
+    } | null
   }[]
 }
 
@@ -940,7 +1083,9 @@ export function AssignmentGradebook({ id }: { id: string }) {
           "Student",
           ...(data.assignment.exam ? ["Exam"] : []),
           ...data.problems.map((p) => `${p.title} (${p.points})`),
-          ...(data.assignment.quiz ? [`Quiz (${data.assignment.quiz.points})`] : []),
+          ...(data.assignment.quiz
+            ? [`Quiz (${data.assignment.quiz.points})`]
+            : []),
           `Total (${data.total})`,
         ]}
       >
@@ -1121,10 +1266,12 @@ function StudentCode({
   const refresh = () =>
     Promise.all([
       client.invalidateQueries({ queryKey: ["attempts", path] }),
-      client.invalidateQueries({ queryKey: owner.key("gradebook", assignmentId) }),
+      client.invalidateQueries({
+        queryKey: owner.key("gradebook", assignmentId),
+      }),
     ])
-  const addComment = (submissionId: string, file: string) =>
-    (line: number, body: string) =>
+  const addComment =
+    (submissionId: string, file: string) => (line: number, body: string) =>
       api(owner.api(`/assignments/${assignmentId}/comments`), {
         body: { student, submissionId, path: file, line, body },
       }).then(refresh)
@@ -1231,7 +1378,9 @@ function StudentCode({
                     className="overflow-hidden rounded-md border border-hairline"
                   >
                     {a.files.length > 1 && (
-                      <div className="px-3 pt-2 text-xs text-body">{f.path}</div>
+                      <div className="px-3 pt-2 text-xs text-body">
+                        {f.path}
+                      </div>
                     )}
                     <CommentedCode
                       content={f.content}
@@ -1300,7 +1449,9 @@ function ExamRecord({
                 <li key={i}>
                   <span className="tabular-nums">{formatDateTime(e.at)}</span>
                   {" · "}
-                  <span className="text-ink">{EVENT_LABEL[e.kind] ?? e.kind}</span>
+                  <span className="text-ink">
+                    {EVENT_LABEL[e.kind] ?? e.kind}
+                  </span>
                   {e.detail && ` (${e.detail})`}
                 </li>
               ))}
@@ -1469,7 +1620,9 @@ function RubricEditor({
           </DialogHeader>
           <div className="grid gap-2">
             {draft.length === 0 && (
-              <p className="text-caption">No criteria: tests decide the marks.</p>
+              <p className="text-caption">
+                No criteria: tests decide the marks.
+              </p>
             )}
             {draft.map((row, index) => (
               <div key={row.id} className="flex items-center gap-2">
@@ -1478,7 +1631,9 @@ function RubricEditor({
                   placeholder="Readable names"
                   className="flex-1"
                   value={row.label}
-                  onChange={(event) => edit(index, { label: event.target.value })}
+                  onChange={(event) =>
+                    edit(index, { label: event.target.value })
+                  }
                 />
                 <TextInput
                   type="number"
@@ -1486,14 +1641,18 @@ function RubricEditor({
                   aria-label="Criterion points"
                   className="w-20"
                   value={row.points}
-                  onChange={(event) => edit(index, { points: event.target.value })}
+                  onChange={(event) =>
+                    edit(index, { points: event.target.value })
+                  }
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-xs"
                   aria-label="Remove criterion"
-                  onClick={() => setDraft((rows) => rows.filter((_, i) => i !== index))}
+                  onClick={() =>
+                    setDraft((rows) => rows.filter((_, i) => i !== index))
+                  }
                 >
                   ×
                 </Button>
@@ -1508,7 +1667,11 @@ function RubricEditor({
               onClick={() =>
                 setDraft((rows) => [
                   ...rows,
-                  { id: crypto.randomUUID().slice(0, 8), label: "", points: "10" },
+                  {
+                    id: crypto.randomUUID().slice(0, 8),
+                    label: "",
+                    points: "10",
+                  },
                 ])
               }
             >
@@ -1516,7 +1679,11 @@ function RubricEditor({
             </Button>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
             <Button
@@ -1572,8 +1739,7 @@ function OutcomeTagger({
   const query = search.trim().toLowerCase()
   const shown = (data ?? []).filter(
     (o) =>
-      !query ||
-      `${o.course} ${o.code} ${o.title}`.toLowerCase().includes(query)
+      !query || `${o.course} ${o.code} ${o.title}`.toLowerCase().includes(query)
   )
   const courses = [...new Set(shown.map((o) => o.course))]
   const codes = (data ?? [])
@@ -1615,7 +1781,9 @@ function OutcomeTagger({
               <div className="grid max-h-80 gap-3 overflow-y-auto">
                 {courses.map((course) => (
                   <div key={course} className="grid gap-1">
-                    <div className="text-caption font-medium text-ink">{course}</div>
+                    <div className="text-caption font-medium text-ink">
+                      {course}
+                    </div>
                     {shown
                       .filter((o) => o.course === course)
                       .map((o) => (
@@ -1689,7 +1857,12 @@ function ExtensionControl({
     mutationFn: () =>
       api(path, {
         method: "PUT",
-        body: { student, dueAt: new Date(until).toISOString(), problemIds: chosen, reason },
+        body: {
+          student,
+          dueAt: new Date(until).toISOString(),
+          problemIds: chosen,
+          reason,
+        },
       }),
     onSuccess: () => {
       setOpen(false)
@@ -1748,8 +1921,9 @@ function ExtensionControl({
           <DialogHeader>
             <DialogTitle>Extend for {name}</DialogTitle>
             <DialogDescription>
-              A later due time for this student only. Choose problems to reopen just those,
-              for example after feedback; choose none for the whole assignment.
+              A later due time for this student only. Choose problems to reopen
+              just those, for example after feedback; choose none for the whole
+              assignment.
             </DialogDescription>
           </DialogHeader>
           <Field label="New due time">
@@ -1762,12 +1936,17 @@ function ExtensionControl({
           <div className="grid gap-1.5">
             <div className="text-caption font-medium text-ink">Problems</div>
             {problems.map((p, index) => (
-              <label key={p.problemId} className="inline-flex items-center gap-2 text-body-sm">
+              <label
+                key={p.problemId}
+                className="inline-flex items-center gap-2 text-body-sm"
+              >
                 <Checkbox
                   checked={chosen.includes(p.problemId)}
                   onCheckedChange={(checked) =>
                     setChosen((all) =>
-                      checked ? [...all, p.problemId] : all.filter((x) => x !== p.problemId)
+                      checked
+                        ? [...all, p.problemId]
+                        : all.filter((x) => x !== p.problemId)
                     )
                   }
                 />
@@ -1775,11 +1954,16 @@ function ExtensionControl({
               </label>
             ))}
             <p className="text-caption">
-              {chosen.length === 0 ? "None chosen: the whole assignment." : "Only these reopen."}
+              {chosen.length === 0
+                ? "None chosen: the whole assignment."
+                : "Only these reopen."}
             </p>
           </div>
           <Field label="Reason (optional, for your records)">
-            <TextInput value={reason} onChange={(event) => setReason(event.target.value)} />
+            <TextInput
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+            />
           </Field>
           {message && <FormMessage message={{ text: message, kind: "err" }} />}
           <DialogFooter>
@@ -1836,7 +2020,10 @@ function QuizMarking({
     queryFn: () => api<StudentQuiz>(path),
   })
   const [given, setGiven] = useState<Record<string, string>>({})
-  const [message, setMessage] = useState<{ text: string; kind: "ok" | "err" } | null>(null)
+  const [message, setMessage] = useState<{
+    text: string
+    kind: "ok" | "err"
+  } | null>(null)
   const save = useMutation({
     mutationFn: () => {
       const marks: Record<string, number | null> = {}
@@ -1852,7 +2039,9 @@ function QuizMarking({
       setMessage({ text: "Saved.", kind: "ok" })
       setGiven({})
       void client.invalidateQueries({ queryKey: ["quiz-marking", path] })
-      void client.invalidateQueries({ queryKey: owner.key("gradebook", assignmentId) })
+      void client.invalidateQueries({
+        queryKey: owner.key("gradebook", assignmentId),
+      })
     },
     onError: (e) => setMessage({ text: e.message, kind: "err" }),
   })
@@ -1885,9 +2074,14 @@ function QuizMarking({
         </div>
         {!data && <Loading error={error} />}
         {data?.questions.map((q, index) => (
-          <div key={q.id} className="grid gap-1.5 border-t border-hairline pt-3">
+          <div
+            key={q.id}
+            className="grid gap-1.5 border-t border-hairline pt-3"
+          >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-body-sm font-semibold text-ink">Q{index + 1}</span>
+              <span className="text-body-sm font-semibold text-ink">
+                Q{index + 1}
+              </span>
               <span className="text-caption">
                 {q.needsMarking
                   ? "Needs marking"

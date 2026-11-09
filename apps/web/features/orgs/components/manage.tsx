@@ -113,6 +113,11 @@ export function ManageShell({
           show: has("assignments.manage", "gradebook.view"),
         },
         {
+          href: `${base}/templates`,
+          label: "Templates",
+          show: has("assignments.manage"),
+        },
+        {
           href: `${base}/contests`,
           label: "Contests",
           show: has("contests.manage"),

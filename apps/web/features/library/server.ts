@@ -3,6 +3,7 @@ import {
   collections,
   contentShares,
   courses,
+  templates,
   getDb,
   organizations,
   problems,
@@ -22,7 +23,7 @@ import { saveProblem } from "@/features/problems/server"
 import { sourceOf, usableBy, usableIds, type ShareKind } from "./sharing"
 
 const tableOf = (kind: ShareKind) =>
-  kind === "problem" ? problems : kind === "question" ? questions : courses
+  kind === "problem" ? problems : kind === "question" ? questions : kind === "course" ? courses : templates
 
 /*
  * The library: one place for an owner's content (the platform's, or one college's) and
@@ -211,7 +212,7 @@ export async function setSharing(
   input: { sharing: Sharing; orgIds: string[]; emails: string[] }
 ) {
   const db = getDb()
-  for (const kind of ["problem", "question", "course"] as const) {
+  for (const kind of ["problem", "question", "course", "template"] as const) {
     const ids = items.filter((i) => i.kind === kind).map((i) => i.id)
     if (ids.length === 0) continue
     const table = tableOf(kind)
@@ -236,7 +237,11 @@ export async function setSharing(
   await db.transaction(async (tx) => {
     for (const item of items) {
       const table = tableOf(item.kind)
-      await tx.update(table).set({ sharing: input.sharing }).where(eq(table.id, item.id))
+      // Who it reaches isn't an edit: open editors keep their version.
+      await tx
+        .update(table)
+        .set({ sharing: input.sharing, updatedAt: sql.sql`${table.updatedAt}` })
+        .where(eq(table.id, item.id))
       await tx
         .delete(contentShares)
         .where(and(eq(contentShares.itemType, item.kind), eq(contentShares.itemId, item.id)))

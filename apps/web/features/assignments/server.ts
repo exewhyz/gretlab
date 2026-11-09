@@ -795,6 +795,27 @@ export async function listAssignmentsForStaff(orgId: string | null) {
   })
 }
 
+/**
+ * The chosen problems as the form's picker lists them, so problems it can't pick any more
+ * (a template's shared ones, or sharing taken back) still show their titles.
+ */
+export async function chosenProblems(ids: string[]) {
+  if (ids.length === 0) return []
+  return getDb()
+    .select({
+      id: problems.id,
+      slug: problems.slug,
+      title: problems.title,
+      level: problems.level,
+      position: problems.position,
+      unitId: problems.unitId,
+      published: problems.published,
+      listed: problems.listed,
+    })
+    .from(problems)
+    .where(inArray(problems.id, ids))
+}
+
 export async function getAssignmentForStaff(id: string, orgId: string | null) {
   const [assignment] = await getDb()
     .select()
@@ -804,6 +825,7 @@ export async function getAssignmentForStaff(id: string, orgId: string | null) {
   const [items, questions] = await Promise.all([itemsOf([id]), questionsOf([id])])
   return {
     ...assignment,
+    chosenProblems: await chosenProblems(items.map((i) => i.problemId)),
     problems: items.map(({ problemId, points, rubric, outcomes }) => ({
       problemId,
       points,
@@ -860,10 +882,31 @@ export async function responsesOn(assignmentIds: string[], userId?: string) {
 export async function saveAssignment(
   id: string | null,
   input: AssignmentInput,
-  orgId: string | null
+  orgId: string | null,
+  options: {
+    /** Problems and questions allowed without being shared: a template's. */
+    allowed?: Set<string>
+    /** A new use of this template. */
+    templateId?: string
+  } = {}
 ) {
   const { problems: chosen, expectedUpdatedAt, questions, ...fields } = input
   const ids = chosen.map((c) => c.problemId)
+  // What it already has stays allowed (a template's shared problems, or sharing taken back).
+  const allowed = new Set(options.allowed)
+  if (id) {
+    const [had, hadQuestions] = await Promise.all([
+      getDb()
+        .select({ id: assignmentProblems.problemId })
+        .from(assignmentProblems)
+        .where(eq(assignmentProblems.assignmentId, id)),
+      getDb()
+        .select({ id: assignmentQuestions.questionId })
+        .from(assignmentQuestions)
+        .where(eq(assignmentQuestions.assignmentId, id)),
+    ])
+    for (const r of [...had, ...hadQuestions]) allowed.add(r.id)
+  }
   const found = await getDb()
     .select({
       id: problems.id,
@@ -882,7 +925,7 @@ export async function saveAssignment(
     )
   }
   const usable = await usableIds("problem", ids, orgId)
-  if (found.some((p) => p.orgId !== orgId && !usable.has(p.id))) {
+  if (found.some((p) => p.orgId !== orgId && !usable.has(p.id) && !allowed.has(p.id))) {
     throw new ApiError(
       400,
       "private_problem",
@@ -926,7 +969,7 @@ export async function saveAssignment(
     }
   }
   await usableQuestions(
-    questions.map((q) => q.questionId),
+    questions.map((q) => q.questionId).filter((q) => !allowed.has(q)),
     orgId
   )
   if (id) await guardStartedExam(id, input)
@@ -938,7 +981,12 @@ export async function saveAssignment(
           .where(eq(assignments.id, id))
       )[0]?.published ?? false)
     : false
-  const values = { ...fields, orgId, audience: orgId ? fields.audience : [] }
+  const values = {
+    ...fields,
+    orgId,
+    audience: orgId ? fields.audience : [],
+    ...(options.templateId ? { templateId: options.templateId } : {}),
+  }
 
   const saved = await getDb().transaction(async (tx) => {
     const [assignment] = id

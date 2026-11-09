@@ -34,6 +34,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         label: "Assignments",
         needs: ["platform.work.manage", "platform.gradebook.view"],
       },
+      { href: "/admin/templates", label: "Templates", needs: ["platform.work.manage"] },
       { href: "/admin/contests", label: "Contests", needs: ["platform.work.manage"] },
       { href: "/admin/daily", label: "Daily challenge", needs: ["platform.library.manage"] },
       { href: "/admin/study-plans", label: "Study plans", needs: ["platform.library.manage"] },

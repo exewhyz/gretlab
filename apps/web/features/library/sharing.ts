@@ -1,4 +1,4 @@
-import { contentShares, courses, getDb, problems, questions, sql } from "@workspace/db"
+import { contentShares, courses, getDb, problems, questions, sql, templates } from "@workspace/db"
 
 /*
  * Who may use library content in their own work (assignments, exams, contests, the daily
@@ -9,8 +9,8 @@ import { contentShares, courses, getDb, problems, questions, sql } from "@worksp
 
 const { and, eq, isNull, or } = sql
 
-type Item = typeof problems | typeof questions | typeof courses
-export type ShareKind = "problem" | "question" | "course"
+type Item = typeof problems | typeof questions | typeof courses | typeof templates
+export type ShareKind = "problem" | "question" | "course" | "template"
 
 const ownedBy = (table: Item, orgId: string | null) =>
   orgId === null ? isNull(table.orgId) : eq(table.orgId, orgId)
@@ -58,7 +58,8 @@ export async function usableIds(
   userId?: string
 ) {
   if (ids.length === 0) return new Set<string>()
-  const table = kind === "problem" ? problems : kind === "question" ? questions : courses
+  const table =
+    kind === "problem" ? problems : kind === "question" ? questions : kind === "course" ? courses : templates
   const rows = await getDb()
     .select({ id: table.id })
     .from(table)
