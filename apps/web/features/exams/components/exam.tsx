@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 
 import { Button } from "@workspace/ui/components/button"
 
@@ -57,12 +58,14 @@ export function HideDuringExam({
 }
 
 /** Refreshes everything that shows a sitting. */
-function useRefreshExam() {
+export function useRefreshExam() {
   const client = useQueryClient()
   return () =>
     client.invalidateQueries({
       predicate: (q) =>
-        q.queryKey[0] === "assignment" || q.queryKey[0] === "assignments",
+        q.queryKey[0] === "assignment" ||
+        q.queryKey[0] === "assignments" ||
+        q.queryKey[0] === "exam",
     })
 }
 
@@ -76,15 +79,26 @@ export function formatLeft(ms: number) {
   return h > 0 ? `${h}:${twoDigits(m)}:${twoDigits(s)}` : `${m}:${twoDigits(s)}`
 }
 
-/** Time left until `endsAt`, ticking each second; calls `onEnd` once at zero. */
-function useTimeLeft(endsAt: string | null, onEnd?: () => void) {
+/**
+ * Time left until `endsAt`, ticking each second; calls `onEnd` once at zero. `serverNow`
+ * is the server's time when the data was sent: the device's clock may be wrong, and the
+ * server decides when a sitting ends.
+ */
+export function useTimeLeft(
+  endsAt: string | null,
+  onEnd?: () => void,
+  serverNow?: string
+) {
+  const [offset] = useState(() =>
+    serverNow ? new Date(serverNow).getTime() - Date.now() : 0
+  )
   const [now, setNow] = useState(() => Date.now())
   const ended = useRef(false)
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [])
-  const left = endsAt ? new Date(endsAt).getTime() - now : 0
+  const left = endsAt ? new Date(endsAt).getTime() - (now + offset) : 0
   useEffect(() => {
     if (endsAt && left <= 0 && !ended.current) {
       ended.current = true
@@ -94,7 +108,7 @@ function useTimeLeft(endsAt: string | null, onEnd?: () => void) {
   return left
 }
 
-function enterFullscreen() {
+export function enterFullscreen() {
   // Called straight from a click, which browsers require. Refusal isn't fatal: it's recorded.
   document.documentElement.requestFullscreen?.().catch(() => {})
 }
@@ -106,18 +120,13 @@ function enterFullscreen() {
  */
 export function ExamGuard({
   slug,
-  title,
   fullscreen,
-  endsAt,
 }: {
   slug: string
-  title: string
   fullscreen: boolean
-  endsAt: string
 }) {
-  const refresh = useRefreshExam()
-  const left = useTimeLeft(endsAt, refresh)
   const [outside, setOutside] = useState(false)
+  const cover = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const last = new Map<string, number>()
@@ -171,40 +180,43 @@ export function ExamGuard({
     }
   }, [slug, fullscreen])
 
-  const low = left < 5 * 60_000
-  return (
-    <>
-      <Link
-        href={`/assignments/${slug}`}
-        data-testid="exam-timer"
-        title={`${title}: back to the exam`}
-        className={
-          "fixed right-4 bottom-4 z-40 rounded-full border px-3 py-1.5 text-body-sm font-medium tabular-nums shadow-md " +
-          (low
-            ? "border-destructive bg-destructive text-white"
-            : "border-hairline bg-card text-ink")
-        }
-      >
-        {title} · {formatLeft(left)} left
-      </Link>
-      {fullscreen && outside && (
-        <div
-          role="alertdialog"
-          aria-label="Return to fullscreen"
-          className="fixed inset-0 z-50 grid place-items-center bg-canvas/95 p-4"
-        >
-          <div className="grid max-w-md gap-3 text-center">
-            <h2 className="text-title-sm text-ink">This exam is taken in fullscreen</h2>
-            <p className="text-body-sm text-body">
-              Leaving fullscreen is noted for your teacher. Your time keeps running.
-            </p>
-            <Button className="justify-self-center" onClick={enterFullscreen}>
-              Return to fullscreen
-            </Button>
-          </div>
-        </div>
-      )}
-    </>
+  // Outside fullscreen, nothing but the cover can be reached: not by mouse, not by Tab.
+  useEffect(() => {
+    if (!fullscreen || !outside) return
+    const shut = () =>
+      [...document.body.children]
+        .filter((el) => el !== cover.current && !el.hasAttribute("inert"))
+        .forEach((el) => el.setAttribute("inert", ""))
+    shut()
+    // Anything added while the cover is up (a dialog, a menu) is shut too.
+    const watch = new MutationObserver(shut)
+    watch.observe(document.body, { childList: true })
+    return () => {
+      watch.disconnect()
+      ;[...document.body.children].forEach((el) => el.removeAttribute("inert"))
+    }
+  }, [fullscreen, outside])
+
+  if (!fullscreen || !outside) return null
+  return createPortal(
+    <div
+      ref={cover}
+      role="alertdialog"
+      aria-modal="true"
+      aria-label="Return to fullscreen"
+      className="fixed inset-0 z-[100] grid place-items-center bg-canvas p-4"
+    >
+      <div className="grid max-w-md gap-3 text-center">
+        <h2 className="text-title-sm text-ink">This exam is taken in fullscreen</h2>
+        <p className="text-body-sm text-body">
+          Leaving fullscreen is noted for your teacher. Your time keeps running.
+        </p>
+        <Button autoFocus className="justify-self-center" onClick={enterFullscreen}>
+          Return to fullscreen
+        </Button>
+      </div>
+    </div>,
+    document.body
   )
 }
 
@@ -223,7 +235,10 @@ export function ExamPanel({
     minutes: number | null
     fullscreen: boolean
     restricted: boolean
+    startWithin: number | null
+    opensAt: string
     sitting: SittingView
+    now: string
   }
   problemCount: number
   dueAt: string
@@ -233,7 +248,11 @@ export function ExamPanel({
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const { sitting } = exam
-  const left = useTimeLeft(sitting.status === "in_progress" ? sitting.endsAt : null)
+  const left = useTimeLeft(
+    sitting.status === "in_progress" ? sitting.endsAt : null,
+    refresh,
+    exam.now
+  )
 
   async function act(path: string) {
     setBusy(true)
@@ -254,10 +273,17 @@ export function ExamPanel({
       ? `${exam.minutes} minutes from when you start (ends by ${formatDateTime(dueAt)} at the latest)`
       : `until ${formatDateTime(dueAt)}`,
     "one attempt: once started, the clock doesn't stop",
+    ...(exam.startWithin
+      ? [
+          `start by ${formatDateTime(
+            new Date(new Date(exam.opensAt).getTime() + exam.startWithin * 60_000).toISOString()
+          )}`,
+        ]
+      : []),
     ...(exam.fullscreen ? ["in fullscreen"] : []),
     ...(exam.restricted ? ["from the lab's network only"] : []),
+    "until you finish, the rest of the site is closed: no other problems, playground, editorials, hints, notes or earlier code",
     "leaving the page, leaving fullscreen and pasting from elsewhere are noted for your teacher",
-    "editorials and hints for its problems are hidden until you finish",
   ]
 
   return (

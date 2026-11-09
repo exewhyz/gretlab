@@ -1,6 +1,8 @@
 import {
   assignmentProblems,
   courseOutcomes,
+  examEvents,
+  examSessions,
   rubricMarks,
   submissionComments,
   assignments,
@@ -34,6 +36,7 @@ import {
 import { draftHistory, latestDraft } from "@/features/drafts/server"
 import { extendSitting } from "@/features/exams/server"
 import {
+  dbNow,
   eventsOf,
   presentSitting,
   sittingsOn,
@@ -41,8 +44,11 @@ import {
   type Sitting,
 } from "@/features/exams/sittings"
 import { ApiError, notFound } from "@/lib/api/route"
+import { buildDetail, type ProblemSummary } from "@/features/problems/server"
 import {
   accessTo,
+  narrowLanguages,
+  orgPolicy,
   classLinks,
   rolePermissions,
   viewpoint,
@@ -155,7 +161,11 @@ function grade(
       counted.filter((a) => a.problemId === item.problemId),
       rules
     )
-    const byHand = rubricEarned(item.rubric, marks?.get(item.problemId))
+    // An exam nobody sat earns nothing, hand marks included.
+    const byHand =
+      assignment.exam && !sitting
+        ? null
+        : rubricEarned(item.rubric, marks?.get(item.problemId))
     return {
       problemId: item.problemId,
       ...tests,
@@ -309,6 +319,7 @@ export async function getAssignment(slug: string, viewer: User) {
         .get(assignment.id)
         ?.get(viewer.id)
     : undefined
+  const examNow = assignment.exam ? await dbNow() : new Date()
   // Before it opens, students learn when, not what; an exam's problems show once started.
   const visible =
     access === "manage" ||
@@ -349,11 +360,8 @@ export async function getAssignment(slug: string, viewer: User) {
     classes,
     problems: items.map((item, index) => ({
       slug: item.slug,
-      // Members-only problems are solved on their organization's pages.
-      href:
-        item.membersOnly && item.orgSlug
-          ? `/orgs/${item.orgSlug}/practice/${item.slug}`
-          : `/problems/${item.slug}`,
+      // Solved on the assignment's own pages, numbered by the assignment.
+      href: `/assignments/${assignment.slug}/problems/${index + 1}`,
       title: item.title,
       level: item.level,
       points: item.points,
@@ -377,7 +385,11 @@ export async function getAssignment(slug: string, viewer: User) {
           fullscreen: assignment.exam.fullscreen,
           /** Whether it must be taken from certain networks (which ones stays private). */
           restricted: assignment.exam.networks.length > 0,
-          sitting: presentSitting(sitting),
+          startWithin: assignment.exam.startWithin ?? null,
+          opensAt: assignment.opensAt,
+          sitting: presentSitting(sitting, examNow),
+          /** The server's time, so the page's clock can correct for the device's. */
+          now: examNow,
         }
       : null,
   }
@@ -389,6 +401,95 @@ async function countProblems(assignmentId: string) {
     .from(assignmentProblems)
     .where(eq(assignmentProblems.assignmentId, assignmentId))
   return row?.n ?? 0
+}
+
+/**
+ * One problem of an assignment, solved on the assignment's own page: labelled Q1, Q2 in
+ * the assignment's order, with only its problems beside it. Every assignment problem is
+ * solved here, including problems kept out of the library. During an exam sitting, hints,
+ * notes and the editorial are left out of the data, not just hidden.
+ */
+export async function getAssignmentProblem(
+  slug: string,
+  number: string,
+  viewer: User
+) {
+  await requireFeature("assignments.enabled")
+  const { assignment, access } = await findAssignment(slug, viewer)
+  const now = await dbNow()
+  const phase = phaseOf(assignment, now)
+  const sitting = assignment.exam
+    ? (await sittingsOn([assignment.id], viewer.id)).get(assignment.id)?.get(viewer.id)
+    : undefined
+  if (access !== "manage") {
+    if (phase === "upcoming") {
+      throw new ApiError(403, "not_open", "This assignment hasn't opened yet.")
+    }
+    if (assignment.exam && !sitting) {
+      throw new ApiError(403, "exam_not_started", "Start the exam to see its problems.")
+    }
+  }
+  const items = await itemsOf([assignment.id])
+  const index = Number(number) - 1
+  const item = Number.isInteger(index) ? items[index] : undefined
+  if (!item) throw notFound("Problem not found")
+  const [problem] = await getDb()
+    .select()
+    .from(problems)
+    .where(eq(problems.id, item.problemId))
+  if (!problem) throw notFound("Problem not found")
+  const summaries: ProblemSummary[] = items.map((it, i) => ({
+    id: it.slug,
+    title: it.title,
+    level: it.level,
+    unit: assignment.title,
+    // Assignment problems are numbered by the assignment, not the library.
+    unitNo: 0,
+    no: i + 1,
+    label: `Q${i + 1}`,
+  }))
+  const [detail, policy, attempts] = await Promise.all([
+    buildDetail(problem, summaries[index]!),
+    orgPolicy(assignment.orgId),
+    attemptsOn(
+      items.map((i) => i.problemId),
+      assignment.opensAt,
+      viewer.id
+    ),
+  ])
+  const counted = assignment.exam ? duringSitting(attempts, sitting) : attempts
+  const status: Record<string, "solved" | "tried"> = {}
+  for (const a of counted) {
+    const s = items.find((i) => i.problemId === a.problemId)?.slug
+    if (!s) continue
+    if (a.verdict === "AC") status[s] = "solved"
+    else status[s] ??= "tried"
+  }
+  const sittingNow = presentSitting(sitting, now)
+  const examRunning = sittingNow.status === "in_progress"
+  return {
+    assignment: {
+      slug: assignment.slug,
+      title: assignment.title,
+      dueAt: assignment.dueAt,
+      phase,
+      exam: assignment.exam
+        ? { fullscreen: assignment.exam.fullscreen, sitting: sittingNow, now }
+        : null,
+    },
+    summaries,
+    problem: {
+      ...detail,
+      // An exam's problems never open their editorial here.
+      hasSolution: assignment.exam ? false : detail.hasSolution,
+      hints: examRunning ? [] : detail.hints,
+      notes: examRunning ? [] : detail.notes,
+      tags: examRunning ? [] : detail.tags,
+      allowedLanguages: narrowLanguages(detail.allowedLanguages, policy.languages),
+      pasteBlocked: !policy.allowPaste,
+    },
+    status,
+  }
 }
 
 /** Open assignments for this person that include this problem, for its page. */
@@ -416,6 +517,11 @@ export async function assignmentsForProblem(slug: string, viewer: User) {
     .filter(
       ({ assignment }) =>
         accessTo(vp, assignment, "assignments.manage") !== "none"
+    )
+    // An exam doesn't say which problems it uses until the student has started it.
+    .filter(
+      ({ assignment }) =>
+        !assignment.exam || sittings.get(assignment.id)?.has(viewer.id)
     )
     .map(({ assignment }) => ({ assignment, phase: phaseOf(assignment, now) }))
     .filter(({ phase }) => phase === "open" || phase === "late")
@@ -491,6 +597,7 @@ export async function saveAssignment(
       id: problems.id,
       published: problems.published,
       membersOnly: problems.membersOnly,
+      listed: problems.listed,
       orgId: problems.orgId,
     })
     .from(problems)
@@ -502,7 +609,7 @@ export async function saveAssignment(
       "A chosen problem no longer exists."
     )
   }
-  if (found.some((p) => p.membersOnly && p.orgId !== orgId)) {
+  if (found.some((p) => (p.membersOnly || !p.listed) && p.orgId !== orgId)) {
     throw new ApiError(
       400,
       "private_problem",
@@ -538,6 +645,7 @@ export async function saveAssignment(
       )
     }
   }
+  if (id) await guardStartedExam(id, input)
   const values = { ...fields, orgId, audience: orgId ? fields.audience : [] }
 
   return getDb().transaction(async (tx) => {
@@ -563,6 +671,53 @@ export async function saveAssignment(
       }))
     )
     return assignment
+  })
+}
+
+/**
+ * Once students have started an exam, it stays an exam with the same problems: turning it
+ * off would count everyone's practice, and swapping problems would change it under them.
+ * Time, due time and networks can still change (running sittings keep their end time).
+ */
+async function guardStartedExam(id: string, input: AssignmentInput) {
+  const [current] = await getDb()
+    .select({ exam: assignments.exam })
+    .from(assignments)
+    .where(eq(assignments.id, id))
+  if (!current?.exam) return
+  const started = await sittingsOn([id])
+  if ((started.get(id)?.size ?? 0) === 0) return
+  if (!input.exam) {
+    throw new ApiError(
+      409,
+      "exam_started",
+      "Students have started this exam, so it can't stop being an exam."
+    )
+  }
+  const before = (await itemsOf([id])).map((i) => i.problemId)
+  const after = input.problems.map((p) => p.problemId)
+  if (before.length !== after.length || before.some((p, i) => p !== after[i])) {
+    throw new ApiError(
+      409,
+      "exam_started",
+      "Students have started this exam, so its problems can't change. Points and rubrics can."
+    )
+  }
+}
+
+/** Drops the network addresses an exam recorded: where each sitting started, and refused submissions. */
+export async function forgetExamAddresses(id: string, orgId: string | null) {
+  const [assignment] = await getDb()
+    .select({ id: assignments.id })
+    .from(assignments)
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+  if (!assignment) throw notFound("Assignment not found")
+  await getDb().transaction(async (tx) => {
+    await tx.update(examSessions).set({ ip: null }).where(eq(examSessions.assignmentId, id))
+    await tx
+      .update(examEvents)
+      .set({ detail: "" })
+      .where(and(eq(examEvents.assignmentId, id), eq(examEvents.kind, "other_network")))
   })
 }
 

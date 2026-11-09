@@ -24,6 +24,8 @@ import { formatDateTime } from "@/lib/format"
 import { useOwner } from "@/features/admin/owner"
 import { AudiencePicker } from "./audience"
 
+import { NewProblemDialog } from "./problem-editor"
+import { ImportProblemsDialog } from "./problem-import"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle, Table } from "./shell"
 
@@ -253,6 +255,15 @@ export function ProblemPicker({
 }) {
   const [search, setSearch] = useState("")
   const [level, setLevel] = useState("")
+  const [writing, setWriting] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const owner = useOwner()
+  const client = useQueryClient()
+  // New problems are added at once; the list catches up when the picker reloads.
+  const added = (ids: string[]) => {
+    void client.invalidateQueries({ queryKey: owner.key("problems") })
+    onChange([...selected, ...ids.filter((id) => !selected.includes(id))])
+  }
   const byId = useMemo(
     () => new Map(problems.map((problem) => [problem.id, problem])),
     [problems]
@@ -272,9 +283,40 @@ export function ProblemPicker({
 
   return (
     <div className="grid gap-2">
-      <div className="text-caption font-semibold text-ink">
-        Problems ({selected.length})
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-caption font-semibold text-ink">
+          Problems ({selected.length})
+        </div>
+        <span className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => setWriting(true)}
+          >
+            Write a problem
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => setImporting(true)}
+          >
+            Import problems
+          </Button>
+        </span>
       </div>
+      <NewProblemDialog
+        open={writing}
+        onOpenChange={setWriting}
+        onCreated={(problem) => added([problem.id])}
+      />
+      <ImportProblemsDialog
+        open={importing}
+        onOpenChange={setImporting}
+        forAssessment
+        onImported={(problems) => added(problems.map((p) => p.id))}
+      />
       <div className="grid gap-3 min-[901px]:grid-cols-2">
         <div className="rounded-md border border-hairline p-2.5">
           <div className="mb-2 flex gap-2">
@@ -318,6 +360,14 @@ export function ProblemPicker({
                       title="Only visible through this contest"
                     >
                       Draft
+                    </span>
+                  )}
+                  {problem.published && !problem.listed && (
+                    <span
+                      className="text-xs"
+                      title="Not in the problem library: only through work that uses it"
+                    >
+                      Own
                     </span>
                   )}
                 </Button>

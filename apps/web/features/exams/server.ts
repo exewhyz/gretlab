@@ -18,24 +18,12 @@ import { findAssignment } from "@/features/assignments/server"
 import { requireFeature } from "@/features/settings/server"
 import { ApiError, notFound } from "@/lib/api/route"
 
-import { presentSitting, sittingsOn } from "./sittings"
+import { dbNow, presentSitting, sittingsOn } from "./sittings"
 
-const { and, count, eq, isNotNull } = sql
+const { and, eq, gt, isNotNull } = sql
 
-/**
- * The database's clock. Submissions are stamped by it, so sittings must be too: the web
- * server's clock can differ (a container VM drifts after a laptop sleeps), and a sitting
- * started by one clock and judged by another would drop work done in it.
- */
-async function dbNow(): Promise<Date> {
-  const [row] = (await getDb().execute(sql.sql`select now() as now`)) as unknown as {
-    now: Date | string
-  }[]
-  return new Date(row!.now)
-}
-
-/** At most this many recorded events per sitting, so a looping page can't fill the table. */
-const MAX_EVENTS = 500
+/** At most this many recorded events of each kind per sitting. */
+const MAX_EVENTS = 200
 
 async function examFor(slug: string, user: User) {
   await requireFeature("assignments.enabled")
@@ -71,6 +59,17 @@ export async function startExam(slug: string, user: User, ip: string | null) {
       )
     }
     return presentSitting(existing, now)
+  }
+  // Everyone starts within a window, so nobody can brief a late starter.
+  if (
+    exam.startWithin &&
+    now.getTime() > assignment.opensAt.getTime() + exam.startWithin * 60_000
+  ) {
+    throw new ApiError(
+      409,
+      "exam_start_closed",
+      "The time to start this exam has passed. Ask your teacher."
+    )
   }
   if (!ipAllowed(ip, exam.networks)) {
     throw new ApiError(
@@ -120,22 +119,24 @@ export async function finishExam(slug: string, user: User) {
   return presentSitting(sitting, now)
 }
 
+/**
+ * Records an event, at most MAX_EVENTS of each kind per sitting, so a student who floods
+ * one kind can't push out the others (the count and the insert are one statement).
+ */
 async function record(
   assignmentId: string,
   userId: string,
   kind: ExamEventKind,
   detail = ""
 ) {
-  const [{ n }] = (await getDb()
-    .select({ n: count() })
-    .from(examEvents)
-    .where(
-      and(eq(examEvents.assignmentId, assignmentId), eq(examEvents.userId, userId))
-    )) as [{ n: number }]
-  if (n >= MAX_EVENTS) return
-  await getDb()
-    .insert(examEvents)
-    .values({ assignmentId, userId, kind, detail: detail.slice(0, 200) })
+  await getDb().execute(sql.sql`
+    insert into ${examEvents} (assignment_id, user_id, kind, detail)
+    select ${assignmentId}, ${userId}, ${kind}, ${detail.slice(0, 200)}
+    where (
+      select count(*) from ${examEvents}
+      where assignment_id = ${assignmentId} and user_id = ${userId} and kind = ${kind}
+    ) < ${MAX_EVENTS}
+  `)
 }
 
 /** What the student's browser noticed: leaving the tab or fullscreen, pasting. */
@@ -157,53 +158,114 @@ export async function recordExamEvent(
   return { recorded: true }
 }
 
-/** Exams this student is sitting right now that include this problem. */
-async function sittingNow(userId: string, problemId: string) {
+/** The exam this student is sitting right now, if any, with its problems. */
+export async function activeExam(userId: string) {
+  const now = await dbNow()
   const rows = await getDb()
     .select({ assignment: assignments, sitting: examSessions })
     .from(examSessions)
     .innerJoin(assignments, eq(examSessions.assignmentId, assignments.id))
-    .innerJoin(
-      assignmentProblems,
-      eq(assignmentProblems.assignmentId, assignments.id)
-    )
     .where(
       and(
         eq(examSessions.userId, userId),
-        eq(assignmentProblems.problemId, problemId),
+        gt(examSessions.endsAt, now),
         isNotNull(assignments.exam)
       )
     )
-  const now = await dbNow()
-  return rows.filter((r) => now < sittingClosesAt(r.sitting))
-}
-
-/** During a sitting, its problems can only be submitted from the exam's networks. */
-export async function guardExamSubmission(
-  user: User,
-  problemId: string,
-  ip: string | null
-) {
-  for (const { assignment } of await sittingNow(user.id, problemId)) {
-    if (!ipAllowed(ip, assignment.exam?.networks ?? [])) {
-      await record(assignment.id, user.id, "other_network", ip ?? "unknown")
-      throw new ApiError(
-        403,
-        "exam_network",
-        "During the exam, submit from the lab's network."
-      )
-    }
+  const live = rows.find((r) => now < sittingClosesAt(r.sitting))
+  if (!live) return null
+  const problemIds = (
+    await getDb()
+      .select({ id: assignmentProblems.problemId })
+      .from(assignmentProblems)
+      .where(eq(assignmentProblems.assignmentId, live.assignment.id))
+  ).map((r) => r.id)
+  return {
+    assignment: live.assignment,
+    sitting: live.sitting,
+    problemIds,
+    closesAt: sittingClosesAt(live.sitting),
+    now,
   }
 }
 
-/** Editorials, solutions and hints stay closed while a sitting uses the problem. */
-export async function guardExamSolutions(userId: string, problemId: string) {
-  if ((await sittingNow(userId, problemId)).length > 0) {
+const locked = (message: string) => new ApiError(403, "exam_locked", message)
+
+/**
+ * During a sitting, only the exam's problems can be run or submitted (no playground, no
+ * other problems, contests included), and only from the exam's networks.
+ */
+export async function guardExamSubmission(
+  user: User,
+  problemId: string | null,
+  ip: string | null
+) {
+  const exam = await activeExam(user.id)
+  if (!exam) return false
+  if (!problemId || !exam.problemIds.includes(problemId)) {
+    throw locked("During your exam, only the exam's problems can be run.")
+  }
+  if (!ipAllowed(ip, exam.assignment.exam?.networks ?? [])) {
+    await record(exam.assignment.id, user.id, "other_network", ip ?? "unknown")
+    throw new ApiError(
+      403,
+      "exam_network",
+      "During the exam, submit from the lab's network."
+    )
+  }
+  return true
+}
+
+/** Editorials and solutions, of any problem, are closed during a sitting. */
+export async function guardExamSolutions(userId: string) {
+  if (await activeExam(userId)) {
     throw new ApiError(
       403,
       "exam_running",
-      "Hidden while you're taking an exam with this problem."
+      "Editorials and solutions are closed during your exam."
     )
+  }
+}
+
+/**
+ * What a student may read of their own work during a sitting: the exam's problems, and
+ * only from when the sitting began (earlier code and notes would carry answers in). null
+ * when they aren't sitting an exam.
+ */
+export async function examScope(userId: string) {
+  const exam = await activeExam(userId)
+  return exam
+    ? { problemIds: exam.problemIds, since: exam.sitting.startedAt, exam }
+    : null
+}
+
+/** The exam the student is sitting, for the site-wide lock. */
+export async function myActiveExam(user: User) {
+  const exam = await activeExam(user.id)
+  if (!exam) return null
+  const items = await getDb()
+    .select({ position: assignmentProblems.position })
+    .from(assignmentProblems)
+    .where(eq(assignmentProblems.assignmentId, exam.assignment.id))
+  return {
+    slug: exam.assignment.slug,
+    title: exam.assignment.title,
+    fullscreen: exam.assignment.exam?.fullscreen ?? false,
+    endsAt: exam.closesAt,
+    now: exam.now,
+    problems: items.length,
+  }
+}
+
+/** A network check for writes that carry code in (saved drafts). */
+export async function guardExamNetwork(user: User, problemId: string, ip: string | null) {
+  const exam = await activeExam(user.id)
+  if (!exam) return
+  if (!exam.problemIds.includes(problemId)) {
+    throw locked("During your exam, only the exam's problems can be worked on.")
+  }
+  if (!ipAllowed(ip, exam.assignment.exam?.networks ?? [])) {
+    throw new ApiError(403, "exam_network", "During the exam, work from the lab's network.")
   }
 }
 

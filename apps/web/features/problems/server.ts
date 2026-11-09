@@ -28,6 +28,7 @@ import {
 } from "@/features/catalog/server"
 
 import type { ProblemInput } from "./schemas"
+import { readProblemFile, slugFor, toProblemInput } from "./import"
 
 const { and, asc, count, eq, gt, inArray, isNull, lte, or } = sql
 
@@ -65,7 +66,8 @@ export interface ProblemDetail extends ProblemSummary {
 /** Problems anyone may see: published, and not kept for an organization's members. */
 export const isPublicProblem = and(
   eq(problems.published, true),
-  eq(problems.membersOnly, false)
+  eq(problems.membersOnly, false),
+  eq(problems.listed, true)
 )!
 
 async function numbered(where = isPublicProblem) {
@@ -414,4 +416,48 @@ export async function problemsByIds(ids: string[]) {
   return ids.length
     ? getDb().select().from(problems).where(inArray(problems.id, ids))
     : []
+}
+
+/**
+ * Problems from a problem file (features/problems/import.ts), saved for this owner. Every
+ * problem is checked before any is saved; addresses that are taken get a number added.
+ */
+export async function importProblems(
+  orgId: string | null,
+  raw: unknown,
+  options: { listed: boolean; published: boolean }
+) {
+  const { problems: found, errors } = readProblemFile(raw)
+  if (errors.length) {
+    throw new ApiError(400, "invalid_file", errors.slice(0, 5).join(" "))
+  }
+  const wanted = found.map(slugFor)
+  const taken = new Set(
+    (
+      await getDb()
+        .select({ slug: problems.slug })
+        .from(problems)
+        .where(
+          or(...wanted.map((s) => sql.like(problems.slug, `${s}%`)))
+        )
+    ).map((r) => r.slug)
+  )
+  const inputs = found.map((p, index) => {
+    const base = wanted[index]!.slice(0, 56)
+    let slug = base
+    for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`
+    taken.add(slug)
+    try {
+      return toProblemInput(p, slug, options)
+    } catch (error) {
+      const issue = error instanceof Error ? error.message : "invalid"
+      throw new ApiError(400, "invalid_file", `Problem ${index + 1} (${p.title}): ${issue}`)
+    }
+  })
+  const created: { id: string; title: string; slug: string }[] = []
+  for (const input of inputs) {
+    const saved = await saveProblem(null, input, orgId)
+    created.push({ id: saved.id, title: saved.title, slug: saved.slug })
+  }
+  return { created }
 }

@@ -13,12 +13,16 @@ import {
 import { ScopeSwitcher } from "@/features/account/scope-switcher"
 import { useViewer } from "@/features/account/use-viewer"
 import { Brand } from "@/features/lab/components/brand"
+import { ExamHeader, useExamLock } from "@/features/exams/components/exam-lock"
 
 const DEFAULT_TITLE = "Python Practice Lab"
 
 /** The one header used on every page. `children` sit after the main sections. */
 export function PageHeader({ children }: { children?: ReactNode }) {
   const { data: viewer } = useViewer()
+  const exam = useExamLock()
+  // During an exam sitting nothing leads away from it.
+  if (exam) return <ExamHeader exam={exam} />
 
   return (
     <header className="sticky top-0 z-30 flex h-14 flex-none items-center gap-3 border-b border-hairline bg-canvas px-4">

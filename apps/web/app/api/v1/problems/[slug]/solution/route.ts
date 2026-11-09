@@ -21,7 +21,7 @@ export const GET = route({ access: "user" }, async ({ user, params }) => {
   }
   if (!writer) {
     const settings = await requireFeature("practice.show_solutions")
-    await guardExamSolutions(user.id, problem.id)
+    await guardExamSolutions(user.id)
     if (await isInLiveContest(problem.id)) {
       throw new ApiError(
         403,

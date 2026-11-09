@@ -2,27 +2,15 @@
 
 import Link from "next/link"
 
-import {
-  ExamGuard,
-  useProblemAssignments,
-} from "@/features/exams/components/exam"
+import { useProblemAssignments } from "@/features/exams/components/exam"
 import { formatDateTime } from "@/lib/format"
 
 /** "Part of Week 3, due Tue 10 Nov" under a problem's title; during an exam, its clock. */
 export function AssignmentChips({ problemSlug }: { problemSlug: string }) {
   const { data } = useProblemAssignments(problemSlug)
   if (!data?.length) return null
-  const sitting = data.find((a) => a.exam?.sitting.status === "in_progress")
   return (
     <div className="-mt-2 mb-4 flex flex-wrap gap-1.5">
-      {sitting?.exam?.sitting.endsAt && (
-        <ExamGuard
-          slug={sitting.slug}
-          title={sitting.title}
-          fullscreen={sitting.exam.fullscreen}
-          endsAt={sitting.exam.sitting.endsAt}
-        />
-      )}
       {data.map((due) => (
         <Link
           key={due.slug}

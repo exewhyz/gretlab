@@ -1,0 +1,37 @@
+{
+  "format": "gretlab-problems",
+  "version": 1,
+  "problems": [
+    {
+      "title": "Sum of Two Numbers",
+      "level": "easy",
+      "statement": "Read two integers and print their **sum**.\n\nUse this to check the import works before writing your own problems.",
+      "input": ["Line 1: `a`", "Line 2: `b`"],
+      "output": ["Line 1: `a + b`"],
+      "constraints": ["-10^9 ≤ a, b ≤ 10^9"],
+      "samples": [
+        { "input": "2\n3", "output": "5" },
+        { "input": "-4\n10", "output": "6" }
+      ],
+      "tests": [
+        { "input": "0\n0", "output": "0" },
+        { "input": "1000000000\n1000000000", "output": "2000000000", "points": 2 }
+      ],
+      "code": {
+        "python": {
+          "starter": "a = int(input())\nb = int(input())\n\n# Your code here\n",
+          "solution": "a = int(input())\nb = int(input())\nprint(a + b)\n"
+        },
+        "cpp": {
+          "solution": "#include <iostream>\nint main() {\n    long long a, b;\n    std::cin >> a >> b;\n    std::cout << a + b << std::endl;\n}\n"
+        }
+      },
+      "hints": ["Read each number on its own line, then convert it to an integer."],
+      "editorial": "Read both numbers and print `a + b`. In C++ use `long long`: the sum can pass 2^31.",
+      "tags": ["basics"],
+      "timeLimitMs": null,
+      "memoryLimitMb": null,
+      "languages": null
+    }
+  ]
+}

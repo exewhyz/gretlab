@@ -45,6 +45,8 @@ export interface WorkbenchProps {
   /** Ad slots. The workbench only decides where they go, never whether they show. */
   sidebarAd?: ReactNode
   pageEndAd?: ReactNode
+  /** An exam sitting: no notes (they'd carry answers in) and no editorial. */
+  examMode?: boolean
 }
 
 /** The student app shell: top bar, question list, problem, resizable editor. */
@@ -63,6 +65,7 @@ export function Workbench({
   banner,
   sidebarAd,
   pageEndAd,
+  examMode = false,
 }: WorkbenchProps) {
   const current = questions.find((q) => q.id === activeId) ?? questions[0]
   const layout = useLocalStore(layoutStore, (value) => value)
@@ -188,18 +191,22 @@ export function Workbench({
               >
                 Problem
               </TabButton>
-              <EditorialTabButton
-                problemSlug={current.id}
-                selected={leftTab === "editorial"}
-                onClick={() => setLeftTab("editorial")}
-              />
-              <TabButton
-                selected={leftTab === "notes"}
-                className="py-3"
-                onClick={() => setLeftTab("notes")}
-              >
-                Notes
-              </TabButton>
+              {!examMode && (
+                <EditorialTabButton
+                  problemSlug={current.id}
+                  selected={leftTab === "editorial"}
+                  onClick={() => setLeftTab("editorial")}
+                />
+              )}
+              {!examMode && (
+                <TabButton
+                  selected={leftTab === "notes"}
+                  className="py-3"
+                  onClick={() => setLeftTab("notes")}
+                >
+                  Notes
+                </TabButton>
+              )}
               <TabButton
                 selected={leftTab === "submissions"}
                 className="py-3"

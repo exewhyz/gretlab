@@ -1,4 +1,4 @@
-import { EXAM_EVENTS } from "@workspace/judge"
+import { BROWSER_EXAM_EVENTS } from "@workspace/judge"
 import { z } from "zod"
 
 export const rubricMarksSchema = z.object({
@@ -25,6 +25,7 @@ export const extendSchema = z.object({
 })
 
 export const examEventSchema = z.object({
-  kind: z.enum(EXAM_EVENTS),
+  // The server records other kinds (another network) itself.
+  kind: z.enum(BROWSER_EXAM_EVENTS),
   detail: z.string().max(200).optional(),
 })

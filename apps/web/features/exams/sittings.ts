@@ -3,6 +3,18 @@ import { sittingClosesAt, type ExamSitting } from "@workspace/judge"
 
 const { and, asc, count, eq, inArray } = sql
 
+/**
+ * The database's clock. Submissions are stamped by it, so sittings must be too: the web
+ * server's clock can differ (a container VM drifts after a laptop sleeps), and a sitting
+ * started by one clock and judged by another would drop work done in it.
+ */
+export async function dbNow(): Promise<Date> {
+  const [row] = (await getDb().execute(sql.sql`select now() as now`)) as unknown as {
+    now: Date | string
+  }[]
+  return new Date(row!.now)
+}
+
 export type Sitting = ExamSitting & { ip: string | null }
 
 /** Sittings of these exams, by assignment then student; for one student or everyone. */

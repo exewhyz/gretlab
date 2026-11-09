@@ -400,6 +400,7 @@ export async function checkUsableProblems(
       id: problems.id,
       published: problems.published,
       membersOnly: problems.membersOnly,
+      listed: problems.listed,
       orgId: problems.orgId,
     })
     .from(problems)
@@ -411,7 +412,11 @@ export async function checkUsableProblems(
       "A chosen problem no longer exists."
     )
   }
-  if (found.some((p) => (!p.published || p.membersOnly) && p.orgId !== orgId)) {
+  if (
+    found.some(
+      (p) => (!p.published || p.membersOnly || !p.listed) && p.orgId !== orgId
+    )
+  ) {
     throw new ApiError(
       400,
       "draft_problem",

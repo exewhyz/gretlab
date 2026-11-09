@@ -7,6 +7,13 @@ import { useState, type ReactNode } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -69,7 +76,61 @@ const EMPTY: ProblemInput = {
   allowedLanguages: null,
   published: false,
   membersOnly: false,
+  listed: true,
   tests: [{ input: "", expected: "", isSample: true, points: 1 }],
+}
+
+/** A problem written inside an assignment, exam or contest form: ready, and not in the library. */
+export const ASSESSMENT_PROBLEM: Partial<ProblemInput> = {
+  published: true,
+  listed: false,
+}
+
+/**
+ * Writing a problem without leaving an assignment or contest form. It's saved for this
+ * owner, kept out of the library, and handed back to be added.
+ */
+export function NewProblemDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onCreated: (problem: { id: string; title: string }) => void
+}) {
+  const owner = useOwner()
+  const list = useQuery({
+    queryKey: owner.key("problems"),
+    queryFn: () => api<StaffProblemList>(owner.api("/problems")),
+    enabled: open,
+  })
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>Write a problem</DialogTitle>
+          <DialogDescription>
+            It belongs to this assignment or contest: students reach it only through
+            work that uses it, never in the problem library.
+          </DialogDescription>
+        </DialogHeader>
+        {list.data ? (
+          <ProblemEditor
+            id={null}
+            initial={{ ...EMPTY, ...ASSESSMENT_PROBLEM }}
+            units={list.data.units}
+            onSaved={(saved) => {
+              onCreated(saved)
+              onOpenChange(false)
+            }}
+          />
+        ) : (
+          <Loading error={list.error} />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 export function ProblemEditorPage({ id }: { id: string | null }) {
@@ -100,10 +161,13 @@ function ProblemEditor({
   id,
   initial,
   units,
+  onSaved,
 }: {
   id: string | null
   initial: ProblemInput
   units: StaffProblemList["units"]
+  /** Embedded in another form: hand the new problem back instead of opening its page. */
+  onSaved?: (problem: { id: string; title: string }) => void
 }) {
   const owner = useOwner()
   const router = useRouter()
@@ -215,7 +279,8 @@ function ProblemEditor({
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: ["admin"] })
       setMessage({ text: "Saved.", kind: "ok" })
-      if (!id) router.push(owner.page(`/problems/${saved.id}`))
+      if (onSaved) onSaved({ id: saved.id, title: form.title })
+      else if (!id) router.push(owner.page(`/problems/${saved.id}`))
     },
     onError: (error) => setMessage({ text: error.message, kind: "err" }),
   })
@@ -241,7 +306,7 @@ function ProblemEditor({
 
   return (
     <>
-      <PageTitle>{id ? "Edit problem" : "New problem"}</PageTitle>
+      {!onSaved && <PageTitle>{id ? "Edit problem" : "New problem"}</PageTitle>}
       <Card className="grid gap-4">
         <div className="grid gap-3 min-[901px]:grid-cols-[2fr_1fr_1fr]">
           <Field label="Title">
@@ -563,9 +628,16 @@ function ProblemEditor({
               checked={form.published}
               onCheckedChange={(checked) => set("published", checked)}
             />
-            Published in practice
+            {form.listed ? "Published in practice" : "Ready for students"}
           </label>
-          {owner.orgSlug && (
+          <label className="inline-flex items-center gap-2 text-ink">
+            <Checkbox
+              checked={form.listed}
+              onCheckedChange={(checked) => set("listed", checked)}
+            />
+            Show in the problem library
+          </label>
+          {owner.orgSlug && form.listed && (
             <label className="inline-flex items-center gap-2 text-ink">
               <Checkbox
                 checked={form.membersOnly}
@@ -577,7 +649,7 @@ function ProblemEditor({
           <span className="min-w-45 flex-1">
             <FormMessage message={message} />
           </span>
-          {id && (
+          {id && !onSaved && (
             <ConfirmButton
               variant="destructive"
               title={`Delete ${form.title || "this problem"}?`}

@@ -4,13 +4,14 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 
-import { buttonVariants } from "@workspace/ui/components/button"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { SelectInput, TextInput } from "@/components/form"
 import { api } from "@/lib/api/client"
 import { useOwner } from "@/features/admin/owner"
 
+import { ImportProblemsDialog } from "./problem-import"
 import { Loading, PageTitle, Table } from "./shell"
 
 export interface StaffProblemList {
@@ -23,6 +24,8 @@ export interface StaffProblemList {
     position: number
     unitId: string | null
     published: boolean
+    /** false: written for assignments, exams or contests, not in the library. */
+    listed: boolean
     testCount: number
   }[]
 }
@@ -36,6 +39,7 @@ export function AdminProblems() {
   const [search, setSearch] = useState("")
   const [unit, setUnit] = useState("")
   const [state, setState] = useState("")
+  const [importing, setImporting] = useState(false)
 
   // Course order: by unit, then by position inside it, as students see them.
   const rows = useMemo(() => {
@@ -49,7 +53,10 @@ export function AdminProblems() {
             problem.title.toLowerCase().includes(query) ||
             problem.slug.toLowerCase().includes(query)) &&
           (!unit || problem.unitId === unit) &&
-          (!state || (state === "published") === problem.published)
+          (!state ||
+            (state === "own"
+              ? !problem.listed
+              : (state === "published") === problem.published))
       )
       .sort(
         (a, b) =>
@@ -69,12 +76,17 @@ export function AdminProblems() {
     <>
       <PageTitle
         action={
-          <Link
-            href={owner.page("/problems/new")}
-            className={cn(buttonVariants({ size: "sm" }))}
-          >
-            New problem
-          </Link>
+          <span className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
+              Import
+            </Button>
+            <Link
+              href={owner.page("/problems/new")}
+              className={cn(buttonVariants({ size: "sm" }))}
+            >
+              New problem
+            </Link>
+          </span>
         }
       >
         Problems
@@ -113,8 +125,10 @@ export function AdminProblems() {
           <option value="">Any status</option>
           <option value="published">Published</option>
           <option value="draft">Draft</option>
+          <option value="own">Not in the library</option>
         </SelectInput>
       </div>
+      <ImportProblemsDialog open={importing} onOpenChange={setImporting} />
       <Table headers={["Title", "Unit", "Level", "Tests", "Status", ""]}>
         {rows.map((problem) => (
           <tr key={problem.id}>
@@ -140,9 +154,17 @@ export function AdminProblems() {
               >
                 {problem.published ? "Published" : "Draft"}
               </span>
+              {!problem.listed && (
+                <span
+                  className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs text-body"
+                  title="Only through the assignments, exams and contests that use it"
+                >
+                  Not in library
+                </span>
+              )}
             </td>
             <td className="text-right">
-              {problem.published && (
+              {problem.published && problem.listed && (
                 <Link
                   href={`/problems/${problem.slug}`}
                   className="text-caption underline underline-offset-2"

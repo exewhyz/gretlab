@@ -5,6 +5,7 @@ import { z } from "zod"
 import { ApiError, notFound } from "@/lib/api/route"
 import { getProblemBySlug } from "@/features/problems/server"
 import { canReachProblem } from "@/features/submissions/server"
+import { examScope, guardExamNetwork } from "@/features/exams/server"
 
 /*
  * Drafts: the code a student is writing, saved to their account every few seconds, so it
@@ -13,7 +14,7 @@ import { canReachProblem } from "@/features/submissions/server"
  * graded work on the assignment (see `studentAttempts`).
  */
 
-const { and, asc, desc, eq } = sql
+const { and, asc, desc, eq, gte } = sql
 
 /** Snapshots kept per student, problem and language; the oldest go first. */
 const KEEP_SNAPSHOTS = 2000
@@ -35,6 +36,11 @@ async function reachable(user: User, slug: string) {
 /** The signed-in student's drafts on a problem, one per language. */
 export async function myDrafts(user: User, slug: string) {
   const problem = await reachable(user, slug)
+  // During an exam: only the exam's problems, and only code written since it began.
+  const scope = await examScope(user.id)
+  if (scope && !scope.problemIds.includes(problem.id)) {
+    throw new ApiError(403, "exam_locked", "Closed during your exam.")
+  }
   const rows = await getDb()
     .select({
       language: drafts.language,
@@ -43,16 +49,25 @@ export async function myDrafts(user: User, slug: string) {
       updatedAt: drafts.updatedAt,
     })
     .from(drafts)
-    .where(and(eq(drafts.userId, user.id), eq(drafts.problemId, problem.id)))
+    .where(
+      and(
+        eq(drafts.userId, user.id),
+        eq(drafts.problemId, problem.id),
+        scope ? gte(drafts.updatedAt, scope.since) : undefined
+      )
+    )
   return { drafts: rows }
 }
 
 export async function saveDraft(
   user: User,
   slug: string,
-  input: z.infer<typeof draftSchema>
+  input: z.infer<typeof draftSchema>,
+  ip: string | null = null
 ) {
   const problem = await reachable(user, slug)
+  // Code written elsewhere mustn't arrive in the lab through a draft.
+  await guardExamNetwork(user, problem.id, ip)
   if (!input.files.some((f) => f.path === input.entry)) {
     throw new ApiError(
       400,

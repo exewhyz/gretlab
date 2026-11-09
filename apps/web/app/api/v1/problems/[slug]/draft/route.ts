@@ -1,3 +1,4 @@
+import { clientIp } from "@/lib/api/client-ip"
 import { route } from "@/lib/api/route"
 import { draftSchema, myDrafts, saveDraft } from "@/features/drafts/server"
 
@@ -9,5 +10,6 @@ export const GET = route({ access: "user" }, ({ user, params }) =>
 /** Saves your code on this problem in one language, as you type. */
 export const PUT = route(
   { access: "user", body: draftSchema },
-  ({ user, params, body }) => saveDraft(user, params.slug ?? "", body)
+  ({ user, params, body, request }) =>
+    saveDraft(user, params.slug ?? "", body, clientIp(request))
 )

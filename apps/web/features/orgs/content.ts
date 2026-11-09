@@ -6,6 +6,7 @@ import {
   deleteLineComment,
   releaseFeedback,
   extendStudentSitting,
+  forgetExamAddresses,
   setRubricMarks,
   listAssignments,
   getAssignmentForStaff,
@@ -36,6 +37,7 @@ import {
   listNotes,
   listProblemsForStaff,
   saveProblem,
+  importProblems,
   type ProblemSummary,
 } from "@/features/problems/server"
 import { ApiError } from "@/lib/api/route"
@@ -222,6 +224,23 @@ export async function orgProblem(slug: string, user: User, id: string) {
   const ctx = await orgContext(slug, user)
   needAnywhere(ctx, "problems.manage")
   return getProblemForStaff(id, ctx.org.id)
+}
+
+export async function orgImportProblems(
+  slug: string,
+  user: User,
+  input: { file: unknown; listed: boolean; published: boolean }
+) {
+  const ctx = await orgContext(slug, user)
+  needAnywhere(ctx, "problems.manage")
+  const result = await importProblems(ctx.org.id, input.file, input)
+  await writeAudit(
+    ctx,
+    "problem.import",
+    `Imported ${result.created.length} problems`,
+    { problems: result.created.map((p) => p.slug) }
+  )
+  return result
 }
 
 export async function saveOrgProblem(
@@ -449,6 +468,14 @@ export async function orgExtendSitting(
     minutes: input.minutes,
   })
   return sitting
+}
+
+export async function orgForgetExamAddresses(slug: string, user: User, id: string) {
+  const { ctx } = await feedbackContext(slug, user)
+  await forgetExamAddresses(id, ctx.org.id)
+  await writeAudit(ctx, "assignment.exam_addresses", "Forgot an exam's network addresses", {
+    assignment: id,
+  })
 }
 
 export async function orgReleaseFeedback(slug: string, user: User, id: string) {

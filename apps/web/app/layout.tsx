@@ -8,6 +8,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { QueryProvider } from "@/components/query-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ADSENSE_CLIENT } from "@/features/ads/config"
+import { ExamLockProvider } from "@/features/exams/components/exam-lock"
 
 // Inter stands in for the design system's licensed CursorGothic.
 const fontSans = Inter({ subsets: ["latin"], variable: "--font-sans" })
@@ -41,7 +42,9 @@ export default function RootLayout({
     >
       <body>
         <ThemeProvider>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            <ExamLockProvider>{children}</ExamLockProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

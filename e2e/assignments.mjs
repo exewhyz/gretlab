@@ -4,7 +4,7 @@
  *   node e2e/assignments.mjs [base-url] [screenshot-dir]
  */
 import { execFileSync } from "node:child_process"
-import { mkdirSync } from "node:fs"
+import { mkdirSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 
 const ROOT = new URL("../", import.meta.url).pathname
@@ -25,6 +25,7 @@ const psql = (q) => execFileSync("docker", ["compose", "-f", ROOT + "docker-comp
 const PEOPLE = [["asg-a@example.com", "student", "Asha"], ["asg-b@example.com", "student", "=HYPERLINK(\"x\")"], ["asg-t@example.com", "teacher", "Teacher"], ["asg-admin@example.com", "admin", "Admin"]]
 psql(`delete from assignments where slug like 'asg-%'`)
 psql(`delete from submissions where user_id in (select id from users where email like 'asg-%')`)
+psql(`delete from problems where slug like 'sum-of-two-numbers%' and listed = false`)
 psql(`delete from settings where key in ('assignments.enabled','submissions.per_minute')`)
 for (const [email, role, name] of PEOPLE) {
   const handle = email.split("@")[0]
@@ -194,9 +195,31 @@ check("the problem page knows the exam is on", (await a("/problems/p1/assignment
 check("submitting from outside the lab is refused", (await a("/submissions", { headers: HOME, body: { kind: "submit", language: "python", entry: "main.py", files: [{ path: "main.py", content: SI }], problemSlug: "p1" } })).json?.error?.code === "exam_network")
 check("solved from the lab", (await submit(a, "p1", SI, LAB)).verdict === "AC")
 check("work during the sitting counts", (await a("/assignments/asg-exam")).json.earned === 100)
+// The whole site is locked to the exam while it runs.
+const runCode = (headers, extra = {}) => a("/submissions", { headers, body: { kind: "run", language: "python", entry: "main.py", files: [{ path: "main.py", content: "print(1)\n" }], inputs: [""], ...extra } })
+check("the site knows the exam is on", (await a("/me/exam")).json?.exam?.slug === "asg-exam" && (await b("/me/exam")).json?.exam === null)
+check("locked: no playground runs", (await runCode(LAB)).json?.error?.code === "exam_locked")
+check("locked: no other problems", (await runCode(LAB, { problemSlug: "p3" })).json?.error?.code === "exam_locked")
+check("locked: the library's problems aren't served", (await a("/problems/p3")).json?.error?.code === "exam_locked")
+check("locked: no editorial of any problem", (await a("/problems/p9/solution")).json?.error?.code === "exam_running")
+check("locked: notes are closed", (await a("/problems/p1/note")).json?.error?.code === "exam_locked")
+check("locked: earlier code on the exam's problems is gone from the list", (await a("/submissions?problem=p1")).json.every((x) => new Date(x.createdAt) >= new Date(started.json.startedAt)))
+const earlier = (await t(`/admin/assignments/${week1.json.id}/attempts?student=asg-a@example.com&problem=${id("p1")}`)).json.attempts.at(-1)
+check("locked: and can't be opened by id", (await a(`/submissions/${earlier.id}`)).json?.error?.code === "exam_locked")
+check("locked: drafts from before the exam don't come back", (await a("/problems/p1/draft")).json?.drafts?.length === 0)
+check("locked: no drafts for other problems", (await a("/problems/p3/draft", { method: "PUT", headers: LAB, body: { language: "python", entry: "main.py", files: [{ path: "main.py", content: "x" }] } })).json?.error?.code === "exam_locked")
+check("locked: drafts only from the lab's network", (await a("/problems/p1/draft", { method: "PUT", headers: HOME, body: { language: "python", entry: "main.py", files: [{ path: "main.py", content: "x" }] } })).json?.error?.code === "exam_network")
+const q1 = (await a("/assignments/asg-exam/problems/1")).json
+check("the exam's problems are served on its own pages, numbered by it", q1.problem?.label === "Q1" && q1.summaries.length === 2 && q1.problem.hints.length === 0 && !q1.problem.hasSolution, JSON.stringify(q1.problem ?? q1).slice(0, 150))
+check("not to someone who hasn't started", (await b("/assignments/asg-exam/problems/1")).json?.error?.code === "exam_not_started")
+check("an ordinary assignment's page keeps its hints", (await a("/assignments/asg-week-1/problems/1")).json.problem?.hints?.length > 0)
+check("a started exam stays an exam", (await t(examBase, { method: "PUT", body: body({ title: "Lab exam", slug: "asg-exam", allowLate: false, published: true, exam: null }) })).json?.error?.code === "exam_started")
+check("and keeps its problems", (await t(examBase, { method: "PUT", body: body({ title: "Lab exam", slug: "asg-exam", allowLate: false, published: true, exam: EXAM, problems: [{ problemId: id("p1"), points: 100 }] }) })).json?.error?.code === "exam_started")
+check("its time can still change", (await t(examBase, { method: "PUT", body: body({ title: "Lab exam", slug: "asg-exam", allowLate: false, published: true, exam: { ...EXAM, minutes: 45 } }) })).status === 200)
 const event = (api, kind) => api("/assignments/asg-exam/exam/events", { body: { kind, detail: "test" } })
 check("the browser reports leaving the tab", (await event(a, "left_tab")).json?.recorded === true)
 check("only known kinds", (await event(a, "hacked")).status === 400)
+check("the browser can't report another network itself", (await event(a, "other_network")).status === 400)
 check("nothing is recorded for someone not sitting it", (await event(b, "left_tab")).json?.recorded === false)
 const examBook = (await t(examBase + "/gradebook")).json
 const examRow = examBook.rows.find((r) => r.email === "asg-a@example.com")
@@ -215,6 +238,20 @@ check("not to someone who never started", (await t(examBase + "/extend", { body:
 await a("/assignments/asg-exam/exam/finish", { method: "POST" })
 const examCsv = await (await t(examBase + "/gradebook?format=csv", { raw: true })).text()
 check("the CSV has the exam and its warnings", examCsv.includes("Exam,Exam warnings") && examCsv.split("\r\n").some((l) => l.startsWith("Asha,") && l.endsWith(",Finished,2")), examCsv.split("\r\n").slice(0, 2).join(" | "))
+check("forgetting the addresses", (await t(examBase + "/forget-addresses", { method: "POST" })).status === 200 && (await t(`${examBase}/attempts?student=asg-a@example.com&problem=${id("p1")}`)).json.exam.ip === null)
+const windowExam = await t("/admin/assignments", { body: body({ title: "Window exam", slug: "asg-exam-window", allowLate: false, published: true, opensAt: hours(-2), exam: { minutes: 30, fullscreen: false, networks: [], startWithin: 15 } }) })
+check("an exam can limit when students start", windowExam.status === 200 && (await a("/assignments/asg-exam-window/exam", { method: "POST" })).json?.error?.code === "exam_start_closed")
+// Problems of its own: imported for the assessment, never in the library.
+const imported = await t("/admin/problems/import", { body: { file: JSON.parse(readFileSync(ROOT + "apps/web/public/problem-template.json", "utf8")), listed: false, published: true } })
+check("problems import from the template file", imported.status === 200 && imported.json.created.length === 1, JSON.stringify(imported.json).slice(0, 150))
+const own = imported.json.created[0]
+check("a bad file names the problem and field", (await t("/admin/problems/import", { body: { file: { problems: [{ title: "Broken", statement: "x", samples: [] }] }, listed: false, published: true } })).json?.error?.message?.includes("Problem 1 (Broken): samples"))
+check("an assessment's own problem isn't in the library", !(await a("/problems")).json.problems?.some?.((p) => p.slug === own.slug) && (await a(`/problems/${own.slug}`)).status === 404)
+check("nor can it be practised outside the work that uses it", (await a("/submissions", { body: { kind: "run", language: "python", entry: "main.py", files: [{ path: "main.py", content: "print(5)" }], inputs: ["2\n3"], problemSlug: own.slug } })).status === 404)
+const ownAsg = await t("/admin/assignments", { body: body({ title: "Own problems", slug: "asg-own", allowLate: false, published: true, problems: [{ problemId: own.id, points: 10 }] }) })
+check("an assignment uses it", ownAsg.status === 200)
+check("and its students solve it there", (await submit(a, own.slug, "a = int(input())\nb = int(input())\nprint(a + b)\n")).verdict === "AC" && (await a("/assignments/asg-own")).json.earned === 10)
+check("the template is served", (await fetch(BASE + "/problem-template.json")).status === 200)
 // For the pages: an exam without a network rule.
 const exam2 = await t("/admin/assignments", { body: body({ title: "Quiz exam", slug: "asg-exam2", allowLate: false, published: true, exam: { minutes: 20, fullscreen: true, networks: [] }, problems: [{ problemId: id("p1"), points: 10 }] }) })
 
@@ -250,8 +287,14 @@ await s.getByTestId("assignment-problem").first().waitFor({ timeout: 15000 })
 check("assignment page shows marks per problem", await s.getByText("100 / 150 points").isVisible() && await s.getByRole("cell", { name: "Solved", exact: true }).isVisible())
 await s.screenshot({ path: SHOTS + "assignment.png", fullPage: true })
 await s.getByRole("link", { name: "Simple Interest" }).click()
+await s.waitForURL(/\/assignments\/asg-week-1\/problems\/1$/, { timeout: 30000 })
+await s.getByRole("heading", { name: "Q1. Simple Interest" }).waitFor({ timeout: 30000 })
+const assignmentList = await s.getByRole("navigation", { name: "Problems" }).innerText()
+check("an assignment's problems open on its own pages, numbered by it", assignmentList.includes("Q1") && assignmentList.includes("Q2") && !/\bP\d/.test(assignmentList), assignmentList)
+await s.screenshot({ path: SHOTS + "assignment-problem.png" })
+await s.goto(`${BASE}/problems/p1`)
 await s.getByTestId("assignment-chip").first().waitFor({ timeout: 30000 })
-check("problem page links back to its assignment", (await s.getByTestId("assignment-chip").first().textContent()).includes("Week 1"))
+check("the library page links back to its assignment", (await s.getByTestId("assignment-chip").first().textContent()).includes("Week 1"))
 
 const tp = await open("asg-t@example.com")
 await tp.goto(`${BASE}/admin/assignments/new`)
@@ -327,9 +370,9 @@ check("the assignment page breaks marks down", (await s.getByTestId("rubric-brea
 // A lab exam from the student's side.
 const xs = await open("asg-b@example.com")
 await xs.goto(`${BASE}/problems/p1`)
-await xs.getByTestId("assignment-chip").filter({ hasText: "Quiz exam" }).waitFor({ timeout: 30000 })
-check("before the exam the chip says how to start", (await xs.getByTestId("assignment-chip").filter({ hasText: "Quiz exam" }).innerText()).includes("start it from its page"))
-check("and hints show as usual", await xs.getByRole("heading", { name: "Hints" }).isVisible())
+await xs.getByRole("heading", { name: "Hints" }).waitFor({ timeout: 30000 })
+await xs.waitForTimeout(1000)
+check("before the exam, a library problem doesn't say it's in one", (await xs.getByTestId("assignment-chip").filter({ hasText: "Quiz exam" }).count()) === 0)
 await xs.goto(`${BASE}/assignments/asg-exam2`)
 await xs.getByTestId("exam-panel").waitFor({ timeout: 30000 })
 check("the exam page lists the rules, no problems", (await xs.getByTestId("exam-panel").innerText()).includes("20 minutes from when you start") && (await xs.getByTestId("assignment-problem").count()) === 0)
@@ -340,14 +383,24 @@ await xs.getByTestId("exam-clock").waitFor({ timeout: 15000 })
 await xs.getByTestId("assignment-problem").first().waitFor({ timeout: 15000 })
 check("started: the clock and the problems", /^(19|20):\d\d$/.test(await xs.getByTestId("exam-clock").innerText()), await xs.getByTestId("exam-clock").innerText())
 await xs.screenshot({ path: SHOTS + "exam-running.png", fullPage: true })
+check("the header shrinks to the exam and its clock", await xs.getByTestId("exam-header").isVisible() && /^\d+:\d\d left$/.test(await xs.getByTestId("exam-timer").innerText()) && (await xs.getByRole("link", { name: "Problems", exact: true }).count()) === 0)
 await xs.getByRole("link", { name: "Simple Interest" }).click()
-await xs.waitForURL(/\/problems\/p1$/, { timeout: 30000 })
-await xs.getByTestId("assignment-chip").filter({ hasText: "Quiz exam" }).waitFor({ timeout: 30000 })
-await xs.getByTestId("exam-timer").waitFor({ timeout: 30000 })
-check("the problem page shows the time left", (await xs.getByTestId("exam-timer").innerText()).includes("Quiz exam ·"))
-check("hints are hidden during the exam", (await xs.getByRole("heading", { name: "Sample Test Cases" }).count()) === 1 && (await xs.getByRole("heading", { name: "Hints" }).count()) === 0)
-check("and the chip says it's the exam being taken", (await xs.getByTestId("assignment-chip").filter({ hasText: "Quiz exam" }).innerText()).includes("the exam you're taking"))
+await xs.waitForURL(/\/assignments\/asg-exam2\/problems\/1$/, { timeout: 30000 })
+await xs.getByRole("heading", { name: "Q1. Simple Interest" }).waitFor({ timeout: 30000 })
+const examList = await xs.getByRole("navigation", { name: "Problems" }).innerText()
+check("exam problems are numbered by the exam, alone in the list", examList.includes("Q1") && !examList.includes("Q2") && !/\bP\d/.test(examList) && (await xs.getByText("P1.").count()) === 0, examList)
+check("no hints, notes or editorial during the exam", (await xs.getByRole("heading", { name: "Sample Test Cases" }).count()) === 1 && (await xs.getByRole("heading", { name: "Hints" }).count()) === 0 && (await xs.getByRole("tab", { name: "Notes" }).count()) === 0 && (await xs.getByRole("tab", { name: "Editorial" }).count()) === 0)
 await xs.screenshot({ path: SHOTS + "exam-problem.png" })
+for (const away of ["/problems", "/problems/p9", "/playground", "/contests", "/submissions"]) {
+  await xs.goto(BASE + away)
+  await xs.waitForURL(/\/assignments\/asg-exam2$/, { timeout: 30000 })
+}
+check("every other page sends the student back to the exam", xs.url().endsWith("/assignments/asg-exam2"))
+await xs.evaluate(() => document.exitFullscreen?.().catch(() => {}))
+await xs.getByRole("alertdialog", { name: "Return to fullscreen" }).waitFor({ timeout: 15000 })
+check("outside fullscreen nothing else can be reached, keyboard included", await xs.evaluate(() => Boolean(document.querySelector("header")?.closest("[inert]")) && Boolean(document.querySelector("main")?.closest("[inert]")) && !document.querySelector("[role=alertdialog]")?.closest("[inert]")))
+await xs.screenshot({ path: SHOTS + "exam-cover.png" })
+await xs.getByRole("button", { name: "Return to fullscreen" }).click()
 await tp.goto(`${BASE}/admin/assignments/${exam2.json.id}/grades`)
 await tp.getByTestId("exam-cell").first().waitFor({ timeout: 15000 })
 check("the gradebook shows who is sitting it", (await tp.getByTestId("grade-row").filter({ hasText: "asg-b@example.com" }).getByTestId("exam-cell").innerText()).includes("In progress"))
@@ -365,6 +418,7 @@ await browser.close()
 
 psql(`delete from assignments where slug like 'asg-%'`)
 psql(`delete from submissions where user_id in (select id from users where email like 'asg-%')`)
+psql(`delete from problems where slug like 'sum-of-two-numbers%' and listed = false`)
 psql(`delete from users where email like 'asg-%'`)
 psql(`delete from settings where key in ('assignments.enabled','submissions.per_minute')`)
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED")

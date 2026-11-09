@@ -1,4 +1,7 @@
 import {
+  assignmentProblems,
+  assignments,
+  examSessions,
   contestParticipants,
   contestProblems,
   contests,
@@ -25,7 +28,7 @@ import { getLanguages, requireFeature } from "@/features/settings/server"
 import { contestFor } from "@/features/contests/server"
 import { accessTo, orgPolicy, viewpoint } from "@/features/orgs/access"
 import { cached } from "@/lib/ttl-cache"
-import { guardExamSubmission } from "@/features/exams/server"
+import { examScope, guardExamSubmission } from "@/features/exams/server"
 
 const { and, asc, count, desc, eq, gte, inArray, lt, ne } = sql
 
@@ -125,17 +128,75 @@ export async function canEditProblem(
 /** Whether someone may open and practise a problem outside a contest. */
 export async function canReachProblem(
   user: User | null,
-  problem: { published: boolean; membersOnly: boolean; orgId: string | null }
+  problem: {
+    id: string
+    published: boolean
+    membersOnly: boolean
+    listed: boolean
+    orgId: string | null
+  }
 ) {
-  if (problem.published && !problem.membersOnly) return true
+  if (problem.published && !problem.membersOnly && problem.listed) return true
   const vp = await viewpoint(user)
   const content = { orgId: problem.orgId, audience: [] as string[][] }
   if (accessTo(vp, content, "problems.manage") === "manage") return true
+  // Written for assignments and contests: only through one that uses it and has begun.
+  if (!problem.listed) {
+    return problem.published && user !== null && (await usedInOpenWork(user, vp, problem.id))
+  }
   // Published for members: any active member of its organization.
   return (
     problem.published &&
     problem.orgId !== null &&
     accessTo(vp, content, "problems.manage") === "take"
+  )
+}
+
+/**
+ * Whether the problem is in an assignment this person takes that has opened (for an exam,
+ * once they've started it), or in a contest of theirs that has started.
+ */
+async function usedInOpenWork(
+  user: User,
+  vp: Awaited<ReturnType<typeof viewpoint>>,
+  problemId: string
+) {
+  const db = getDb()
+  const now = new Date()
+  const work = await db
+    .select({ assignment: assignments })
+    .from(assignmentProblems)
+    .innerJoin(assignments, eq(assignmentProblems.assignmentId, assignments.id))
+    .where(
+      and(eq(assignmentProblems.problemId, problemId), eq(assignments.published, true))
+    )
+  for (const { assignment } of work) {
+    const access = accessTo(vp, assignment, "assignments.manage")
+    if (access === "none") continue
+    if (access === "manage") return true
+    if (assignment.opensAt > now) continue
+    if (!assignment.exam) return true
+    const started = await db
+      .select({ at: examSessions.startedAt })
+      .from(examSessions)
+      .where(
+        and(
+          eq(examSessions.assignmentId, assignment.id),
+          eq(examSessions.userId, user.id)
+        )
+      )
+      .limit(1)
+    if (started.length) return true
+  }
+  const inContests = await db
+    .select({ contest: contests })
+    .from(contestProblems)
+    .innerJoin(contests, eq(contestProblems.contestId, contests.id))
+    .where(eq(contestProblems.problemId, problemId))
+  return inContests.some(
+    ({ contest }) =>
+      contest.startsAt <= now &&
+      accessTo(vp, contest, "contests.manage") !== "none"
   )
 }
 
@@ -277,6 +338,9 @@ export async function createSubmission(
     )
   }
 
+  // During an exam sitting: only the exam's problems, from its networks, contests included.
+  const inExam = await guardExamSubmission(user, problem?.id ?? null, ip)
+
   let contestId: string | null = null
   // An organization's language rules cover its contests and its members-only problems.
   let ruledBy: string | null = null
@@ -292,7 +356,6 @@ export async function createSubmission(
     throw notFound("Problem not found")
   }
   if (!contestId && problem?.membersOnly) ruledBy = problem.orgId
-  if (problem && !contestId) await guardExamSubmission(user, problem.id, ip)
   if (ruledBy) {
     const { languages } = await orgPolicy(ruledBy)
     if (languages && !languages.includes(language.id)) {
@@ -320,7 +383,8 @@ export async function createSubmission(
       ? await resolveRunCases(input.inputs ?? [input.stdin ?? ""], problem?.id)
       : null
 
-  await enforceCapacity(input.kind, settings["queue.max_depth"])
+  // An exam's last submissions aren't shed when the lab is busy: they can't be retried later.
+  if (!inExam) await enforceCapacity(input.kind, settings["queue.max_depth"])
 
   const headStart = queueHeadStartMs({
     kind: input.kind,
@@ -488,6 +552,10 @@ export async function getSubmissionFor(id: string, viewer: User) {
   if (!submission || (submission.userId !== viewer.id && !isStaff(viewer))) {
     throw notFound("Submission not found")
   }
+  const scope = await examScope(viewer.id)
+  if (scope && !inExamScope(scope, submission)) {
+    throw new ApiError(403, "exam_locked", "Earlier code is closed during your exam.")
+  }
   return presentSubmission(submission, viewer)
 }
 
@@ -525,6 +593,12 @@ export async function listSubmissionsFor(
   if (filters.contestSlug) {
     conditions.push(eq(contests.slug, filters.contestSlug))
   }
+  // During an exam: only this sitting's work on the exam's problems.
+  const scope = await examScope(user.id)
+  if (scope) {
+    conditions.push(inArray(submissions.problemId, scope.problemIds))
+    conditions.push(gte(submissions.createdAt, scope.since))
+  }
   return getDb()
     .select(LIST_COLUMNS)
     .from(submissions)
@@ -534,6 +608,14 @@ export async function listSubmissionsFor(
     .orderBy(desc(submissions.createdAt))
     .limit(100)
 }
+
+const inExamScope = (
+  scope: { problemIds: string[]; since: Date },
+  row: { problemId: string | null; createdAt: Date }
+) =>
+  row.problemId !== null &&
+  scope.problemIds.includes(row.problemId) &&
+  row.createdAt >= scope.since
 
 /**
  * Per-problem status for the signed-in student's question list. Only a graded submit

@@ -46,6 +46,8 @@ export const problemInputSchema = z.object({
     )
     .default({}),
   membersOnly: z.boolean().default(false),
+  /** false: only for the assignments, exams and contests that use it. */
+  listed: z.boolean().default(true),
   editorial: z.string().max(100_000).default(""),
   hints: z.array(z.string().trim().min(1).max(2000)).max(10).default([]),
   tags: z.array(z.string().trim().min(1).max(40)).max(10).default([]),
@@ -154,6 +156,14 @@ export const assignmentInputSchema = z
               .refine(isNetwork, "Use an address like 10.1.2.3 or a range like 10.1.0.0/16")
           )
           .max(50, "At most 50 networks"),
+        /** Minutes after opening during which Start may be pressed; null for any time. */
+        startWithin: z
+          .number({ error: "Enter the minutes" })
+          .int()
+          .min(1, "At least a minute")
+          .max(24 * 60, "At most a day")
+          .nullable()
+          .default(null),
       })
       .nullable()
       .default(null),

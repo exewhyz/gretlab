@@ -340,7 +340,9 @@ check("other organizations can't pick it", !(await api.owner("/orgs/orgtest-comp
 check("or put it in their contests", (await api.owner("/orgs/orgtest-company/contests", { body: contestBody({ slug: "orgtest-steal", audience: [], problemIds: [priv.json.id] }) })).status === 400)
 const privAsg = await api.owner(`${C}/assignments`, { body: asgBody({ slug: "orgtest-private-week", title: "Private week", audience: [], problems: [{ problemId: priv.json.id, points: 10 }] }) })
 check("its own organization can assign it", privAsg.status === 200)
-check("the assignment links to the members' page", (await api.s2("/assignments/orgtest-private-week")).json.problems[0].href === "/orgs/orgtest-college/practice/orgtest-private")
+check("the assignment's problems open on its own pages", (await api.s2("/assignments/orgtest-private-week")).json.problems[0].href === "/assignments/orgtest-private-week/problems/1")
+check("members-only problems are served there", (await api.s2("/assignments/orgtest-private-week/problems/1")).json?.problem?.title === "Members Only Problem")
+check("and not to people the assignment isn't for", (await api.outsider("/assignments/orgtest-private-week/problems/1")).status === 404)
 
 // ---------- code from the gradebook
 const graded = await api.s2("/submissions", { body: { kind: "submit", language: "python", entry: "main.py", files: [{ path: "main.py", content: SI }], problemSlug: "p1" } })

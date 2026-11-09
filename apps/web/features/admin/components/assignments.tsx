@@ -150,6 +150,8 @@ interface AssignmentForm {
   examFullscreen: boolean
   /** One address or range per line. */
   examNetworks: string
+  /** Minutes after opening to press Start; empty for any time. */
+  examStartWithin: string
   audience: string[][]
 }
 
@@ -196,6 +198,7 @@ function blankForm(forClass: string | null): AssignmentForm {
     examMinutes: "60",
     examFullscreen: true,
     examNetworks: "",
+    examStartWithin: "",
   }
 }
 
@@ -241,6 +244,7 @@ export function AssignmentEditorPage({
         examMinutes: data.exam?.minutes ? String(data.exam.minutes) : data.exam ? "" : "60",
         examFullscreen: data.exam?.fullscreen ?? true,
         examNetworks: (data.exam?.networks ?? []).join("\n"),
+        examStartWithin: data.exam?.startWithin ? String(data.exam.startWithin) : "",
       }
     : blankForm(forClass)
   return (
@@ -314,6 +318,10 @@ function AssignmentEditor({
               .split(/[\n,]/)
               .map((n) => n.trim())
               .filter(Boolean),
+            startWithin:
+              form.examStartWithin.trim() === ""
+                ? null
+                : Number(form.examStartWithin),
           }
         : null,
       published,
@@ -575,6 +583,18 @@ function AssignmentEditor({
                   onChange={(event) => set("examNetworks", event.target.value)}
                 />
               </Field>
+              <Field
+                label="Students must start within (minutes after it opens)"
+                help="Keeps a lab starting together, so nobody who has finished can brief a late starter. Empty allows starting any time before the due time."
+              >
+                <TextInput
+                  type="number"
+                  min={1}
+                  max={1440}
+                  value={form.examStartWithin}
+                  onChange={(event) => set("examStartWithin", event.target.value)}
+                />
+              </Field>
               <label className="inline-flex items-center gap-2 self-start text-ink">
                 <Checkbox
                   checked={form.examFullscreen}
@@ -582,6 +602,19 @@ function AssignmentEditor({
                 />
                 Ask for fullscreen
               </label>
+              {form.problemIds.some(
+                (id) => problems.find((p) => p.id === id)?.listed
+              ) && (
+                <p
+                  className="rounded-md border border-primary/40 bg-primary/5 p-2 text-caption text-ink min-[901px]:col-span-2"
+                  data-testid="exam-library-warning"
+                >
+                  Some of these problems are in the public library, so anyone can practise
+                  them, with hints and editorials, before the exam. For a closed exam, use
+                  &ldquo;Write a problem&rdquo; or &ldquo;Import problems&rdquo; above: those
+                  stay out of the library.
+                </p>
+              )}
               <p className="text-caption min-[901px]:col-span-2">
                 Problems stay hidden until a student starts. Leaving the page or fullscreen
                 and pasting from elsewhere are recorded in the gradebook; editorials are
@@ -748,6 +781,24 @@ export function AssignmentGradebook({ id }: { id: string }) {
       <PageTitle
         action={
           <span className="flex gap-2">
+            {data.assignment.exam && (
+              <ConfirmButton
+                size="sm"
+                variant="outline"
+                title="Forget network addresses?"
+                description="The addresses each sitting started from, and of refused submissions, are deleted. Everything else stays. This can't be undone."
+                confirmLabel="Forget addresses"
+                onConfirm={() =>
+                  void api(owner.api(`/assignments/${id}/forget-addresses`), {
+                    method: "POST",
+                  }).then(() =>
+                    client.invalidateQueries({ queryKey: ["attempts"] })
+                  )
+                }
+              >
+                Forget addresses
+              </ConfirmButton>
+            )}
             {data.assignment.holdFeedback && (
               <ConfirmButton
                 size="sm"

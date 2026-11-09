@@ -13,11 +13,7 @@ import { ScopeNote } from "@/features/account/scope-switcher"
 import { ClassChips } from "@/features/classes/components/class-chips"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
-import {
-  ExamGuard,
-  ExamPanel,
-  type SittingView,
-} from "@/features/exams/components/exam"
+import { ExamPanel, type SittingView } from "@/features/exams/components/exam"
 
 export type AssignmentPhase = "upcoming" | "open" | "late" | "closed"
 export type GradeStatus =
@@ -72,7 +68,10 @@ interface AssignmentDetail {
     minutes: number | null
     fullscreen: boolean
     restricted: boolean
+    startWithin: number | null
+    opensAt: string
     sitting: SittingView
+    now: string
   } | null
 }
 
@@ -275,15 +274,6 @@ export function AssignmentView({ slug }: { slug: string }) {
           phase={data.phase}
         />
       )}
-      {data.exam?.sitting.status === "in_progress" &&
-        data.exam.sitting.endsAt && (
-          <ExamGuard
-            slug={data.slug}
-            title={data.title}
-            fullscreen={data.exam.fullscreen}
-            endsAt={data.exam.sitting.endsAt}
-          />
-        )}
       {data.exam && data.problems.length === 0 ? null : data.phase === "upcoming" &&
         data.problems.length === 0 ? (
         <p className="text-body-sm text-body">

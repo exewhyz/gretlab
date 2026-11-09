@@ -123,6 +123,11 @@ export const problems = pgTable(
      * pages. Never in the public library or on public problem pages.
      */
     membersOnly: boolean("members_only").notNull().default(false),
+    /**
+     * false: written for assignments, exams or contests. Never in the library or on public
+     * pages; reachable only through the assignments and contests that use it.
+     */
+    listed: boolean("listed").notNull().default(true),
     /** The organization that wrote it, credited in the library. null: the platform's. */
     orgId: uuid("org_id").references((): AnyPgColumn => organizations.id, {
       onDelete: "set null",
@@ -881,7 +886,11 @@ export const examSessions = pgTable(
     /** Where it was started from. */
     ip: text("ip"),
   },
-  (table) => [primaryKey({ columns: [table.assignmentId, table.userId] })]
+  (table) => [
+    primaryKey({ columns: [table.assignmentId, table.userId] }),
+    // Every Run and Submit asks whether the student is sitting an exam.
+    index("exam_sessions_by_user").on(table.userId, table.endsAt),
+  ]
 )
 
 /** Things the browser noticed during a sitting: leaving the tab or fullscreen, pasting. */
