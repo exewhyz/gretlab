@@ -1,8 +1,50 @@
+# The images build from the repository root (COPY . .) and need only the workspace:
+# package.json, pnpm-lock.yaml, pnpm-workspace.yaml, turbo.json, apps/ and packages/
+# (including the migrations and seed data). Everything below stays out of the build.
+
+# installed and built output (rebuilt inside the image)
 **/node_modules
 **/.next
 **/.turbo
-.git
+**/dist
+**/build
+**/coverage
+**/*.tsbuildinfo
 apps/web/public/vendor
+
+# secrets: never in an image (the platforms inject environment variables)
 **/.env
-**/.env.local
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+
+# version control and deployment tools
+.git
+.gitignore
+.vercel
+.railway
+
+# AI assistants and their skills: not part of the app, and they'd interfere with builds
+.claude
+.agents
+.cursor
+**/skills
+.firecrawl
+
+# tests, docs and local tooling
 e2e
+docs
+playwright-report
+test-results
+docker-compose*.yml
+deploy
+docker
+*.md
+
+# editors, operating systems, logs
+.DS_Store
+**/.DS_Store
+.idea
+.vscode
+*.log
