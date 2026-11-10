@@ -88,7 +88,8 @@ The live site, https://gretlab.grettech.com, runs as three parts, all in Sydney 
 
 - Judge logs: `ssh ubuntu@<judge address>`, then `cd /opt/gretlab && sudo docker compose -f docker-compose.runner.yml logs -f runner`. A submission stuck at "queued" means the judge is down or can't reach Neon.
 - Costs: an AWS budget (`gretlab-monthly`, $20) emails at 50% and 100% of actual spend, and at a forecast above 100%. Neon's compute stays awake, because the judge keeps a `LISTEN` connection open.
-- Health: `GET /api/health` answers `{"status":"ok"}`.
+- Health: `GET /api/health` answers `{"status":"ok"}` while the website reaches the database (load balancers use it). `GET /api/health/judge` answers 200 while a code judge is online and no submission has waited over 3 minutes, and 503 with the reason otherwise.
+- Uptime alerts: a free UptimeRobot (or similar) account watching both addresses every 5 minutes emails you when either goes down.
 
 **Lab exams limited to a network** work here with no setup: on Vercel the app trusts the visitor address Vercel's edge reports (`x-vercel-forwarded-for`), so `PROXY_SECRET` isn't needed. Don't put another proxy or CDN in front of the site, or every student will appear to come from it. On another host, set `CLIENT_IP_HEADER` to the header that host uses ([docs/deploy-exams.md](docs/deploy-exams.md)).
 
