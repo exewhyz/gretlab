@@ -9,6 +9,7 @@ import {
   users,
   type User,
 } from "@workspace/db"
+import { after } from "next/server"
 
 import { listAssignments } from "@/features/assignments/server"
 import { listContests } from "@/features/contests/server"
@@ -34,6 +35,20 @@ export interface NewNotification {
   href?: string
 }
 
+/**
+ * Email goes out after the response, so the action that caused it isn't slowed down. On
+ * serverless hosts (Vercel) a function is frozen once it has answered, and a promise left
+ * running is cut off; after() keeps the function alive until it settles. Outside a request
+ * (a script), there's nothing to outlive, so it just runs.
+ */
+function sendAfterResponse(task: () => Promise<void>) {
+  try {
+    after(task)
+  } catch {
+    void task()
+  }
+}
+
 /** Tells these people. Never fails the action that caused it. */
 export async function notify(userIds: string[], n: NewNotification) {
   const ids = [...new Set(userIds)]
@@ -50,7 +65,7 @@ export async function notify(userIds: string[], n: NewNotification) {
           href: n.href ?? "",
         }))
       )
-    void emailThem(ids, n)
+    sendAfterResponse(() => emailThem(ids, n))
   } catch (error) {
     console.error("[notifications] couldn't store:", error)
   }
