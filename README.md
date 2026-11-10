@@ -90,7 +90,7 @@ The live site, https://gretlab.grettech.com, runs as three parts, all in Sydney 
 - Costs: an AWS budget (`gretlab-monthly`, $20) emails at 50% and 100% of actual spend, and at a forecast above 100%. Neon's compute stays awake, because the judge keeps a `LISTEN` connection open.
 - Health: `GET /api/health` answers `{"status":"ok"}`.
 
-**Limits on this setup:** lab exams limited to networks need the visitor's real address, which this app trusts only from Caddy (`PROXY_SECRET`). On Vercel, keep exams unrestricted by network until that is adapted; everything else works.
+**Lab exams limited to a network** work here with no setup: on Vercel the app trusts the visitor address Vercel's edge reports (`x-vercel-forwarded-for`), so `PROXY_SECRET` isn't needed. Don't put another proxy or CDN in front of the site, or every student will appear to come from it ([docs/deploy-exams.md](docs/deploy-exams.md)).
 
 ### Settings
 
@@ -103,7 +103,7 @@ The web app reads these (in development from `apps/web/.env.local`; in productio
 | `NEXTAUTH_SECRET` | yes | Signs session cookies: `openssl rand -base64 32` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | yes, in production | Google sign-in |
 | `ADMIN_EMAILS` | yes | Comma-separated platform owners |
-| `PROXY_SECRET` | for network-limited exams | Shared with Caddy so the app trusts visitors' addresses ([docs/deploy-exams.md](docs/deploy-exams.md)) |
+| `PROXY_SECRET` | for network-limited exams behind Caddy (not on Vercel) | Shared with Caddy so the app trusts visitors' addresses ([docs/deploy-exams.md](docs/deploy-exams.md)) |
 | `SMTP_URL`, `MAIL_FROM` | no | Email notifications; without them, in-app only |
 | `GITHUB_TOKEN` | no | Raises GitHub's limit for pinning project commits |
 | `LTI_PRIVATE_KEY`, `LTI_KEY_ID` | no | A fixed LTI signing key; otherwise one is made and kept in the database |

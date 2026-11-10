@@ -984,7 +984,7 @@ export async function saveAssignment(
     throw new ApiError(
       400,
       "addresses_unverifiable",
-      "This server can't confirm where students connect from, so an exam can't be limited to a network yet. An administrator sets PROXY_SECRET (see docs/deploy-exams.md)."
+      "This server can't confirm where students connect from, so an exam can't be limited to a network yet. This works on Vercel, or behind Caddy once an administrator sets PROXY_SECRET (see docs/deploy-exams.md)."
     )
   }
   const tagged = [...new Set(chosen.flatMap((c) => c.outcomes))]
