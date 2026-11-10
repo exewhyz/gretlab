@@ -3,18 +3,50 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "!.next/dev/**"
+      ],
+      "env": [
+        "NEXT_PUBLIC_*"
+      ],
+      "passThroughEnv": [
+        "DATABASE_*",
+        "NEXTAUTH_*",
+        "GOOGLE_CLIENT_*",
+        "ADMIN_EMAILS",
+        "AUTH_DEV_LOGIN",
+        "SMTP_URL",
+        "MAIL_FROM",
+        "GITHUB_TOKEN",
+        "GITHUB_LOOKUP",
+        "LTI_*",
+        "METRICS_TOKEN",
+        "PROXY_SECRET"
+      ]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "format": {
-      "dependsOn": ["^format"]
+      "dependsOn": [
+        "^format"
+      ]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": [
+        "^typecheck"
+      ]
     },
     "dev": {
       "cache": false,
