@@ -30,7 +30,10 @@
         "GITHUB_LOOKUP",
         "LTI_*",
         "METRICS_TOKEN",
-        "PROXY_SECRET"
+        "PROXY_SECRET",
+        "CLIENT_IP_HEADER",
+        "RESEND_*",
+        "CRON_SECRET"
       ]
     },
     "lint": {
