@@ -790,19 +790,22 @@ function AssignmentEditor({
                 />
               </Field>
               {!template && (
-                <Field
-                  label="Lab networks (optional)"
-                  help="One address or range per line, such as 10.1.0.0/16. Students can start and submit only from these. Empty allows anywhere."
-                >
-                  <TextArea
-                    rows={3}
-                    mono
-                    value={form.examNetworks}
-                    onChange={(event) =>
-                      set("examNetworks", event.target.value)
-                    }
-                  />
-                </Field>
+                <div className="grid content-start gap-1">
+                  <Field
+                    label="Lab networks (optional)"
+                    help="One address or range per line, such as 10.1.0.0/16. Students can start and submit only from these. Empty allows anywhere."
+                  >
+                    <TextArea
+                      rows={3}
+                      mono
+                      value={form.examNetworks}
+                      onChange={(event) =>
+                        set("examNetworks", event.target.value)
+                      }
+                    />
+                  </Field>
+                  <YourAddress />
+                </div>
               )}
               <Field
                 label="Students must start within (minutes after it opens)"
@@ -2287,5 +2290,28 @@ function QuizMarking({
         )}
       </Card>
     </div>
+  )
+}
+
+/** The address the server sees for this teacher, to check lab networks against. */
+function YourAddress() {
+  const { data } = useQuery({
+    queryKey: ["me", "address"],
+    queryFn: () =>
+      api<{ address: string | null; source: string }>("/me/address"),
+    staleTime: 60_000,
+  })
+  if (!data) return null
+  return (
+    <p className="text-caption text-body" data-testid="your-address">
+      {data.address ? (
+        <>
+          Your address right now:{" "}
+          <span className="font-mono">{data.address}</span>
+        </>
+      ) : (
+        "This server can't confirm where people connect from, so exams can't be limited to a network yet (docs/deploy-exams.md)."
+      )}
+    </p>
   )
 }
