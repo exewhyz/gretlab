@@ -40,6 +40,14 @@ services:
       # The same secret as Caddy's; at least 16 characters. Without it, exams can't be
       # limited to a network.
       PROXY_SECRET: ${PROXY_SECRET:-}
+      # Optional: notification email (see .env.example).
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      # Optional: a higher GitHub rate limit for pinning project commits.
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      # Optional: a fixed LTI signing key; without it one is made and kept in the database.
+      LTI_PRIVATE_KEY: ${LTI_PRIVATE_KEY:-}
+      LTI_KEY_ID: ${LTI_KEY_ID:-}
 
   # Web replicas share a small number of real database connections through this.
   pgbouncer:
