@@ -1523,3 +1523,114 @@ export const projectSubmissions = pgTable(
   },
   (table) => [primaryKey({ columns: [table.projectId, table.userId] })]
 )
+
+/*
+ * LTI 1.3: learning platforms (Moodle, Canvas, Blackboard) an organization connects, so
+ * their courses open Gretlab with people signed in and grades go back. features/lti.
+ */
+
+/** An LMS registration: what the LMS gave the organization's admin. */
+export const ltiPlatforms = pgTable(
+  "lti_platforms",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    issuer: text("issuer").notNull(),
+    clientId: text("client_id").notNull(),
+    deploymentIds: jsonb("deployment_ids").$type<string[]>().notNull().default([]),
+    authUrl: text("auth_url").notNull(),
+    tokenUrl: text("token_url").notNull(),
+    jwksUrl: text("jwks_url").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("lti_platforms_client").on(table.issuer, table.clientId)]
+)
+
+/** A sign-in handshake in flight: state and nonce, used once, short-lived. */
+export const ltiStates = pgTable("lti_states", {
+  state: text("state").primaryKey(),
+  nonce: text("nonce").notNull(),
+  platformId: uuid("platform_id")
+    .notNull()
+    .references(() => ltiPlatforms.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+})
+
+/** Who an LMS user is here. */
+export const ltiUsers = pgTable(
+  "lti_users",
+  {
+    platformId: uuid("platform_id")
+      .notNull()
+      .references(() => ltiPlatforms.id, { onDelete: "cascade" }),
+    sub: text("sub").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.platformId, table.sub] }), index("lti_users_user").on(table.userId)]
+)
+
+/** An LMS course, linked by an admin to one of the organization's classes. */
+export const ltiContexts = pgTable(
+  "lti_contexts",
+  {
+    id: id(),
+    platformId: uuid("platform_id")
+      .notNull()
+      .references(() => ltiPlatforms.id, { onDelete: "cascade" }),
+    contextId: text("context_id").notNull(),
+    title: text("title").notNull().default(""),
+    groupId: uuid("group_id").references(() => orgGroups.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("lti_contexts_key").on(table.platformId, table.contextId)]
+)
+
+/** A link in an LMS course that opens an assignment, with its gradebook column there. */
+export const ltiLinks = pgTable(
+  "lti_links",
+  {
+    id: id(),
+    platformId: uuid("platform_id")
+      .notNull()
+      .references(() => ltiPlatforms.id, { onDelete: "cascade" }),
+    resourceLinkId: text("resource_link_id").notNull(),
+    contextId: uuid("context_id").references(() => ltiContexts.id, { onDelete: "set null" }),
+    assignmentId: uuid("assignment_id").references(() => assignments.id, { onDelete: "set null" }),
+    /** Where its scores go (LTI Assignment and Grade Services). */
+    lineItemUrl: text("line_item_url"),
+    title: text("title").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("lti_links_key").on(table.platformId, table.resourceLinkId)]
+)
+
+/** A teacher choosing what to add to an LMS course (deep linking), short-lived. */
+export const ltiDeepLinks = pgTable("lti_deep_links", {
+  id: id(),
+  platformId: uuid("platform_id")
+    .notNull()
+    .references(() => ltiPlatforms.id, { onDelete: "cascade" }),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  deploymentId: text("deployment_id").notNull(),
+  returnUrl: text("return_url").notNull(),
+  data: text("data"),
+  contextId: uuid("context_id").references(() => ltiContexts.id, { onDelete: "set null" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+})
+
+/** Gretlab's own signing keys (deep linking responses, grade service tokens). */
+export const ltiKeys = pgTable("lti_keys", {
+  kid: text("kid").primaryKey(),
+  privateKey: text("private_key").notNull(),
+  publicJwk: jsonb("public_jwk").$type<Record<string, string>>().notNull(),
+  createdAt: createdAt(),
+})

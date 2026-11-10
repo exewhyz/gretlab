@@ -197,6 +197,14 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Attendance is marked when logging a class, for people in that class only (`attendance` table). Below 75% shows red to the teacher and the student.
 - Teach (`/teach`) lists a teacher's classes per organization as the group tree, with "Due this week" and "Behind the syllabus" first. Students' `/classes` lists the last-level groups they sit in. Assignments and contests link to the classes they're for (`classLinks`).
 
+## LMS (LTI 1.3)
+
+- An organization connects Moodle, Canvas, Blackboard or another LMS under Manage › LMS (organization-wide "Change settings"; audited), entering what the LMS gives it (issuer, client ID, deployment IDs, auth, token and keyset URLs, https in production; `LTI_ALLOW_HTTP=true` for local tests). The page shows the addresses to give the LMS: `/api/v1/lti/login`, `/api/v1/lti/launch` (also deep linking) and `/api/v1/lti/jwks`.
+- Launch (`features/lti/server.ts`): login initiation stores a state and nonce (10 minutes, used once; a state cookie too, SameSite=None over https) and sends the browser to the LMS; the LMS posts a signed id_token back. It's verified RS256 against the LMS's keyset (cached 5 minutes, refetched once on a miss), then its claims (`packages/judge/src/lti.ts`, unit-tested: issuer, audience/azp, expiry with a minute's skew, nonce, LTI 1.3.0, a registered deployment, the message type). These endpoints are plain handlers (an LMS's cross-site POST would fail `route()`'s origin check) and answer errors with a short page.
+- The person is found by their LMS id, then by email (an account is made if new; an LMS that doesn't share email can't bring new people), becomes an active member, and is signed in with the same session cookie Google sign-in makes. Each LMS course is recorded; an admin links it to a class on the LMS page. In a linked course, learners are placed in the class (its last-level groups) and instructors get the built-in Teacher role for it. A link opens its assignment (custom `assignment=<slug>` or an `/assignments/<slug>` target), else the class, else `/lti/unlinked`.
+- Deep linking: an instructor's request opens `/lti/pick/<id>` (theirs only, 30 minutes, used once) listing the organization's published assignments; the choice goes back to the LMS as a JWT signed with Gretlab's key (`lti_keys`, made on first use, or `LTI_PRIVATE_KEY` and `LTI_KEY_ID`), as a resource link with a gradebook column out of the assignment's total.
+- Grades: the gradebook's **Send grades to LMS** (whoever sets the assignment and sees its grades) gets a token with a signed client assertion (client credentials, the score scope) and posts each student's total as an LTI score to every linked column; students who never came through that LMS are skipped and counted.
+
 ## GitHub projects
 
 - An assignment (not an exam) may have projects (`assignment_projects`: title, markdown instructions, points), written in its form's Projects section; an assignment may be projects only. Edits keep project ids, so handed-in work stays; removing a project removes its work. Template uses keep their own projects.
@@ -284,6 +292,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/library.mjs`: sharing the platform's content (every college, chosen colleges or teachers, staff only), what each college sees and can pick, copying, collections and the pages.
 - `e2e/certificates.mjs`: course and written certificates (once each, class only), the public page (no sign-in, no email, any case, unknown codes), revoking, My certificates and the class panel.
 - `e2e/calendar.mjs`: what's on someone's calendar (extensions, exams, contests, reviews; not drafts or other classes), the iCal feed (no sign-in, new link, off, blocked accounts) and the page.
+- `e2e/lti.mjs`: LTI 1.3 against a fake LMS it runs (own keys, token and score endpoints): registration, login and launch, every refusal (forged, nonce, audience, deployment, expired, version, reused state, no email), accounts, classes and roles, opening assignments, sending grades (assertion and score checked like an LMS), deep linking (Gretlab's signature checked), and the pages.
 - `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.
@@ -320,6 +329,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Platform staff and roles: permissions, built-in and custom roles, no escalation, activity log
 - [x] Certificates: for finishing a course or written by a teacher, each with a public verification page; revocable
 - [x] Calendar: everything dated per person, with a private iCal feed for Google Calendar, Outlook and Apple Calendar
+- [x] LTI 1.3: connect an LMS, launches sign people in to their class, deep linking for teachers, grades sent back
 - [x] GitHub projects: project work in assignments, handed in as repositories pinned to a commit, marked from the gradebook
 - [x] Peer code review: students review classmates' final code against the rubric with line comments, anonymously if chosen; teachers start, read and hide reviews
 - [x] Class discussions: threads and replies per class, anonymous to classmates, votes, teacher moderation and answers, reply notifications

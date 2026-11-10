@@ -55,6 +55,7 @@ import {
   CommentedCode,
   type LineComment,
 } from "@/features/feedback/components/commented-code"
+import { SendGrades } from "@/features/lti/components/send-grades"
 import { PeerReviewPanel } from "@/features/peer/components/peer"
 import {
   ProjectMarking,
@@ -1166,7 +1167,8 @@ export function AssignmentGradebook({ id }: { id: string }) {
           " Results are held: students don't see quiz marks, rubric marks or comments yet."}
         {rejudged && <span data-testid="rejudge-result"> {rejudged}</span>}
       </p>
-      <div className="mb-3">
+      <div className="mb-3 grid gap-3 empty:hidden">
+        <SendGrades id={id} />
         <PeerReviewPanel id={id} />
       </div>
       <div className="mb-4 grid grid-cols-2 gap-3 min-[901px]:grid-cols-4">

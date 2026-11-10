@@ -163,6 +163,11 @@ export function ManageShell({
           show: has("org.settings.manage"),
         },
         {
+          href: `${base}/lms`,
+          label: "LMS (LTI)",
+          show: has("org.settings.manage"),
+        },
+        {
           href: `${base}/activity`,
           label: "Activity",
           show: has("org.audit.view"),

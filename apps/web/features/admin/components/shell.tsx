@@ -136,12 +136,16 @@ export function PageTitle({
 export function Card({
   children,
   className,
+  ...rest
 }: {
   children: ReactNode
   className?: string
+  /** For tests to find it. */
+  "data-testid"?: string
 }) {
   return (
     <div
+      {...rest}
       className={cn(
         "rounded-lg border border-hairline bg-card p-5 text-body-sm text-body",
         className
