@@ -280,3 +280,25 @@ export async function answerPractice(
     solution: reveal ? { correct: q.correct, accepted: q.accepted, explanation: q.explanation } : null,
   }
 }
+
+/** Students of this class who finished every item of one of its courses. */
+export async function courseFinishers(slug: string, user: User, groupId: string, courseId: string) {
+  const cc = await classContext(slug, user, groupId)
+  const [map] = await getDb()
+    .select({ course: courses })
+    .from(courseClasses)
+    .innerJoin(courses, eq(courseClasses.courseId, courses.id))
+    .where(and(eq(courseClasses.courseId, courseId), inArray(courseClasses.groupId, groupChain(cc.ctx, groupId))))
+  if (!map) throw notFound("This class doesn't have that course")
+  const modules = (await outlineOf([courseId])).get(courseId) ?? []
+  const items = modules.flatMap((m) => m.items)
+  const students = await studentsIn(cc)
+  const { done } = await finished(students.map((s) => s.id), items)
+  return {
+    cc,
+    course: map.course,
+    modules: modules.length,
+    total: students.length,
+    finishers: items.length === 0 ? [] : students.filter((s) => items.every((i) => done.get(s.id)?.has(i.id))),
+  }
+}

@@ -24,6 +24,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { ConfirmButton } from "@/components/confirm"
 import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
 import { Loading } from "@/features/admin/components/shell"
+import { ClassCertificates } from "@/features/certificates/components/class-certificates"
 import {
   DailyQuestion,
   type DailyQuestionData,
@@ -152,6 +153,13 @@ export function ClassCourses({ slug, groupId }: { slug: string; groupId: string 
           </section>
         )
       })}
+      {data.canAdd && (
+        <ClassCertificates
+          slug={slug}
+          groupId={groupId}
+          courses={data.courses.map((c) => ({ id: c.id, title: c.title }))}
+        />
+      )}
       {adding && (
         <AddCourseDialog
           base={base}

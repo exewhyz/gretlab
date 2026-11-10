@@ -54,6 +54,8 @@ export const users = pgTable("users", {
   disabled: boolean("disabled").notNull().default(false),
   /** Notifications also by email, when the server has SMTP set up. */
   emailNotifications: boolean("email_notifications").notNull().default(true),
+  /** A secret for the person's calendar feed (iCal); null until they turn it on. */
+  calendarToken: text("calendar_token").unique(),
   createdAt: createdAt(),
 })
 
@@ -1446,3 +1448,34 @@ export const peerReviews = pgTable(
     index("peer_reviews_reviewer").on(table.reviewerId),
   ]
 )
+
+/**
+ * A certificate given to a student: for finishing a course in a class, or one a teacher
+ * writes. Anyone can check it at /certificates/<code>; revoked ones say so.
+ */
+export const certificates = pgTable(
+  "certificates",
+  {
+    id: id(),
+    /** Short and public: what the verification page is found by. */
+    code: text("code").notNull().unique(),
+    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id").references(() => orgGroups.id, { onDelete: "set null" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"course" | "custom">().notNull(),
+    /** The course it's for (kind course). */
+    sourceId: uuid("source_id"),
+    title: text("title").notNull(),
+    detail: text("detail").notNull().default(""),
+    issuedBy: uuid("issued_by").references(() => users.id, { onDelete: "set null" }),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("certificates_by_user").on(table.userId),
+    index("certificates_by_group").on(table.groupId),
+  ]
+)
+

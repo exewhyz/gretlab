@@ -216,6 +216,16 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - A class's Grades tab starts with **Needs attention** for teachers who see its grades (`features/classes/warnings.ts`): each student flagged and why. Rules (`packages/judge/src/warnings.ts`, unit-tested, defaults in `WARNING_RULES`): missed work (a finished assignment set for them with nothing submitted and no quiz answer), under 40% on finished work once two have finished (weighted by points), nothing submitted for 7 days while they have unfinished open work, attendance under 75% once four classes are marked. One reason is "watch"; two or more, or two missed, "at risk". Due times count each student's extension. Computed on each request, never stored.
 - Teachers tick students and **Send a note**: a `teacher_note` notification (and email) to each of them, from the teacher; only the class's students. The activity log records that a note was sent, not its words.
 
+## Certificates
+
+- Given in a class by whoever may set its work (`features/certificates`, `certificates`), from the Course tab's Certificates panel: for finishing one of the class's courses (every item done; once per student per course, even if revoked) or one the teacher writes for chosen students of the class. Students are notified and find them under My certificates (account menu, `/certificates`).
+- Each has a short public code (`ABCDE-23456`, no 0/O/1/I/L) and a page at `/certificates/<code>` that anyone can open without signing in: name (never email), title, college, issuer, date, and whether it's valid or revoked. It prints as the certificate. Revoking keeps the record and says so on the page; issuing and revoking are in the activity log.
+
+## Calendar
+
+- `/calendar` (account menu) lists everything with a date for the viewer, by day (`features/calendar/server.ts`, `eventsFor`): published assignments' due times with their own extension, exam windows, peer reviews still to write that have a due time, and contests they registered for or their organizations run (the platform's open contests don't fill everyone's calendar).
+- The same events as a private iCal feed at `/api/v1/calendar/<secret>.ics` (`users.calendar_token`, 24 random bytes): calendar apps can't sign in, so the address is the key. Off until turned on; "New link" retires the old one; blocked accounts' feeds stop. It never includes marks or code. iCal rules (escaping, 75-octet folding, UTC, CRLF, stable UIDs): `packages/judge/src/ical.ts`, unit-tested. Absolute links use `NEXTAUTH_URL`.
+
 ## Notifications
 
 - Events are stored per person (`notifications`) when they happen: an assignment or exam first published (its students), rubric marks and line comments (unless feedback is held), feedback released, an extension, a class notice. `notify()` in `features/notifications/server.ts` never fails the action that caused it.
@@ -265,6 +275,8 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
 - `e2e/assignments.mjs`: grading rules, late penalties, gradebook and CSV, privacy, drafts and playback, rubrics, line comments and releasing feedback, lab exams (sittings, networks, events, more time, the site-wide lock, start window, edits after starting), problem import and assessment-only problems, the switch and the pages.
 - `e2e/library.mjs`: sharing the platform's content (every college, chosen colleges or teachers, staff only), what each college sees and can pick, copying, collections and the pages.
+- `e2e/certificates.mjs`: course and written certificates (once each, class only), the public page (no sign-in, no email, any case, unknown codes), revoking, My certificates and the class panel.
+- `e2e/calendar.mjs`: what's on someone's calendar (extensions, exams, contests, reviews; not drafts or other classes), the iCal feed (no sign-in, new link, off, blocked accounts) and the page.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.
 - `e2e/warnings.mjs`: who needs attention and why (missed, low marks, quiet, attendance), who may see it, notes to students, and the page.
@@ -298,6 +310,8 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Saved drafts: code follows students between computers; teachers see it live and play back how it was written
 - [x] Quizzes: a question bank (single/multiple choice, short and written answers) with import, used in assignments, exams, contests and the daily challenge alone or with coding problems; teacher marks override; results after the due time or on release
 - [x] Platform staff and roles: permissions, built-in and custom roles, no escalation, activity log
+- [x] Certificates: for finishing a course or written by a teacher, each with a public verification page; revocable
+- [x] Calendar: everything dated per person, with a private iCal feed for Google Calendar, Outlook and Apple Calendar
 - [x] Peer code review: students review classmates' final code against the rubric with line comments, anonymously if chosen; teachers start, read and hide reviews
 - [x] Class discussions: threads and replies per class, anonymous to classmates, votes, teacher moderation and answers, reply notifications
 - [x] Early warnings: students who need attention per class (missed work, low marks, gone quiet, attendance) with reasons, and notes to them

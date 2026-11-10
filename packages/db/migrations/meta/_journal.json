@@ -246,6 +246,20 @@
       "when": 1794262452807,
       "tag": "0034_peer_review",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794263201321,
+      "tag": "0035_calendar",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794263404387,
+      "tag": "0036_certificates",
+      "breakpoints": true
     }
   ]
 }

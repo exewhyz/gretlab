@@ -278,6 +278,12 @@ export function AccountMenu() {
         <DropdownMenuItem render={<Link href="/submissions" />}>
           My submissions
         </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/calendar" />}>
+          Calendar
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/certificates" />}>
+          My certificates
+        </DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/orgs" />}>
           My organizations
         </DropdownMenuItem>
