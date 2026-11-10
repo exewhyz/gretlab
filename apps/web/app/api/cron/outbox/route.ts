@@ -16,19 +16,40 @@ export const maxDuration = 60
  * that's already queued. Without a CRON_SECRET of 16+ characters it's off.
  */
 
-function authorized(request: NextRequest) {
-  const expected = process.env.CRON_SECRET ?? ""
-  if (expected.length < 16) return false
-  const given =
-    request.headers.get("authorization")?.replace(/^Bearer /, "") ?? ""
+/** Spaces or a line break pasted around a secret don't count. */
+const configuredSecret = () => (process.env.CRON_SECRET ?? "").trim()
+
+function tokenMatches(request: NextRequest, expected: string) {
+  const given = (request.headers.get("authorization") ?? "")
+    .replace(/^Bearer\s+/i, "")
+    .trim()
   const a = Buffer.from(given)
   const b = Buffer.from(expected)
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
 async function handle(request: NextRequest) {
-  if (!authorized(request)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  const expected = configuredSecret()
+  // Says which side is wrong, so a scheduler's log is enough to fix it. Whether a secret is
+  // set reveals nothing about it.
+  if (expected.length < 16) {
+    return NextResponse.json(
+      {
+        error: "not_configured",
+        message:
+          "CRON_SECRET isn't set on this server (or is under 16 characters). Set it and redeploy.",
+      },
+      { status: 503 }
+    )
+  }
+  if (!tokenMatches(request, expected)) {
+    return NextResponse.json(
+      {
+        error: "unauthorized",
+        message: "The Bearer token doesn't match this server's CRON_SECRET.",
+      },
+      { status: 401 }
+    )
   }
   const done = await drainOutbox()
   return NextResponse.json({ ...done, ...(await outboxHealth()) })
