@@ -53,6 +53,17 @@ Load balancer, web replicas and PgBouncer run from `docker-compose.prod.yml`, an
 - **Colleges:** one deployment serves many. Create each under **Dashboard → Organizations** and name its first owner, who runs it from **Manage** (members, groups, roles, teachers, settings, LMS). Restrict who can sign up with **Settings → Allowed email domains**.
 - **Database:** run migrations (and the seed, the first time) before each release: `docker compose -f docker-compose.prod.yml run --rm migrate`, or `pnpm db:migrate` with `DATABASE_URL` set.
 
+### The code judge (runner), on one command
+
+Any fresh Ubuntu 22.04/24.04 server (2 vCPU, 4 GB is a good start) becomes a judge with:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o runner-setup.sh
+sudo DATABASE_URL='postgres://user:password@host:port/db' bash runner-setup.sh
+```
+
+It installs Docker and gVisor, proves a container runs under gVisor, locks the firewall to SSH, builds the language images, creates the database tables (and loads the starter problems), runs the 16 hostile-program tests against the real sandbox, and only then starts the runner. Use the database's direct address, not a pooler. Run it again to update; run it on more servers for more capacity. Keep the server for this alone (see AGENTS.md › Sandbox rules).
+
 ### Planned: Vercel and Railway
 
 The web app (`apps/web`, the whole UI and API) goes on Vercel; Postgres and the runner (`apps/runner`) go on Railway.
