@@ -1479,3 +1479,47 @@ export const certificates = pgTable(
   ]
 )
 
+/** Project work in an assignment: handed in as a GitHub repository, marked by a teacher. */
+export const assignmentProjects = pgTable(
+  "assignment_projects",
+  {
+    id: id(),
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => assignments.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    /** Markdown: what to build and how it's marked. */
+    instructions: text("instructions").notNull().default(""),
+    points: integer("points").notNull().default(10),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [index("assignment_projects_by_assignment").on(table.assignmentId, table.position)]
+)
+
+/**
+ * A student's repository for a project, pinned to the commit it was at when handed in, so
+ * later pushes don't change what's marked. Handing in again replaces it.
+ */
+export const projectSubmissions = pgTable(
+  "project_submissions",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => assignmentProjects.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** https://github.com/owner/repo */
+    repoUrl: text("repo_url").notNull(),
+    ref: text("ref"),
+    commitSha: text("commit_sha"),
+    note: text("note").notNull().default(""),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    late: boolean("late").notNull().default(false),
+    mark: integer("mark"),
+    feedback: text("feedback").notNull().default(""),
+    markedBy: uuid("marked_by").references(() => users.id, { onDelete: "set null" }),
+    markedAt: timestamp("marked_at", { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.projectId, table.userId] })]
+)

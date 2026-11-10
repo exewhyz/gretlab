@@ -235,6 +235,23 @@ export const assignmentInputSchema = z
     /** Quiz questions from the bank, beside or instead of the problems. */
     questions: chosenQuestions,
     audience: audienceSchema,
+    /** Project work handed in as GitHub repositories and marked by a teacher. */
+    projects: z
+      .array(
+        z.object({
+          /** Kept for existing projects, so their submissions stay with them. */
+          id: z.uuid().optional(),
+          title: z.string().trim().min(1, "Name each project").max(200),
+          instructions: z.string().max(20_000).default(""),
+          points: z
+            .number({ error: "Enter the points" })
+            .int()
+            .min(1, "At least 1 point")
+            .max(1000, "At most 1000 points"),
+        })
+      )
+      .max(10, "At most 10 projects")
+      .default([]),
     /** Students review each other's work after the due time. */
     peerReview: z
       .object({
@@ -249,13 +266,17 @@ export const assignmentInputSchema = z
       .nullable()
       .default(null),
   })
-  .refine((a) => a.problems.length + a.questions.length > 0, {
-    message: "Add at least one problem or question",
+  .refine((a) => a.problems.length + a.questions.length + a.projects.length > 0, {
+    message: "Add at least one problem, question or project",
     path: ["problems"],
   })
   .refine((a) => a.dueAt > a.opensAt, {
     message: "The due time must be after it opens",
     path: ["dueAt"],
+  })
+  .refine((a) => !(a.exam && a.projects.length), {
+    message: "Exams don't have projects",
+    path: ["projects"],
   })
   .refine((a) => !(a.exam && a.peerReview), {
     message: "Exams don't have peer review",

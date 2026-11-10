@@ -70,7 +70,10 @@ export async function classWarnings(slug: string, user: User, groupId: string) {
       finished.push({
         earned: row.earned,
         total: book.total,
-        missed: row.cells.every((c) => c.status === "missing") && !row.quiz?.answered,
+        missed:
+          row.cells.every((c) => c.status === "missing") &&
+          !row.quiz?.answered &&
+          !(row.projects?.submitted ?? 0),
       })
     }
     const seen = active.find((x) => x.userId === s.id)?.last

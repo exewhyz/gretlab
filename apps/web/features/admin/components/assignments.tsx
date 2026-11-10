@@ -56,6 +56,12 @@ import {
   type LineComment,
 } from "@/features/feedback/components/commented-code"
 import { PeerReviewPanel } from "@/features/peer/components/peer"
+import {
+  ProjectMarking,
+  ProjectsEditor,
+  projectKey,
+  type ProjectDraft,
+} from "@/features/projects/components/projects"
 import { AudiencePicker } from "./audience"
 
 import { FieldError, ProblemPicker, toLocalInput } from "./contests"
@@ -165,6 +171,8 @@ interface AssignmentForm {
   /** Minutes after opening to press Start; empty for any time. */
   examStartWithin: string
   audience: string[][]
+  /** Project work handed in as GitHub repositories. */
+  projects: ProjectDraft[]
   /** Peer review after the due time, as typed. */
   peer: boolean
   peerReviews: string
@@ -187,6 +195,7 @@ interface StoredAssignment {
   holdFeedback: boolean
   exam: ExamSettings | null
   peerReview?: { reviews: number; anonymous: boolean; dueAt: string | null } | null
+  projects?: { id: string; title: string; instructions: string; points: number }[]
   audience?: string[][]
   /** Made from a template (assignments). */
   templateId?: string | null
@@ -226,6 +235,7 @@ function blankForm(forClass: string | null): AssignmentForm {
     examFullscreen: true,
     examNetworks: "",
     examStartWithin: "",
+    projects: [],
     peer: false,
     peerReviews: "2",
     peerAnonymous: true,
@@ -292,6 +302,13 @@ export function AssignmentEditorPage({
             : "60",
         examFullscreen: data.exam?.fullscreen ?? true,
         examNetworks: (data.exam?.networks ?? []).join("\n"),
+        projects: (data.projects ?? []).map((p) => ({
+          key: projectKey(),
+          id: p.id,
+          title: p.title,
+          instructions: p.instructions,
+          points: String(p.points),
+        })),
         peer: Boolean(data.peerReview),
         peerReviews: String(data.peerReview?.reviews ?? 2),
         peerAnonymous: data.peerReview?.anonymous ?? true,
@@ -423,6 +440,15 @@ function AssignmentEditor({
         rubric: rubricOf(problemId),
         outcomes: form.outcomes[problemId] ?? [],
       })),
+      projects:
+        template || form.exam
+          ? []
+          : form.projects.map((p) => ({
+              id: p.id,
+              title: p.title,
+              instructions: p.instructions,
+              points: Number(p.points),
+            })),
       peerReview:
         form.peer && !form.exam && !template
           ? {
@@ -729,6 +755,14 @@ function AssignmentEditor({
           error={errors.questions}
         />
 
+        {!template && !form.exam && (
+          <ProjectsEditor
+            projects={form.projects}
+            onChange={(projects) => set("projects", projects)}
+            error={errors.projects}
+          />
+        )}
+
         <div className="grid gap-3 rounded-md border border-hairline p-3">
           <label className="inline-flex items-center gap-2 self-start text-ink">
             <Checkbox
@@ -970,6 +1004,7 @@ interface Gradebook {
     holdFeedback: boolean
     exam: ExamSettings | null
     quiz: { questions: number; points: number } | null
+    projects: { id: string; title: string; points: number }[] | null
   }
   /** `points` is tests plus rubric. */
   problems: {
@@ -1002,6 +1037,7 @@ interface Gradebook {
       answered: boolean
       needsMarking: number
     } | null
+    projects: { earned: number; max: number; submitted: number; needsMarking: number } | null
   }[]
 }
 
@@ -1013,6 +1049,7 @@ export function AssignmentGradebook({ id }: { id: string }) {
   } | null>(null)
   const [now] = useState(() => Date.now())
   const [marking, setMarking] = useState<string | null>(null)
+  const [markingProjects, setMarkingProjects] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const client = useQueryClient()
   const [rejudged, setRejudged] = useState<string | null>(null)
@@ -1155,6 +1192,9 @@ export function AssignmentGradebook({ id }: { id: string }) {
           ...(data.assignment.quiz
             ? [`Quiz (${data.assignment.quiz.points})`]
             : []),
+          ...(data.assignment.projects
+            ? [`Projects (${data.assignment.projects.reduce((n, p) => n + p.points, 0)})`]
+            : []),
           `Total (${data.total})`,
         ]}
       >
@@ -1253,6 +1293,28 @@ export function AssignmentGradebook({ id }: { id: string }) {
                 )}
               </td>
             )}
+            {data.assignment.projects && (
+              <td className="tabular-nums" data-testid="projects-cell">
+                {row.projects?.submitted ? (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 font-normal text-inherit"
+                    aria-label={`Mark ${row.email}'s projects`}
+                    onClick={() => setMarkingProjects(row.email)}
+                  >
+                    {row.projects.earned}
+                  </Button>
+                ) : (
+                  "—"
+                )}
+                {(row.projects?.needsMarking ?? 0) > 0 && (
+                  <div className="text-xs text-primary">
+                    {row.projects!.needsMarking} to mark
+                  </div>
+                )}
+              </td>
+            )}
             <td className="font-semibold text-ink tabular-nums">
               {row.earned}
             </td>
@@ -1261,6 +1323,14 @@ export function AssignmentGradebook({ id }: { id: string }) {
       </Table>
       {rows.length === 0 && (
         <p className="mt-3 text-body-sm text-body">No students match.</p>
+      )}
+      {markingProjects && (
+        <ProjectMarking
+          key={markingProjects}
+          assignmentId={id}
+          student={markingProjects}
+          onClose={() => setMarkingProjects(null)}
+        />
       )}
       {marking && (
         <QuizMarking

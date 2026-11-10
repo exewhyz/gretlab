@@ -1,5 +1,7 @@
 "use client"
 
+import type { ComponentProps } from "react"
+
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 
@@ -11,6 +13,7 @@ import { Difficulty } from "@/features/catalog/components/difficulty"
 import { useContentScope } from "@/features/account/scope"
 import { ScopeNote } from "@/features/account/scope-switcher"
 import { StudentPeerReview } from "@/features/peer/components/peer"
+import { StudentProjects } from "@/features/projects/components/projects"
 import { ClassChips } from "@/features/classes/components/class-chips"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
@@ -40,6 +43,8 @@ interface AssignmentSummary {
 }
 
 interface AssignmentDetail {
+  /** Project work handed in as GitHub repositories. */
+  projects: ComponentProps<typeof StudentProjects>["projects"]
   classes: { name: string; href: string }[]
   slug: string
   title: string
@@ -285,6 +290,15 @@ export function AssignmentView({ slug }: { slug: string }) {
       <div className="mb-4 empty:hidden">
         <StudentPeerReview slug={data.slug} />
       </div>
+      {data.projects.length > 0 && (
+        <div className="mb-4">
+          <StudentProjects
+            slug={data.slug}
+            projects={data.projects}
+            open={data.phase === "open" || data.phase === "late"}
+          />
+        </div>
+      )}
       {data.description && (
         <div className="mb-4 text-body-sm text-body">
           <RichText text={data.description} />
@@ -311,8 +325,11 @@ export function AssignmentView({ slug }: { slug: string }) {
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1">
             <Progress earned={data.earned} total={data.total} />
             <span className="text-caption text-body">
-              Open a problem, solve it there and press Submit. Your marks here
-              update by themselves.
+              {data.problems.length > 0
+                ? "Open a problem, solve it there and press Submit. Your marks here update by themselves."
+                : data.projects.length > 0
+                  ? "Hand in each project's repository above; your teacher marks it."
+                  : "Your marks here update by themselves."}
               {data.feedbackHeld &&
                 data.problems.some((p) => p.rubric.length > 0) &&
                 " Your teacher's rubric marks and comments appear once they release them."}

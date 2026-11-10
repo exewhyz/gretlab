@@ -301,7 +301,7 @@ const single = (await t(`/admin/questions/${qSingle}`)).json
 check("a choice question's right option is stored by letter", single.correct.join() === "b" && single.options[1].text === "def")
 const pick = (...ids) => ids.map((questionId) => ({ questionId, points: questionId === qWritten ? 4 : 2 }))
 const quizBody = (over) => body({ title: "Quiz 1", slug: "asg-quiz", allowLate: false, published: true, problems: [], questions: pick(qSingle, qMultiple, qShort, qWritten), ...over })
-check("an assignment needs a problem or a question", (await t("/admin/assignments", { body: quizBody({ slug: "asg-quiz-empty", questions: [] }) })).json?.error?.message === "Add at least one problem or question")
+check("an assignment needs a problem, question or project", (await t("/admin/assignments", { body: quizBody({ slug: "asg-quiz-empty", questions: [] }) })).json?.error?.message === "Add at least one problem, question or project")
 const quiz = await t("/admin/assignments", { body: quizBody({}) })
 check("a quiz: questions alone", quiz.status === 200, JSON.stringify(quiz.json).slice(0, 150))
 const quizBase = `/admin/assignments/${quiz.json.id}`

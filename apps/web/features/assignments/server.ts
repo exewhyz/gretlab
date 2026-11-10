@@ -44,6 +44,7 @@ import {
 
 import { draftHistory, latestDraft } from "@/features/drafts/server"
 import { notify } from "@/features/notifications/server"
+import { projectGrades, projectsOf, projectSubmissionsOn, saveProjects } from "@/features/projects/server"
 import { usableQuestions } from "@/features/questions/server"
 import { usableIds } from "@/features/library/sharing"
 import { extendSitting } from "@/features/exams/server"
@@ -366,6 +367,10 @@ export async function listAssignments(viewer: User) {
       viewer.id
     ),
   ])
+  const projectBook = await projectGrades(
+    rows.map((a) => a.id),
+    viewer.id
+  )
   const now = new Date()
 
   return rows.map((assignment) => {
@@ -406,8 +411,13 @@ export async function listAssignments(viewer: User) {
       phase: phaseOf(mine),
       problemCount: own.length,
       solved,
-      earned: round(earned + (quizOut ? quiz.earned : 0)),
-      total: total + quiz.max,
+      earned: round(
+        earned +
+          (quizOut ? quiz.earned : 0) +
+          // Project marks count once results aren't held.
+          (assignment.holdFeedback ? 0 : projectBook.grade(assignment.id, viewer.id).earned)
+      ),
+      total: total + quiz.max + projectBook.max(assignment.id),
     }
   })
 }
@@ -533,6 +543,14 @@ export async function getAssignment(slug: string, viewer: User) {
     : [[], undefined]
   const quiz = gradeQuiz(questions, response)
   const quizOut = quizResultsOut(assignment, examNow, extension, sitting)
+  const projects = visible ? await projectsOf([assignment.id]) : []
+  const mySubmissions = await projectSubmissionsOn(
+    projects.map((p) => p.id),
+    viewer.id
+  )
+  const projectsEarned = assignment.holdFeedback
+    ? 0
+    : mySubmissions.reduce((n, s) => n + (s.mark ?? 0), 0)
 
   return {
     slug: assignment.slug,
@@ -556,9 +574,31 @@ export async function getAssignment(slug: string, viewer: User) {
     allowLate: assignment.allowLate,
     latePenaltyPercent: assignment.latePenaltyPercent,
     phase,
-    earned: round(earned + (quizOut ? quiz.earned : 0)),
-    total: total + quiz.max,
+    earned: round(earned + (quizOut ? quiz.earned : 0) + projectsEarned),
+    total: total + quiz.max + projects.reduce((n, p) => n + p.points, 0),
     solved,
+    /** Project work: the student's repository and, once results aren't held, the mark. */
+    projects: projects.map((p) => {
+      const sub = mySubmissions.find((s) => s.projectId === p.id)
+      return {
+        id: p.id,
+        title: p.title,
+        instructions: p.instructions,
+        points: p.points,
+        submission: sub
+          ? {
+              repoUrl: sub.repoUrl,
+              ref: sub.ref,
+              commitSha: sub.commitSha,
+              note: sub.note,
+              submittedAt: sub.submittedAt,
+              late: sub.late,
+              mark: assignment.holdFeedback ? null : sub.mark,
+              feedback: assignment.holdFeedback ? "" : sub.feedback,
+            }
+          : null,
+      }
+    }),
     /** The classes it's for, linked. */
     classes,
     problems: items.map((item, index) => ({
@@ -822,9 +862,10 @@ export async function getAssignmentForStaff(id: string, orgId: string | null) {
     .from(assignments)
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
   if (!assignment) throw notFound("Assignment not found")
-  const [items, questions] = await Promise.all([itemsOf([id]), questionsOf([id])])
+  const [items, questions, projects] = await Promise.all([itemsOf([id]), questionsOf([id]), projectsOf([id])])
   return {
     ...assignment,
+    projects: projects.map(({ id: projectId, title, instructions, points }) => ({ id: projectId, title, instructions, points })),
     chosenProblems: await chosenProblems(items.map((i) => i.problemId)),
     problems: items.map(({ problemId, points, rubric, outcomes }) => ({
       problemId,
@@ -890,7 +931,7 @@ export async function saveAssignment(
     templateId?: string
   } = {}
 ) {
-  const { problems: chosen, expectedUpdatedAt, questions, ...fields } = input
+  const { problems: chosen, expectedUpdatedAt, questions, projects, ...fields } = input
   const ids = chosen.map((c) => c.problemId)
   // What it already has stays allowed (a template's shared problems, or sharing taken back).
   const allowed = new Set(options.allowed)
@@ -1026,6 +1067,7 @@ export async function saveAssignment(
         }))
       )
     }
+    await saveProjects(tx, assignment.id, projects)
     // Answers are kept by bank question, so they stay with a question across edits.
     await tx
       .delete(assignmentQuestions)
@@ -1187,6 +1229,7 @@ export interface GradebookRow {
   exam: (ReturnType<typeof presentSitting> & { warnings: number }) | null
   extension: { dueAt: Date; problemIds: readonly string[]; reason: string } | null
   quiz: { earned: number; max: number; answered: boolean; needsMarking: number } | null
+  projects: { earned: number; max: number; submitted: number; needsMarking: number } | null
 }
 
 /** The people an assignment is for: everyone's students, or an organization's audience. */
@@ -1286,9 +1329,10 @@ export async function getGradebook(
     ? await Promise.all([sittingsOn([id]), warningCounts(id)])
     : [new Map<string, Map<string, Sitting>>(), new Map<string, number>()]
   const extensions = (await extensionsOn([id])).get(id)
-  const [questions, responses] = await Promise.all([
+  const [questions, responses, projectBook] = await Promise.all([
     questionsOf([id]),
     responsesOn([id]).then((r) => r.get(id)),
+    projectGrades([id]),
   ])
 
   const rows: GradebookRow[] = students.map((student) => {
@@ -1303,7 +1347,10 @@ export async function getGradebook(
     const extension = extensions?.get(student.id)
     const response = responses?.get(student.id)
     const quiz = gradeQuiz(questions, response)
+    const project = projectBook.grade(id, student.id)
     return {
+      /** Teachers see project marks at once, held or not. */
+      projects: projectBook.projects.length ? project : null,
       /** Teachers see quiz marks at once, held or not. */
       quiz: questions.length
         ? {
@@ -1330,15 +1377,16 @@ export async function getGradebook(
       email: student.email,
       handle: student.handle,
       cells,
-      earned: round(earned + quiz.earned),
+      earned: round(earned + quiz.earned + project.earned),
       late: cells.filter((c) => c.status === "late").length,
     }
   })
   const total =
     items.reduce((sum, i) => sum + i.points + rubricTotal(i.rubric), 0) +
-    questions.reduce((sum, q) => sum + q.points, 0)
+    questions.reduce((sum, q) => sum + q.points, 0) +
+    projectBook.max(id)
   const started = rows.filter(
-    (r) => r.cells.some((c) => c.status !== "missing") || r.quiz?.answered
+    (r) => r.cells.some((c) => c.status !== "missing") || r.quiz?.answered || (r.projects?.submitted ?? 0) > 0
   )
 
   return {
@@ -1353,6 +1401,10 @@ export async function getGradebook(
       /** The quiz part, when there is one. */
       quiz: questions.length
         ? { questions: questions.length, points: questions.reduce((t, q) => t + q.points, 0) }
+        : null,
+      /** The project part, when there is one. */
+      projects: projectBook.projects.length
+        ? projectBook.projects.map((p) => ({ id: p.id, title: p.title, points: p.points }))
         : null,
     },
     problems: items.map(({ problemId, slug, title, points, rubric, outcomes }) => ({
@@ -1885,6 +1937,9 @@ export async function gradebookCsv(
     "Handle",
     ...book.problems.map((p) => `${p.title} (${p.points})`),
     ...(book.assignment.quiz ? [`Quiz (${book.assignment.quiz.points})`] : []),
+    ...(book.assignment.projects
+      ? [`Projects (${book.assignment.projects.reduce((n, p) => n + p.points, 0)})`]
+      : []),
     `Total (${book.total})`,
     "Problems late",
     ...(book.assignment.exam ? ["Exam", "Exam warnings"] : []),
@@ -1897,6 +1952,7 @@ export async function gradebookCsv(
       row.handle,
       ...row.cells.map((c) => c.earned),
       ...(book.assignment.quiz ? [row.quiz?.earned ?? 0] : []),
+      ...(book.assignment.projects ? [row.projects?.earned ?? 0] : []),
       row.earned,
       row.late,
       ...(row.exam

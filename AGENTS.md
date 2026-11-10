@@ -197,6 +197,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Attendance is marked when logging a class, for people in that class only (`attendance` table). Below 75% shows red to the teacher and the student.
 - Teach (`/teach`) lists a teacher's classes per organization as the group tree, with "Due this week" and "Behind the syllabus" first. Students' `/classes` lists the last-level groups they sit in. Assignments and contests link to the classes they're for (`classLinks`).
 
+## GitHub projects
+
+- An assignment (not an exam) may have projects (`assignment_projects`: title, markdown instructions, points), written in its form's Projects section; an assignment may be projects only. Edits keep project ids, so handed-in work stays; removing a project removes its work. Template uses keep their own projects.
+- Students hand in a GitHub repository link on the assignment page (`project_submissions`). Links are parsed strictly (`packages/judge/src/github.ts`, unit-tested: github.com only, GitHub's name rules, an optional `/tree/<branch>` or `/commit/<sha>`, no `..`), so the server only ever calls `api.github.com` with checked parts. The submission is pinned to the commit: a commit link as given, otherwise the branch's current commit from GitHub's API (4 s timeout; `GITHUB_TOKEN` raises the rate limit). GitHub saying "not found" refuses it (private repos must be shared with the teacher, who then sees the branch); GitHub unreachable or `GITHUB_LOOKUP=off` (the e2e tests) saves it unpinned.
+- Handing in is open from when it opens until the student's own due time (their extension counts), later only with late work allowed (then marked late). Handing in again replaces the work and clears its mark.
+- Teachers mark from the gradebook's Projects column (mark up to the points, markdown feedback); marks count in totals, the CSV and early warnings (a handed-in project isn't missed work). Students see marks and feedback unless results are held, and are notified when marked.
+
 ## Peer review
 
 - An assignment (not an exam) may have peer review (`assignments.peer_review`: reviews per student, anonymous, an optional review due time after the assignment's), set in its form. Students review classmates' final code; it never changes marks.
@@ -277,6 +284,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/library.mjs`: sharing the platform's content (every college, chosen colleges or teachers, staff only), what each college sees and can pick, copying, collections and the pages.
 - `e2e/certificates.mjs`: course and written certificates (once each, class only), the public page (no sign-in, no email, any case, unknown codes), revoking, My certificates and the class panel.
 - `e2e/calendar.mjs`: what's on someone's calendar (extensions, exams, contests, reviews; not drafts or other classes), the iCal feed (no sign-in, new link, off, blocked accounts) and the page.
+- `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.
 - `e2e/warnings.mjs`: who needs attention and why (missed, low marks, quiet, attendance), who may see it, notes to students, and the page.
@@ -312,6 +320,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Platform staff and roles: permissions, built-in and custom roles, no escalation, activity log
 - [x] Certificates: for finishing a course or written by a teacher, each with a public verification page; revocable
 - [x] Calendar: everything dated per person, with a private iCal feed for Google Calendar, Outlook and Apple Calendar
+- [x] GitHub projects: project work in assignments, handed in as repositories pinned to a commit, marked from the gradebook
 - [x] Peer code review: students review classmates' final code against the rubric with line comments, anonymously if chosen; teachers start, read and hide reviews
 - [x] Class discussions: threads and replies per class, anonymous to classmates, votes, teacher moderation and answers, reply notifications
 - [x] Early warnings: students who need attention per class (missed work, low marks, gone quiet, attendance) with reasons, and notes to them

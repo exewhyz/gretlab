@@ -12,6 +12,7 @@ import {
 
 import { chosenProblems, getAssignmentForStaff, saveAssignment } from "@/features/assignments/server"
 import { dbNow } from "@/features/exams/sittings"
+import { projectsOf } from "@/features/projects/server"
 import { sourceOf, usableBy, usableIds } from "@/features/library/sharing"
 import type { AssignmentInput } from "@/features/problems/schemas"
 import { slugify } from "@/features/problems/schemas"
@@ -225,8 +226,9 @@ async function bringChanges(t: typeof templates.$inferSelect) {
           : null,
         published: use.published,
         audience: use.audience,
-        // Its own: review dates belong to each use.
+        // Its own: review dates and projects belong to each use.
         peerReview: use.peerReview,
+        projects: (await projectsOf([use.id])).map(({ id, title, instructions, points }) => ({ id, title, instructions, points })),
         problems: t.content.problems.map((p) => ({
           ...p,
           // Course outcomes are the class's: kept for problems still in it.
@@ -344,6 +346,7 @@ export async function applyTemplate(
         published: input.published,
         audience: use.groupId ? [[use.groupId]] : [],
         peerReview: null,
+        projects: [],
         problems: t.content.problems.map((p) => ({ ...p, outcomes: [] })),
         questions: t.content.questions,
       },

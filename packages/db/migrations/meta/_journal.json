@@ -260,6 +260,13 @@
       "when": 1794263404387,
       "tag": "0036_certificates",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794291692337,
+      "tag": "0037_projects",
+      "breakpoints": true
     }
   ]
 }
