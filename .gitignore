@@ -78,3 +78,6 @@ todo.txt
 
 # Third-party design reference: kept locally, not published
 cursor.design.md
+
+# Written by `next dev` on every run; the same note heads the root AGENTS.md
+apps/web/AGENTS.md
