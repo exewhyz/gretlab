@@ -72,3 +72,6 @@ Thumbs.db
 
 # AI assistants' per-machine settings (shared skills and instructions stay committed)
 .claude/settings.local.json
+
+# Personal notes (their content is in AGENTS.md › Roadmap)
+todo.txt

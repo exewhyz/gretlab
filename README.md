@@ -1,13 +1,20 @@
 # Gretlab
 
-A coding lab for a teacher or college: practice problems, graded submissions in a secure sandbox, and contests, all configured from a dashboard. Design and security decisions are in [AGENTS.md](AGENTS.md).
+A coding lab and LMS for colleges: practice problems, graded assignments and lab exams judged in a secure sandbox, quizzes, contests and courses, run by many colleges from one deployment.
+
+**Start with [AGENTS.md](AGENTS.md).** It is the project's full context: architecture, every feature's rules and where its code lives, decisions and why, conventions, how to test, and the roadmap. AI assistants read it automatically (`CLAUDE.md` points to it).
 
 - **Editor:** Monaco with multiple files and folders, highlighting, line numbers, formatting and completion.
 - **Languages:** Python, JavaScript, C, C++ and Java.
 - **Sandbox:** every run is a throwaway gVisor container with no network.
-- **Dashboard:** settings and feature switches, language limits, problems and hidden tests, users and roles, contests, live submissions.
-- **Contests:** registration, ICPC or IOI scoring, wrong-attempt penalties, scoreboard freeze.
-- **Practice like LeetCode:** a problem library with topic tags, filters and acceptance rates; a daily challenge with streaks; hints; editorials unlocked by solving; private notes; favorites, lists and teacher-made study plans; profiles with an activity heatmap and badges; a leaderboard.
+- **Colleges:** organizations with their own groups (year › branch › section, or anything), members, custom roles scoped to groups, invites, CSV and Excel import, reports and an activity log.
+- **Classes:** a page per class with notices, classwork, a course, a discussion board, people, grades with early warnings, syllabus and attendance, and CO–PO outcomes.
+- **Assignments and exams:** problems, quiz questions and GitHub projects; late penalties, extensions, rubrics, line comments, held results, peer code review; timed lab exams locked to lab networks; gradebooks with CSV.
+- **Content once, used everywhere:** a shared library with collections and sharing between the platform and colleges; courses with module release rules; assignment and exam templates for many classes.
+- **Contests:** registration, ICPC or IOI scoring, wrong-attempt penalties, scoreboard freeze, quiz questions.
+- **Practice like LeetCode:** a problem library with tags and filters, a daily challenge with streaks, hints, editorials unlocked by solving, notes, lists and study plans, profiles and a leaderboard.
+- **For students:** notifications (in-app and email), a calendar with a private iCal feed, certificates anyone can verify.
+- **Integration:** LTI 1.3 for Moodle, Canvas and other LMSs (sign-in, deep linking, grades back).
 - **Integrity:** plagiarism checks that see through renamed variables and reformatting.
 
 ## Run it locally
@@ -34,17 +41,45 @@ ADMIN_EMAILS=you@example.com
 AUTH_DEV_LOGIN=true        # sign in without Google; ignored in production builds
 ```
 
-Open http://localhost:3000, sign in with `you@example.com`, and go to **Dashboard**.
+Open http://localhost:3000, sign in with `you@example.com`, and go to **Dashboard**. Docker's Postgres listens on port 5433; its data lives in a Docker volume, so it survives restarts (don't prune volumes).
 
 ## Go to production
 
 Load balancer, web replicas and PgBouncer run from `docker-compose.prod.yml`, and each runner machine from `docker-compose.runner.yml`. The full guide, sizing table and measurements are in [docs/scaling.md](docs/scaling.md).
 
 - **Runners must be dedicated machines**, with gVisor installed and firewalled so they reach only Postgres. A runner can start containers, so it must not share a machine with the web app or anything secret. It refuses to start without gVisor.
-- **Google sign-in:** create an OAuth client with the redirect URI `<NEXTAUTH_URL>/api/auth/callback/google`.
-- **First admin:** put your email in `ADMIN_EMAILS`, then sign in. Promote teachers under **Dashboard → Users**.
+- **Google sign-in:** create an OAuth client with the redirect URI `<NEXTAUTH_URL>/api/auth/callback/google`. It is the only sign-in method in production builds today.
+- **First admin:** put your email in `ADMIN_EMAILS`, then sign in. Give platform staff their roles under **Dashboard → Staff and roles**.
+- **Colleges:** one deployment serves many. Create each under **Dashboard → Organizations** and name its first owner, who runs it from **Manage** (members, groups, roles, teachers, settings, LMS). Restrict who can sign up with **Settings → Allowed email domains**.
+- **Database:** run migrations (and the seed, the first time) before each release: `docker compose -f docker-compose.prod.yml run --rm migrate`, or `pnpm db:migrate` with `DATABASE_URL` set.
 
-For another college, deploy another copy with its own database. Restrict sign-ups with **Settings → Allowed email domains**.
+### Planned: Vercel and Railway
+
+The web app (`apps/web`, the whole UI and API) goes on Vercel; Postgres and the runner (`apps/runner`) go on Railway.
+
+- **Runner:** needs Docker with gVisor (`runsc`) on its host and refuses to start without it. Confirm the host allows running containers with gVisor before relying on it; otherwise run runners on a VM (see docs/scaling.md).
+- **Database connections:** serverless functions open many short connections, so put a pooler (PgBouncer) in front of Postgres and set `DATABASE_PREPARE=false`, as `docker-compose.prod.yml` does.
+- **Lab exams limited to networks** need the visitor's real address, which this app trusts only from Caddy (`PROXY_SECRET`). On Vercel, network-limited exams stay off until that is adapted; everything else works.
+
+### Settings
+
+The web app reads these (in development from `apps/web/.env.local`; in production from the host or the `.env` that `docker-compose.prod.yml` reads). Templates: [`apps/web/.env.example`](apps/web/.env.example) and [`.env.example`](.env.example).
+
+| Setting | Needed | What it does |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Postgres connection (web, runner, migrations) |
+| `NEXTAUTH_URL` | yes | The site's public address; also used for links in email, calendar and LTI |
+| `NEXTAUTH_SECRET` | yes | Signs session cookies: `openssl rand -base64 32` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | yes, in production | Google sign-in |
+| `ADMIN_EMAILS` | yes | Comma-separated platform owners |
+| `PROXY_SECRET` | for network-limited exams | Shared with Caddy so the app trusts visitors' addresses ([docs/deploy-exams.md](docs/deploy-exams.md)) |
+| `SMTP_URL`, `MAIL_FROM` | no | Email notifications; without them, in-app only |
+| `GITHUB_TOKEN` | no | Raises GitHub's limit for pinning project commits |
+| `LTI_PRIVATE_KEY`, `LTI_KEY_ID` | no | A fixed LTI signing key; otherwise one is made and kept in the database |
+| `METRICS_TOKEN` | no | Turns on `GET /api/metrics` |
+| `NEXT_PUBLIC_ADSENSE_*` | no | Ads on public practice pages (see Ads) |
+| `SANDBOX_RUNTIME`, `RUNNER_CONCURRENCY`, `RUNNER_MEMORY_MB` | runner | Sandbox runtime (`runsc` in production) and capacity |
+| `AUTH_DEV_LOGIN`, `GITHUB_LOOKUP=off`, `LTI_ALLOW_HTTP` | development and tests only | Sign-in without Google, skipping GitHub lookups, http LMS addresses |
 
 ## Add things
 
@@ -66,7 +101,8 @@ For another college, deploy another copy with its own database. Restrict sign-up
 | `packages/judge` | Languages, settings, verdicts, leaderboard, file validation |
 | `packages/ui` | Design tokens and shared components |
 | `docker/sandbox` | One image per language |
-| `e2e` | Whole-system, load and failure tests |
+| `e2e` | Whole-system tests (`run.sh`), load and failure tests |
+| `docs` | Problem and question import formats, exam deployment, scaling |
 | `deploy`, `docker-compose.*.yml` | Production deployment |
 
 ## Styling
@@ -91,8 +127,9 @@ With no configuration the site has no ads and loads no ad scripts. Ads appear on
 ## Test
 
 ```bash
-pnpm test        # unit tests
-pnpm test:e2e    # needs Docker, sandbox images and: pnpm exec playwright install chromium
+pnpm test        # unit tests of the pure rules (packages/judge)
+pnpm typecheck
+pnpm test:e2e    # everything, about 40 minutes; needs Docker, sandbox images, ~10 GB free disk and: pnpm exec playwright install chromium
 ```
 
-Load and failure tests are described in [docs/scaling.md](docs/scaling.md).
+Each feature has its own browser and API suite in `e2e/` (listed in AGENTS.md › Testing), and any one can run against your dev server. Load and failure tests are described in [docs/scaling.md](docs/scaling.md).

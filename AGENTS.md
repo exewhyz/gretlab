@@ -28,6 +28,35 @@ Full diagram, measurements and sizing: `docs/scaling.md`.
 | `packages/judge` | Language registry, verdicts, file validation, output compare, feature list. No I/O |
 | `packages/ui` | Design tokens and shared components |
 | `docker/sandbox` | One image per language |
+| `e2e` | Whole-system tests (`run.sh` runs them all), plus load and failure tests |
+| `docs` | Problem and question import formats, exam deployment, scaling |
+| `deploy`, `docker-compose.*.yml` | Production: Caddy, web replicas, PgBouncer (`prod`), runner machines (`runner`), local Postgres (plain) |
+
+Where each feature lives (`apps/web/features/<name>`: UI in `components/`, rules in `server.ts`, browser-safe form schemas in `schemas.ts`; pure, unit-tested rules in `packages/judge/src/<name>.ts`):
+
+| Feature | Code |
+| --- | --- |
+| Problems, library practice, daily, lists, profiles | `problems`, `catalog`, `lab`, `editor` |
+| Question bank and quizzes | `questions`; rules `judge/quiz.ts` |
+| Assignments, grading, gradebook, rubrics, feedback | `assignments`, `feedback`, `admin/components/assignments.tsx`; rules `judge/grading.ts` |
+| Lab exams | `exams`; rules `judge/exam.ts` |
+| Contests | `contests` |
+| Organizations, groups, roles, invites, import | `orgs`; permissions `judge/permissions.ts` |
+| Classes, attendance, teaching log, reports | `classes`, `teaching` |
+| Outcomes (CO–PO) | `outcomes`; rules `judge/outcomes.ts` |
+| Platform staff and roles, activity log | `platform`; rules `judge/platform.ts` |
+| Library, sharing, collections | `library` (`sharing.ts` is the one rule for what an owner may use) |
+| Courses | `courses`; release rules `judge/course.ts` |
+| Templates | `templates` |
+| Early warnings | `classes/warnings.ts`; rules `judge/warnings.ts` |
+| Discussions | `discussions` |
+| Peer review | `peer`; rules `judge/peer.ts` |
+| Calendar and iCal | `calendar`; `judge/ical.ts` |
+| Certificates | `certificates` |
+| GitHub projects | `projects`; link rules `judge/github.ts` |
+| LTI 1.3 | `lti`; launch rules `judge/lti.ts` |
+| Notifications and email | `notifications` |
+| Settings and switches | `settings`; list `judge/features.ts` |
 
 ## Decisions (and why)
 
@@ -55,9 +84,9 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 ## Navigation (keep it this simple)
 
 - The header's switcher (`features/account/scope-switcher.tsx`, shown to people in an organization) chooses whose content lists show: everything, personal (from no organization), any mix of organizations, or one; each organization can be opened from it. It's a per-browser cookie read by `useContentScope()`; Problems, Assignments, Contests and Teach filter with it and show a note with the hidden count and "Show everything". It only narrows lists; access is still decided on the server.
-- One header everywhere (`components/page-header.tsx`): the site title, the organization switcher, the Learn/Teach toggle, then the current mode's sections. Learn: Problems, My classes (`/classes`), Assignments, Contests, Leaderboard, Playground. Teach: My classes (`/teach`), Organizations (managers who don't teach), Dashboard (platform staff), Playground. Only people who teach somewhere or are platform staff get the toggle (`features/account/mode.ts`); a page that belongs to one mode switches the header to it, and pages in both (a class, the playground) keep the last choice. Personal pages (profile, submissions, lists, sign out) live in the account menu. Don't add top-level links; put new pages under a section.
+- One header everywhere (`components/page-header.tsx`): the site title, the organization switcher, the Learn/Teach toggle, then the current mode's sections. Learn: Problems, My classes (`/classes`), Assignments, Contests, Leaderboard, Playground. Teach: My classes (`/teach`), Organizations (managers who don't teach), Dashboard (platform staff), Playground. Only people who teach somewhere or are platform staff get the toggle (`features/account/mode.ts`); a page that belongs to one mode switches the header to it, and pages in both (a class, the playground) keep the last choice. Personal pages (profile, submissions, organizations, Calendar, My certificates, lists, sign out) live in the account menu. Don't add top-level links; put new pages under a section.
 - Problems are at `/problems` (library) and `/problems/[slug]` (solve). `/questions/[slug]` only redirects, for old links.
-- The dashboard sidebar is grouped by task: Content, Students, Setup.
+- The platform dashboard sidebar is grouped by task, each item shown only to roles with its permission: Content (Library, Courses, Problems, Questions, Units, Assignments, Templates, Contests, Daily challenge, Study plans, Notices), Students (Users, Submissions, Plagiarism check), Setup (Organizations, Staff and roles, Activity, Languages, Settings). An organization's Manage sidebar works the same (Members, Groups, Roles, Invites, Import, Assignments, Templates, Contests, Library, Courses, Problems, Questions, Reports, Notices, Outcomes, Settings, LMS (LTI), Activity).
 - Say "problem", never "question", in anything a person reads.
 - Messages must match who is reading: never tell a signed-in person to sign in. With server execution off, signed-in students run in the browser and Submit is paused.
 
@@ -161,7 +190,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 
 ## Organizations and permissions
 
-- Platform roles (`users.role`: student, teacher, admin) still run the platform dashboard. Inside an organization, access comes only from organization roles.
+- The platform dashboard is run by platform staff roles (see "Platform staff and roles"; `users.role` is kept in step for older checks). Inside an organization, access comes only from organization roles.
 - Permissions are a fixed list in `packages/judge/src/permissions.ts`; roles are bundles of them stored per organization. Built-in roles (Owner, Admin, Teacher, Member) can't be edited or deleted; organizations add their own.
 - A role is given across the organization or within one group, and then covers that group and every group under it. Organization-wide actions need an organization-wide grant.
 - Roles count only while the membership is active (not while a join request is pending).
@@ -190,7 +219,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 
 ## Classes (the LMS view)
 
-- A class is a group someone teaches, at any level. `/orgs/[slug]/classes/[groupId]` gathers everything about it in tabs: Stream (class notices, logged classes, new work), Classwork (assignments and contests reaching it, syllabus), People, Grades, Syllabus and log (with attendance) and Insights. Teachers of the group see all of it; students sitting in it or a group inside it see their side; everyone else gets 404. `features/classes/server.ts` holds the rules.
+- A class is a group someone teaches, at any level. `/orgs/[slug]/classes/[groupId]` gathers everything about it in tabs: Stream (class notices, logged classes, new work), Classwork (assignments and contests reaching it, syllabus), Course (its courses, with certificates for teachers), Discussion, People, Grades (with Needs attention for teachers), Syllabus and log (with attendance), Outcomes and Insights. Teachers of the group see all of it; students sitting in it or a group inside it see their side; everyone else gets 404. `features/classes/server.ts` holds the rules.
 - Content reaches a class when one of its conditions names the class, a group above it ("From CSE") or a group inside it; organization-wide content reaches every class. Students still only see what `accessTo` lets them take part in.
 - "New assignment" and "New contest" from a class open the form with `?for=<group>`: aimed at the class, and back to it after saving.
 - Notices can be aimed at a class (`notes.audience`). A notice for the whole organization needs organization-wide "Post notices"; a class teacher posts from the class page and can remove only notices for groups they cover.
@@ -280,11 +309,19 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - Schemas shared with forms (`features/*/schemas.ts`, `lib/api/version.ts`) are loaded in the browser: they may import zod and `@workspace/judge`, never `@workspace/db`, `lib/api/route` or a `server.ts`. Doing so pulls Postgres into the client bundle and breaks every form page.
 - Saves of problems, assignments and contests send the `updatedAt` the form opened with (`expectedUpdatedAt`); a newer version refuses the save with `edited_elsewhere` (`lib/api/conflict.ts`) and the form offers "Load their version" or "Keep mine".
 - Tests find a checkbox by role (`getByRole("checkbox", { name })`): Base UI pairs it with a hidden native input that a wrapping label also names.
+- Next route files (`route.ts`, `page.tsx`) may export only what Next allows (handlers, `metadata`, the page). Put shared schemas in `features/*/schemas.ts`.
+- A `route()` handler that returns `null` or `undefined` answers `{ ok: true }`; return an object (`{ exam: null }`) when the client reads a value.
+- `route()` refuses cross-site POSTs (its origin check). Endpoints that another site posts to (an LMS's LTI launch) are plain handlers with their own errors: `features/lti/http.ts`.
+- Times compared with submission stamps use the database clock (`dbNow()`): the Docker VM's clock drifted from the host's and broke exam timing once.
+- Migrations: never edit one that's applied anywhere; add a new one. Data migrations are SQL appended to the generated file (0030 sharing defaults, 0031 the platform course from units), kept idempotent, and mirrored in the seed when a fresh database needs the same rows.
+- Sharing changes (`setSharing`) keep `updated_at`, so an open editor doesn't get a false conflict.
+- In `next dev`, Turbopack has served stale module exports after a file gained new exports (a function "is not a function"). If a dev request fails that way, check on a production build (`pnpm --filter web build`, then `next start -p 3101`) before chasing a bug; restarting `pnpm dev` clears it.
 
 ## Testing
 
-- `pnpm test`: fast unit tests (leaderboard, file names, settings).
-- `pnpm test:e2e`: everything against a throwaway database and real gVisor: queue guarantees, 16 hostile programs, API security, every seeded solution, contests, the browser UI. Run it before merging anything touching the sandbox, queue, auth or the API.
+- `pnpm test`: unit tests of the pure rules in `packages/judge` (grading, quizzes, exams, outcomes, platform roles, course release, warnings, peer pairing, iCal, GitHub links, LTI launches, starter code, the judge).
+- `pnpm test:e2e` (`e2e/run.sh`): everything against a throwaway database (`gretlab_test`, recreated each run) and real gVisor in a Docker rig: queue guarantees, 16 hostile programs, API security, every seeded solution, then every suite below against a production build on :3100 (started with `PROXY_SECRET`, `GITHUB_LOOKUP=off`, `LTI_ALLOW_HTTP=true`). About 40 minutes; set `E2E_SCREENSHOTS` to keep screenshots. Run it before merging anything touching the sandbox, queue, auth or the API, and as an ordinary process (a backgrounded, low-priority run timed out browsers and looked like failures). It needs roughly 10 GB free disk: when Docker runs out of space builds fail with `ENOSPC` and Docker itself can get I/O errors (`docker builder prune` frees build cache; never prune volumes, which hold the data).
+- One suite against your dev server and database: `E2E_DB=gretlab NEXTAUTH_SECRET=<your dev secret> node e2e/<suite>.mjs http://localhost:3000 /tmp/gretlab-e2e/<dir>/`. Suites make their own users and organizations with a prefix (`lib-`, `crs-`, `tpl-`…) and delete them at the end, so they don't touch real data.
 - `e2e/stack.sh` with `e2e/load.mjs` and `e2e/resilience.mjs`: load and failure tests on the production shape. See `docs/scaling.md`.
 - `e2e/features.mjs`: library, daily (problem and question), streaks, notes, lists, study plans, profiles, leaderboard, hints, editorials, integrity, editor extras and their switches.
 - `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
@@ -346,6 +383,12 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Classes: class pages (stream, classwork, people, grades, syllabus and log, insights), class notices, attendance, teacher class tree with today's work, student My classes, Learn/Teach modes, organization switcher
 - [x] Scale: replicas, load balancer, connection pooling, queue priorities, load shedding, crash recovery, metrics, containers
 
+Decided not to build for now: the AI tutor (it needs an Anthropic API key and a usage policy).
+
+Shipping (November 2026): the web app on Vercel; Postgres and the runner on Railway. The runner needs Docker with gVisor (`runsc`) on its host and refuses to start without it, so its host must allow that; web functions on Vercel open many short connections, so Postgres needs a pooler in front (PgBouncer, as in `docker-compose.prod.yml`).
+
+The organization hierarchy we're heading for (from the owner's notes): platform › organization › year › branch › section (these three are an organization's group levels, set in its settings) › course › module › problems, questions, contests, assignments and exams. Groups and courses (with modules) exist; content is aimed at groups today.
+
 Next, roughly in order of value for a college deployment:
 
 0. Organizations, next: per-organization time and memory limits; class feedback reminders; members-only problems inside study plans; tagging assignments with syllabus topics; a server-paged members list for very large organizations.
@@ -353,18 +396,19 @@ Next, roughly in order of value for a college deployment:
 
 1. A separate, least-privilege database role for runners.
 2. Student sign-in without Google: email and password, or college SSO (SAML/OIDC).
-3. Assignments for a class group only (today every student sees every published assignment); extensions for one student.
-4. CSV roster import and class groups.
-5. Plagiarism: cross-language detection and a side-by-side diff view (pairwise similarity within a language is built, under Plagiarism check).
-6. Rate limiting on public endpoints at the edge; a Content-Security-Policy (Monaco and AdSense need care).
-7. Audit log of staff actions; monitoring and alerts for queue depth.
-8. Measure scale-out on real machines (see "What this does not prove" in `docs/scaling.md`); read replica for leaderboards if a contest ever needs it.
-9. Server-side language servers for C++ and Java completion (only Python and JavaScript have real completion today).
-10. Custom checkers for problems with more than one right answer; subtasks for IOI scoring.
-11. Per-organization single sign-on and branding.
+3. Plagiarism: cross-language detection and a side-by-side diff view (pairwise similarity within a language is built, under Plagiarism check).
+4. Rate limiting on public endpoints at the edge; a Content-Security-Policy (Monaco and AdSense need care).
+5. Monitoring and alerts for queue depth (the platform and organization activity logs are built).
+6. Measure scale-out on real machines (see "What this does not prove" in `docs/scaling.md`); read replica for leaderboards if a contest ever needs it.
+7. Server-side language servers for C++ and Java completion (only Python and JavaScript have real completion today).
+8. Custom checkers for problems with more than one right answer; subtasks for IOI scoring.
+9. Per-organization single sign-on and branding.
 
 ### Known limits
 
 - Memory measurements come from inside the sandbox and are informational; time limits are enforced by `timeout` with a host-side backstop.
 - Under gVisor a fork bomb can stop the whole sandbox rather than just failing `fork`. It is contained and reported as a failed run, and any remaining tests are not judged.
 - Scale-out across machines is designed and tested for correctness, but its throughput has only been measured on one laptop.
+- LTI 1.3 is tested end to end against a fake LMS in `e2e/lti.mjs`, not yet against a real Moodle or Canvas.
+- Pinning GitHub projects to a commit depends on GitHub's API (60 lookups an hour without `GITHUB_TOKEN`); when it can't answer, work is saved unpinned.
+- A calendar feed's address is its only key (calendar apps can't sign in); anyone with it sees that person's due dates.
