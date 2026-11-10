@@ -396,6 +396,7 @@ Next, roughly in order of value for a college deployment:
 
 1. A separate, least-privilege database role for runners.
 2. Student sign-in without Google: email and password, or college SSO (SAML/OIDC).
+2. Two-factor authentication in the app, for everyone (the owner's decision, November 2026): passkeys or an authenticator app (TOTP) with recovery codes, independent of the sign-in provider. Required for platform staff and organization admins, then teachers, optional for students (an organization setting can require it). Step-up: critical actions ask for the second factor again if it's older than a few minutes (changing roles and permissions, grades and overrides, exam settings and extra time, LTI and organization settings, deleting content), recorded in the activity log. Google's "authentication strength" claims were considered and not used: they need a verified Google app, cover only Google sign-ins, and the app would still need its own check.
 3. Plagiarism: cross-language detection and a side-by-side diff view (pairwise similarity within a language is built, under Plagiarism check).
 4. Rate limiting on public endpoints at the edge; a Content-Security-Policy (Monaco and AdSense need care).
 5. Monitoring and alerts for queue depth (the platform and organization activity logs are built).
