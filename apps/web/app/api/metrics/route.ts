@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto"
 import { NextResponse, type NextRequest } from "next/server"
 
 import { getQueueHealth } from "@/features/admin/server"
+import { outboxHealth } from "@/features/notifications/outbox"
 
 export const dynamic = "force-dynamic"
 
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
   if (!authorized(request)) {
     return new NextResponse("Unauthorized", { status: 401 })
   }
-  const queue = await getQueueHealth()
+  const [queue, mail] = await Promise.all([getQueueHealth(), outboxHealth()])
   const metrics: [string, string, number][] = [
     ["gretlab_queue_waiting", "Jobs waiting for a runner", queue.queued],
     ["gretlab_queue_running", "Jobs running now", queue.running],
@@ -46,6 +47,17 @@ export async function GET(request: NextRequest) {
     ],
     ["gretlab_runner_slots", "Total runner slots", queue.slots],
     ["gretlab_runner_slots_busy", "Runner slots in use", queue.busySlots],
+    ["gretlab_mail_queued", "Emails waiting to be sent", mail.queued],
+    [
+      "gretlab_mail_oldest_seconds",
+      "Age of the oldest waiting email",
+      mail.oldestQueuedSeconds,
+    ],
+    [
+      "gretlab_mail_failed_1d",
+      "Emails given up on, last day",
+      mail.failedLastDay,
+    ],
   ]
   const body = metrics
     .map(

@@ -91,6 +91,14 @@ The live site, https://gretlab.grettech.com, runs as three parts, all in Sydney 
 - Health: `GET /api/health` answers `{"status":"ok"}` while the website reaches the database (load balancers use it). `GET /api/health/judge` answers 200 while a code judge is online and no submission has waited over 3 minutes, and 503 with the reason otherwise.
 - Uptime alerts: a free UptimeRobot (or similar) account watching both addresses every 5 minutes emails you when either goes down.
 
+**Email:**
+
+- Notifications are queued in Postgres (`email_outbox`) in the same transaction as the in-app ones, then sent right after the response, in batches of 100 through Resend's API, each with a key that stops duplicates.
+- Failures retry after 1 min, 5 min, 30 min, 2 h and 6 h; a bad address fails alone without holding up the rest.
+- Retries and very large batches are sent by `POST /api/cron/outbox` (`Authorization: Bearer <CRON_SECRET>`). Vercel calls it daily (`apps/web/vercel.json`, the most the Hobby plan allows), and `.github/workflows/email-outbox.yml` calls it every 15 minutes once the repository has the secret `CRON_SECRET` and the variable `SITE_URL`. On Vercel Pro, change the schedule in `vercel.json` to `* * * * *` instead.
+- Vercel settings: `RESEND_API_KEY`, `MAIL_FROM` (on the domain verified in Resend) and `CRON_SECRET`. `SMTP_URL` isn't needed alongside the key.
+- Watching it: `/api/metrics` reports `gretlab_mail_queued`, `gretlab_mail_oldest_seconds` and `gretlab_mail_failed_1d`; failures are logged as `[outbox]`.
+
 **Lab exams limited to a network** work here with no setup: on Vercel the app trusts the visitor address Vercel's edge reports (`x-vercel-forwarded-for`), so `PROXY_SECRET` isn't needed. Don't put another proxy or CDN in front of the site, or every student will appear to come from it. On another host, set `CLIENT_IP_HEADER` to the header that host uses ([docs/deploy-exams.md](docs/deploy-exams.md)).
 
 ### Settings
@@ -106,7 +114,8 @@ The web app reads these (in development from `apps/web/.env.local`; in productio
 | `ADMIN_EMAILS` | yes | Comma-separated platform owners |
 | `CLIENT_IP_HEADER` | for network-limited exams on hosts other than Vercel or Caddy | The header your host puts the visitor's address in, such as `cf-connecting-ip` ([docs/deploy-exams.md](docs/deploy-exams.md)) |
 | `PROXY_SECRET` | for network-limited exams behind Caddy (not on Vercel) | Shared with Caddy so the app trusts visitors' addresses ([docs/deploy-exams.md](docs/deploy-exams.md)) |
-| `SMTP_URL`, `MAIL_FROM` | no | Email notifications; without them, in-app only |
+| `RESEND_API_KEY` or `SMTP_URL`, and `MAIL_FROM` | no | Email notifications, queued and sent in batches with retries; without them, in-app only. Resend's API by default; `SMTP_URL` for any mail server |
+| `CRON_SECRET` | with email | Lets a scheduler call `POST /api/cron/outbox` to send big batches and retries (see Email below) |
 | `GITHUB_TOKEN` | no | Raises GitHub's limit for pinning project commits |
 | `LTI_PRIVATE_KEY`, `LTI_KEY_ID` | no | A fixed LTI signing key; otherwise one is made and kept in the database |
 | `METRICS_TOKEN` | no | Turns on `GET /api/metrics` |

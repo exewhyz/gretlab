@@ -15,7 +15,8 @@ import { listAssignments } from "@/features/assignments/server"
 import { listContests } from "@/features/contests/server"
 import { getSettings } from "@/features/settings/server"
 
-import { sendMail } from "./mail"
+import { mailEnabled } from "./mailer"
+import { drainOutbox, queueEmails } from "./outbox"
 
 /*
  * Notifications. Events (new work, feedback released, an extension, a class notice) are
@@ -36,27 +37,37 @@ export interface NewNotification {
 }
 
 /**
- * Email goes out after the response, so the action that caused it isn't slowed down. On
- * serverless hosts (Vercel) a function is frozen once it has answered, and a promise left
- * running is cut off; after() keeps the function alive until it settles. Outside a request
- * (a script), there's nothing to outlive, so it just runs.
+ * Runs after the response, so the action that caused it isn't slowed down. On serverless
+ * hosts (Vercel) a function is frozen once it has answered, and a promise left running is
+ * cut off; after() keeps the function alive until it settles. Outside a request (a
+ * script), there's nothing to outlive, so it just runs.
  */
-function sendAfterResponse(task: () => Promise<void>) {
+function afterResponse(task: () => Promise<unknown>) {
+  const run = () =>
+    task().catch((error) => console.error("[notifications] after:", error))
   try {
-    after(task)
+    after(run)
   } catch {
-    void task()
+    void run()
   }
 }
 
-/** Tells these people. Never fails the action that caused it. */
+/**
+ * Tells these people: an in-app notification each, and an email for those who want them,
+ * queued in the same transaction (the outbox), so neither is stored without the other.
+ * Sending starts right after the response; a failure retries later. Never fails the action
+ * that caused it.
+ */
 export async function notify(userIds: string[], n: NewNotification) {
   const ids = [...new Set(userIds)]
   if (ids.length === 0) return
   try {
-    await getDb()
-      .insert(notifications)
-      .values(
+    const site = process.env.NEXTAUTH_URL ?? ""
+    const text = [n.body, n.href ? `${site}${n.href}` : ""]
+      .filter(Boolean)
+      .join("\n\n")
+    await getDb().transaction(async (tx) => {
+      await tx.insert(notifications).values(
         ids.map((userId) => ({
           userId,
           kind: n.kind,
@@ -65,36 +76,25 @@ export async function notify(userIds: string[], n: NewNotification) {
           href: n.href ?? "",
         }))
       )
-    sendAfterResponse(() => emailThem(ids, n))
+      if (!mailEnabled()) return
+      const recipients = await tx
+        .select({ email: users.email })
+        .from(users)
+        .where(
+          and(
+            inArray(users.id, ids),
+            eq(users.emailNotifications, true),
+            eq(users.disabled, false)
+          )
+        )
+      await queueEmails(
+        tx,
+        recipients.map(({ email }) => ({ to: email, subject: n.title, text }))
+      )
+    })
+    if (mailEnabled()) afterResponse(() => drainOutbox())
   } catch (error) {
     console.error("[notifications] couldn't store:", error)
-  }
-}
-
-async function emailThem(userIds: string[], n: NewNotification) {
-  try {
-    const recipients = await getDb()
-      .select({ email: users.email })
-      .from(users)
-      .where(
-        and(
-          inArray(users.id, userIds),
-          eq(users.emailNotifications, true),
-          eq(users.disabled, false)
-        )
-      )
-    const site = process.env.NEXTAUTH_URL ?? ""
-    for (const { email } of recipients) {
-      await sendMail({
-        to: email,
-        subject: n.title,
-        text: [n.body, n.href ? `${site}${n.href}` : ""]
-          .filter(Boolean)
-          .join("\n\n"),
-      })
-    }
-  } catch (error) {
-    console.error("[notifications] email failed:", error)
   }
 }
 

@@ -1113,6 +1113,40 @@ export const notifications = pgTable(
   (table) => [index("notifications_by_user").on(table.userId, table.createdAt)]
 )
 
+/**
+ * Email waiting to go out (a transactional outbox). notify() adds rows in the same
+ * transaction as the notifications, and drainOutbox() (apps/web/features/notifications)
+ * sends them in batches with retries, so a slow or failing mail server never loses mail or
+ * slows the action that caused it. Sent rows are deleted after a week.
+ */
+export const emailStatus = pgEnum("email_status", [
+  "queued",
+  "sending",
+  "sent",
+  "failed",
+])
+
+export const emailOutbox = pgTable(
+  "email_outbox",
+  {
+    id: id(),
+    to: text("to_address").notNull(),
+    subject: text("subject").notNull(),
+    text: text("body").notNull(),
+    status: emailStatus("status").notNull().default("queued"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /** When a worker took it; a send still "sending" long after was cut off. */
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("email_outbox_due").on(table.status, table.nextAttemptAt)]
+)
+
 /** What a program's graduates should be able to do (PO1..PO12, PSOs): one list per organization. */
 export const programOutcomes = pgTable(
   "program_outcomes",

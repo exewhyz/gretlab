@@ -40,14 +40,35 @@ services:
       # The same secret as Caddy's; at least 16 characters. Without it, exams can't be
       # limited to a network.
       PROXY_SECRET: ${PROXY_SECRET:-}
-      # Optional: notification email (see .env.example).
+      # Optional: notification email (see .env.example). RESEND_API_KEY, or SMTP_URL for
+      # any mail server; CRON_SECRET lets the scheduler below send retries.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      CRON_SECRET: ${CRON_SECRET:-}
       # Optional: a higher GitHub rate limit for pinning project commits.
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       # Optional: a fixed LTI signing key; without it one is made and kept in the database.
       LTI_PRIVATE_KEY: ${LTI_PRIVATE_KEY:-}
       LTI_KEY_ID: ${LTI_KEY_ID:-}
+
+  # Sends queued email every minute: big batches and retries (apps/web/app/api/cron/outbox).
+  # Idle without CRON_SECRET.
+  scheduler:
+    image: curlimages/curl:8.11.1
+    restart: unless-stopped
+    depends_on: [web]
+    environment:
+      CRON_SECRET: ${CRON_SECRET:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          sleep 60
+          [ -n "$$CRON_SECRET" ] || continue
+          curl -fsS --max-time 90 -X POST -H "Authorization: Bearer $$CRON_SECRET" \
+            http://web:3000/api/cron/outbox > /dev/null || echo "outbox drain failed"
+        done
 
   # Web replicas share a small number of real database connections through this.
   pgbouncer:

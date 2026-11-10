@@ -274,6 +274,13 @@
       "when": 1794297238800,
       "tag": "0038_lti",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794320676089,
+      "tag": "0039_email_outbox",
+      "breakpoints": true
     }
   ]
 }

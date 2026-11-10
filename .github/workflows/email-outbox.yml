@@ -1,0 +1,32 @@
+# Sends queued email every 15 minutes: retries and batches the immediate send didn't
+# finish. Needed where the host's own scheduler can't run that often (Vercel Hobby runs
+# cron once a day). Set up once, in the repository's Settings › Secrets and variables ›
+# Actions: the secret CRON_SECRET (the same value as the web app's) and the variable
+# SITE_URL (e.g. https://gretlab.example.edu). Without them this does nothing.
+# GitHub may start scheduled runs late under load; the immediate send doesn't depend on it.
+name: Email outbox
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Send queued email
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ] || [ -z "$SITE_URL" ]; then
+            echo "CRON_SECRET or SITE_URL isn't set; skipping."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            -X POST -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/cron/outbox"
