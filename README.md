@@ -64,13 +64,33 @@ sudo DATABASE_URL='postgres://user:password@host:port/db' bash runner-setup.sh
 
 It installs Docker and gVisor, proves a container runs under gVisor, locks the firewall to SSH, builds the language images, creates the database tables (and loads the starter problems), runs the 16 hostile-program tests against the real sandbox, and only then starts the runner. Use the database's direct address, not a pooler. Run it again to update; run it on more servers for more capacity. Keep the server for this alone (see AGENTS.md › Sandbox rules).
 
-### Planned: Vercel and Railway
+### How the live site runs (Vercel, Neon, EC2)
 
-The web app (`apps/web`, the whole UI and API) goes on Vercel; Postgres and the runner (`apps/runner`) go on Railway.
+The live site, https://gretlab.grettech.com, runs as three parts, all in Sydney (`ap-southeast-2`):
 
-- **Runner:** needs Docker with gVisor (`runsc`) on its host and refuses to start without it. Confirm the host allows running containers with gVisor before relying on it; otherwise run runners on a VM (see docs/scaling.md).
-- **Database connections:** serverless functions open many short connections, so put a pooler (PgBouncer) in front of Postgres and set `DATABASE_PREPARE=false`, as `docker-compose.prod.yml` does.
-- **Lab exams limited to networks** need the visitor's real address, which this app trusts only from Caddy (`PROXY_SECRET`). On Vercel, network-limited exams stay off until that is adapted; everything else works.
+| Part | Where | Notes |
+| --- | --- | --- |
+| Web app (`apps/web`: the whole UI and API) | Vercel, project `web`, Function Region `syd1` | Deploys itself on every push to `main` |
+| Postgres | Neon | Two addresses: the **pooled** one (host contains `-pooler`) for Vercel, the **direct** one for the judge and migrations |
+| Code judge (`apps/runner`) | AWS EC2 (`c7i-flex.large`, Ubuntu), set up by `deploy/runner-setup.sh` | gVisor sandboxes; firewall allows SSH only; `restart: always`, so it comes back after a reboot |
+
+**Vercel settings** (Settings › Environment Variables, then Redeploy, because settings apply only to new deployments): `DATABASE_URL` (Neon pooled), `DATABASE_PREPARE=false` (required behind a pooler), `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS`, plus any optional settings below. The build reads the database too (it pre-renders `/problems`), and Turborepo passes only the settings listed in `turbo.json`, so add a new setting there as well (`passThroughEnv`).
+
+**Google sign-in:** the OAuth client lists `https://gretlab.grettech.com` as a JavaScript origin and `https://gretlab.grettech.com/api/auth/callback/google` as the redirect URI. The consent screen must be published ("In production"); in testing mode, only listed test users can sign in.
+
+**Releasing a change:**
+
+1. If the change adds a migration, apply it first, from your machine, with Neon's direct address: `DATABASE_URL='<direct>' pnpm db:migrate`. Write migrations the running site can live with (add columns and tables; rename or drop only in a later release), since the old version serves until Vercel switches over.
+2. Push to `main`. Vercel builds and deploys the web app.
+3. If the change touches the judge (`apps/runner`, `packages/judge`, `packages/db`, the sandbox images), update it on the server: `curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh && sudo bash /tmp/runner-setup.sh`. It reuses the saved database address, migrates, reruns the attack tests and restarts. Run a downloaded copy, not `/opt/gretlab/deploy/runner-setup.sh` (the script replaces that file as it runs), and don't pipe it into bash (docker reads the pipe).
+
+**Watching it:**
+
+- Judge logs: `ssh ubuntu@<judge address>`, then `cd /opt/gretlab && sudo docker compose -f docker-compose.runner.yml logs -f runner`. A submission stuck at "queued" means the judge is down or can't reach Neon.
+- Costs: an AWS budget (`gretlab-monthly`, $20) emails at 50% and 100% of actual spend, and at a forecast above 100%. Neon's compute stays awake, because the judge keeps a `LISTEN` connection open.
+- Health: `GET /api/health` answers `{"status":"ok"}`.
+
+**Limits on this setup:** lab exams limited to networks need the visitor's real address, which this app trusts only from Caddy (`PROXY_SECRET`). On Vercel, keep exams unrestricted by network until that is adapted; everything else works.
 
 ### Settings
 

@@ -385,7 +385,7 @@ Status is updated as items ship; anything not ticked has not been built.
 
 Decided not to build for now: the AI tutor (it needs an Anthropic API key and a usage policy).
 
-Shipping (November 2026): the web app on Vercel; Postgres and the runner on Railway. The runner needs Docker with gVisor (`runsc`) on its host and refuses to start without it, so its host must allow that; web functions on Vercel open many short connections, so Postgres needs a pooler in front (PgBouncer, as in `docker-compose.prod.yml`).
+Shipped (November 2026): https://gretlab.grettech.com. The web app is on Vercel (Sydney, `syd1`), Postgres on Neon (the pooled address with `DATABASE_PREPARE=false` for Vercel, the direct address for the runner and migrations), and the runner on a dedicated AWS EC2 server with gVisor, set up and updated by `deploy/runner-setup.sh`. README › How the live site runs has the settings, the release steps (migrate first, then push, then update the judge if it changed) and how to watch it. Railway was tried and dropped: it can't run gVisor. Turborepo runs in strict env mode, so every setting the build needs must be listed in `turbo.json`.
 
 The organization hierarchy we're heading for (from the owner's notes): platform › organization › year › branch › section (these three are an organization's group levels, set in its settings) › course › module › problems, questions, contests, assignments and exams. Groups and courses (with modules) exist; content is aimed at groups today.
 

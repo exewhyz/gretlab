@@ -4,6 +4,10 @@
 # with the 16 hostile-program tests. Safe to run again (it updates and restarts).
 #
 #   sudo DATABASE_URL='postgres://user:password@host:port/db' bash runner-setup.sh
+# To update later (reuses the saved address; run a fresh download, not the copy in /opt/gretlab,
+# which this script replaces as it runs, and not through a pipe, which docker would read):
+#   curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh
+#   sudo bash /tmp/runner-setup.sh
 #
 # DATABASE_URL is the DIRECT Postgres address (not a pooler): the runner keeps a LISTEN
 # session open. Optional: RUNNER_CONCURRENCY (default: one per core, at most 8), REPO, BRANCH,
@@ -13,10 +17,14 @@
 # host, so it must hold no secrets beyond its database address (AGENTS.md, Sandbox rules).
 set -euo pipefail
 
-: "${DATABASE_URL:?Set DATABASE_URL to the direct Postgres address, e.g. sudo DATABASE_URL='postgres://...' bash runner-setup.sh}"
 REPO="${REPO:-https://github.com/exewhyz/gretlab.git}"
 BRANCH="${BRANCH:-main}"
 DIR="${DIR:-/opt/gretlab}"
+# On an update, reuse the address saved by the first run.
+if [ -z "${DATABASE_URL:-}" ] && [ -f "$DIR/.env" ]; then
+  DATABASE_URL="$(sed -n 's/^DATABASE_URL=//p' "$DIR/.env" | head -1)"
+fi
+: "${DATABASE_URL:?Set DATABASE_URL to the direct Postgres address, e.g. sudo DATABASE_URL='postgres://...' bash runner-setup.sh}"
 SEED="${SEED:-1}"
 CORES="$(nproc)"
 RUNNER_CONCURRENCY="${RUNNER_CONCURRENCY:-$(( CORES < 8 ? CORES : 8 ))}"
@@ -114,6 +122,7 @@ cat <<EOF
 
 Done. This server now judges submissions from the queue in your database.
   Logs:     cd $DIR && docker compose -f docker-compose.runner.yml logs -f runner
-  Update:   run this script again (it pulls $BRANCH, rebuilds and restarts)
+  Update:   curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh
+            sudo bash /tmp/runner-setup.sh   (pulls $BRANCH, migrates, retests, restarts)
   More capacity: run it on another server with the same DATABASE_URL.
 EOF
