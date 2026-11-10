@@ -75,3 +75,6 @@ Thumbs.db
 
 # Personal notes (their content is in AGENTS.md › Roadmap)
 todo.txt
+
+# Third-party design reference: kept locally, not published
+cursor.design.md

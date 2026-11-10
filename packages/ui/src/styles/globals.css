@@ -7,10 +7,8 @@
 @source "../**/*.{ts,tsx}";
 
 /*
- * Design tokens from cursor.design.md: warm cream canvas, warm ink, a single
- * orange voltage for CTAs and the wordmark, hairline-only depth. The timeline
- * pastels are deliberately absent: the system scopes them to agent timelines and
- * forbids them as status colors.
+ * Design tokens: warm cream canvas, warm ink, a single orange accent for primary
+ * actions and the wordmark, hairline-only depth.
  */
 :root {
   color-scheme: light;
@@ -49,8 +47,8 @@
 }
 
 /*
- * cursor.design.md is light only, so this palette is derived from it: the same
- * warm hues inverted, with the same single orange and hairline-only depth.
+ * The light palette's warm hues inverted, with the same single orange and
+ * hairline-only depth.
  */
 .dark {
   color-scheme: dark;

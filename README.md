@@ -111,8 +111,8 @@ Tailwind utilities by default, using the tokens (`bg-canvas`, `text-body`, `text
 
 - Tailwind v4 can't be processed through Sass, so `@apply` and `theme()` don't belong in `.scss` files. Read tokens as CSS variables, such as `var(--radius-lg)`.
 - A new `--text-*` token must also be added to `packages/ui/src/lib/utils.ts`, or `cn()` will mistake it for a color and drop it.
-- The timeline pastels in `cursor.design.md` are reserved for agent timelines, so they aren't tokens here.
-- Dark mode follows the system until someone picks a theme. `cursor.design.md` is light only, so the `.dark` palette in `globals.css` is derived from it. Use tokens rather than fixed colors, and both themes work.
+- The design tokens live in `packages/ui/src/styles/globals.css`: a warm cream canvas, warm ink, one orange accent for primary actions, and hairlines instead of shadows.
+- Dark mode follows the system until someone picks a theme. The `.dark` palette is the same warm hues inverted. Use tokens rather than fixed colors, and both themes work.
 
 ## Ads
 
