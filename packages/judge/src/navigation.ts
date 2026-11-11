@@ -1,3 +1,4 @@
+import { ORG_TYPE_CONFIG, ORG_TYPES, type OrgType } from "./org-types.ts"
 import type { Permission } from "./permissions.ts"
 
 /*
@@ -10,9 +11,6 @@ import type { Permission } from "./permissions.ts"
  * that module is enabled for the org (tenant-type config). This is what lets a college turn
  * on attendance, timetable, library and the rest while a lean cohort leaves them off.
  */
-
-export type OrgType = "college" | "company" | "community" | "other"
-export const ORG_TYPES: OrgType[] = ["college", "company", "community", "other"]
 
 /** The fixed, named sidebar groups, in order. Every feature belongs to exactly one. */
 export const NAV_GROUPS = [
@@ -38,6 +36,8 @@ export interface NavItem {
   orgTypes?: OrgType[]
   /** A toggleable module key; omitted = core, always eligible. */
   module?: string
+  /** A different label for some org types (e.g. Groups is \"Classes\" in a school). */
+  labels?: Partial<Record<OrgType, string>>
 }
 
 /** The current org features, grouped. New modules (attendance, timetable, ...) are added here. */
@@ -63,6 +63,9 @@ export const ORG_NAV: NavItem[] = [
     path: "/groups",
     group: "People",
     anyOf: ["org.members.view", "org.groups.manage"],
+    labels: Object.fromEntries(
+      ORG_TYPES.map((t) => [t, ORG_TYPE_CONFIG[t].groupsLabel])
+    ),
   },
   {
     key: "roles",
@@ -217,7 +220,11 @@ export function visibleOrgNav(
           (!item.module || (ctx.enabledModules?.has(item.module) ?? false)) &&
           (item.anyOf.length === 0 || item.anyOf.some((p) => ctx.can(p)))
       )
-      .map((item) => ({ key: item.key, label: item.label, path: item.path }))
+      .map((item) => ({
+        key: item.key,
+        label: item.labels?.[ctx.orgType] ?? item.label,
+        path: item.path,
+      }))
     if (visible.length) out.push({ group, items: visible })
   }
   return out

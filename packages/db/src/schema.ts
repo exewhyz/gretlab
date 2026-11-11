@@ -597,7 +597,9 @@ export const runners = pgTable("runners", {
 /* ---------- organizations ---------- */
 
 export const orgType = pgEnum("org_type", [
+  "school",
   "college",
+  "cohort",
   "company",
   "community",
   "other",
@@ -640,6 +642,14 @@ export const organizations = pgTable("organizations", {
    */
   notifications: jsonb("notifications")
     .$type<PolicyOverrides>()
+    .notNull()
+    .default({}),
+  /**
+   * Optional modules switched on or off for this organization, over its type's defaults
+   * (packages/judge/src/org-types.ts). Only what was chosen is stored.
+   */
+  modules: jsonb("modules")
+    .$type<Record<string, boolean>>()
     .notNull()
     .default({}),
   /** The week (its Monday, YYYY-MM-DD) of the last weekly summary sent, so each goes once. */

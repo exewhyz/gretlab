@@ -12,18 +12,18 @@ import { Checkbox } from "@workspace/ui/components/checkbox"
 import { ConfirmButton } from "@/components/confirm"
 import { FormMessage, TextInput } from "@/components/form"
 import { useViewer } from "@/features/account/use-viewer"
+import { ORG_TYPE_CONFIG, ORG_TYPES, type OrgType } from "@workspace/judge"
+
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { formatDate, formatDateTime } from "@/lib/format"
 
-export type OrgType = "college" | "company" | "community" | "other"
+export type { OrgType } from "@workspace/judge"
 
-export const ORG_TYPE: Record<OrgType, string> = {
-  college: "College",
-  company: "Company",
-  community: "Community",
-  other: "Organization",
-}
+/** Each kind of organization's display name, from the shared type config. */
+export const ORG_TYPE = Object.fromEntries(
+  ORG_TYPES.map((t) => [t, ORG_TYPE_CONFIG[t].label])
+) as Record<OrgType, string>
 
 interface MyOrg {
   slug: string

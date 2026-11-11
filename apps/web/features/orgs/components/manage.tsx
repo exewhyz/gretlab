@@ -2,9 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  MODULE_KEYS,
+  MODULES,
+  moduleAvailable,
   ORG_NAV,
   PERMISSIONS,
   visibleOrgNav,
+  type ModuleKey,
   type Permission,
 } from "@workspace/judge"
 import Link from "next/link"
@@ -14,6 +18,7 @@ import { useState, type ReactNode } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 import { Checkbox } from "@workspace/ui/components/checkbox"
+import { Switch } from "@workspace/ui/components/switch"
 import {
   RadioGroup,
   RadioGroupItem,
@@ -87,6 +92,7 @@ export function ManageShell({
     ? visibleOrgNav(ORG_NAV, {
         orgType: data.org.type,
         can: (p) => data.permissions.includes(p),
+        enabledModules: new Set(data.org.modules),
       })
     : []
 
@@ -1324,7 +1330,74 @@ function SettingsForm({
           </Button>
         </div>
       </Card>
+      <ModulesCard slug={slug} org={initial} onSaved={onSaved} />
     </>
+  )
+}
+
+/** Optional modules this kind of organization can run, switched on or off. */
+function ModulesCard({
+  slug,
+  org,
+  onSaved,
+}: {
+  slug: string
+  org: Summary["org"]
+  onSaved: () => void
+}) {
+  const available = MODULE_KEYS.filter((k) => moduleAvailable(org.type, k))
+  const toggle = useMutation({
+    mutationFn: ({ key, on }: { key: ModuleKey; on: boolean }) =>
+      api(`/orgs/${slug}`, {
+        method: "PATCH",
+        body: { modules: { [key]: on } },
+      }),
+    onSuccess: onSaved,
+  })
+  if (available.length === 0) return null
+  return (
+    <Card className="mt-4 grid gap-1" data-testid="org-modules">
+      <h2 className="font-semibold text-ink">Modules</h2>
+      <p className="mb-2 text-caption">
+        Turn on what this {ORG_TYPE[org.type].toLowerCase()} needs. Each module
+        adds its pages to the sidebar for people whose role allows them.
+      </p>
+      {available.map((key) => {
+        const m = MODULES[key]
+        const on = org.modules.includes(key)
+        return (
+          <label
+            key={key}
+            data-testid={`module-${key}`}
+            className={cn(
+              "flex items-start justify-between gap-4 border-t border-hairline py-3",
+              !m.ready && "opacity-60"
+            )}
+          >
+            <span className="grid gap-0.5">
+              <span className="flex items-center gap-2 text-body-sm text-ink">
+                {m.label}
+                {!m.ready && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-body">
+                    Coming soon
+                  </span>
+                )}
+              </span>
+              <span className="text-xs text-body">{m.description}</span>
+            </span>
+            <Switch
+              aria-label={m.label}
+              checked={on}
+              disabled={!m.ready || toggle.isPending}
+              onCheckedChange={(next) => toggle.mutate({ key, on: next })}
+            />
+          </label>
+        )
+      })}
+      {toggle.error && (
+        <FormMessage message={{ text: toggle.error.message, kind: "err" }} />
+      )}
+    </Card>
   )
 }
 

@@ -666,7 +666,7 @@ await s2member.getByRole("button", { name: `Remove Teacher from ${PEOPLE.s2[0]}`
 await o.getByRole("alertdialog").getByRole("button", { name: "Take role" }).click()
 await s2member.getByText("3rd Year › Sec B › Lab 3").waitFor({ state: "detached", timeout: 15000 })
 check("and taken away after confirming", true)
-await o.getByRole("link", { name: /^Groups/ }).click()
+await o.getByRole("link", { name: /^Batches/ }).click()
 await o.getByRole("button", { name: "Open CSE" }).waitFor({ timeout: 15000 })
 await o.getByLabel(/^New (branch|year)$/).fill("MECH")
 await o.getByRole("button", { name: /^Add (branch|year)$/ }).click()

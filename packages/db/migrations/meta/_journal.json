@@ -288,6 +288,13 @@
       "when": 1794392573920,
       "tag": "0040_notification_policy",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794425690977,
+      "tag": "0041_org_types_and_modules",
+      "breakpoints": true
     }
   ]
 }

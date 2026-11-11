@@ -1,4 +1,4 @@
-import { PERMISSION_KEYS } from "@workspace/judge"
+import { MODULE_KEYS, ORG_TYPES, PERMISSION_KEYS } from "@workspace/judge"
 import { z } from "zod"
 
 const slug = z
@@ -19,7 +19,7 @@ const domain = z
 export const orgCreateSchema = z.object({
   name: z.string().trim().min(2, "Give it a name").max(120),
   slug,
-  type: z.enum(["college", "company", "community", "other"]),
+  type: z.enum(ORG_TYPES),
   ownerEmail: z.email("Enter the owner's email").toLowerCase(),
 })
 
@@ -28,7 +28,7 @@ export const orgSettingsSchema = z
     name: z.string().trim().min(2).max(120),
     description: z.string().max(5000),
     website: z.url("Enter a full address, like https://…").or(z.literal("")),
-    type: z.enum(["college", "company", "community", "other"]),
+    type: z.enum(ORG_TYPES),
     listed: z.boolean(),
     joinPolicy: z.enum(["open", "approval", "invite"]),
     emailDomains: z.array(domain).max(20),
@@ -36,6 +36,8 @@ export const orgSettingsSchema = z
       .array(z.string().trim().min(1).max(30))
       .min(1, "Name at least one level")
       .max(4, "At most 4 levels"),
+    /** Optional modules switched on or off over the type's defaults. */
+    modules: z.partialRecord(z.enum(MODULE_KEYS), z.boolean()),
     /** null: every language the platform has on. */
     languages: z.array(z.string().max(40)).max(50).nullable(),
     allowPaste: z.boolean(),

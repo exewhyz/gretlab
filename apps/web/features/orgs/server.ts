@@ -23,7 +23,13 @@ import {
   inAudience,
   type Audience,
   domainMatches,
+  enabledModules,
   grantsPermission,
+  isModuleKey,
+  moduleAvailable,
+  MODULES,
+  ORG_TYPE_CONFIG,
+  readModuleChoices,
   isPermission,
   PERMISSIONS,
   SYSTEM_ROLES,
@@ -327,12 +333,7 @@ export async function createOrganization(
         name: input.name,
         slug: input.slug,
         type: input.type,
-        groupLevels:
-          input.type === "college"
-            ? ["Branch", "Batch"]
-            : input.type === "company"
-              ? ["Team"]
-              : ["Cohort"],
+        groupLevels: ORG_TYPE_CONFIG[input.type].groupLevels,
       })
       .returning()
     await tx.insert(orgRoles).values(
@@ -989,6 +990,10 @@ export async function getManageSummary(slug: string, user: User) {
       active: ctx.org.active,
       languages: ctx.org.languages,
       allowPaste: ctx.org.allowPaste,
+      /** What this org chose, over its type's defaults. */
+      moduleChoices: readModuleChoices(ctx.org.modules),
+      /** The modules on right now (defaults + choices, limited to the type and ready ones). */
+      modules: [...enabledModules(ctx.org.type, ctx.org.modules)],
     },
     permissions,
     /** Whether a permission reaches the whole organization, not just some groups. */
@@ -1010,6 +1015,23 @@ export async function updateSettings(
 ) {
   const ctx = await context(slug, user)
   need(ctx, "org.settings.manage")
+  if (input.modules) {
+    const type = input.type ?? ctx.org.type
+    for (const [key, on] of Object.entries(input.modules)) {
+      if (!on || !isModuleKey(key)) continue
+      if (!moduleAvailable(type, key) || !MODULES[key].ready) {
+        throw new ApiError(
+          400,
+          "module_unavailable",
+          `${MODULES[key].label} isn't available for this kind of organization yet.`
+        )
+      }
+    }
+    input = {
+      ...input,
+      modules: { ...readModuleChoices(ctx.org.modules), ...input.modules },
+    }
+  }
   if (input.groupLevels) {
     const deepest = Math.max(
       0,
