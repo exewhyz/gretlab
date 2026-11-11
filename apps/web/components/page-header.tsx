@@ -26,8 +26,8 @@ export function PageHeader({ children }: { children?: ReactNode }) {
   if (exam) return <ExamHeader exam={exam} />
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 flex-none items-center gap-3 border-b border-hairline bg-canvas px-4">
-      <Link href="/" className="mr-2 flex-none">
+    <header className="sticky top-0 z-30 flex h-14 flex-none items-center gap-2 border-b border-hairline bg-canvas px-4 sm:gap-3">
+      <Link href="/" className="mr-2 min-w-0 shrink">
         <Brand title={viewer?.siteTitle ?? DEFAULT_TITLE} />
       </Link>
       <ScopeSwitcher />

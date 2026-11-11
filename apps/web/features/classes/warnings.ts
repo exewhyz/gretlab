@@ -124,6 +124,7 @@ export async function nudgeStudents(
     title: `A note from ${user.name ?? "your teacher"} (${name})`,
     body: input.message,
     href: `/orgs/${slug}/classes/${groupId}`,
+    orgId: cc.ctx.org.id,
   })
   // The note's words stay between them; the log records that one was sent.
   await writeAudit(cc.ctx, "class.note", `Sent a note to ${input.userIds.length} students in ${name}`)

@@ -128,6 +128,7 @@ export async function markProject(
       title: `${project.title} was marked`,
       body: `${input.mark} / ${project.points}${input.feedback ? ` · ${input.feedback.slice(0, 120)}` : ""}`,
       href: `/assignments/${a.slug}`,
+      orgId: a.orgId,
     })
   }
 }

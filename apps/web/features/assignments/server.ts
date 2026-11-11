@@ -929,6 +929,8 @@ export async function saveAssignment(
     allowed?: Set<string>
     /** A new use of this template. */
     templateId?: string
+    /** Who is saving it, so they aren't told about their own work. */
+    by?: User
   } = {}
 ) {
   const { problems: chosen, expectedUpdatedAt, questions, projects, ...fields } = input
@@ -1101,8 +1103,18 @@ export async function saveAssignment(
               .filter(Boolean)
               .join(" and ")}. Open it to see when it's due.`,
         href: `/assignments/${saved.slug}`,
+        orgId: saved.orgId,
       }
     )
+    // The class's other teachers get a copy, so nobody is surprised by a colleague's work.
+    const kind = saved.exam ? "exam" : "assignment"
+    await notify(await colleaguesOf(saved, options.by?.id), {
+      kind: "staff_assignment_published",
+      title: `${options.by?.name ?? "A colleague"} published the ${kind} ${saved.title}`,
+      body: `${students.length} ${students.length === 1 ? "student" : "students"} can see it.`,
+      href: `/assignments/${saved.slug}`,
+      orgId: saved.orgId,
+    })
   }
   return saved
 }
@@ -1302,6 +1314,66 @@ export async function studentsOf(
       (scope === "all" ||
         groupsOf(m.id).some((g) => chain(g).some((id) => scope.has(id))))
   )
+}
+
+/**
+ * The teachers of the classes an assignment is for, other than `exceptId`: people whose
+ * role lets them set or mark work for a group the audience touches (the group, one above
+ * it or one inside it), or for the whole organization. Owners and admins run everything
+ * and would get a copy of all of it, so they're left out.
+ */
+async function colleaguesOf(assignment: Assignment, exceptId?: string) {
+  if (assignment.orgId === null) return []
+  const db = getDb()
+  const [grants, groups] = await Promise.all([
+    db
+      .select({
+        userId: roleAssignments.userId,
+        groupId: roleAssignments.groupId,
+        systemKey: orgRoles.systemKey,
+        permissions: orgRoles.permissions,
+      })
+      .from(roleAssignments)
+      .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
+      .innerJoin(
+        orgMembers,
+        and(
+          eq(orgMembers.orgId, roleAssignments.orgId),
+          eq(orgMembers.userId, roleAssignments.userId)
+        )
+      )
+      .where(
+        and(
+          eq(roleAssignments.orgId, assignment.orgId),
+          eq(orgMembers.status, "active")
+        )
+      ),
+    db
+      .select({ id: orgGroups.id, parentId: orgGroups.parentId })
+      .from(orgGroups)
+      .where(eq(orgGroups.orgId, assignment.orgId)),
+  ])
+  const parentOf = new Map(groups.map((g) => [g.id, g.parentId]))
+  const chain = (id: string) => ancestry(id, (x) => parentOf.get(x))
+  const audience = assignment.audience.flat()
+  const touches = (groupId: string) =>
+    audience.length === 0 ||
+    audience.some((g) => chain(g).includes(groupId) || chain(groupId).includes(g))
+  return [
+    ...new Set(
+      grants
+        .filter(
+          (g) =>
+            g.userId !== exceptId &&
+            g.systemKey !== "owner" &&
+            g.systemKey !== "admin" &&
+            (rolePermissions(g).includes("assignments.manage") ||
+              rolePermissions(g).includes("gradebook.view")) &&
+            (g.groupId === null || touches(g.groupId))
+        )
+        .map((g) => g.userId)
+    ),
+  ]
 }
 
 /** Every student's marks, including those who haven't started. */
@@ -1537,6 +1609,7 @@ export async function setQuizMarks(
       kind: "marks",
       title: `Your teacher marked your answers in ${assignment.title}`,
       href: `/assignments/${assignment.slug}`,
+      orgId: assignment.orgId,
     })
   }
   return { marks: next }
@@ -1589,6 +1662,7 @@ export async function setExtension(
       ? "Some of its problems are open again for you. Open it to see until when."
       : "Your teacher moved your due time. Open it to see the new one.",
     href: `/assignments/${assignment.slug}`,
+    orgId: assignment.orgId,
   })
   return { student: student.email, ...values }
 }
@@ -1707,7 +1781,12 @@ export async function setRubricMarks(
       set: { marks: input.marks, graderId, updatedAt: now },
     })
   const [assignment] = await getDb()
-    .select({ title: assignments.title, slug: assignments.slug, hold: assignments.holdFeedback })
+    .select({
+      title: assignments.title,
+      slug: assignments.slug,
+      hold: assignments.holdFeedback,
+      orgId: assignments.orgId,
+    })
     .from(assignments)
     .where(eq(assignments.id, id))
   if (assignment && !assignment.hold) {
@@ -1715,6 +1794,7 @@ export async function setRubricMarks(
       kind: "marks",
       title: `Your teacher marked ${item.title} in ${assignment.title}`,
       href: `/assignments/${assignment.slug}`,
+      orgId: assignment.orgId,
     })
   }
   return { byHand: rubricEarned(item.rubric, input.marks) }
@@ -1764,7 +1844,11 @@ export async function addLineComment(
     .values({ ...input, assignmentId: id, authorId })
     .returning()
   const [assignment] = await getDb()
-    .select({ title: assignments.title, hold: assignments.holdFeedback })
+    .select({
+      title: assignments.title,
+      hold: assignments.holdFeedback,
+      orgId: assignments.orgId,
+    })
     .from(assignments)
     .where(eq(assignments.id, id))
   if (assignment && !assignment.hold) {
@@ -1773,6 +1857,7 @@ export async function addLineComment(
       title: `A comment on your code in ${assignment.title}`,
       body: input.body.slice(0, 300),
       href: `/submissions/${input.submissionId}`,
+      orgId: assignment.orgId,
     })
   }
   return comment
@@ -1832,6 +1917,7 @@ export async function releaseFeedback(id: string, orgId: string | null) {
       title: `Results of ${updated[0]!.title} are out`,
       body: "Your marks, the right answers and your teacher's comments.",
       href: `/assignments/${updated[0]!.slug}`,
+      orgId,
     }
   )
 }

@@ -138,15 +138,26 @@ export function NotificationBell() {
               <p className="px-3 py-6 text-center text-caption">Nothing yet.</p>
             )}
         </div>
-        {data?.email.available && (
-          <label className="flex items-center gap-2 border-t border-hairline px-3 py-2 text-caption">
-            <Checkbox
-              checked={data.email.on}
-              onCheckedChange={(on) => update.mutate({ email: on })}
-            />
-            Also email me these
-          </label>
-        )}
+        <div className="flex items-center justify-between gap-2 border-t border-hairline px-3 py-2 text-caption">
+          {data?.email.available ? (
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={data.email.on}
+                onCheckedChange={(on) => update.mutate({ email: on })}
+              />
+              Also email me these
+            </label>
+          ) : (
+            <span />
+          )}
+          <Link
+            href="/notifications"
+            className="text-ink underline-offset-2 hover:underline"
+            onClick={() => setOpen(false)}
+          >
+            Settings
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   )

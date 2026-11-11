@@ -97,6 +97,7 @@ export async function startPeerReview(id: string, orgId: string | null) {
       ? `Review your classmates' work by ${new Date(a.peerReview.dueAt).toUTCString()}.`
       : "Review your classmates' work.",
     href: `/assignments/${a.slug}`,
+    orgId: a.orgId,
   })
   return { reviews: rows.length, reviewers: reviewers.length }
 }
@@ -301,6 +302,7 @@ export async function saveReview(slug: string, viewer: User, reviewId: string, i
       title: `Your work on ${a.title} was reviewed`,
       body: "A classmate reviewed it. Read their comments on the assignment's page.",
       href: `/assignments/${a.slug}`,
+      orgId: a.orgId,
     })
   }
   return { submitted: input.submit || review.submittedAt !== null }

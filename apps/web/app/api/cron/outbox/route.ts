@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto"
 
 import { NextResponse, type NextRequest } from "next/server"
 
+import { runDueDigests } from "@/features/notifications/digest"
 import { drainOutbox, outboxHealth } from "@/features/notifications/outbox"
 
 export const dynamic = "force-dynamic"
@@ -9,8 +10,9 @@ export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
 /*
- * Sends queued email: big batches and retries that the drain right after a notification
- * didn't finish (features/notifications/outbox.ts). Any scheduler can call it with
+ * The scheduled work: queues the weekly summaries that are due (features/notifications/
+ * digest.ts), then sends queued email, the big batches and retries that the drain right
+ * after a notification didn't finish (features/notifications/outbox.ts). Any scheduler can call it with
  * `Authorization: Bearer <CRON_SECRET>`: Vercel Cron sends exactly that header, and so can
  * cron on a server or a scheduled GitHub Actions run. The token can do nothing but send mail
  * that's already queued. Without a CRON_SECRET of 16+ characters it's off.
@@ -51,8 +53,13 @@ async function handle(request: NextRequest) {
       { status: 401 }
     )
   }
+  // Weekly summaries that are due are queued first, so this same run sends them.
+  const digests = await runDueDigests().catch((error) => {
+    console.error("[digest]", error)
+    return { organizations: 0, emails: 0 }
+  })
   const done = await drainOutbox()
-  return NextResponse.json({ ...done, ...(await outboxHealth()) })
+  return NextResponse.json({ ...done, ...(await outboxHealth()), digests })
 }
 
 export const GET = handle

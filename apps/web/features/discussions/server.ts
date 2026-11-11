@@ -239,6 +239,7 @@ export async function postReply(
       title: `New reply to "${t.title}"`,
       body: input.body.slice(0, 140),
       href: `/orgs/${slug}/classes/${groupId}?tab=discussion&thread=${t.id}`,
+      orgId: cc.ctx.org.id,
     })
   }
   return { id: row!.id }

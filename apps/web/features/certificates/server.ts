@@ -79,6 +79,7 @@ export async function issueCertificates(slug: string, user: User, groupId: strin
       title: `You've earned a certificate: ${title}`,
       body: "Find it under My certificates, with a link anyone can check.",
       href: "/certificates",
+      orgId: cc.ctx.org.id,
     }
   )
   await writeAudit(cc.ctx, "certificate.issue", `Issued ${people.length} "${title}" certificates in ${className}`)

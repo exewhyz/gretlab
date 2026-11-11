@@ -33,6 +33,7 @@ import {
 import type { z } from "zod"
 
 import { ApiError, notFound } from "@/lib/api/route"
+import { notify } from "@/features/notifications/server"
 import { platformCan } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
 
@@ -470,7 +471,7 @@ export async function joinOrganization(
     throw forbidden("This organization only takes members with an invite link.")
   }
   const via = domainMatches(user.email, org.emailDomains) ? "domain" : "open"
-  return getDb().transaction(async (tx) => {
+  const joined = await getDb().transaction(async (tx) => {
     const result = await admitMember(
       tx,
       org,
@@ -487,6 +488,50 @@ export async function joinOrganization(
     )
     return { status: result.status }
   })
+  // People who can let them in hear that someone is waiting.
+  if (joined.status === "pending") {
+    await notify(await membersWhoCan(org.id, "org.members.invite"), {
+      kind: "join_request",
+      title: `${user.name ?? user.email} asked to join ${org.name}`,
+      body: "Approve or decline them under Manage › Members.",
+      href: `/orgs/${org.slug}/manage/members?status=pending`,
+      orgId: org.id,
+    })
+  }
+  return joined
+}
+
+/** Active members whose role gives them a permission for the whole organization. */
+export async function membersWhoCan(orgId: string, permission: Permission) {
+  const rows = await getDb()
+    .select({
+      userId: roleAssignments.userId,
+      systemKey: orgRoles.systemKey,
+      permissions: orgRoles.permissions,
+    })
+    .from(roleAssignments)
+    .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
+    .innerJoin(
+      orgMembers,
+      and(
+        eq(orgMembers.orgId, roleAssignments.orgId),
+        eq(orgMembers.userId, roleAssignments.userId)
+      )
+    )
+    .where(
+      and(
+        eq(roleAssignments.orgId, orgId),
+        isNull(roleAssignments.groupId),
+        eq(orgMembers.status, "active")
+      )
+    )
+  return [
+    ...new Set(
+      rows
+        .filter((r) => rolePermissions(r).includes(permission))
+        .map((r) => r.userId)
+    ),
+  ]
 }
 
 export async function leaveOrganization(slug: string, user: User) {

@@ -475,6 +475,7 @@ export async function postClassNotice(
       title: `New notice in ${nameOf(ctx, groupId)}`,
       body: text.slice(0, 300),
       href: `/orgs/${slug}/classes/${groupId}`,
+      orgId: ctx.org.id,
     }
   )
   return note

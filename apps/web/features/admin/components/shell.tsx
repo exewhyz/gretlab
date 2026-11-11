@@ -56,6 +56,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/admin/staff", label: "Staff and roles", needs: ["platform.roles.manage"] },
       { href: "/admin/activity", label: "Activity", needs: ["platform.audit.view"] },
       { href: "/admin/languages", label: "Languages", needs: ["platform.settings.manage"] },
+      { href: "/admin/notifications", label: "Notifications", needs: ["platform.settings.manage"] },
       { href: "/admin/settings", label: "Settings", needs: ["platform.settings.manage"] },
     ],
   },

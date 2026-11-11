@@ -14,6 +14,7 @@ A coding lab and LMS for colleges: practice problems, graded assignments and lab
 - **Contests:** registration, ICPC or IOI scoring, wrong-attempt penalties, scoreboard freeze, quiz questions.
 - **Practice like LeetCode:** a problem library with tags and filters, a daily challenge with streaks, hints, editorials unlocked by solving, notes, lists and study plans, profiles and a leaderboard.
 - **For students:** notifications (in-app and email), a calendar with a private iCal feed, certificates anyone can verify.
+- **Notifications you control:** the platform decides what may be sent, each organization chooses within that, and each person chooses what reaches them by email. Teachers get a copy when a colleague publishes to their class; owners get a weekly summary.
 - **Integration:** LTI 1.3 for Moodle, Canvas and other LMSs (sign-in, deep linking, grades back).
 - **Integrity:** plagiarism checks that see through renamed variables and reformatting.
 

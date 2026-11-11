@@ -171,7 +171,7 @@ export async function saveOrgAssignment(
     )
   }
   needFor(ctx, "assignments.manage", input.audience)
-  const assignment = await saveAssignment(id, input, ctx.org.id)
+  const assignment = await saveAssignment(id, input, ctx.org.id, { by: user })
   await writeAudit(
     ctx,
     id ? "assignment.update" : "assignment.create",

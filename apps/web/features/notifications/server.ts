@@ -9,6 +9,12 @@ import {
   users,
   type User,
 } from "@workspace/db"
+import {
+  deliveryFor,
+  eventOfKind,
+  readPreferences,
+  type EventPolicy,
+} from "@workspace/judge"
 import { after } from "next/server"
 
 import { listAssignments } from "@/features/assignments/server"
@@ -17,11 +23,14 @@ import { getSettings } from "@/features/settings/server"
 
 import { mailEnabled } from "./mailer"
 import { drainOutbox, queueEmails } from "./outbox"
+import { policyFor } from "./policy"
 
 /*
  * Notifications. Events (new work, feedback released, an extension, a class notice) are
- * stored when they happen, for each person they concern, and emailed when the server has
- * SMTP set up and the person hasn't turned email off. Reminders that depend on the clock
+ * stored when they happen, for each person they concern, and emailed through the outbox.
+ * Whether an event appears in the bell, is emailed, and whether people may turn its email
+ * off is decided by the platform, then the organization, then the person
+ * (packages/judge/src/notifications.ts, ./policy.ts). Reminders that depend on the clock
  * (due within a day, a contest starting soon, attendance below 75%) are worked out each
  * time they're read, so they're never stale and need no scheduler.
  */
@@ -34,6 +43,8 @@ export interface NewNotification {
   body?: string
   /** A path on this site. */
   href?: string
+  /** The organization this happened in, whose settings apply; none for the platform's own. */
+  orgId?: string | null
 }
 
 /**
@@ -52,50 +63,71 @@ function afterResponse(task: () => Promise<unknown>) {
   }
 }
 
+/** A kind this code doesn't list as an event: shown in the bell, emailed to who wants email. */
+const UNLISTED: EventPolicy = { inApp: true, email: true, userChoice: true }
+
 /**
- * Tells these people: an in-app notification each, and an email for those who want them,
- * queued in the same transaction (the outbox), so neither is stored without the other.
- * Sending starts right after the response; a failure retries later. Never fails the action
- * that caused it.
+ * Tells these people about an event, as its policy allows: a notification in the bell,
+ * and an email to those the policy and their own settings give one. Both are written in
+ * one transaction (the email to the outbox), so neither is stored without the other, and
+ * sending starts right after the response. Never fails the action that caused it. Returns
+ * how many were told each way.
  */
 export async function notify(userIds: string[], n: NewNotification) {
+  const told = { inApp: 0, email: 0 }
   const ids = [...new Set(userIds)]
-  if (ids.length === 0) return
+  if (ids.length === 0) return told
   try {
+    const event = eventOfKind(n.kind)
+    const policy = event ? await policyFor(event, n.orgId ?? null) : UNLISTED
+    const emailing = policy.email && mailEnabled()
+    if (!policy.inApp && !emailing) return told
     const site = process.env.NEXTAUTH_URL ?? ""
     const text = [n.body, n.href ? `${site}${n.href}` : ""]
       .filter(Boolean)
       .join("\n\n")
     await getDb().transaction(async (tx) => {
-      await tx.insert(notifications).values(
-        ids.map((userId) => ({
-          userId,
-          kind: n.kind,
-          title: n.title.slice(0, 300),
-          body: (n.body ?? "").slice(0, 2000),
-          href: n.href ?? "",
-        }))
-      )
-      if (!mailEnabled()) return
-      const recipients = await tx
-        .select({ email: users.email })
-        .from(users)
-        .where(
-          and(
-            inArray(users.id, ids),
-            eq(users.emailNotifications, true),
-            eq(users.disabled, false)
-          )
+      if (policy.inApp) {
+        await tx.insert(notifications).values(
+          ids.map((userId) => ({
+            userId,
+            kind: n.kind,
+            title: n.title.slice(0, 300),
+            body: (n.body ?? "").slice(0, 2000),
+            href: n.href ?? "",
+          }))
         )
+        told.inApp = ids.length
+      }
+      if (!emailing) return
+      const people = await tx
+        .select({
+          email: users.email,
+          emailOn: users.emailNotifications,
+          prefs: users.notificationPrefs,
+        })
+        .from(users)
+        .where(and(inArray(users.id, ids), eq(users.disabled, false)))
+      const recipients = people.filter((person) => {
+        const choices = {
+          emailOn: person.emailOn,
+          events: readPreferences(person.prefs),
+        }
+        return event
+          ? deliveryFor(event, policy, choices).email
+          : choices.emailOn
+      })
       await queueEmails(
         tx,
         recipients.map(({ email }) => ({ to: email, subject: n.title, text }))
       )
+      told.email = recipients.length
     })
-    if (mailEnabled()) afterResponse(() => drainOutbox())
+    if (told.email) afterResponse(() => drainOutbox())
   } catch (error) {
     console.error("[notifications] couldn't store:", error)
   }
+  return told
 }
 
 export interface Reminder {
@@ -208,7 +240,7 @@ export async function myNotifications(user: User) {
     reminders,
     notifications: stored,
     unread: unread?.n ?? 0,
-    email: { on: me?.email ?? true, available: Boolean(process.env.SMTP_URL) },
+    email: { on: me?.email ?? true, available: mailEnabled() },
   }
 }
 
@@ -224,11 +256,4 @@ export async function markRead(user: User, ids: string[] | "all") {
         ids === "all" ? undefined : inArray(notifications.id, ids)
       )
     )
-}
-
-export async function setEmailNotifications(user: User, on: boolean) {
-  await getDb()
-    .update(users)
-    .set({ emailNotifications: on })
-    .where(eq(users.id, user.id))
 }

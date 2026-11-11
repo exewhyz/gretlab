@@ -21,6 +21,8 @@ import type {
   PeerReviewSettings,
   QuestionKind,
   AttainmentRules,
+  NotificationEvent,
+  PolicyOverrides,
   SourceFile,
   Verdict,
 } from "@workspace/judge"
@@ -54,6 +56,11 @@ export const users = pgTable("users", {
   disabled: boolean("disabled").notNull().default(false),
   /** Notifications also by email, when the server has SMTP set up. */
   emailNotifications: boolean("email_notifications").notNull().default(true),
+  /** Which events' email they chose to get or not; missing ones follow the event's default. */
+  notificationPrefs: jsonb("notification_prefs")
+    .$type<Partial<Record<NotificationEvent, boolean>>>()
+    .notNull()
+    .default({}),
   /** A secret for the person's calendar feed (iCal); null until they turn it on. */
   calendarToken: text("calendar_token").unique(),
   createdAt: createdAt(),
@@ -627,6 +634,16 @@ export const organizations = pgTable("organizations", {
   allowPaste: boolean("allow_paste").notNull().default(true),
   /** How course outcome attainment is judged; null for the defaults (60%; 50/60/70). */
   attainment: jsonb("attainment").$type<AttainmentRules | null>(),
+  /**
+   * Which notifications this organization allows, within what the platform allows: only
+   * what it changed (packages/judge/src/notifications.ts).
+   */
+  notifications: jsonb("notifications")
+    .$type<PolicyOverrides>()
+    .notNull()
+    .default({}),
+  /** The week (its Monday, YYYY-MM-DD) of the last weekly summary sent, so each goes once. */
+  digestWeek: text("digest_week"),
   createdAt: createdAt(),
 })
 
