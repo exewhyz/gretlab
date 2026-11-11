@@ -1,7 +1,12 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { PERMISSIONS, type Permission } from "@workspace/judge"
+import {
+  ORG_NAV,
+  PERMISSIONS,
+  visibleOrgNav,
+  type Permission,
+} from "@workspace/judge"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, type ReactNode } from "react"
@@ -77,112 +82,12 @@ export function ManageShell({
 }) {
   const pathname = usePathname()
   const { data, error } = useSummary(slug)
-  const has = (...p: Permission[]) =>
-    data ? p.some((x) => data.permissions.includes(x)) : false
   const base = `/orgs/${slug}/manage`
-  const nav = data
-    ? [
-        { href: base, label: "Overview", show: true },
-        {
-          href: `${base}/members`,
-          label: `Members${data.counts.pending ? ` (${data.counts.pending} waiting)` : ""}`,
-          show: has("org.members.view", "org.members.invite"),
-        },
-        {
-          href: `${base}/groups`,
-          label: `Groups`,
-          show: has("org.members.view", "org.groups.manage"),
-        },
-        {
-          href: `${base}/roles`,
-          label: "Roles",
-          show: has("org.roles.manage", "org.members.view"),
-        },
-        {
-          href: `${base}/invites`,
-          label: "Invites",
-          show: has("org.members.invite"),
-        },
-        {
-          href: `${base}/import`,
-          label: "Import",
-          show: has("org.members.import"),
-        },
-        {
-          href: `${base}/assignments`,
-          label: "Assignments",
-          show: has("assignments.manage", "gradebook.view"),
-        },
-        {
-          href: `${base}/templates`,
-          label: "Templates",
-          show: has("assignments.manage"),
-        },
-        {
-          href: `${base}/contests`,
-          label: "Contests",
-          show: has("contests.manage"),
-        },
-        {
-          href: `${base}/library`,
-          label: "Library",
-          show: has("problems.manage", "assignments.manage", "contests.manage"),
-        },
-        {
-          href: `${base}/courses`,
-          label: "Courses",
-          show: has("problems.manage", "assignments.manage", "contests.manage"),
-        },
-        {
-          href: `${base}/problems`,
-          label: "Problems",
-          show: has("problems.manage"),
-        },
-        {
-          href: `${base}/questions`,
-          label: "Questions",
-          show: has("problems.manage"),
-        },
-        {
-          href: `${base}/reports`,
-          label: "Reports",
-          show: has("reports.view"),
-        },
-        {
-          href: `${base}/notes`,
-          label: "Notices",
-          show: has("notices.manage"),
-        },
-        {
-          href: `${base}/outcomes`,
-          label: "Outcomes",
-          show: has(
-            "org.outcomes.manage",
-            "assignments.manage",
-            "reports.view"
-          ),
-        },
-        {
-          href: `${base}/settings`,
-          label: "Settings",
-          show: has("org.settings.manage"),
-        },
-        {
-          href: `${base}/notifications`,
-          label: "Notifications",
-          show: has("org.notifications.manage"),
-        },
-        {
-          href: `${base}/lms`,
-          label: "LMS (LTI)",
-          show: has("org.settings.lms"),
-        },
-        {
-          href: `${base}/activity`,
-          label: "Activity",
-          show: has("org.audit.view"),
-        },
-      ].filter((item) => item.show)
+  const groups = data
+    ? visibleOrgNav(ORG_NAV, {
+        orgType: data.org.type,
+        can: (p) => data.permissions.includes(p),
+      })
     : []
 
   return (
@@ -207,25 +112,37 @@ export function ManageShell({
               </div>
             </div>
           )}
-          {nav.map((item) => {
-            const active =
-              item.href === base
-                ? pathname === base
-                : pathname.startsWith(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "rounded-sm px-3 py-1.5 text-nav text-body hover:bg-muted hover:text-ink",
-                  active && "bg-muted text-ink"
-                )}
-              >
-                {item.label}
-              </Link>
-            )
-          })}
+          {groups.map((group) => (
+            <div key={group.group} className="grid gap-0.5 min-[901px]:mb-1.5">
+              {group.group !== "Overview" && (
+                <div className="px-3 pt-1.5 text-caption-upper text-body uppercase">
+                  {group.group}
+                </div>
+              )}
+              {group.items.map((item) => {
+                const href = `${base}${item.path}`
+                const active =
+                  href === base ? pathname === base : pathname.startsWith(href)
+                const label =
+                  item.key === "members" && data?.counts.pending
+                    ? `${item.label} (${data.counts.pending} waiting)`
+                    : item.label
+                return (
+                  <Link
+                    key={item.key}
+                    href={href}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "rounded-sm px-3 py-1.5 text-nav text-body hover:bg-muted hover:text-ink",
+                      active && "bg-muted text-ink"
+                    )}
+                  >
+                    {label}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
         </nav>
         <main className="min-w-0">
           {data ? (
