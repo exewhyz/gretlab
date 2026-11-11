@@ -8,6 +8,6 @@ export const GET = route({ access: "platform.library.manage" }, ({ user, query }
 )
 
 export const POST = route(
-  { access: "platform.library.manage", body: questionInputSchema },
+  { access: "platform.library.create", body: questionInputSchema },
   ({ body }) => saveQuestion(null, body, null)
 )

@@ -1,5 +1,12 @@
-import { getDb, platformRoles, platformStaff, sql, type User } from "@workspace/db"
 import {
+  getDb,
+  platformRoles,
+  platformStaff,
+  sql,
+  type User,
+} from "@workspace/db"
+import {
+  grantsPlatformPermission,
   isPlatformPermission,
   isPlatformRoleKey,
   PLATFORM_ROLES,
@@ -71,6 +78,12 @@ async function resolve(user: User): Promise<PlatformAccess> {
   return NONE
 }
 
-export async function platformCan(user: User | null, permission: PlatformPermission) {
-  return (await platformAccess(user)).permissions.includes(permission)
+export async function platformCan(
+  user: User | null,
+  permission: PlatformPermission
+) {
+  return grantsPlatformPermission(
+    (await platformAccess(user)).permissions,
+    permission
+  )
 }

@@ -24,40 +24,116 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Content",
     items: [
-      { href: "/admin/library", label: "Library", needs: ["platform.library.manage"] },
-      { href: "/admin/courses", label: "Courses", needs: ["platform.library.manage"] },
-      { href: "/admin/problems", label: "Problems", needs: ["platform.library.manage"] },
-      { href: "/admin/questions", label: "Questions", needs: ["platform.library.manage"] },
-      { href: "/admin/units", label: "Units", needs: ["platform.library.manage"] },
+      {
+        href: "/admin/library",
+        label: "Library",
+        needs: ["platform.library.manage"],
+      },
+      {
+        href: "/admin/courses",
+        label: "Courses",
+        needs: ["platform.library.manage"],
+      },
+      {
+        href: "/admin/problems",
+        label: "Problems",
+        needs: ["platform.library.manage"],
+      },
+      {
+        href: "/admin/questions",
+        label: "Questions",
+        needs: ["platform.library.manage"],
+      },
+      {
+        href: "/admin/units",
+        label: "Units",
+        needs: ["platform.library.manage"],
+      },
       {
         href: "/admin/assignments",
         label: "Assignments",
         needs: ["platform.work.manage", "platform.gradebook.view"],
       },
-      { href: "/admin/templates", label: "Templates", needs: ["platform.work.manage"] },
-      { href: "/admin/contests", label: "Contests", needs: ["platform.work.manage"] },
-      { href: "/admin/daily", label: "Daily challenge", needs: ["platform.library.manage"] },
-      { href: "/admin/study-plans", label: "Study plans", needs: ["platform.library.manage"] },
-      { href: "/admin/notes", label: "Notices", needs: ["platform.library.manage"] },
+      {
+        href: "/admin/templates",
+        label: "Templates",
+        needs: ["platform.work.manage"],
+      },
+      {
+        href: "/admin/contests",
+        label: "Contests",
+        needs: ["platform.work.manage"],
+      },
+      {
+        href: "/admin/daily",
+        label: "Daily challenge",
+        needs: ["platform.library.manage"],
+      },
+      {
+        href: "/admin/study-plans",
+        label: "Study plans",
+        needs: ["platform.library.manage"],
+      },
+      {
+        href: "/admin/notes",
+        label: "Notices",
+        needs: ["platform.library.manage"],
+      },
     ],
   },
   {
     title: "Students",
     items: [
-      { href: "/admin/users", label: "Users", needs: ["platform.users.manage"] },
-      { href: "/admin/submissions", label: "Submissions", needs: ["platform.submissions.view"] },
-      { href: "/admin/integrity", label: "Plagiarism check", needs: ["platform.submissions.view"] },
+      {
+        href: "/admin/users",
+        label: "Users",
+        needs: ["platform.users.manage"],
+      },
+      {
+        href: "/admin/submissions",
+        label: "Submissions",
+        needs: ["platform.submissions.view"],
+      },
+      {
+        href: "/admin/integrity",
+        label: "Plagiarism check",
+        needs: ["platform.submissions.view"],
+      },
     ],
   },
   {
     title: "Setup",
     items: [
-      { href: "/admin/organizations", label: "Organizations", needs: ["platform.orgs.manage"] },
-      { href: "/admin/staff", label: "Staff and roles", needs: ["platform.roles.manage"] },
-      { href: "/admin/activity", label: "Activity", needs: ["platform.audit.view"] },
-      { href: "/admin/languages", label: "Languages", needs: ["platform.settings.manage"] },
-      { href: "/admin/notifications", label: "Notifications", needs: ["platform.settings.manage"] },
-      { href: "/admin/settings", label: "Settings", needs: ["platform.settings.manage"] },
+      {
+        href: "/admin/organizations",
+        label: "Organizations",
+        needs: ["platform.orgs.manage"],
+      },
+      {
+        href: "/admin/staff",
+        label: "Staff and roles",
+        needs: ["platform.roles.manage"],
+      },
+      {
+        href: "/admin/activity",
+        label: "Activity",
+        needs: ["platform.audit.view"],
+      },
+      {
+        href: "/admin/languages",
+        label: "Languages",
+        needs: ["platform.languages.manage"],
+      },
+      {
+        href: "/admin/notifications",
+        label: "Notifications",
+        needs: ["platform.notifications.manage"],
+      },
+      {
+        href: "/admin/settings",
+        label: "Settings",
+        needs: ["platform.settings.manage"],
+      },
     ],
   },
 ]

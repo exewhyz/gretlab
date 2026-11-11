@@ -6,6 +6,6 @@ import { contestInputSchema } from "@/features/problems/schemas"
 export const GET = route({ access: "platform.work.manage" }, () => listOwnedContests(null))
 
 export const POST = route(
-  { access: "platform.work.manage", body: contestInputSchema },
+  { access: "platform.work.create", body: contestInputSchema },
   ({ body }) => saveContest(null, body, null)
 )

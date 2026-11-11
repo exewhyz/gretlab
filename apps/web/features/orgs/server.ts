@@ -295,7 +295,7 @@ async function giveRole(
 
 /** Running colleges from the platform: the "Manage colleges" permission. */
 async function requirePlatformAdmin(user: User) {
-  if (!(await platformCan(user, "platform.orgs.manage"))) throw forbidden()
+  if (!(await platformCan(user, "platform.orgs.create"))) throw forbidden()
 }
 
 export async function listAllOrganizations(user: User) {
@@ -494,7 +494,7 @@ export async function joinOrganization(
   })
   // People who can let them in hear that someone is waiting.
   if (joined.status === "pending") {
-    await notify(await membersWhoCan(org.id, "org.members.invite"), {
+    await notify(await membersWhoCan(org.id, "org.members.approve"), {
       kind: "join_request",
       title: `${user.name ?? user.email} asked to join ${org.name}`,
       body: "Approve or decline them under Manage › Members.",
@@ -532,7 +532,7 @@ export async function membersWhoCan(orgId: string, permission: Permission) {
   return [
     ...new Set(
       rows
-        .filter((r) => rolePermissions(r).includes(permission))
+        .filter((r) => grantsPermission(rolePermissions(r), permission))
         .map((r) => r.userId)
     ),
   ]
@@ -1167,7 +1167,7 @@ export async function updateMember(
   const { member, user: person } = await memberOf(ctx, memberId)
   return getDb().transaction(async (tx) => {
     if (input.status === "active" && member.status === "pending") {
-      need(ctx, "org.members.invite")
+      need(ctx, "org.members.approve")
       await admitMember(tx, ctx.org, memberId, "approval", member.shareProgress)
       await audit(tx, ctx, "member.approve", `Approved ${person.email}`)
     }
@@ -1234,7 +1234,7 @@ export async function updateMember(
 export async function removeMember(slug: string, user: User, memberId: string) {
   const ctx = await context(slug, user)
   const { member, user: person } = await memberOf(ctx, memberId)
-  if (member.status === "pending") need(ctx, "org.members.invite")
+  if (member.status === "pending") need(ctx, "org.members.approve")
   else need(ctx, "org.members.remove")
   const target = await context(slug, person)
   if (isOwner(target) && !isOwner(ctx) && !ctx.platformAdmin) {
@@ -1393,7 +1393,7 @@ export async function createGroup(
 ) {
   const ctx = await context(slug, user)
   // Top-level groups need the permission org-wide; subgroups, on their parent.
-  need(ctx, "org.groups.manage", input.parentId)
+  need(ctx, "org.groups.create", input.parentId)
   if (input.parentId) {
     const depth = chainOf(ctx, groupIn(ctx, input.parentId).id).length
     if (depth >= ctx.org.groupLevels.length) {
@@ -1447,7 +1447,7 @@ export async function updateGroup(
 ) {
   const ctx = await context(slug, user)
   const group = groupIn(ctx, id)
-  need(ctx, "org.groups.manage", id)
+  need(ctx, "org.groups.edit", id)
   await getDb().transaction(async (tx) => {
     await tx.update(orgGroups).set(input).where(eq(orgGroups.id, id))
     await audit(
@@ -1474,7 +1474,7 @@ export async function deleteGroup(
   const ctx = await context(slug, user)
   const group = groupIn(ctx, id)
   // Deleting needs the permission above the group, not just on it.
-  need(ctx, "org.groups.manage", group.parentId)
+  need(ctx, "org.groups.delete", group.parentId)
   const doomed = ctx.groups
     .filter((g) => chainOf(ctx, g.id).includes(id))
     .map((g) => g.id)

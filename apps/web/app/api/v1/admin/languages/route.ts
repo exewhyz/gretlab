@@ -1,4 +1,4 @@
 import { route } from "@/lib/api/route"
 import { getLanguages } from "@/features/settings/server"
 
-export const GET = route({ access: "platform.settings.manage" }, () => getLanguages())
+export const GET = route({ access: "platform.languages.manage" }, () => getLanguages())

@@ -37,7 +37,7 @@ const OUTCOME_READERS: Permission[] = [
   "assignments.manage",
   "gradebook.view",
   "reports.view",
-  "org.settings.manage",
+  "org.outcomes.manage",
 ]
 
 function needReader(ctx: OrgContext) {
@@ -72,7 +72,7 @@ export async function getProgramOutcomes(slug: string, user: User) {
 }
 
 /** Program outcomes are organization-wide, so editing them needs an organization-wide grant. */
-const canEditOrg = (ctx: OrgContext) => canFor(ctx, "org.settings.manage", [])
+const canEditOrg = (ctx: OrgContext) => canFor(ctx, "org.outcomes.manage", [])
 
 /** Replaces the list, keeping ids so CO mappings follow each outcome. */
 export async function saveProgramOutcomes(
@@ -81,7 +81,7 @@ export async function saveProgramOutcomes(
   input: ProgramOutcomesInput
 ) {
   const ctx = await orgContext(slug, user)
-  needFor(ctx, "org.settings.manage", [])
+  needFor(ctx, "org.outcomes.manage", [])
   const codes = input.outcomes.map((o) => o.code.toLowerCase())
   if (new Set(codes).size !== codes.length) {
     throw new ApiError(400, "duplicate_code", "Two outcomes share a code.")
@@ -103,14 +103,23 @@ export async function saveProgramOutcomes(
           .update(programOutcomes)
           .set(values)
           .where(
-            and(eq(programOutcomes.id, o.id), eq(programOutcomes.orgId, ctx.org.id))
+            and(
+              eq(programOutcomes.id, o.id),
+              eq(programOutcomes.orgId, ctx.org.id)
+            )
           )
           .returning({ id: programOutcomes.id })
         if (updated.length === 0) {
-          throw new ApiError(400, "unknown_outcome", "An outcome no longer exists.")
+          throw new ApiError(
+            400,
+            "unknown_outcome",
+            "An outcome no longer exists."
+          )
         }
       } else {
-        await tx.insert(programOutcomes).values({ ...values, orgId: ctx.org.id })
+        await tx
+          .insert(programOutcomes)
+          .values({ ...values, orgId: ctx.org.id })
       }
     }
     await tx
@@ -171,10 +180,19 @@ export async function saveCourseOutcomes(
         const updated = await tx
           .update(courseOutcomes)
           .set(values)
-          .where(and(eq(courseOutcomes.id, o.id), eq(courseOutcomes.groupId, groupId)))
+          .where(
+            and(
+              eq(courseOutcomes.id, o.id),
+              eq(courseOutcomes.groupId, groupId)
+            )
+          )
           .returning({ id: courseOutcomes.id })
         if (updated.length === 0) {
-          throw new ApiError(400, "unknown_outcome", "An outcome no longer exists.")
+          throw new ApiError(
+            400,
+            "unknown_outcome",
+            "An outcome no longer exists."
+          )
         }
       } else {
         await tx
@@ -183,10 +201,15 @@ export async function saveCourseOutcomes(
       }
     }
   })
-  await writeAudit(ctx, "outcomes.course", "Changed a class's course outcomes", {
-    group: groupId,
-    outcomes: input.outcomes.length,
-  })
+  await writeAudit(
+    ctx,
+    "outcomes.course",
+    "Changed a class's course outcomes",
+    {
+      group: groupId,
+      outcomes: input.outcomes.length,
+    }
+  )
 }
 
 /** Every course's outcomes, to tag assignment problems with. */

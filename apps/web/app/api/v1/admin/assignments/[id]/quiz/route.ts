@@ -9,6 +9,6 @@ export const GET = route({ access: "platform.gradebook.view" }, ({ params, query
 
 /** Marks that replace the automatic ones (null goes back to automatic). */
 export const PUT = route(
-  { access: "platform.work.manage", body: quizMarksSchema },
+  { access: "platform.work.grade", body: quizMarksSchema },
   ({ params, body }) => setQuizMarks(params.id ?? "", null, "all", body)
 )

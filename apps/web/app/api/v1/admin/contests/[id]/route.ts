@@ -11,10 +11,10 @@ export const GET = route({ access: "platform.work.manage" }, ({ params }) =>
 )
 
 export const PUT = route(
-  { access: "platform.work.manage", body: contestInputSchema },
+  { access: "platform.work.edit", body: contestInputSchema },
   ({ params, body }) => saveContest(params.id ?? "", body, null)
 )
 
-export const DELETE = route({ access: "platform.work.manage" }, ({ params }) =>
+export const DELETE = route({ access: "platform.work.delete" }, ({ params }) =>
   deleteContest(params.id ?? "", null)
 )

@@ -1,14 +1,12 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  PLATFORM_PERMISSIONS,
-  type PlatformPermission,
-} from "@workspace/judge"
+import { PLATFORM_PERMISSIONS, type PlatformPermission } from "@workspace/judge"
+
+import { PermissionPicker } from "@/features/orgs/components/permission-picker"
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
-import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -17,10 +15,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 
 import { ConfirmButton } from "@/components/confirm"
-import { Field, FormMessage, SelectInput, TextArea, TextInput } from "@/components/form"
+import {
+  Field,
+  FormMessage,
+  SelectInput,
+  TextArea,
+  TextInput,
+} from "@/components/form"
 import { useViewer } from "@/features/account/use-viewer"
 import { Loading, PageTitle, Table } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
@@ -50,14 +59,20 @@ const SOURCE: Record<Staff["source"], string> = {
   admin_emails: "ADMIN_EMAILS",
 }
 
-const MODULES = [...new Set(Object.values(PLATFORM_PERMISSIONS).map((p) => p.module))]
-
 /** Platform staff and the roles they hold: who may do what on the platform. */
 export function StaffPage() {
   const client = useQueryClient()
-  const staff = useQuery({ queryKey: ["admin", "staff"], queryFn: () => api<Staff[]>("/admin/staff") })
-  const roles = useQuery({ queryKey: ["admin", "roles"], queryFn: () => api<Role[]>("/admin/roles") })
-  const [giving, setGiving] = useState<{ email: string; role: string } | null>(null)
+  const staff = useQuery({
+    queryKey: ["admin", "staff"],
+    queryFn: () => api<Staff[]>("/admin/staff"),
+  })
+  const roles = useQuery({
+    queryKey: ["admin", "roles"],
+    queryFn: () => api<Role[]>("/admin/roles"),
+  })
+  const [giving, setGiving] = useState<{ email: string; role: string } | null>(
+    null
+  )
   const [editingRole, setEditingRole] = useState<Role | "new" | null>(null)
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["admin", "staff"] })
@@ -65,19 +80,23 @@ export function StaffPage() {
     void client.invalidateQueries({ queryKey: ["me"] })
   }
   const remove = useMutation({
-    mutationFn: (userId: string) => api(`/admin/staff/${userId}`, { method: "DELETE" }),
+    mutationFn: (userId: string) =>
+      api(`/admin/staff/${userId}`, { method: "DELETE" }),
     onSuccess: refresh,
   })
-  if (!staff.data || !roles.data) return <Loading error={staff.error ?? roles.error} />
+  if (!staff.data || !roles.data)
+    return <Loading error={staff.error ?? roles.error} />
   return (
     <>
       <PageTitle>Staff and roles</PageTitle>
       <p className="mb-3 max-w-3xl text-body-sm text-body">
-        Who may run the platform and what each may do. Nobody can give a role with
-        permissions they don&apos;t hold, only owners make owners, and the platform always
-        keeps one owner. Every change is in the activity log.
+        Who may run the platform and what each may do. Nobody can give a role
+        with permissions they don&apos;t hold, only owners make owners, and the
+        platform always keeps one owner. Every change is in the activity log.
       </p>
-      {remove.error && <FormMessage message={{ text: remove.error.message, kind: "err" }} />}
+      {remove.error && (
+        <FormMessage message={{ text: remove.error.message, kind: "err" }} />
+      )}
       <Tabs defaultValue="staff">
         <TabsList variant="line">
           <TabsTrigger value="staff">Staff ({staff.data.length})</TabsTrigger>
@@ -108,7 +127,10 @@ export function StaffPage() {
                         variant="outline"
                         aria-label={`Change ${s.email}'s role`}
                         onClick={() =>
-                          setGiving({ email: s.email, role: s.role.key ?? s.role.id ?? "" })
+                          setGiving({
+                            email: s.email,
+                            role: s.role.key ?? s.role.id ?? "",
+                          })
                         }
                       >
                         Change role
@@ -132,7 +154,11 @@ export function StaffPage() {
           </Table>
         </TabsContent>
         <TabsContent value="roles" className="grid gap-3 pt-3">
-          <Button size="sm" className="justify-self-start" onClick={() => setEditingRole("new")}>
+          <Button
+            size="sm"
+            className="justify-self-start"
+            onClick={() => setEditingRole("new")}
+          >
             New role
           </Button>
           <Table headers={["Role", "Can", "People", ""]}>
@@ -151,13 +177,19 @@ export function StaffPage() {
                 </td>
                 <td className="max-w-96 text-caption">
                   <span className="line-clamp-2">
-                    {r.permissions.map((p) => PLATFORM_PERMISSIONS[p].label).join(", ") || "Nothing"}
+                    {r.permissions
+                      .map((p) => PLATFORM_PERMISSIONS[p].label)
+                      .join(", ") || "Nothing"}
                   </span>
                 </td>
                 <td className="tabular-nums">{r.members}</td>
                 <td className="text-right">
                   {!r.builtIn && (
-                    <Button size="sm" variant="outline" onClick={() => setEditingRole(r)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditingRole(r)}
+                    >
                       Edit
                     </Button>
                   )}
@@ -202,7 +234,8 @@ function GiveRoleDialog({
   const [email, setEmail] = useState(initial.email)
   const [role, setRole] = useState(initial.role)
   const save = useMutation({
-    mutationFn: () => api("/admin/staff", { method: "PUT", body: { email, role } }),
+    mutationFn: () =>
+      api("/admin/staff", { method: "PUT", body: { email, role } }),
     onSuccess: onDone,
   })
   const chosen = roles.find((r) => r.id === role)
@@ -210,10 +243,12 @@ function GiveRoleDialog({
     <Dialog open onOpenChange={(open) => !open && onDone()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{initial.email ? "Change role" : "Add staff"}</DialogTitle>
+          <DialogTitle>
+            {initial.email ? "Change role" : "Add staff"}
+          </DialogTitle>
           <DialogDescription>
-            Their platform role. Someone new to the site gets an account that's ready when
-            they first sign in.
+            Their platform role. Someone new to the site gets an account that's
+            ready when they first sign in.
           </DialogDescription>
         </DialogHeader>
         <Field label="Email">
@@ -225,7 +260,11 @@ function GiveRoleDialog({
           />
         </Field>
         <Field label="Role">
-          <SelectInput aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
+          <SelectInput
+            aria-label="Role"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+          >
             {roles.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -235,15 +274,23 @@ function GiveRoleDialog({
         </Field>
         {chosen && (
           <p className="text-caption">
-            Can: {chosen.permissions.map((p) => PLATFORM_PERMISSIONS[p].label).join(", ") || "nothing"}
+            Can:{" "}
+            {chosen.permissions
+              .map((p) => PLATFORM_PERMISSIONS[p].label)
+              .join(", ") || "nothing"}
           </p>
         )}
-        {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={onDone}>
             Cancel
           </Button>
-          <Button disabled={!email || save.isPending} onClick={() => save.mutate()}>
+          <Button
+            disabled={!email || save.isPending}
+            onClick={() => save.mutate()}
+          >
             Save
           </Button>
         </DialogFooter>
@@ -252,16 +299,27 @@ function GiveRoleDialog({
   )
 }
 
-function RoleDialog({ role, onDone }: { role: Role | null; onDone: () => void }) {
+function RoleDialog({
+  role,
+  onDone,
+}: {
+  role: Role | null
+  onDone: () => void
+}) {
   const { data: viewer } = useViewer()
   const held = viewer?.user?.platform.permissions ?? []
   const [name, setName] = useState(role?.name ?? "")
   const [description, setDescription] = useState(role?.description ?? "")
-  const [permissions, setPermissions] = useState<PlatformPermission[]>(role?.permissions ?? [])
+  const [permissions, setPermissions] = useState<PlatformPermission[]>(
+    role?.permissions ?? []
+  )
   const save = useMutation({
     mutationFn: () =>
       role
-        ? api(`/admin/roles/${role.id}`, { method: "PUT", body: { name, description, permissions } })
+        ? api(`/admin/roles/${role.id}`, {
+            method: "PUT",
+            body: { name, description, permissions },
+          })
         : api("/admin/roles", { body: { name, description, permissions } }),
     onSuccess: onDone,
   })
@@ -275,43 +333,34 @@ function RoleDialog({ role, onDone }: { role: Role | null; onDone: () => void })
         <DialogHeader>
           <DialogTitle>{role ? `Edit ${role.name}` : "New role"}</DialogTitle>
           <DialogDescription>
-            A role is a set of permissions. You can only include ones you hold yourself.
+            A role is a set of permissions. You can only include ones you hold
+            yourself.
           </DialogDescription>
         </DialogHeader>
         <Field label="Name">
           <TextInput value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Description">
-          <TextArea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+          <TextArea
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
         </Field>
-        <div className="grid gap-3">
-          {MODULES.map((module) => (
-            <div key={module} className="grid gap-1.5">
-              <div className="text-caption font-semibold text-ink">{module}</div>
-              {(Object.entries(PLATFORM_PERMISSIONS) as [PlatformPermission, (typeof PLATFORM_PERMISSIONS)[PlatformPermission]][])
-                .filter(([, p]) => p.module === module)
-                .map(([key, p]) => (
-                  <label key={key} className="flex items-start gap-2 text-body-sm">
-                    <Checkbox
-                      checked={permissions.includes(key)}
-                      disabled={!held.includes(key)}
-                      onCheckedChange={(checked) =>
-                        setPermissions((all) =>
-                          checked ? [...all, key] : all.filter((x) => x !== key)
-                        )
-                      }
-                    />
-                    <span>
-                      <span className="text-ink">{p.label}</span>
-                      <span className="block text-caption">{p.description}</span>
-                    </span>
-                  </label>
-                ))}
-            </div>
-          ))}
-        </div>
+        <PermissionPicker
+          catalog={PLATFORM_PERMISSIONS}
+          order={Object.keys(PLATFORM_PERMISSIONS)}
+          held={held}
+          value={permissions}
+          onChange={(next) => setPermissions(next as PlatformPermission[])}
+        />
         {(save.error || remove.error) && (
-          <FormMessage message={{ text: (save.error ?? remove.error)!.message, kind: "err" }} />
+          <FormMessage
+            message={{
+              text: (save.error ?? remove.error)!.message,
+              kind: "err",
+            }}
+          />
         )}
         <DialogFooter>
           {role && (
@@ -329,7 +378,10 @@ function RoleDialog({ role, onDone }: { role: Role | null; onDone: () => void })
           <Button variant="outline" onClick={onDone}>
             Cancel
           </Button>
-          <Button disabled={!name.trim() || save.isPending} onClick={() => save.mutate()}>
+          <Button
+            disabled={!name.trim() || save.isPending}
+            onClick={() => save.mutate()}
+          >
             Save role
           </Button>
         </DialogFooter>
@@ -356,7 +408,8 @@ export function ActivityPage() {
   if (!data) return <Loading error={error} />
   const q = search.trim().toLowerCase()
   const rows = data.filter(
-    (a) => !q || a.summary.toLowerCase().includes(q) || (a.actor ?? "").includes(q)
+    (a) =>
+      !q || a.summary.toLowerCase().includes(q) || (a.actor ?? "").includes(q)
   )
   return (
     <>
@@ -371,13 +424,17 @@ export function ActivityPage() {
       <Table headers={["When", "Who", "What"]}>
         {rows.map((a) => (
           <tr key={a.id} data-testid="activity-row">
-            <td className="whitespace-nowrap text-caption">{formatDateTime(a.createdAt)}</td>
+            <td className="text-caption whitespace-nowrap">
+              {formatDateTime(a.createdAt)}
+            </td>
             <td className="text-caption">{a.actor ?? "—"}</td>
             <td className="text-ink">{a.summary}</td>
           </tr>
         ))}
       </Table>
-      {rows.length === 0 && <p className="mt-3 text-body-sm text-body">Nothing yet.</p>}
+      {rows.length === 0 && (
+        <p className="mt-3 text-body-sm text-body">Nothing yet.</p>
+      )}
     </>
   )
 }

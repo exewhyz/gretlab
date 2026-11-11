@@ -17,7 +17,8 @@ export const PERMISSIONS = {
   },
   "org.members.invite": {
     label: "Invite and approve",
-    description: "Create invite links and approve requests to join.",
+    description:
+      'Create invite links and approve requests to join. Grant this, or just "Approve requests" under it.',
     module: "Members",
   },
   "org.members.manage": {
@@ -29,7 +30,7 @@ export const PERMISSIONS = {
   "org.groups.manage": {
     label: "Manage groups",
     description:
-      "Create, rename and delete groups such as branches, batches or teams.",
+      "Create, rename and delete groups such as branches, batches or teams. Grant this, or the finer actions under it.",
     module: "Structure",
   },
   "org.roles.manage": {
@@ -40,7 +41,8 @@ export const PERMISSIONS = {
   },
   "org.settings.manage": {
     label: "Organization settings",
-    description: "Name, description, who can join and how.",
+    description:
+      "The organization's profile and rules: name, description, who can join, group level names, languages. Grant this, or the finer actions under it (LMS, outcomes, notifications).",
     module: "Structure",
   },
   "problems.manage": {
@@ -210,6 +212,44 @@ export const PERMISSIONS = {
     description: "Remove members from the organization.",
     module: "Members",
     parent: "org.members.manage",
+  },
+  "org.groups.create": {
+    label: "Create groups",
+    description: "Add branches, batches or teams.",
+    module: "Structure",
+    parent: "org.groups.manage",
+  },
+  "org.groups.edit": {
+    label: "Rename groups",
+    description: "Rename groups and change where they sit.",
+    module: "Structure",
+    parent: "org.groups.manage",
+  },
+  "org.groups.delete": {
+    label: "Delete groups",
+    description: "Remove groups.",
+    module: "Structure",
+    parent: "org.groups.manage",
+  },
+  "org.settings.lms": {
+    label: "Connect an LMS",
+    description:
+      "Connect Moodle, Canvas or another LMS and link its courses to classes.",
+    module: "Structure",
+    parent: "org.settings.manage",
+  },
+  "org.outcomes.manage": {
+    label: "Course outcomes",
+    description: "Edit the program and course outcomes and attainment rules.",
+    module: "Structure",
+    parent: "org.settings.manage",
+  },
+  "org.members.approve": {
+    label: "Approve requests",
+    description:
+      "Approve or decline requests to join, without creating invite links.",
+    module: "Members",
+    parent: "org.members.invite",
   },
   "org.notifications.manage": {
     label: "Manage notifications",

@@ -106,6 +106,15 @@ check("Assigner can give someone a role they aren't escalating", allowed(await c
 check("Assigner CANNOT hand out a role with permissions they lack", denied(await cAs(`${O}/members/${uid("prm-s1")}/roles`, { body: { roleId: grader.id, groupId: lab.id } })))
 check("Assigner CANNOT edit the roles catalog", denied(await cAs(`${O}/roles`, { body: { name: "Nope", permissions: [] } })))
 
+// ---------- structure: group actions are separate
+const gMaker = await mkRole("Group maker", ["org.members.view", "org.groups.create"])
+const gRemover = await mkRole("Group remover", ["org.members.view", "org.groups.delete"])
+await give("prm-mgroups", gMaker.id, null); await give("prm-mremove", gRemover.id, null)
+const made = await cMg(`${O}/groups`, { body: { name: "prm Branch" } })
+check("a create-groups role can add a group", allowed(made))
+check("...but can't delete one", denied(await cMg(`${O}/groups/${made.json?.id ?? lab.id}`, { method: "DELETE" })))
+check("a delete-groups role can't create", denied(await cMr(`${O}/groups`, { body: { name: "prm Nope" } })))
+
 cleanup()
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED")
 process.exit(failures ? 1 : 0)

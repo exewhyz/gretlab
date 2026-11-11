@@ -11,10 +11,10 @@ export const GET = route({ access: "platform.work.manage" }, ({ params }) =>
 )
 
 export const PUT = route(
-  { access: "platform.work.manage", body: assignmentInputSchema },
+  { access: "platform.work.edit", body: assignmentInputSchema },
   ({ params, body }) => saveAssignment(params.id ?? "", body, null)
 )
 
-export const DELETE = route({ access: "platform.work.manage" }, ({ params }) =>
+export const DELETE = route({ access: "platform.work.delete" }, ({ params }) =>
   deleteAssignment(params.id ?? "", null)
 )

@@ -11,10 +11,10 @@ export const GET = route({ access: "platform.library.manage" }, ({ params }) =>
 )
 
 export const PUT = route(
-  { access: "platform.library.manage", body: problemInputSchema },
+  { access: "platform.library.edit", body: problemInputSchema },
   ({ params, body }) => saveProblem(params.id ?? "", body, null)
 )
 
-export const DELETE = route({ access: "platform.library.manage" }, ({ params }) =>
+export const DELETE = route({ access: "platform.library.delete" }, ({ params }) =>
   deleteProblem(params.id ?? "", null)
 )

@@ -4,6 +4,6 @@ import { extendSchema } from "@/features/assignments/feedback-schemas"
 
 /** More exam time for one student. */
 export const POST = route(
-  { access: "platform.work.manage", body: extendSchema },
+  { access: "platform.work.extend", body: extendSchema },
   ({ params, body }) => extendStudentSitting(params.id ?? "", null, "all", body)
 )

@@ -45,7 +45,7 @@ const can = async (api, path) => (await api(path)).status === 200
 
 // ---------- who is what
 const me = (await owner("/me")).json.user.platform
-check("ADMIN_EMAILS are owners", me.owner && me.role === "Owner" && me.permissions.length === 10)
+check("ADMIN_EMAILS are owners", me.owner && me.role === "Owner" && me.permissions.length >= 10 && ["platform.work.manage", "platform.work.grade"].every((x) => me.permissions.includes(x)))
 check("a teacher from before roles is a Content admin", (await teacher("/me")).json.user.platform.role === "Content admin")
 check("students have no platform access", (await a("/me")).json.user.platform.permissions.length === 0 && (await a("/admin/problems")).status === 403)
 check("a Content admin works on the library", await can(teacher, "/admin/problems") && await can(teacher, "/admin/questions") && await can(teacher, "/admin/assignments"))

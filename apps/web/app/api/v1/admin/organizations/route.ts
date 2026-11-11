@@ -11,7 +11,7 @@ export const GET = route({ access: "platform.orgs.manage" }, ({ user }) =>
 )
 
 export const POST = route(
-  { access: "platform.orgs.manage", body: orgCreateSchema },
+  { access: "platform.orgs.create", body: orgCreateSchema },
   async ({ user, body }) => {
     const org = await createOrganization(user, body)
     await writePlatformAudit(user, "org.create", `Created the organization ${body.name}`)

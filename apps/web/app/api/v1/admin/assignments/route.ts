@@ -11,6 +11,6 @@ export const GET = route({ access: "platform.gradebook.view" }, () =>
 )
 
 export const POST = route(
-  { access: "platform.work.manage", body: assignmentInputSchema },
+  { access: "platform.work.create", body: assignmentInputSchema },
   ({ body }) => saveAssignment(null, body, null)
 )

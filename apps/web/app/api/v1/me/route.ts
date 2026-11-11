@@ -1,3 +1,4 @@
+import { expandPlatformPermissions } from "@workspace/judge"
 import { route } from "@/lib/api/route"
 import { getLanguages, getSettings } from "@/features/settings/server"
 import { teachesAnywhere } from "@/features/teaching/server"
@@ -23,7 +24,7 @@ export const GET = route({ access: "public" }, async ({ user }) => {
       teaches,
       /** What they may do on the platform dashboard; empty for everyone else. */
       platform: {
-        permissions: platform.permissions,
+        permissions: expandPlatformPermissions(platform.permissions),
         role: platform.role?.name ?? null,
         owner: platform.owner,
       },

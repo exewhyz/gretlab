@@ -1,12 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  grantsPermission,
-  parentPermission,
-  PERMISSIONS,
-  type Permission,
-} from "@workspace/judge"
+import { PERMISSIONS, type Permission } from "@workspace/judge"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, type ReactNode } from "react"
@@ -50,6 +45,7 @@ import {
 import { useViewer } from "@/features/account/use-viewer"
 import { OwnerProvider } from "@/features/admin/owner"
 import { api } from "@/lib/api/client"
+import { PermissionPicker } from "./permission-picker"
 
 import { GroupChecklist, leafIds } from "./group-checklist"
 import { GroupPicker } from "./group-picker"
@@ -161,7 +157,7 @@ export function ManageShell({
           href: `${base}/outcomes`,
           label: "Outcomes",
           show: has(
-            "org.settings.manage",
+            "org.outcomes.manage",
             "assignments.manage",
             "reports.view"
           ),
@@ -179,7 +175,7 @@ export function ManageShell({
         {
           href: `${base}/lms`,
           label: "LMS (LTI)",
-          show: has("org.settings.manage"),
+          show: has("org.settings.lms"),
         },
         {
           href: `${base}/activity`,
@@ -749,8 +745,6 @@ function MemberRow({
 
 /* ---------- roles ---------- */
 
-const MODULES = [...new Set(Object.values(PERMISSIONS).map((p) => p.module))]
-
 function PermissionChips({ permissions }: { permissions: string[] }) {
   if (permissions.length === 0) {
     return <span className="text-xs text-body">No management access</span>
@@ -852,104 +846,6 @@ export function ManageRoles({ slug }: { slug: string }) {
   )
 }
 
-/** An area's heading as a checkbox: ticks or unticks every permission in it you may give. */
-function ModuleToggle({
-  module,
-  keys,
-  permissions,
-  onChange,
-}: {
-  module: string
-  keys: Permission[]
-  permissions: string[]
-  onChange: (permissions: string[]) => void
-}) {
-  const on = keys.filter((k) => permissions.includes(k)).length
-  const all = keys.length > 0 && on === keys.length
-  return (
-    <label className="flex items-center gap-2 text-caption-upper text-body uppercase">
-      <Checkbox
-        indeterminate={on > 0 && !all}
-        aria-label={`All of ${module}`}
-        disabled={keys.length === 0}
-        checked={all}
-        onCheckedChange={(checked) =>
-          onChange(
-            checked
-              ? [...new Set([...permissions, ...keys])]
-              : permissions.filter((p) => !keys.includes(p as Permission))
-          )
-        }
-      />
-      {module}
-    </label>
-  )
-}
-
-/** A top-level permission and its finer actions, indented. A selected parent grants and
- *  locks all its children; otherwise each child can be given on its own. */
-function PermissionRows({
-  parent,
-  held,
-  permissions,
-  onChange,
-}: {
-  parent: Permission
-  held: Permission[] | null
-  permissions: string[]
-  onChange: (permissions: string[]) => void
-}) {
-  const children = (Object.keys(PERMISSIONS) as Permission[]).filter(
-    (k) => parentPermission(k) === parent
-  )
-  const row = (key: Permission, child: boolean) => {
-    const allowed = held === null || held.includes(key)
-    const grantedByParent = child && permissions.includes(parent)
-    const checked = grantsPermission(permissions, key)
-    const toggle = (on: boolean) =>
-      onChange(
-        on ? [...permissions, key] : permissions.filter((x) => x !== key)
-      )
-    return (
-      <label
-        key={key}
-        className={cn(
-          "flex items-start gap-2",
-          child && "ml-6",
-          (!allowed || grantedByParent) && "opacity-60"
-        )}
-        title={
-          !allowed
-            ? "You don't have this permission, so you can't give it."
-            : grantedByParent
-              ? `Granted by “${PERMISSIONS[parent].label}” above.`
-              : undefined
-        }
-      >
-        <Checkbox
-          disabled={!allowed || grantedByParent}
-          checked={checked}
-          onCheckedChange={toggle}
-        />
-        <span>
-          <span className="text-body-sm text-ink">
-            {PERMISSIONS[key].label}
-          </span>
-          <span className="block text-xs text-body">
-            {PERMISSIONS[key].description}
-          </span>
-        </span>
-      </label>
-    )
-  }
-  return (
-    <>
-      {row(parent, false)}
-      {children.map((c) => row(c, true))}
-    </>
-  )
-}
-
 function DeleteRole({
   name,
   onDelete,
@@ -1020,36 +916,13 @@ function RoleEditor({
           />
         </Field>
       </div>
-      {MODULES.map((module) => (
-        <fieldset key={module} className="grid gap-2">
-          <legend className="mb-1">
-            <ModuleToggle
-              module={module}
-              keys={(Object.keys(PERMISSIONS) as Permission[]).filter(
-                (k) =>
-                  PERMISSIONS[k].module === module &&
-                  (held === null || held.includes(k))
-              )}
-              permissions={permissions}
-              onChange={setPermissions}
-            />
-          </legend>
-          {(Object.keys(PERMISSIONS) as Permission[])
-            .filter(
-              (key) =>
-                PERMISSIONS[key].module === module && !parentPermission(key)
-            )
-            .map((parent) => (
-              <PermissionRows
-                key={parent}
-                parent={parent}
-                held={held}
-                permissions={permissions}
-                onChange={setPermissions}
-              />
-            ))}
-        </fieldset>
-      ))}
+      <PermissionPicker
+        catalog={PERMISSIONS}
+        order={Object.keys(PERMISSIONS)}
+        held={held}
+        value={permissions}
+        onChange={setPermissions}
+      />
       <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
         <span className="flex-1">
           {save.error && (

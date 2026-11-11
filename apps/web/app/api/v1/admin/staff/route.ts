@@ -9,7 +9,7 @@ export const GET = route({ access: "platform.roles.manage" }, ({ user }) => list
 /** Gives someone a platform role: a built-in key or a custom role's id. */
 export const PUT = route(
   {
-    access: "platform.roles.manage",
+    access: "platform.roles.assign",
     body: z.object({ email: z.email(), role: z.string().min(1).max(64) }),
   },
   ({ user, body }) => setStaffRole(user, body)
