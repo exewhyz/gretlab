@@ -1,4 +1,5 @@
 import { getDb, notes, problems, sql, type User } from "@workspace/db"
+import type { Permission } from "@workspace/judge"
 import {
   deleteQuestion,
   getQuestionForStaff,
@@ -112,13 +113,14 @@ export async function saveOrgContest(
   const ctx = await orgContext(slug, user)
   checkAudience(ctx, input.audience)
   // Both who it was for and who it will be for must be within reach.
+  const contestAction = id ? "contests.edit" : "contests.create"
   if (id)
     needFor(
       ctx,
-      "contests.manage",
+      contestAction,
       (await getContestForStaff(id, ctx.org.id)).audience
     )
-  needFor(ctx, "contests.manage", input.audience)
+  needFor(ctx, contestAction, input.audience)
   const contest = await saveContest(id, input, ctx.org.id)
   await writeAudit(
     ctx,
@@ -131,7 +133,7 @@ export async function saveOrgContest(
 export async function deleteOrgContest(slug: string, user: User, id: string) {
   const ctx = await orgContext(slug, user)
   const contest = await getContestForStaff(id, ctx.org.id)
-  needFor(ctx, "contests.manage", contest.audience)
+  needFor(ctx, "contests.delete", contest.audience)
   await deleteContest(id, ctx.org.id)
   await writeAudit(ctx, "contest.delete", `Deleted contest ${contest.title}`)
 }
@@ -163,14 +165,15 @@ export async function saveOrgAssignment(
 ) {
   const ctx = await orgContext(slug, user)
   checkAudience(ctx, input.audience)
-  if (id) {
-    needFor(
-      ctx,
-      "assignments.manage",
-      (await getAssignmentForStaff(id, ctx.org.id)).audience
-    )
+  const existing = id ? await getAssignmentForStaff(id, ctx.org.id) : null
+  const action = id ? "assignments.edit" : "assignments.create"
+  if (existing) needFor(ctx, action, existing.audience)
+  needFor(ctx, action, input.audience)
+  // Publishing (or unpublishing) is its own action, so a role may draft but not release.
+  if (input.published !== (existing?.published ?? false)) {
+    needFor(ctx, "assignments.publish", input.audience)
+    if (existing) needFor(ctx, "assignments.publish", existing.audience)
   }
-  needFor(ctx, "assignments.manage", input.audience)
   const assignment = await saveAssignment(id, input, ctx.org.id, { by: user })
   await writeAudit(
     ctx,
@@ -187,7 +190,7 @@ export async function deleteOrgAssignment(
 ) {
   const ctx = await orgContext(slug, user)
   const assignment = await getAssignmentForStaff(id, ctx.org.id)
-  needFor(ctx, "assignments.manage", assignment.audience)
+  needFor(ctx, "assignments.delete", assignment.audience)
   await deleteAssignment(id, ctx.org.id)
   await writeAudit(
     ctx,
@@ -241,7 +244,13 @@ export async function orgProblem(slug: string, user: User, id: string) {
 export async function orgQuestions(slug: string, user: User, picker: boolean) {
   const ctx = await orgContext(slug, user)
   // Picking needs the right to set work; the bank itself, to write problems.
-  if (picker) needAnywhere(ctx, "assignments.manage", "contests.manage", "problems.manage")
+  if (picker)
+    needAnywhere(
+      ctx,
+      "assignments.manage",
+      "contests.manage",
+      "problems.manage"
+    )
   else needAnywhere(ctx, "problems.manage")
   return listQuestionsForStaff(ctx.org.id, picker, user.id)
 }
@@ -259,17 +268,23 @@ export async function saveOrgQuestion(
   input: Parameters<typeof saveQuestion>[1]
 ) {
   const ctx = await orgContext(slug, user)
-  needAnywhere(ctx, "problems.manage")
+  needAnywhere(ctx, id ? "problems.edit" : "problems.create")
   const saved = await saveQuestion(id, input, ctx.org.id)
-  await writeAudit(ctx, id ? "question.update" : "question.create", `${id ? "Changed" : "Created"} question ${input.title}`)
+  await writeAudit(
+    ctx,
+    id ? "question.update" : "question.create",
+    `${id ? "Changed" : "Created"} question ${input.title}`
+  )
   return saved
 }
 
 export async function deleteOrgQuestion(slug: string, user: User, id: string) {
   const ctx = await orgContext(slug, user)
-  needAnywhere(ctx, "problems.manage")
+  needAnywhere(ctx, "problems.delete")
   await deleteQuestion(id, ctx.org.id)
-  await writeAudit(ctx, "question.delete", "Deleted a question", { question: id })
+  await writeAudit(ctx, "question.delete", "Deleted a question", {
+    question: id,
+  })
 }
 
 export async function orgImportQuestions(
@@ -278,9 +293,13 @@ export async function orgImportQuestions(
   input: { file: unknown; published: boolean }
 ) {
   const ctx = await orgContext(slug, user)
-  needAnywhere(ctx, "problems.manage")
+  needAnywhere(ctx, "problems.create")
   const result = await importQuestions(ctx.org.id, input.file, input.published)
-  await writeAudit(ctx, "question.import", `Imported ${result.created.length} questions`)
+  await writeAudit(
+    ctx,
+    "question.import",
+    `Imported ${result.created.length} questions`
+  )
   return result
 }
 
@@ -290,7 +309,7 @@ export async function orgImportProblems(
   input: { file: unknown; listed: boolean; published: boolean }
 ) {
   const ctx = await orgContext(slug, user)
-  needAnywhere(ctx, "problems.manage")
+  needAnywhere(ctx, "problems.create")
   const result = await importProblems(ctx.org.id, input.file, input)
   await writeAudit(
     ctx,
@@ -308,7 +327,8 @@ export async function saveOrgProblem(
   input: ProblemInput
 ) {
   const ctx = await orgContext(slug, user)
-  needAnywhere(ctx, "problems.manage")
+  needAnywhere(ctx, id ? "problems.edit" : "problems.create")
+  if (input.published) needAnywhere(ctx, "problems.publish")
   const problem = await saveProblem(id, input, ctx.org.id)
   await writeAudit(
     ctx,
@@ -320,7 +340,7 @@ export async function saveOrgProblem(
 
 export async function deleteOrgProblem(slug: string, user: User, id: string) {
   const ctx = await orgContext(slug, user)
-  needAnywhere(ctx, "problems.manage")
+  needAnywhere(ctx, "problems.delete")
   await deleteProblem(id, ctx.org.id)
   await writeAudit(ctx, "problem.delete", "Deleted a problem")
 }
@@ -336,7 +356,7 @@ export async function orgNotices(slug: string, user: User) {
 export async function addOrgNotice(slug: string, user: User, text: string) {
   const ctx = await orgContext(slug, user)
   // A notice here is for the whole organization; class notices go from the class page.
-  needFor(ctx, "notices.manage", [])
+  needFor(ctx, "notices.create", [])
   const note = await addNote(text, null, ctx.org.id)
   await writeAudit(ctx, "notice.create", "Posted a notice")
   return note
@@ -350,7 +370,7 @@ export async function deleteOrgNotice(slug: string, user: User, id: string) {
     .select({ audience: notes.audience })
     .from(notes)
     .where(and(eq(notes.id, id), eq(notes.orgId, ctx.org.id)))
-  if (note) needFor(ctx, "notices.manage", note.audience)
+  if (note) needFor(ctx, "notices.delete", note.audience)
   await deleteNote(id, ctx.org.id)
   await writeAudit(ctx, "notice.delete", "Removed a notice")
 }
@@ -475,9 +495,14 @@ export async function orgStudentAttempts(
 /* ---------- feedback: rubric marks, line comments, release ---------- */
 
 /** Giving feedback needs managing assignments, for students whose grades this person sees. */
-async function feedbackContext(slug: string, user: User) {
+async function feedbackContext(
+  slug: string,
+  user: User,
+  // The action being done: grading, extending, or (default) general exam management.
+  action: Permission = "assignments.manage"
+) {
   const ctx = await orgContext(slug, user)
-  needAnywhere(ctx, "assignments.manage")
+  needAnywhere(ctx, action)
   needAnywhere(ctx, "gradebook.view")
   return { ctx, scope: groupsFor(ctx, "gradebook.view") }
 }
@@ -488,7 +513,7 @@ export async function orgSetRubricMarks(
   id: string,
   input: Parameters<typeof setRubricMarks>[3]
 ) {
-  const { ctx, scope } = await feedbackContext(slug, user)
+  const { ctx, scope } = await feedbackContext(slug, user, "assignments.grade")
   return setRubricMarks(id, ctx.org.id, scope, input, user.id)
 }
 
@@ -498,7 +523,7 @@ export async function orgAddLineComment(
   id: string,
   input: Parameters<typeof addLineComment>[3]
 ) {
-  const { ctx, scope } = await feedbackContext(slug, user)
+  const { ctx, scope } = await feedbackContext(slug, user, "assignments.grade")
   return addLineComment(id, ctx.org.id, scope, input, user.id)
 }
 
@@ -508,7 +533,7 @@ export async function orgDeleteLineComment(
   id: string,
   commentId: string
 ) {
-  const { ctx } = await feedbackContext(slug, user)
+  const { ctx } = await feedbackContext(slug, user, "assignments.grade")
   await deleteLineComment(id, ctx.org.id, commentId)
 }
 
@@ -518,13 +543,18 @@ export async function orgExtendSitting(
   id: string,
   input: Parameters<typeof extendStudentSitting>[3]
 ) {
-  const { ctx, scope } = await feedbackContext(slug, user)
+  const { ctx, scope } = await feedbackContext(slug, user, "assignments.extend")
   const sitting = await extendStudentSitting(id, ctx.org.id, scope, input)
-  await writeAudit(ctx, "assignment.exam_time", "Gave a student more exam time", {
-    assignment: id,
-    student: input.student,
-    minutes: input.minutes,
-  })
+  await writeAudit(
+    ctx,
+    "assignment.exam_time",
+    "Gave a student more exam time",
+    {
+      assignment: id,
+      student: input.student,
+      minutes: input.minutes,
+    }
+  )
   return sitting
 }
 
@@ -534,26 +564,46 @@ export async function orgSetExtension(
   id: string,
   input: Parameters<typeof setExtension>[3]
 ) {
-  const { ctx, scope } = await feedbackContext(slug, user)
+  const { ctx, scope } = await feedbackContext(slug, user, "assignments.extend")
   const result = await setExtension(id, ctx.org.id, scope, input, user.id)
-  await writeAudit(ctx, "assignment.extension", `Extended an assignment for ${input.student}`, {
-    assignment: id,
-    student: input.student,
-    dueAt: input.dueAt.toISOString(),
-    problems: input.problemIds.length,
-  })
+  await writeAudit(
+    ctx,
+    "assignment.extension",
+    `Extended an assignment for ${input.student}`,
+    {
+      assignment: id,
+      student: input.student,
+      dueAt: input.dueAt.toISOString(),
+      problems: input.problemIds.length,
+    }
+  )
   return result
 }
 
-export async function orgRemoveExtension(slug: string, user: User, id: string, email: string) {
-  const { ctx, scope } = await feedbackContext(slug, user)
+export async function orgRemoveExtension(
+  slug: string,
+  user: User,
+  id: string,
+  email: string
+) {
+  const { ctx, scope } = await feedbackContext(slug, user, "assignments.extend")
   await removeExtension(id, ctx.org.id, scope, email)
-  await writeAudit(ctx, "assignment.extension_removed", `Removed ${email}'s extension`, {
-    assignment: id,
-  })
+  await writeAudit(
+    ctx,
+    "assignment.extension_removed",
+    `Removed ${email}'s extension`,
+    {
+      assignment: id,
+    }
+  )
 }
 
-export async function orgStudentQuiz(slug: string, user: User, id: string, email: string) {
+export async function orgStudentQuiz(
+  slug: string,
+  user: User,
+  id: string,
+  email: string
+) {
   const ctx = await orgContext(slug, user)
   needAnywhere(ctx, "gradebook.view")
   return studentQuiz(id, ctx.org.id, groupsFor(ctx, "gradebook.view"), email)
@@ -565,34 +615,57 @@ export async function orgSetQuizMarks(
   id: string,
   input: Parameters<typeof setQuizMarks>[3]
 ) {
-  const { ctx, scope } = await feedbackContext(slug, user)
+  const { ctx, scope } = await feedbackContext(slug, user, "assignments.grade")
   const result = await setQuizMarks(id, ctx.org.id, scope, input)
-  await writeAudit(ctx, "assignment.quiz_marks", `Marked ${input.student}'s answers`, {
-    assignment: id,
-  })
+  await writeAudit(
+    ctx,
+    "assignment.quiz_marks",
+    `Marked ${input.student}'s answers`,
+    {
+      assignment: id,
+    }
+  )
   return result
 }
 
-export async function orgRejudgeSystemErrors(slug: string, user: User, id: string) {
-  const { ctx, scope } = await feedbackContext(slug, user)
+export async function orgRejudgeSystemErrors(
+  slug: string,
+  user: User,
+  id: string
+) {
+  const { ctx, scope } = await feedbackContext(slug, user, "assignments.grade")
   const result = await rejudgeSystemErrors(id, ctx.org.id, scope)
-  await writeAudit(ctx, "assignment.rejudge", "Re-judged an assignment's system errors", {
-    assignment: id,
-    queued: result.queued,
-  })
+  await writeAudit(
+    ctx,
+    "assignment.rejudge",
+    "Re-judged an assignment's system errors",
+    {
+      assignment: id,
+      queued: result.queued,
+    }
+  )
   return result
 }
 
-export async function orgForgetExamAddresses(slug: string, user: User, id: string) {
+export async function orgForgetExamAddresses(
+  slug: string,
+  user: User,
+  id: string
+) {
   const { ctx } = await feedbackContext(slug, user)
   await forgetExamAddresses(id, ctx.org.id)
-  await writeAudit(ctx, "assignment.exam_addresses", "Forgot an exam's network addresses", {
-    assignment: id,
-  })
+  await writeAudit(
+    ctx,
+    "assignment.exam_addresses",
+    "Forgot an exam's network addresses",
+    {
+      assignment: id,
+    }
+  )
 }
 
 export async function orgReleaseFeedback(slug: string, user: User, id: string) {
-  const { ctx } = await feedbackContext(slug, user)
+  const { ctx } = await feedbackContext(slug, user, "assignments.grade")
   await releaseFeedback(id, ctx.org.id)
   await writeAudit(
     ctx,

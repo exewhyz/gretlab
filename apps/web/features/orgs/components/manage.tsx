@@ -1,7 +1,12 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { PERMISSIONS, type Permission } from "@workspace/judge"
+import {
+  grantsPermission,
+  parentPermission,
+  PERMISSIONS,
+  type Permission,
+} from "@workspace/judge"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, type ReactNode } from "react"
@@ -155,7 +160,11 @@ export function ManageShell({
         {
           href: `${base}/outcomes`,
           label: "Outcomes",
-          show: has("org.settings.manage", "assignments.manage", "reports.view"),
+          show: has(
+            "org.settings.manage",
+            "assignments.manage",
+            "reports.view"
+          ),
         },
         {
           href: `${base}/settings`,
@@ -165,7 +174,7 @@ export function ManageShell({
         {
           href: `${base}/notifications`,
           label: "Notifications",
-          show: has("org.settings.manage"),
+          show: has("org.notifications.manage"),
         },
         {
           href: `${base}/lms`,
@@ -877,6 +886,70 @@ function ModuleToggle({
   )
 }
 
+/** A top-level permission and its finer actions, indented. A selected parent grants and
+ *  locks all its children; otherwise each child can be given on its own. */
+function PermissionRows({
+  parent,
+  held,
+  permissions,
+  onChange,
+}: {
+  parent: Permission
+  held: Permission[] | null
+  permissions: string[]
+  onChange: (permissions: string[]) => void
+}) {
+  const children = (Object.keys(PERMISSIONS) as Permission[]).filter(
+    (k) => parentPermission(k) === parent
+  )
+  const row = (key: Permission, child: boolean) => {
+    const allowed = held === null || held.includes(key)
+    const grantedByParent = child && permissions.includes(parent)
+    const checked = grantsPermission(permissions, key)
+    const toggle = (on: boolean) =>
+      onChange(
+        on ? [...permissions, key] : permissions.filter((x) => x !== key)
+      )
+    return (
+      <label
+        key={key}
+        className={cn(
+          "flex items-start gap-2",
+          child && "ml-6",
+          (!allowed || grantedByParent) && "opacity-60"
+        )}
+        title={
+          !allowed
+            ? "You don't have this permission, so you can't give it."
+            : grantedByParent
+              ? `Granted by “${PERMISSIONS[parent].label}” above.`
+              : undefined
+        }
+      >
+        <Checkbox
+          disabled={!allowed || grantedByParent}
+          checked={checked}
+          onCheckedChange={toggle}
+        />
+        <span>
+          <span className="text-body-sm text-ink">
+            {PERMISSIONS[key].label}
+          </span>
+          <span className="block text-xs text-body">
+            {PERMISSIONS[key].description}
+          </span>
+        </span>
+      </label>
+    )
+  }
+  return (
+    <>
+      {row(parent, false)}
+      {children.map((c) => row(c, true))}
+    </>
+  )
+}
+
 function DeleteRole({
   name,
   onDelete,
@@ -961,48 +1034,20 @@ function RoleEditor({
               onChange={setPermissions}
             />
           </legend>
-          {(
-            Object.entries(PERMISSIONS) as [
-              Permission,
-              (typeof PERMISSIONS)[Permission],
-            ][]
-          )
-            .filter(([, p]) => p.module === module)
-            .map(([key, p]) => {
-              const allowed = held === null || held.includes(key)
-              return (
-                <label
-                  key={key}
-                  className={cn(
-                    "flex items-start gap-2",
-                    !allowed && "opacity-50"
-                  )}
-                  title={
-                    allowed
-                      ? undefined
-                      : "You don't have this permission, so you can't give it."
-                  }
-                >
-                  <Checkbox
-                    disabled={!allowed}
-                    checked={permissions.includes(key)}
-                    onCheckedChange={(checked) =>
-                      setPermissions(
-                        checked
-                          ? [...permissions, key]
-                          : permissions.filter((x) => x !== key)
-                      )
-                    }
-                  />
-                  <span>
-                    <span className="text-body-sm text-ink">{p.label}</span>
-                    <span className="block text-xs text-body">
-                      {p.description}
-                    </span>
-                  </span>
-                </label>
-              )
-            })}
+          {(Object.keys(PERMISSIONS) as Permission[])
+            .filter(
+              (key) =>
+                PERMISSIONS[key].module === module && !parentPermission(key)
+            )
+            .map((parent) => (
+              <PermissionRows
+                key={parent}
+                parent={parent}
+                held={held}
+                permissions={permissions}
+                onChange={setPermissions}
+              />
+            ))}
         </fieldset>
       ))}
       <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-3">

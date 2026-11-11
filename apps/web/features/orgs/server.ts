@@ -23,6 +23,7 @@ import {
   inAudience,
   type Audience,
   domainMatches,
+  grantsPermission,
   isPermission,
   PERMISSIONS,
   SYSTEM_ROLES,
@@ -162,8 +163,11 @@ function needSubset(
   groupId: string | null
 ) {
   if (ctx.platformAdmin || isOwner(ctx)) return
-  const held = heldFor(ctx, groupId)
-  const extra = permissions.filter((p) => !held.has(p))
+  const held = [...heldFor(ctx, groupId)]
+  // Holding a parent is holding every action under it, so it may be handed out.
+  const extra = permissions.filter(
+    (p) => !(isPermission(p) && grantsPermission(held, p))
+  )
   if (extra.length) {
     throw forbidden(
       `You can't give permissions you don't have: ${extra
@@ -1195,7 +1199,7 @@ export async function updateMember(
       const removed = current.filter((id) => !wanted.includes(id))
       // Each group touched must be one this person may manage.
       for (const id of [...added, ...removed])
-        need(ctx, "org.members.manage", id)
+        need(ctx, "org.members.groups", id)
       if (removed.length) {
         await tx
           .delete(groupMembers)
@@ -1231,7 +1235,7 @@ export async function removeMember(slug: string, user: User, memberId: string) {
   const ctx = await context(slug, user)
   const { member, user: person } = await memberOf(ctx, memberId)
   if (member.status === "pending") need(ctx, "org.members.invite")
-  else need(ctx, "org.members.manage")
+  else need(ctx, "org.members.remove")
   const target = await context(slug, person)
   if (isOwner(target) && !isOwner(ctx) && !ctx.platformAdmin) {
     throw forbidden("Only an owner can remove an owner.")
@@ -1263,7 +1267,7 @@ export async function assignRole(
   input: z.infer<typeof assignRoleSchema>
 ) {
   const ctx = await context(slug, user)
-  need(ctx, "org.roles.manage", input.groupId)
+  need(ctx, "org.members.assign_roles", input.groupId)
   const { member, user: person } = await memberOf(ctx, memberId)
   if (member.status !== "active")
     throw new ApiError(409, "pending", "Approve the request first.")
@@ -1309,7 +1313,7 @@ export async function unassignRole(
       )
     )
   if (!row) throw notFound("Role not found")
-  need(ctx, "org.roles.manage", row.assignment.groupId)
+  need(ctx, "org.members.assign_roles", row.assignment.groupId)
   if (row.role.systemKey === "member") {
     throw new ApiError(
       400,
@@ -2012,7 +2016,7 @@ export async function addToGroup(
 ) {
   const ctx = await context(slug, user)
   const group = groupIn(ctx, groupId)
-  need(ctx, "org.members.manage", groupId)
+  need(ctx, "org.members.groups", groupId)
   const targets = leavesUnder(ctx, groupId)
   const members = await getDb()
     .select({ userId: orgMembers.userId })
@@ -2064,7 +2068,7 @@ export async function removeFromGroup(
 ) {
   const ctx = await context(slug, user)
   const group = groupIn(ctx, groupId)
-  need(ctx, "org.members.manage", groupId)
+  need(ctx, "org.members.groups", groupId)
   if (userIds.length === 0) return { removed: 0 }
   return getDb().transaction(async (tx) => {
     const removed = await tx
@@ -2144,7 +2148,7 @@ export async function placeInGroup(
 ) {
   const ctx = await context(slug, user)
   const group = groupIn(ctx, groupId)
-  need(ctx, "org.members.manage", groupId)
+  need(ctx, "org.members.groups", groupId)
   if (!chainOf(ctx, into).includes(groupId) || into === groupId) {
     throw new ApiError(
       400,
@@ -2191,7 +2195,7 @@ function insideIds(ctx: OrgContext, id: string) {
 export async function emptyGroup(slug: string, user: User, id: string) {
   const ctx = await context(slug, user)
   const group = groupIn(ctx, id)
-  need(ctx, "org.members.manage", id)
+  need(ctx, "org.members.groups", id)
   return getDb().transaction(async (tx) => {
     const removed = await tx
       .delete(groupMembers)
@@ -2223,8 +2227,8 @@ export async function moveGroupPeople(
   const ctx = await context(slug, user)
   const group = groupIn(ctx, id)
   const target = groupIn(ctx, into)
-  need(ctx, "org.members.manage", id)
-  need(ctx, "org.members.manage", into)
+  need(ctx, "org.members.groups", id)
+  need(ctx, "org.members.groups", into)
   const inside = insideIds(ctx, id)
   // Emptying a whole group (before deleting it) must send people outside it. Moving chosen
   // people can go anywhere else, like from Lab 1 to Lab 2 of the same section.

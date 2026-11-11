@@ -103,7 +103,7 @@ export async function savePlatformPolicy(user: User, input: PolicyOverrides) {
 /** Changing who is told what is an organization-wide setting. */
 async function settingsContext(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
-  needFor(ctx, "org.settings.manage", [])
+  needFor(ctx, "org.notifications.manage", [])
   return ctx
 }
 

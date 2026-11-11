@@ -44,6 +44,7 @@ node e2e/certificates.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/projects.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/lti.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/notifications.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+node e2e/permissions.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 
 kill $RUNNER 2>/dev/null
 lsof -ti:3100 | xargs kill 2>/dev/null

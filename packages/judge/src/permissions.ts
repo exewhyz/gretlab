@@ -2,6 +2,12 @@
  * What a role inside an organization can allow. Roles are bundles of these, stored per
  * organization; the server checks them on every request with `allows`. Add a permission
  * here only together with the server check that enforces it.
+ *
+ * Some permissions are fine-grained actions under a coarse parent (`parent`): holding the
+ * parent grants every action beneath it (`allows` walks up the chain), so a role with
+ * "Set assignments" can do all of create/edit/publish/delete/extend/grade, while a role may
+ * instead be given just "Grade & feedback". Existing roles keep working unchanged, because
+ * they hold the parents. Keep a child's `module` the same as its parent's.
  */
 export const PERMISSIONS = {
   "org.members.view": {
@@ -17,7 +23,7 @@ export const PERMISSIONS = {
   "org.members.manage": {
     label: "Manage members",
     description:
-      "Move members between groups, change their roles and remove them.",
+      "Move members between groups and remove them from the organization. Grant this, or the finer actions under it.",
     module: "Members",
   },
   "org.groups.manage": {
@@ -28,7 +34,8 @@ export const PERMISSIONS = {
   },
   "org.roles.manage": {
     label: "Manage roles",
-    description: "Create and edit roles and decide what each one allows.",
+    description:
+      'Create and edit roles and decide what each one allows, and give roles to people. Grant this, or just "Assign roles" under it.',
     module: "Structure",
   },
   "org.settings.manage": {
@@ -39,22 +46,25 @@ export const PERMISSIONS = {
   "problems.manage": {
     label: "Write problems",
     description:
-      "Create and edit the organization's own problems. Published ones join the public library, credited to the organization.",
+      "The organization's own problems and questions: create, edit, publish and delete. Published problems join the public library, credited to the organization. Grant this, or the finer actions under it.",
     module: "Teaching",
   },
   "assignments.manage": {
     label: "Set assignments",
-    description: "Create, edit and delete assignments for the groups this applies to.",
+    description:
+      "Everything about assignments for the groups this applies to: create, edit, publish, delete, extend and grade. Grant this, or the finer actions under it.",
     module: "Teaching",
   },
   "contests.manage": {
     label: "Run contests",
-    description: "Create, edit and delete contests for the groups this applies to.",
+    description:
+      "Everything about contests for the groups this applies to: create, edit, run, delete and grade. Grant this, or the finer actions under it.",
     module: "Teaching",
   },
   "gradebook.view": {
     label: "See grades",
-    description: "See assignment marks of students in the groups this applies to.",
+    description:
+      "See assignment marks of students in the groups this applies to.",
     module: "Teaching",
   },
   "gradebook.export": {
@@ -64,7 +74,8 @@ export const PERMISSIONS = {
   },
   "notices.manage": {
     label: "Post notices",
-    description: "Post and remove notices members see on the organization's page.",
+    description:
+      "Post and remove notices members see on the organization's page. Grant this, or the finer actions under it.",
     module: "Teaching",
   },
   "teaching.log": {
@@ -89,10 +100,158 @@ export const PERMISSIONS = {
     description: "See who changed members, roles and settings, and when.",
     module: "Structure",
   },
+  "assignments.create": {
+    label: "Create assignments",
+    description: "Make new assignments and exams.",
+    module: "Teaching",
+    parent: "assignments.manage",
+  },
+  "assignments.edit": {
+    label: "Edit assignments",
+    description: "Change assignments and exams that already exist.",
+    module: "Teaching",
+    parent: "assignments.manage",
+  },
+  "assignments.publish": {
+    label: "Publish assignments",
+    description:
+      "Make an assignment or exam visible to students (or hide it again).",
+    module: "Teaching",
+    parent: "assignments.manage",
+  },
+  "assignments.delete": {
+    label: "Delete assignments",
+    description: "Remove assignments and exams.",
+    module: "Teaching",
+    parent: "assignments.manage",
+  },
+  "assignments.extend": {
+    label: "Give more time",
+    description: "Extend a student's due time or reopen problems for them.",
+    module: "Teaching",
+    parent: "assignments.manage",
+  },
+  "assignments.grade": {
+    label: "Grade & feedback",
+    description:
+      "Mark answers and projects, comment on code, and release results.",
+    module: "Teaching",
+    parent: "assignments.manage",
+  },
+  "contests.create": {
+    label: "Create contests",
+    description: "Make new contests.",
+    module: "Teaching",
+    parent: "contests.manage",
+  },
+  "contests.edit": {
+    label: "Edit contests",
+    description: "Change contests that already exist.",
+    module: "Teaching",
+    parent: "contests.manage",
+  },
+  "contests.delete": {
+    label: "Delete contests",
+    description: "Remove contests.",
+    module: "Teaching",
+    parent: "contests.manage",
+  },
+  "contests.grade": {
+    label: "Grade contests",
+    description: "Mark contest quiz answers.",
+    module: "Teaching",
+    parent: "contests.manage",
+  },
+  "problems.create": {
+    label: "Create problems & questions",
+    description: "Make new problems and bank questions.",
+    module: "Teaching",
+    parent: "problems.manage",
+  },
+  "problems.edit": {
+    label: "Edit problems & questions",
+    description:
+      "Change problems and questions that already exist, and import them.",
+    module: "Teaching",
+    parent: "problems.manage",
+  },
+  "problems.publish": {
+    label: "Publish problems",
+    description: "Publish a problem to the library (or unpublish it).",
+    module: "Teaching",
+    parent: "problems.manage",
+  },
+  "problems.delete": {
+    label: "Delete problems & questions",
+    description: "Remove problems and questions.",
+    module: "Teaching",
+    parent: "problems.manage",
+  },
+  "notices.create": {
+    label: "Post notices",
+    description: "Post notices members see on the organization's page.",
+    module: "Teaching",
+    parent: "notices.manage",
+  },
+  "notices.delete": {
+    label: "Remove notices",
+    description: "Take down notices.",
+    module: "Teaching",
+    parent: "notices.manage",
+  },
+  "org.members.groups": {
+    label: "Change members' groups",
+    description: "Move members between groups.",
+    module: "Members",
+    parent: "org.members.manage",
+  },
+  "org.members.remove": {
+    label: "Remove members",
+    description: "Remove members from the organization.",
+    module: "Members",
+    parent: "org.members.manage",
+  },
+  "org.notifications.manage": {
+    label: "Manage notifications",
+    description:
+      "Choose which notifications the organization sends its members, within what the platform allows.",
+    module: "Structure",
+    parent: "org.settings.manage",
+  },
+  "org.members.assign_roles": {
+    label: "Assign roles",
+    description:
+      "Give people roles and take them away, without editing the roles themselves.",
+    module: "Structure",
+    parent: "org.roles.manage",
+  },
 } as const
 
 export type Permission = keyof typeof PERMISSIONS
 export const PERMISSION_KEYS = Object.keys(PERMISSIONS) as Permission[]
+
+/** A permission's parent, or null. Children grant nothing their parent doesn't also grant. */
+export function parentPermission(permission: Permission): Permission | null {
+  const entry = PERMISSIONS[permission] as { parent?: Permission }
+  return entry.parent ?? null
+}
+
+/** A permission and every ancestor above it (closest first): holding any of these grants it. */
+export function permissionWithAncestors(permission: Permission): Permission[] {
+  const chain: Permission[] = [permission]
+  for (let p = parentPermission(permission); p; p = parentPermission(p)) {
+    chain.push(p)
+  }
+  return chain
+}
+
+/** Whether a set of held permission keys grants `permission` (directly or via an ancestor). */
+export function grantsPermission(
+  held: readonly string[],
+  permission: Permission
+): boolean {
+  return permissionWithAncestors(permission).some((p) => held.includes(p))
+}
 
 export const isPermission = (value: string): value is Permission =>
   value in PERMISSIONS
@@ -154,7 +313,7 @@ export function allows(
 ): boolean {
   return grants.some(
     (grant) =>
-      grant.permissions.includes(permission) &&
+      grantsPermission(grant.permissions, permission) &&
       (grant.groupId === null ||
         (targetGroups !== null && targetGroups.includes(grant.groupId)))
   )
@@ -191,7 +350,9 @@ export function domainMatches(email: string, domains: readonly string[]) {
 export type Audience = readonly (readonly string[])[]
 
 /** Every group an audience mentions, for checking they belong to the organization. */
-export const audienceGroups = (audience: Audience) => [...new Set(audience.flat())]
+export const audienceGroups = (audience: Audience) => [
+  ...new Set(audience.flat()),
+]
 
 /**
  * Whether grants allow acting on content for this audience. Everyone it reaches is inside
@@ -219,6 +380,7 @@ export function inAudience(
 ): boolean {
   const reach = new Set(memberGroups.flatMap(chainOf))
   return audience.every(
-    (condition) => condition.length === 0 || condition.some((id) => reach.has(id))
+    (condition) =>
+      condition.length === 0 || condition.some((id) => reach.has(id))
   )
 }

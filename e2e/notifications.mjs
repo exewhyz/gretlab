@@ -95,6 +95,11 @@ const setPlatform = (changes) => admin("/admin/notifications", { method: "PUT", 
 check("students can't see the organization's switches", [403, 404].includes((await s1(N)).status))
 check("teachers can't change them", [403, 404].includes((await t1(N, { method: "PUT", body: {} })).status))
 check("its owner can", (await owner(N)).json?.events.length === 11)
+// A role with only notification management can manage them, nothing else in settings.
+const comms = (await owner(`${O}/roles`, { body: { name: "Comms", permissions: ["org.notifications.manage"] } })).json
+await owner(`${O}/members/${uid("ntf-t1")}/roles`, { body: { roleId: comms.id, groupId: null } })
+check("a notifications-only role can open and save them", (await t1(N)).status === 200 && (await t1(N, { method: "PUT", body: {} })).status === 200)
+check("...but can't change other organization settings", [403, 404].includes((await t1(O, { method: "PATCH", body: { description: "x" } })).status))
 check("only platform staff see the platform's", (await owner("/admin/notifications")).status === 403 && (await admin("/admin/notifications")).status === 200)
 check("an unknown event is refused", (await setOrg({ "made.up": { email: false } })).status === 400)
 check("an unknown switch is refused", (await setOrg({ "class.notice": { sms: true } })).status === 400)

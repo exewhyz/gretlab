@@ -70,7 +70,7 @@ const created = await api.admin("/admin/organizations", { body: { name: "Test Co
 check("platform admin creates a college with an owner", created.status === 200, JSON.stringify(created.json).slice(0, 150))
 check("the address must be unique", (await api.admin("/admin/organizations", { body: { name: "Dup", slug: "orgtest-college", type: "college", ownerEmail: PEOPLE.owner[0] } })).status === 409)
 const summary = (await api.owner(`${O}/manage`)).json
-check("the owner can manage it, with every permission", summary?.isOwner && summary.permissions.length === 16 && summary.org.groupLevels.join() === "Branch,Batch", JSON.stringify(summary?.org))
+check("the owner can manage it, with every permission", summary?.isOwner && summary.permissions.length >= 30 && ["assignments.manage", "assignments.grade", "org.notifications.manage"].every((p) => summary.permissions.includes(p)) && summary.org.groupLevels.join() === "Branch,Batch", JSON.stringify(summary?.org))
 check("others can't open management", (await api.s1(`${O}/manage`)).status === 403)
 const roles = (await api.owner(`${O}/roles`)).json
 const role = (key) => roles.find((r) => r.systemKey === key)
