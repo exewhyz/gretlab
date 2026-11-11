@@ -64,7 +64,7 @@ cleanup()
 const platformBefore = psql(`select value from settings where key = 'notifications.policy'`)
 psql(`delete from settings where key = 'notifications.policy'`)
 psql(`insert into users(email,name,role) values ('admin@example.com','Admin','admin') on conflict (email) do nothing`)
-for (const h of ["ntf-o", "ntf-t1", "ntf-t2", "ntf-s1", "ntf-s2", "ntf-j"]) psql(`insert into users(email,name,role,handle) values ('${h}@example.com','${h} Name','student','${h}')`)
+for (const h of ["ntf-o", "ntf-t1", "ntf-t2", "ntf-s1", "ntf-s2", "ntf-j", "ntf-grader"]) psql(`insert into users(email,name,role,handle) values ('${h}@example.com','${h} Name','student','${h}')`)
 const uid = (h) => psql(`select id from users where email='${h}@example.com'`)
 const client = async (email) => {
   const cookie = email ? `next-auth.session-token=${await encode({ token: { email }, secret: SECRET })}` : ""
@@ -152,12 +152,19 @@ await s1(mine, { method: "PATCH", body: { email: true } })
 
 // ---------- a copy to the class's other teachers
 const problem = psql(`select id from problems where org_id is null and published and listed and not members_only and sharing = 'everyone' order by slug limit 1`)
+// A grade-only fine-grained role counts as staff, not a student.
+psql(`insert into org_members(org_id,user_id,status,joined_via) values ('${orgId}','${uid("ntf-grader")}','active','created') on conflict do nothing`)
+await owner(`${O}/groups/${lab.id}/members`, { body: { userIds: [uid("ntf-grader")] } })
+const graderRole = (await owner(`${O}/roles`, { body: { name: "Grader", permissions: ["gradebook.view", "assignments.grade"] } })).json
+await owner(`${O}/members/${uid("ntf-grader")}/roles`, { body: { roleId: graderRole.id, groupId: lab.id } })
+const grader = await client("ntf-grader@example.com")
 const publish = (title) => t1(`${O}/assignments`, { body: { title, slug: title.replace(/ /g, "-"), description: "", opensAt: days(-1), dueAt: days(2), allowLate: false, latePenaltyPercent: 0, published: true, holdFeedback: false, exam: null, audience: [[lab.id]], problems: [{ problemId: problem, points: 100, rubric: [], outcomes: [] }], questions: [] } })
 check("a teacher publishes an assignment", (await publish("ntf lab one")).status === 200)
 check("the class's other teacher gets a copy in the bell", (await bell(t2, "published the assignment ntf lab one")) === 1)
 check("the publisher and the owner don't", (await bell(t1, "ntf lab one")) === 0 && (await bell(owner, "ntf lab one")) === 0)
 got = await mails()
-check("students are emailed; the copy isn't emailed unless asked for", to(got) === "ntf-s1,ntf-s2", to(got))
+check("students are emailed; a grade-only role is staff, not a student", to(got) === "ntf-s1,ntf-s2", to(got))
+check("a grade-only role gets the co-teacher copy in the bell", (await bell(grader, "published the assignment ntf lab one")) === 1)
 await t2(mine, { method: "PATCH", body: { events: { "staff.assignment_published": true } } })
 await publish("ntf lab two")
 got = await mails()

@@ -3,6 +3,7 @@ import { test } from "node:test"
 
 import {
   allows,
+  grantsAnyUnder,
   grantsPermission,
   parentPermission,
   permissionWithAncestors,
@@ -115,4 +116,22 @@ test("allows() honours the parent across org-wide and group grants", () => {
   assert.equal(allows(inGroup, "assignments.grade", ["g1"]), true)
   assert.equal(allows(inGroup, "assignments.publish", ["g1"]), false)
   assert.equal(allows(inGroup, "assignments.grade", ["g2"]), false)
+})
+
+test("grantsAnyUnder: holding the parent or any finer action counts", () => {
+  assert.equal(
+    grantsAnyUnder(["assignments.manage"], "assignments.manage"),
+    true
+  )
+  assert.equal(
+    grantsAnyUnder(["assignments.grade"], "assignments.manage"),
+    true
+  )
+  assert.equal(
+    grantsAnyUnder(["assignments.publish"], "assignments.manage"),
+    true
+  )
+  assert.equal(grantsAnyUnder(["gradebook.view"], "assignments.manage"), false)
+  assert.equal(grantsAnyUnder([], "assignments.manage"), false)
+  assert.equal(grantsAnyUnder(["contests.grade"], "assignments.manage"), false)
 })

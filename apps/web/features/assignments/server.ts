@@ -26,6 +26,7 @@ import {
 } from "@workspace/db"
 import {
   ancestry,
+  grantsAnyUnder,
   gradeProblem,
   inAudience,
   rubricEarned,
@@ -44,7 +45,12 @@ import {
 
 import { draftHistory, latestDraft } from "@/features/drafts/server"
 import { notify } from "@/features/notifications/server"
-import { projectGrades, projectsOf, projectSubmissionsOn, saveProjects } from "@/features/projects/server"
+import {
+  projectGrades,
+  projectsOf,
+  projectSubmissionsOn,
+  saveProjects,
+} from "@/features/projects/server"
 import { usableQuestions } from "@/features/questions/server"
 import { usableIds } from "@/features/library/sharing"
 import { extendSitting } from "@/features/exams/server"
@@ -179,7 +185,10 @@ function grade(
       // An exam's time is its sitting; elsewhere an extension moves the due time.
       assignment.exam
         ? rules
-        : { ...rules, dueAt: extendedDue(rules.dueAt, extension, item.problemId) }
+        : {
+            ...rules,
+            dueAt: extendedDue(rules.dueAt, extension, item.problemId),
+          }
     )
     // An exam nobody sat earns nothing, hand marks included.
     const byHand =
@@ -237,7 +246,10 @@ function quizResultsOut(
 
 /** Extensions on these assignments, for one student or everyone, by assignment then student. */
 export async function extensionsOn(assignmentIds: string[], userId?: string) {
-  const byAssignment = new Map<string, Map<string, Extension & { reason: string }>>()
+  const byAssignment = new Map<
+    string,
+    Map<string, Extension & { reason: string }>
+  >()
   if (assignmentIds.length === 0) return byAssignment
   const rows = await getDb()
     .select()
@@ -388,8 +400,13 @@ export async function listAssignments(viewer: User) {
       sittings.get(assignment.id)?.get(viewer.id),
       extension
     )
-    const questions = allQuestions.filter((q) => q.assignmentId === assignment.id)
-    const quiz = gradeQuiz(questions, responses.get(assignment.id)?.get(viewer.id))
+    const questions = allQuestions.filter(
+      (q) => q.assignmentId === assignment.id
+    )
+    const quiz = gradeQuiz(
+      questions,
+      responses.get(assignment.id)?.get(viewer.id)
+    )
     const quizOut = quizResultsOut(
       assignment,
       now,
@@ -415,7 +432,9 @@ export async function listAssignments(viewer: User) {
         earned +
           (quizOut ? quiz.earned : 0) +
           // Project marks count once results aren't held.
-          (assignment.holdFeedback ? 0 : projectBook.grade(assignment.id, viewer.id).earned)
+          (assignment.holdFeedback
+            ? 0
+            : projectBook.grade(assignment.id, viewer.id).earned)
       ),
       total: total + quiz.max + projectBook.max(assignment.id),
     }
@@ -430,7 +449,8 @@ function quizAnswersOpen(
   sitting?: Sitting
 ) {
   if (now < assignment.opensAt) return false
-  if (assignment.exam) return Boolean(sitting) && now < sittingClosesAt(sitting!)
+  if (assignment.exam)
+    return Boolean(sitting) && now < sittingClosesAt(sitting!)
   return now <= personalDue(assignment.dueAt, extension)
 }
 
@@ -469,11 +489,15 @@ export async function saveQuizAnswers(
   const clean: Record<string, string[] | string> = {}
   for (const [questionId, answer] of Object.entries(answers)) {
     const q = questions.find((x) => x.id === questionId)
-    if (!q) throw new ApiError(400, "unknown_question", "That question isn't here.")
+    if (!q)
+      throw new ApiError(400, "unknown_question", "That question isn't here.")
     if (q.kind === "single" || q.kind === "multiple") {
       const ids = Array.isArray(answer) ? answer : [answer]
       const valid = q.options.map((o) => o.id)
-      if (ids.some((id) => !valid.includes(id)) || (q.kind === "single" && ids.length > 1)) {
+      if (
+        ids.some((id) => !valid.includes(id)) ||
+        (q.kind === "single" && ids.length > 1)
+      ) {
         throw new ApiError(400, "bad_answer", "Choose from the options.")
       }
       clean[questionId] = [...new Set(ids)]
@@ -487,7 +511,12 @@ export async function saveQuizAnswers(
   }
   await getDb()
     .insert(quizResponses)
-    .values({ assignmentId: assignment.id, userId: viewer.id, answers: clean, updatedAt: now })
+    .values({
+      assignmentId: assignment.id,
+      userId: viewer.id,
+      answers: clean,
+      updatedAt: now,
+    })
     .onConflictDoUpdate({
       target: [quizResponses.assignmentId, quizResponses.userId],
       set: { answers: clean, updatedAt: now },
@@ -564,8 +593,10 @@ export async function getAssignment(slug: string, viewer: User) {
           dueAt: extension.dueAt,
           problems: items
             .map((item, index) => ({ item, label: `Q${index + 1}` }))
-            .filter(({ item }) =>
-              extension.problemIds.length === 0 || extension.problemIds.includes(item.problemId)
+            .filter(
+              ({ item }) =>
+                extension.problemIds.length === 0 ||
+                extension.problemIds.includes(item.problemId)
             )
             .map(({ item, label }) => `${label} ${item.title}`),
           whole: extension.problemIds.length === 0,
@@ -646,7 +677,9 @@ export async function getAssignment(slug: string, viewer: User) {
     quizResultsOut: quizOut,
     /** How many problems, so an exam can say so before it starts. */
     problemCount: visible ? items.length : await countProblems(assignment.id),
-    questionCount: visible ? questions.length : (await questionsOf([assignment.id])).length,
+    questionCount: visible
+      ? questions.length
+      : (await questionsOf([assignment.id])).length,
     exam: assignment.exam
       ? {
           minutes: assignment.exam.minutes,
@@ -687,14 +720,20 @@ export async function getAssignmentProblem(
   const now = await dbNow()
   const phase = phaseOf(assignment, now)
   const sitting = assignment.exam
-    ? (await sittingsOn([assignment.id], viewer.id)).get(assignment.id)?.get(viewer.id)
+    ? (await sittingsOn([assignment.id], viewer.id))
+        .get(assignment.id)
+        ?.get(viewer.id)
     : undefined
   if (access !== "manage") {
     if (phase === "upcoming") {
       throw new ApiError(403, "not_open", "This assignment hasn't opened yet.")
     }
     if (assignment.exam && !sitting) {
-      throw new ApiError(403, "exam_not_started", "Start the exam to see its problems.")
+      throw new ApiError(
+        403,
+        "exam_not_started",
+        "Start the exam to see its problems."
+      )
     }
   }
   const items = await itemsOf([assignment.id])
@@ -753,7 +792,10 @@ export async function getAssignmentProblem(
       hints: examRunning ? [] : detail.hints,
       notes: examRunning ? [] : detail.notes,
       tags: examRunning ? [] : detail.tags,
-      allowedLanguages: narrowLanguages(detail.allowedLanguages, policy.languages),
+      allowedLanguages: narrowLanguages(
+        detail.allowedLanguages,
+        policy.languages
+      ),
       pasteBlocked: !policy.allowPaste,
     },
     status,
@@ -781,33 +823,38 @@ export async function assignmentsForProblem(slug: string, viewer: User) {
     rows.filter((r) => r.assignment.exam).map((r) => r.assignment.id),
     viewer.id
   )
-  return rows
-    .filter(
-      ({ assignment }) =>
-        accessTo(vp, assignment, "assignments.manage") !== "none"
-    )
-    // An exam doesn't say which problems it uses until the student has started it.
-    .filter(
-      ({ assignment }) =>
-        !assignment.exam || sittings.get(assignment.id)?.has(viewer.id)
-    )
-    .map(({ assignment }) => ({ assignment, phase: phaseOf(assignment, now) }))
-    .filter(({ phase }) => phase === "open" || phase === "late")
-    .map(({ assignment, phase }) => ({
-      slug: assignment.slug,
-      title: assignment.title,
-      dueAt: assignment.dueAt,
-      phase,
-      exam: assignment.exam
-        ? {
-            fullscreen: assignment.exam.fullscreen,
-            sitting: presentSitting(
-              sittings.get(assignment.id)?.get(viewer.id),
-              now
-            ),
-          }
-        : null,
-    }))
+  return (
+    rows
+      .filter(
+        ({ assignment }) =>
+          accessTo(vp, assignment, "assignments.manage") !== "none"
+      )
+      // An exam doesn't say which problems it uses until the student has started it.
+      .filter(
+        ({ assignment }) =>
+          !assignment.exam || sittings.get(assignment.id)?.has(viewer.id)
+      )
+      .map(({ assignment }) => ({
+        assignment,
+        phase: phaseOf(assignment, now),
+      }))
+      .filter(({ phase }) => phase === "open" || phase === "late")
+      .map(({ assignment, phase }) => ({
+        slug: assignment.slug,
+        title: assignment.title,
+        dueAt: assignment.dueAt,
+        phase,
+        exam: assignment.exam
+          ? {
+              fullscreen: assignment.exam.fullscreen,
+              sitting: presentSitting(
+                sittings.get(assignment.id)?.get(viewer.id),
+                now
+              ),
+            }
+          : null,
+      }))
+  )
 }
 
 /* ---------- staff ---------- */
@@ -862,10 +909,21 @@ export async function getAssignmentForStaff(id: string, orgId: string | null) {
     .from(assignments)
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
   if (!assignment) throw notFound("Assignment not found")
-  const [items, questions, projects] = await Promise.all([itemsOf([id]), questionsOf([id]), projectsOf([id])])
+  const [items, questions, projects] = await Promise.all([
+    itemsOf([id]),
+    questionsOf([id]),
+    projectsOf([id]),
+  ])
   return {
     ...assignment,
-    projects: projects.map(({ id: projectId, title, instructions, points }) => ({ id: projectId, title, instructions, points })),
+    projects: projects.map(
+      ({ id: projectId, title, instructions, points }) => ({
+        id: projectId,
+        title,
+        instructions,
+        points,
+      })
+    ),
     chosenProblems: await chosenProblems(items.map((i) => i.problemId)),
     problems: items.map(({ problemId, points, rubric, outcomes }) => ({
       problemId,
@@ -894,7 +952,10 @@ export function questionsOf(assignmentIds: string[]) {
       points: assignmentQuestions.points,
     })
     .from(assignmentQuestions)
-    .innerJoin(questionBank, eq(assignmentQuestions.questionId, questionBank.id))
+    .innerJoin(
+      questionBank,
+      eq(assignmentQuestions.questionId, questionBank.id)
+    )
     .where(inArray(assignmentQuestions.assignmentId, assignmentIds))
     .orderBy(asc(assignmentQuestions.position))
 }
@@ -933,7 +994,13 @@ export async function saveAssignment(
     by?: User
   } = {}
 ) {
-  const { problems: chosen, expectedUpdatedAt, questions, projects, ...fields } = input
+  const {
+    problems: chosen,
+    expectedUpdatedAt,
+    questions,
+    projects,
+    ...fields
+  } = input
   const ids = chosen.map((c) => c.problemId)
   // What it already has stays allowed (a template's shared problems, or sharing taken back).
   const allowed = new Set(options.allowed)
@@ -968,7 +1035,11 @@ export async function saveAssignment(
     )
   }
   const usable = await usableIds("problem", ids, orgId)
-  if (found.some((p) => p.orgId !== orgId && !usable.has(p.id) && !allowed.has(p.id))) {
+  if (
+    found.some(
+      (p) => p.orgId !== orgId && !usable.has(p.id) && !allowed.has(p.id)
+    )
+  ) {
     throw new ApiError(
       400,
       "private_problem",
@@ -1097,8 +1168,10 @@ export async function saveAssignment(
         body: saved.exam
           ? "Read its rules before you start: one sitting, timed."
           : `${[
-              chosen.length && `${chosen.length} ${chosen.length === 1 ? "problem" : "problems"}`,
-              questions.length && `${questions.length} ${questions.length === 1 ? "question" : "questions"}`,
+              chosen.length &&
+                `${chosen.length} ${chosen.length === 1 ? "problem" : "problems"}`,
+              questions.length &&
+                `${questions.length} ${questions.length === 1 ? "question" : "questions"}`,
             ]
               .filter(Boolean)
               .join(" and ")}. Open it to see when it's due.`,
@@ -1195,13 +1268,20 @@ export async function rejudgeSystemErrors(
           eq(submissions.kind, "submit"),
           eq(submissions.status, "done"),
           eq(submissions.verdict, "SE"),
-          inArray(submissions.problemId, items.map((i) => i.problemId)),
-          inArray(submissions.userId, students.map((s) => s.id)),
+          inArray(
+            submissions.problemId,
+            items.map((i) => i.problemId)
+          ),
+          inArray(
+            submissions.userId,
+            students.map((s) => s.id)
+          ),
           gte(submissions.createdAt, assignment.opensAt)
         )
       )
       .returning({ id: submissions.id })
-    if (rows.length) await tx.execute(sql.sql`SELECT pg_notify(${QUEUE_CHANNEL}, '')`)
+    if (rows.length)
+      await tx.execute(sql.sql`SELECT pg_notify(${QUEUE_CHANNEL}, '')`)
     return rows.length
   })
   return { queued }
@@ -1215,11 +1295,19 @@ export async function forgetExamAddresses(id: string, orgId: string | null) {
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
   if (!assignment) throw notFound("Assignment not found")
   await getDb().transaction(async (tx) => {
-    await tx.update(examSessions).set({ ip: null }).where(eq(examSessions.assignmentId, id))
+    await tx
+      .update(examSessions)
+      .set({ ip: null })
+      .where(eq(examSessions.assignmentId, id))
     await tx
       .update(examEvents)
       .set({ detail: "" })
-      .where(and(eq(examEvents.assignmentId, id), eq(examEvents.kind, "other_network")))
+      .where(
+        and(
+          eq(examEvents.assignmentId, id),
+          eq(examEvents.kind, "other_network")
+        )
+      )
   })
 }
 
@@ -1239,9 +1327,23 @@ export interface GradebookRow {
   earned: number
   late: number
   exam: (ReturnType<typeof presentSitting> & { warnings: number }) | null
-  extension: { dueAt: Date; problemIds: readonly string[]; reason: string } | null
-  quiz: { earned: number; max: number; answered: boolean; needsMarking: number } | null
-  projects: { earned: number; max: number; submitted: number; needsMarking: number } | null
+  extension: {
+    dueAt: Date
+    problemIds: readonly string[]
+    reason: string
+  } | null
+  quiz: {
+    earned: number
+    max: number
+    answered: boolean
+    needsMarking: number
+  } | null
+  projects: {
+    earned: number
+    max: number
+    submitted: number
+    needsMarking: number
+  } | null
 }
 
 /** The people an assignment is for: everyone's students, or an organization's audience. */
@@ -1304,7 +1406,7 @@ export async function studentsOf(
   // People who can set assignments are teachers here, not students.
   const teachers = new Set(
     grants
-      .filter((g) => rolePermissions(g).includes("assignments.manage"))
+      .filter((g) => grantsAnyUnder(rolePermissions(g), "assignments.manage"))
       .map((g) => g.userId)
   )
   return members.filter(
@@ -1358,7 +1460,9 @@ async function colleaguesOf(assignment: Assignment, exceptId?: string) {
   const audience = assignment.audience.flat()
   const touches = (groupId: string) =>
     audience.length === 0 ||
-    audience.some((g) => chain(g).includes(groupId) || chain(groupId).includes(g))
+    audience.some(
+      (g) => chain(g).includes(groupId) || chain(groupId).includes(g)
+    )
   return [
     ...new Set(
       grants
@@ -1367,7 +1471,7 @@ async function colleaguesOf(assignment: Assignment, exceptId?: string) {
             g.userId !== exceptId &&
             g.systemKey !== "owner" &&
             g.systemKey !== "admin" &&
-            (rolePermissions(g).includes("assignments.manage") ||
+            (grantsAnyUnder(rolePermissions(g), "assignments.manage") ||
               rolePermissions(g).includes("gradebook.view")) &&
             (g.groupId === null || touches(g.groupId))
         )
@@ -1458,7 +1562,10 @@ export async function getGradebook(
     questions.reduce((sum, q) => sum + q.points, 0) +
     projectBook.max(id)
   const started = rows.filter(
-    (r) => r.cells.some((c) => c.status !== "missing") || r.quiz?.answered || (r.projects?.submitted ?? 0) > 0
+    (r) =>
+      r.cells.some((c) => c.status !== "missing") ||
+      r.quiz?.answered ||
+      (r.projects?.submitted ?? 0) > 0
   )
 
   return {
@@ -1472,23 +1579,32 @@ export async function getGradebook(
       exam: assignment.exam,
       /** The quiz part, when there is one. */
       quiz: questions.length
-        ? { questions: questions.length, points: questions.reduce((t, q) => t + q.points, 0) }
+        ? {
+            questions: questions.length,
+            points: questions.reduce((t, q) => t + q.points, 0),
+          }
         : null,
       /** The project part, when there is one. */
       projects: projectBook.projects.length
-        ? projectBook.projects.map((p) => ({ id: p.id, title: p.title, points: p.points }))
+        ? projectBook.projects.map((p) => ({
+            id: p.id,
+            title: p.title,
+            points: p.points,
+          }))
         : null,
     },
-    problems: items.map(({ problemId, slug, title, points, rubric, outcomes }) => ({
-      problemId,
-      slug,
-      title,
-      outcomes,
-      // Out of the tests' points and the rubric's.
-      points: points + rubricTotal(rubric),
-      tests: points,
-      rubric,
-    })),
+    problems: items.map(
+      ({ problemId, slug, title, points, rubric, outcomes }) => ({
+        problemId,
+        slug,
+        title,
+        outcomes,
+        // Out of the tests' points and the rubric's.
+        points: points + rubricTotal(rubric),
+        tests: points,
+        rubric,
+      })
+    ),
     total,
     summary: {
       students: rows.length,
@@ -1536,7 +1652,9 @@ export async function studentQuiz(
     .from(assignments)
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
   if (!assignment) throw notFound("Assignment not found")
-  const student = (await studentsOf(assignment, scope)).find((s) => s.email === email)
+  const student = (await studentsOf(assignment, scope)).find(
+    (s) => s.email === email
+  )
   if (!student) throw notFound("Not in this gradebook")
   const [questions, response] = await Promise.all([
     questionsOf([id]),
@@ -1587,13 +1705,18 @@ export async function setQuizMarks(
   const next = { ...current }
   for (const [questionId, mark] of Object.entries(input.marks)) {
     const q = questions.find((x) => x.id === questionId)
-    if (!q) throw new ApiError(400, "unknown_question", "That question isn't here.")
+    if (!q)
+      throw new ApiError(400, "unknown_question", "That question isn't here.")
     if (mark === null) {
       delete next[questionId]
       continue
     }
     if (mark < 0 || mark > q.points) {
-      throw new ApiError(400, "out_of_range", `Marks for that question are 0 to ${q.points}.`)
+      throw new ApiError(
+        400,
+        "out_of_range",
+        `Marks for that question are 0 to ${q.points}.`
+      )
     }
     next[questionId] = mark
   }
@@ -1636,11 +1759,19 @@ export async function setExtension(
   )
   if (!student) throw notFound("Not in this gradebook")
   if (input.dueAt <= assignment.dueAt) {
-    throw new ApiError(400, "not_later", "Pick a time after the assignment's due time.")
+    throw new ApiError(
+      400,
+      "not_later",
+      "Pick a time after the assignment's due time."
+    )
   }
   const items = await itemsOf([id])
   if (input.problemIds.some((p) => !items.some((i) => i.problemId === p))) {
-    throw new ApiError(400, "unknown_problem", "That problem isn't in this assignment.")
+    throw new ApiError(
+      400,
+      "unknown_problem",
+      "That problem isn't in this assignment."
+    )
   }
   const values = {
     dueAt: input.dueAt,
@@ -1678,7 +1809,9 @@ export async function removeExtension(
     .from(assignments)
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
   if (!assignment) throw notFound("Assignment not found")
-  const student = (await studentsOf(assignment, scope)).find((s) => s.email === email)
+  const student = (await studentsOf(assignment, scope)).find(
+    (s) => s.email === email
+  )
   if (!student) throw notFound("Not in this gradebook")
   await getDb()
     .delete(assignmentExtensions)
@@ -1892,7 +2025,11 @@ export async function releaseFeedback(id: string, orgId: string | null) {
     .update(assignments)
     .set({ holdFeedback: false })
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
-    .returning({ id: assignments.id, title: assignments.title, slug: assignments.slug })
+    .returning({
+      id: assignments.id,
+      title: assignments.title,
+      slug: assignments.slug,
+    })
   if (updated.length === 0) throw notFound("Assignment not found")
   // Everyone who has marks or comments waiting hears that they're out.
   const [marked, commented] = await Promise.all([
@@ -1903,7 +2040,10 @@ export async function releaseFeedback(id: string, orgId: string | null) {
     getDb()
       .select({ userId: submissions.userId })
       .from(submissionComments)
-      .innerJoin(submissions, eq(submissionComments.submissionId, submissions.id))
+      .innerJoin(
+        submissions,
+        eq(submissionComments.submissionId, submissions.id)
+      )
       .where(eq(submissionComments.assignmentId, id)),
   ])
   const answered = await getDb()
@@ -1967,18 +2107,22 @@ export async function studentAttempts(
     .orderBy(desc(submissions.createdAt))
     .limit(50)
   // Who may see the graded work may also see the code being written: live, and as it grew.
-  const extensionNow = (await extensionsOn([id], student.id)).get(id)?.get(student.id)
-  const [draft, history, marks, comments, events, sittings] = await Promise.all([
-    latestDraft(student.id, problemId),
-    withHistory ? draftHistory(student.id, problemId) : null,
-    marksOn([id], student.id),
-    commentsOn(
-      id,
-      rows.map((r) => r.id)
-    ),
-    assignment.exam ? eventsOf(id, student.id) : [],
-    assignment.exam ? sittingsOn([id], student.id) : null,
-  ])
+  const extensionNow = (await extensionsOn([id], student.id))
+    .get(id)
+    ?.get(student.id)
+  const [draft, history, marks, comments, events, sittings] = await Promise.all(
+    [
+      latestDraft(student.id, problemId),
+      withHistory ? draftHistory(student.id, problemId) : null,
+      marksOn([id], student.id),
+      commentsOn(
+        id,
+        rows.map((r) => r.id)
+      ),
+      assignment.exam ? eventsOf(id, student.id) : [],
+      assignment.exam ? sittingsOn([id], student.id) : null,
+    ]
+  )
   const sitting = sittings?.get(id)?.get(student.id)
   return {
     extension: extensionNow ?? null,
@@ -1992,8 +2136,7 @@ export async function studentAttempts(
     attempts: rows.map((r) => ({
       ...r,
       late:
-        r.createdAt >
-        extendedDue(assignment.dueAt, extensionNow, problemId),
+        r.createdAt > extendedDue(assignment.dueAt, extensionNow, problemId),
       /** For an exam: made outside the student's sitting, so it doesn't count. */
       outside:
         assignment.exam !== null && duringSitting([r], sitting).length === 0,
@@ -2024,7 +2167,9 @@ export async function gradebookCsv(
     ...book.problems.map((p) => `${p.title} (${p.points})`),
     ...(book.assignment.quiz ? [`Quiz (${book.assignment.quiz.points})`] : []),
     ...(book.assignment.projects
-      ? [`Projects (${book.assignment.projects.reduce((n, p) => n + p.points, 0)})`]
+      ? [
+          `Projects (${book.assignment.projects.reduce((n, p) => n + p.points, 0)})`,
+        ]
       : []),
     `Total (${book.total})`,
     "Problems late",

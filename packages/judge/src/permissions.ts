@@ -293,6 +293,20 @@ export function grantsPermission(
   return permissionWithAncestors(permission).some((p) => held.includes(p))
 }
 
+/**
+ * Whether held keys include `root` or any finer action beneath it. Use it to tell whether
+ * someone does a job at all (e.g. "touches assignments": the parent or any of create, edit,
+ * grade...), rather than whether they have one exact permission.
+ */
+export function grantsAnyUnder(
+  held: readonly string[],
+  root: Permission
+): boolean {
+  return held.some(
+    (p) => isPermission(p) && permissionWithAncestors(p).includes(root)
+  )
+}
+
 export const isPermission = (value: string): value is Permission =>
   value in PERMISSIONS
 
