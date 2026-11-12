@@ -1,12 +1,14 @@
 import {
   academicYears,
   classSubjects,
+  classTeachers,
   enrolments,
   examMarks,
   examPapers,
   getDb,
   guardians,
   organizations,
+  reportRemarks,
   sql,
   studentRecords,
   subjects,
@@ -16,6 +18,7 @@ import {
 } from "@workspace/db"
 import {
   bandFor,
+  cleanRemarkBank,
   enabledModules,
   examProblem,
   markProblem,
@@ -23,8 +26,10 @@ import {
   paperProblem,
   ranks,
   readExamSettings,
+  REMARK_MAX,
   scaleProblem,
   sortScale,
+  SUBJECT_REMARK_MAX,
   summarize,
   weighted,
   type GradeBand,
@@ -78,6 +83,7 @@ export const examSchema = z.object({
 export const examPatchSchema = examSchema.omit({ yearId: true }).partial()
 
 export const scaleSchema = z.object({
+  remarks: z.array(z.string().max(1000)).max(200).optional(),
   scale: z
     .array(
       z.object({
@@ -87,7 +93,8 @@ export const scaleSchema = z.object({
       })
     )
     .min(2)
-    .max(20),
+    .max(20)
+    .optional(),
 })
 
 export const papersSchema = z.object({
@@ -112,6 +119,19 @@ export const marksSchema = z.object({
         userId: z.uuid(),
         marks: z.number().min(0).max(1000).nullable(),
         absent: z.boolean().default(false),
+        /** The subject teacher's remark; omitted: left as it is, "": removed. */
+        remark: z.string().trim().max(SUBJECT_REMARK_MAX).optional(),
+      })
+    )
+    .max(500),
+})
+
+export const remarksSchema = z.object({
+  remarks: z
+    .array(
+      z.object({
+        userId: z.uuid(),
+        text: z.string().trim().max(REMARK_MAX, `At most ${REMARK_MAX} characters`),
       })
     )
     .max(500),
@@ -206,6 +226,23 @@ const mayMark = (
   covers(ctx, "exams.marks", [paper.groupId]) ||
   (paper.teacherId != null && paper.teacherId === ctx.user.id)
 
+/** Each of these sections' class teacher in a year. */
+async function classTeachersIn(yearId: string, groupIds: string[]) {
+  const rows = groupIds.length
+    ? await getDb()
+        .select()
+        .from(classTeachers)
+        .where(and(eq(classTeachers.yearId, yearId), inArray(classTeachers.groupId, groupIds)))
+    : []
+  return new Map(rows.map((r) => [r.groupId, r.teacherId]))
+}
+
+/** Whether this person may write a class's overall remarks. */
+const mayRemark = (ctx: OrgContext, groupId: string, classTeacher: string | null | undefined) =>
+  canSetup(ctx) ||
+  covers(ctx, "exams.remarks", [groupId]) ||
+  (classTeacher != null && classTeacher === ctx.user.id)
+
 async function ownExam(ctx: OrgContext, id: string) {
   if (!z.uuid().safeParse(id).success) throw notFound("Exam not found")
   const [exam] = await getDb()
@@ -248,7 +285,8 @@ const locked = (exam: { publishedAt: Date | null; name: string }) => {
 
 export async function examSettings(slug: string, user: User) {
   const ctx = await context(slug, user)
-  return { scale: settingsOf(ctx).scale, canSetup: canSetup(ctx) }
+  const settings = settingsOf(ctx)
+  return { scale: settings.scale, remarks: settings.remarks, canSetup: canSetup(ctx) }
 }
 
 export async function saveScale(
@@ -257,32 +295,40 @@ export async function saveScale(
   input: z.infer<typeof scaleSchema>
 ) {
   const ctx = await context(slug, user)
-  if (!canSetup(ctx)) throw forbidden("Only those who set up exams can change the scale.")
-  const scale: GradeBand[] = sortScale(
-    input.scale.map((b) => ({
-      min: b.min,
-      grade: b.grade.trim(),
-      points: b.points ?? null,
-    }))
-  )
-  const problem = scaleProblem(scale)
-  if (problem) throw new ApiError(400, "bad_scale", problem)
+  if (!canSetup(ctx)) throw forbidden("Only those who set up exams can change these settings.")
   const settings = (ctx.org.moduleSettings ?? {}) as Record<string, unknown>
+  const exams = { ...((settings.exams as object) ?? {}) } as Record<string, unknown>
+  if (input.scale) {
+    const scale: GradeBand[] = sortScale(
+      input.scale.map((b) => ({
+        min: b.min,
+        grade: b.grade.trim(),
+        points: b.points ?? null,
+      }))
+    )
+    const problem = scaleProblem(scale)
+    if (problem) throw new ApiError(400, "bad_scale", problem)
+    exams.scale = scale
+  }
+  if (input.remarks) {
+    const { bank, problem } = cleanRemarkBank(input.remarks)
+    if (problem) throw new ApiError(400, "bad_remarks", problem)
+    exams.remarks = bank
+  }
   await getDb()
     .update(organizations)
-    .set({
-      moduleSettings: {
-        ...settings,
-        exams: { ...((settings.exams as object) ?? {}), scale },
-      },
-    })
+    .set({ moduleSettings: { ...settings, exams } })
     .where(eq(organizations.id, ctx.org.id))
-  await writeAudit(
-    ctx,
-    "exam.scale",
-    `Set the grading scale: ${scale.map((b) => `${b.grade} from ${b.min}%`).join(", ")}`
-  )
-  return { scale, canSetup: true }
+  const next = readExamSettings({ exams })
+  if (input.scale)
+    await writeAudit(
+      ctx,
+      "exam.scale",
+      `Set the grading scale: ${next.scale.map((b) => `${b.grade} from ${b.min}%`).join(", ")}`
+    )
+  if (input.remarks)
+    await writeAudit(ctx, "exam.remark_bank", `Set ${next.remarks.length} remarks in the comment bank`)
+  return { scale: next.scale, remarks: next.remarks, canSetup: true }
 }
 
 /* ---------- exams ---------- */
@@ -306,7 +352,13 @@ async function needSomeAccess(ctx: OrgContext) {
       )
     )
     .limit(1)
-  if (!teaches) throw forbidden("You don't have access to exams here.")
+  if (teaches) return
+  const [leads] = await getDb()
+    .select({ g: classTeachers.groupId })
+    .from(classTeachers)
+    .where(and(eq(classTeachers.orgId, ctx.org.id), eq(classTeachers.teacherId, ctx.user.id)))
+    .limit(1)
+  if (!leads) throw forbidden("You don't have access to exams here.")
 }
 
 async function yearsOf(orgId: string) {
@@ -523,7 +575,8 @@ export async function getExam(slug: string, user: User, id: string) {
     .filter((r) => canSee(ctx, r.groupId) || mayMark(ctx, r))
   const ids = visible.map((r) => r.id)
   const groupIds = [...new Set(visible.map((r) => r.groupId))]
-  const [entered, seats, teachers] = await Promise.all([
+  const leads = await classTeachersIn(exam.yearId, groupIds)
+  const [entered, seats, teachers, remarked] = await Promise.all([
     ids.length
       ? db
           .select({ paperId: examMarks.paperId, n: count() })
@@ -546,7 +599,11 @@ export async function getExam(slug: string, user: User, id: string) {
       : [],
     (() => {
       const tids = [
-        ...new Set(visible.map((r) => r.teacherId).filter((t): t is string => !!t)),
+        ...new Set(
+          [...visible.map((r) => r.teacherId), ...leads.values()].filter(
+            (t): t is string => !!t
+          )
+        ),
       ]
       return tids.length
         ? db
@@ -555,13 +612,28 @@ export async function getExam(slug: string, user: User, id: string) {
             .where(inArray(users.id, tids))
         : []
     })(),
+    db
+      .select({ userId: reportRemarks.userId, groupId: enrolments.groupId })
+      .from(reportRemarks)
+      .innerJoin(
+        enrolments,
+        and(eq(enrolments.userId, reportRemarks.userId), eq(enrolments.yearId, exam.yearId))
+      )
+      .where(and(eq(reportRemarks.examId, id), sql.isNull(reportRemarks.paperId))),
   ])
+  const nameOf = (uid: string | undefined) => {
+    const t = teachers.find((x) => x.id === uid)
+    return t ? (t.name ?? t.email) : null
+  }
   const classes = groupIds
     .map((groupId) => ({
       groupId,
       name: pathName(ctx, groupId),
       students: Number(seats.find((s) => s.groupId === groupId)?.n ?? 0),
       canSeeResults: canSee(ctx, groupId),
+      classTeacher: nameOf(leads.get(groupId)),
+      canRemark: mayRemark(ctx, groupId, leads.get(groupId)),
+      remarks: remarked.filter((r) => r.groupId === groupId).length,
       papers: visible
         .filter((p) => p.groupId === groupId)
         .map((p) => {
@@ -723,9 +795,10 @@ export async function paperSheet(slug: string, user: User, id: string) {
   const { paper, exam, subject, teacherId } = await ownPaper(ctx, id)
   const canMark = mayMark(ctx, { groupId: paper.groupId, teacherId })
   if (!canMark && !canSee(ctx, paper.groupId)) throw notFound("Paper not found")
-  const [students, marks] = await Promise.all([
+  const [students, marks, notes] = await Promise.all([
     sitting(exam.yearId, paper.groupId, [paper.id]),
     getDb().select().from(examMarks).where(eq(examMarks.paperId, id)),
+    getDb().select().from(reportRemarks).where(eq(reportRemarks.paperId, id)),
   ])
   return {
     paper: {
@@ -748,6 +821,7 @@ export async function paperSheet(slug: string, user: User, id: string) {
         status: s.status,
         marks: m?.marks ?? null,
         absent: m?.absent ?? false,
+        remark: notes.find((n) => n.userId === s.id)?.text ?? "",
       }
     }),
   }
@@ -788,7 +862,15 @@ export async function saveMarks(
       `${who}: ${first.message}${problems.length > 1 ? ` (and ${problems.length - 1} more)` : ""}`
     )
   }
-  const before = await getDb().select().from(examMarks).where(eq(examMarks.paperId, id))
+  const [before, notesBefore] = await Promise.all([
+    getDb().select().from(examMarks).where(eq(examMarks.paperId, id)),
+    getDb().select().from(reportRemarks).where(eq(reportRemarks.paperId, id)),
+  ])
+  const remarkChanges = input.marks.filter(
+    (m) =>
+      m.remark !== undefined &&
+      (notesBefore.find((n) => n.userId === m.userId)?.text ?? "") !== m.remark
+  )
   const set = input.marks.filter((m) => m.absent || m.marks != null)
   const cleared = input.marks.filter((m) => !m.absent && m.marks == null).map((m) => m.userId)
   const changed = input.marks.filter((m) => {
@@ -824,7 +906,15 @@ export async function saveMarks(
             updatedAt: new Date(),
           },
         })
+    await writeRemarks(tx, ctx, exam.id, id, remarkChanges.map((m) => ({ userId: m.userId, text: m.remark! })))
   })
+  if (remarkChanges.length)
+    await writeAudit(
+      ctx,
+      "exam.remarks",
+      `Wrote ${subject} remarks for ${remarkChanges.length} students, ${pathName(ctx, paper.groupId)} (${exam.name})`,
+      { examId: exam.id, paperId: id }
+    )
   if (changed.length) {
     // A correction to marks already entered is worth telling apart in the log.
     const corrected = changed.filter((m) => before.some((b) => b.userId === m.userId)).length
@@ -836,6 +926,131 @@ export async function saveMarks(
     )
   }
   return paperSheet(slug, user, id)
+}
+
+type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0]
+
+/** Writes remarks (an empty one removes it): overall when paperId is null. */
+async function writeRemarks(
+  tx: Tx,
+  ctx: OrgContext,
+  examId: string,
+  paperId: string | null,
+  remarks: { userId: string; text: string }[]
+) {
+  const cleared = remarks.filter((r) => !r.text).map((r) => r.userId)
+  const set = remarks.filter((r) => r.text)
+  const where = paperId
+    ? eq(reportRemarks.paperId, paperId)
+    : and(eq(reportRemarks.examId, examId), sql.isNull(reportRemarks.paperId))
+  if (cleared.length)
+    await tx.delete(reportRemarks).where(and(where, inArray(reportRemarks.userId, cleared)))
+  if (set.length === 0) return
+  // Partial unique indexes can't be an ON CONFLICT target simply, so replace.
+  await tx
+    .delete(reportRemarks)
+    .where(and(where, inArray(reportRemarks.userId, set.map((r) => r.userId))))
+  await tx.insert(reportRemarks).values(
+    set.map((r) => ({
+      orgId: ctx.org.id,
+      examId,
+      paperId,
+      userId: r.userId,
+      text: r.text,
+      writtenBy: ctx.user.id,
+    }))
+  )
+}
+
+/* ---------- overall remarks ---------- */
+
+/** A class's overall remarks in an exam, with each student's result to write from. */
+export async function remarksSheet(
+  slug: string,
+  user: User,
+  examId: string,
+  groupId: string
+) {
+  const ctx = await context(slug, user)
+  const exam = await ownExam(ctx, examId)
+  if (!isLeaf(ctx, groupId)) throw notFound("Class not found")
+  const lead = (await classTeachersIn(exam.yearId, [groupId])).get(groupId)
+  const canWrite = mayRemark(ctx, groupId, lead)
+  if (!canWrite && !canSee(ctx, groupId)) throw notFound("Class not found")
+  const [sheet, notes, leadName] = await Promise.all([
+    classSheet(ctx, exam, groupId),
+    getDb().select().from(reportRemarks).where(eq(reportRemarks.examId, examId)),
+    lead
+      ? getDb().select({ name: users.name, email: users.email }).from(users).where(eq(users.id, lead))
+      : [],
+  ])
+  const subjectOf = new Map(sheet.papers.map((p) => [p.id, p.subject]))
+  return {
+    exam: { id: exam.id, name: exam.name, published: exam.publishedAt != null },
+    class: { id: groupId, name: pathName(ctx, groupId) },
+    classTeacher: leadName[0] ? (leadName[0].name ?? leadName[0].email) : null,
+    canWrite: canWrite && exam.publishedAt == null,
+    bank: settingsOf(ctx).remarks,
+    students: sheet.rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      rollNo: r.rollNo,
+      percent: r.percent,
+      grade: r.grade,
+      result: r.result,
+      rank: r.rank,
+      remark: notes.find((n) => n.userId === r.id && n.paperId == null)?.text ?? "",
+      subjects: notes
+        .filter((n) => n.userId === r.id && n.paperId && subjectOf.has(n.paperId))
+        .map((n) => ({ subject: subjectOf.get(n.paperId!)!, text: n.text })),
+    })),
+  }
+}
+
+export async function saveRemarks(
+  slug: string,
+  user: User,
+  examId: string,
+  groupId: string,
+  input: z.infer<typeof remarksSchema>
+) {
+  const ctx = await context(slug, user)
+  const exam = await ownExam(ctx, examId)
+  if (!isLeaf(ctx, groupId)) throw notFound("Class not found")
+  const lead = (await classTeachersIn(exam.yearId, [groupId])).get(groupId)
+  if (!mayRemark(ctx, groupId, lead)) {
+    if (canSee(ctx, groupId))
+      throw forbidden("Only the class teacher or someone allowed to write remarks can change these.")
+    throw notFound("Class not found")
+  }
+  locked(exam)
+  const paperIds = (
+    await getDb()
+      .select({ id: examPapers.id })
+      .from(examPapers)
+      .where(and(eq(examPapers.examId, examId), eq(examPapers.groupId, groupId)))
+  ).map((p) => p.id)
+  const students = await sitting(exam.yearId, groupId, paperIds)
+  const outsider = input.remarks.find((r) => !students.some((s) => s.id === r.userId))
+  if (outsider)
+    throw new ApiError(400, "not_in_class", "Someone there isn't in this class that year.")
+  const before = await getDb()
+    .select()
+    .from(reportRemarks)
+    .where(and(eq(reportRemarks.examId, examId), sql.isNull(reportRemarks.paperId)))
+  const changed = input.remarks.filter(
+    (r) => (before.find((b) => b.userId === r.userId)?.text ?? "") !== r.text
+  )
+  if (changed.length) {
+    await getDb().transaction((tx) => writeRemarks(tx, ctx, examId, null, changed))
+    await writeAudit(
+      ctx,
+      "exam.remarks",
+      `Wrote remarks for ${changed.length} students, ${pathName(ctx, groupId)} (${exam.name})`,
+      { examId, groupId }
+    )
+  }
+  return remarksSheet(slug, user, examId, groupId)
 }
 
 /* ---------- results ---------- */
@@ -1115,6 +1330,26 @@ export async function reportCard(
       .orderBy(asc(termExams.startsOn), asc(termExams.createdAt))
   )
   const scale = settingsOf(ctx).scale
+  const [notes, lead] = await Promise.all([
+    exams.length
+      ? db
+          .select()
+          .from(reportRemarks)
+          .where(
+            and(
+              eq(reportRemarks.userId, id),
+              inArray(reportRemarks.examId, exams.map((e) => e.id))
+            )
+          )
+      : [],
+    year.groupId
+      ? db
+          .select({ name: users.name, email: users.email })
+          .from(classTeachers)
+          .innerJoin(users, eq(classTeachers.teacherId, users.id))
+          .where(and(eq(classTeachers.yearId, year.id), eq(classTeachers.groupId, year.groupId)))
+      : [],
+  ])
   const sheets = year.groupId
     ? await Promise.all(exams.map((e) => classSheet(ctx, e, year.groupId!)))
     : []
@@ -1150,6 +1385,11 @@ export async function reportCard(
       result: row?.result ?? "none",
       rank: row?.rank ?? null,
       of: sheet.rows.length,
+      remark: notes.find((n) => n.examId === e.id && n.paperId == null)?.text ?? null,
+      subjectRemarks: sheet.papers.flatMap((p) => {
+        const n = notes.find((x) => x.paperId === p.id)
+        return n ? [{ subject: p.subject, text: n.text }] : []
+      }),
     }
   })
   const subjectsOut = subjectList.map((s) => {
@@ -1181,6 +1421,7 @@ export async function reportCard(
       class: year.groupId ? pathName(ctx, year.groupId) : null,
       rollNo: year.rollNo,
       status: year.status,
+      classTeacher: lead[0] ? (lead[0].name ?? lead[0].email) : null,
     },
     scale,
     subjects: subjectsOut,

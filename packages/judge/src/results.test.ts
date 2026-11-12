@@ -2,7 +2,10 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import {
+  cleanRemarkBank,
+  DEFAULT_REMARKS,
   DEFAULT_SCALE,
+  fillRemark,
   examProblem,
   gradeFor,
   markProblem,
@@ -101,4 +104,14 @@ test("checks an exam", () => {
   assert.ok(examProblem({ name: "H", startsOn: null, endsOn: null, weight: 0 }))
   assert.ok(examProblem({ name: "Final", startsOn: null, endsOn: null, weight: 101 }))
   assert.ok(examProblem({ name: "Final", startsOn: "2026-09-20", endsOn: "2026-09-10", weight: 0 }))
+})
+
+test("remarks: the bank and filling in a name", () => {
+  assert.deepEqual(readExamSettings({}).remarks, DEFAULT_REMARKS)
+  assert.deepEqual(readExamSettings({ exams: { remarks: ["Good", 3] } }).remarks, ["Good"])
+  assert.equal(fillRemark("Well done, {name}! {name} tried.", "  Asha  Rao "), "Well done, Asha! Asha tried.")
+  assert.equal(fillRemark("{name} tried.", ""), "The student tried.")
+  assert.deepEqual(cleanRemarkBank([" Good  work ", "good work", "", "Fine"]), { bank: ["Good work", "Fine"], problem: null })
+  assert.ok(cleanRemarkBank(["x".repeat(301)]).problem)
+  assert.ok(cleanRemarkBank(Array.from({ length: 101 }, (_, i) => `R${i}`)).problem)
 })

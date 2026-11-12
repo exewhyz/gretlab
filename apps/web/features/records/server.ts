@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import {
   academicYears,
   attendance,
+  classTeachers,
   enrolments,
   getDb,
   groupMembers,
@@ -31,6 +32,7 @@ import {
 import { z } from "zod"
 
 import { anyGroupGrant, covers, pathName } from "@/features/campus/people"
+import { teachersOfGroups } from "@/features/classes/server"
 import { campusOf } from "@/features/campus/server"
 import { rolePermissions } from "@/features/orgs/access"
 import { today } from "@/features/catalog/server"
@@ -1419,4 +1421,113 @@ export async function recordEveryone(slug: string, user: User) {
     `Created records for ${people.length} students already in classes`
   )
   return { added: people.length }
+}
+
+/* ---------- class teachers ---------- */
+
+export const classTeachersSchema = z.object({
+  assignments: z
+    .array(z.object({ groupId: z.uuid(), teacherId: z.uuid().nullable() }))
+    .max(1000),
+})
+
+async function ownYear(ctx: OrgContext, yearId: string) {
+  if (!z.uuid().safeParse(yearId).success) throw notFound("Year not found")
+  const [year] = await getDb()
+    .select()
+    .from(academicYears)
+    .where(and(eq(academicYears.id, yearId), eq(academicYears.orgId, ctx.org.id)))
+  if (!year) throw notFound("Year not found")
+  return year
+}
+
+/** Each section's class teacher for a year, and who could be (those teaching it). */
+export async function classTeachersOf(slug: string, user: User, yearId: string) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!canFor(ctx, "students.years", []))
+    throw forbidden("Choosing class teachers needs \"Academic years\".")
+  const year = await ownYear(ctx, yearId)
+  const sections = ctx.groups.filter((g) => isLeaf(ctx, g.id))
+  const [rows, options] = await Promise.all([
+    getDb().select().from(classTeachers).where(eq(classTeachers.yearId, year.id)),
+    teachersOfGroups(ctx, sections.map((g) => g.id)),
+  ])
+  return {
+    year: { id: year.id, name: year.name },
+    sections: sections
+      .map((g) => ({
+        groupId: g.id,
+        name: pathName(ctx, g.id),
+        teacherId: rows.find((r) => r.groupId === g.id)?.teacherId ?? null,
+        options: (options.get(g.id) ?? []).map((t) => ({ id: t.id, name: t.name })),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+  }
+}
+
+export async function setClassTeachers(
+  slug: string,
+  user: User,
+  yearId: string,
+  input: z.infer<typeof classTeachersSchema>
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!canFor(ctx, "students.years", []))
+    throw forbidden("Choosing class teachers needs \"Academic years\".")
+  const year = await ownYear(ctx, yearId)
+  for (const a of input.assignments)
+    if (!isLeaf(ctx, a.groupId))
+      throw new ApiError(400, "not_a_section", "Class teachers are for sections.")
+  const options = await teachersOfGroups(
+    ctx,
+    input.assignments.map((a) => a.groupId)
+  )
+  for (const a of input.assignments) {
+    if (a.teacherId && !(options.get(a.groupId) ?? []).some((t) => t.id === a.teacherId))
+      throw new ApiError(
+        400,
+        "not_a_teacher",
+        `Only someone teaching ${pathName(ctx, a.groupId)} can be its class teacher.`
+      )
+  }
+  const before = await getDb()
+    .select()
+    .from(classTeachers)
+    .where(eq(classTeachers.yearId, year.id))
+  const changed = input.assignments.filter(
+    (a) => (before.find((b) => b.groupId === a.groupId)?.teacherId ?? null) !== a.teacherId
+  )
+  if (changed.length === 0) return classTeachersOf(slug, user, yearId)
+  await getDb().transaction(async (tx) => {
+    const cleared = changed.filter((a) => !a.teacherId).map((a) => a.groupId)
+    if (cleared.length)
+      await tx
+        .delete(classTeachers)
+        .where(and(eq(classTeachers.yearId, year.id), inArray(classTeachers.groupId, cleared)))
+    const set = changed.filter((a) => a.teacherId)
+    if (set.length)
+      await tx
+        .insert(classTeachers)
+        .values(
+          set.map((a) => ({
+            orgId: ctx.org.id,
+            yearId: year.id,
+            groupId: a.groupId,
+            teacherId: a.teacherId!,
+          }))
+        )
+        .onConflictDoUpdate({
+          target: [classTeachers.yearId, classTeachers.groupId],
+          set: { teacherId: sql.sql`excluded.teacher_id` },
+        })
+  })
+  await writeAudit(
+    ctx,
+    "records.class_teachers",
+    `Set the class teachers of ${changed.length} sections for ${year.name}`,
+    { yearId: year.id }
+  )
+  return classTeachersOf(slug, user, yearId)
 }

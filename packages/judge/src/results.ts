@@ -24,15 +24,57 @@ export const DEFAULT_SCALE: GradeBand[] = [
   { min: 0, grade: "E", points: null },
 ]
 
+/** Ready-made remarks a school starts with; {name} becomes the student's first name. */
+export const DEFAULT_REMARKS = [
+  "{name} works hard and is a pleasure to teach.",
+  "{name} has made steady progress this term.",
+  "{name} understands the work well and should keep it up.",
+  "{name} takes part in class and asks good questions.",
+  "{name} can do better with more regular practice at home.",
+  "{name} needs to pay more attention in class.",
+  "{name} should revise regularly and complete homework on time.",
+  "An excellent result. Well done, {name}!",
+]
+
+export const REMARK_MAX = 500
+export const SUBJECT_REMARK_MAX = 200
+
 export interface ResultsSettings {
   scale: GradeBand[]
+  /** The comment bank for report card remarks. */
+  remarks: string[]
 }
 
 /** The module's settings (organizations.module_settings.exams), with defaults. */
 export function readExamSettings(moduleSettings: unknown): ResultsSettings {
-  const raw = (moduleSettings as { exams?: { scale?: unknown } } | null)?.exams
+  const raw = (moduleSettings as { exams?: { scale?: unknown; remarks?: unknown } } | null)?.exams
   const scale = Array.isArray(raw?.scale) ? (raw.scale as GradeBand[]) : null
-  return { scale: scale && !scaleProblem(scale) ? sortScale(scale) : DEFAULT_SCALE }
+  const remarks = Array.isArray(raw?.remarks)
+    ? (raw.remarks as unknown[]).filter((r): r is string => typeof r === "string")
+    : null
+  return {
+    scale: scale && !scaleProblem(scale) ? sortScale(scale) : DEFAULT_SCALE,
+    remarks: remarks ?? DEFAULT_REMARKS,
+  }
+}
+
+/** A remark from the bank for one student: {name} is their first name. */
+export const fillRemark = (template: string, fullName: string) =>
+  template.replaceAll("{name}", fullName.trim().split(/\s+/)[0] || "The student")
+
+/** A comment bank cleaned up: trimmed, no blanks or repeats, at most 100 of 300 characters. */
+export function cleanRemarkBank(remarks: string[]): { bank: string[]; problem: string | null } {
+  const seen = new Set<string>()
+  const bank: string[] = []
+  for (const r of remarks) {
+    const text = r.trim().replace(/\s+/g, " ")
+    if (!text || seen.has(text.toLowerCase())) continue
+    if (text.length > 300) return { bank, problem: "Keep each remark to 300 characters." }
+    seen.add(text.toLowerCase())
+    bank.push(text)
+  }
+  if (bank.length > 100) return { bank, problem: "At most 100 remarks in the bank." }
+  return { bank, problem: null }
 }
 
 export const sortScale = (scale: GradeBand[]) => [...scale].sort((a, b) => b.min - a.min)

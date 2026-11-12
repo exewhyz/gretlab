@@ -434,6 +434,13 @@ export const PERMISSIONS = {
     module: "Teaching",
     parent: "exams.manage",
   },
+  "exams.remarks": {
+    label: "Write remarks",
+    description:
+      "Write the overall report card remarks for students of the groups this applies to (for a coordinator or principal). Class teachers can always write them for their own class.",
+    module: "Teaching",
+    parent: "exams.manage",
+  },
   "exams.view": {
     label: "See results",
     description: "See marks, results and report cards of the students of the groups this applies to.",

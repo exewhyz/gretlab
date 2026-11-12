@@ -66,6 +66,7 @@ import {
   Field,
   FormMessage,
   SelectInput,
+  TextArea,
   TextInput,
 } from "@/components/form"
 import { Loading, PageTitle } from "@/features/admin/components/shell"
@@ -131,6 +132,7 @@ export function Exams({ slug }: { slug: string }) {
   })
   const [editing, setEditing] = useState<ExamItem | "new" | null>(null)
   const [scaleOpen, setScaleOpen] = useState(false)
+  const [bankOpen, setBankOpen] = useState(false)
   if (!data) return <Loading error={error} />
   const refresh = () =>
     client.invalidateQueries({ queryKey: ["org", slug, "exams"] })
@@ -142,6 +144,9 @@ export function Exams({ slug }: { slug: string }) {
           data.canSetup &&
           data.year && (
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setBankOpen(true)}>
+                Comment bank
+              </Button>
               <Button variant="outline" onClick={() => setScaleOpen(true)}>
                 Grading scale
               </Button>
@@ -272,6 +277,7 @@ export function Exams({ slug }: { slug: string }) {
           onDone={(changed) => (setEditing(null), changed && void refresh())}
         />
       )}
+      {bankOpen && <BankDialog slug={slug} onDone={() => setBankOpen(false)} />}
       {scaleOpen && (
         <ScaleDialog
           slug={slug}
@@ -367,6 +373,59 @@ function ExamDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** The school's ready-made remarks, one per line. */
+function BankDialog({ slug, onDone }: { slug: string; onDone: () => void }) {
+  const { data, error } = useQuery({
+    queryKey: ["org", slug, "exam-settings"],
+    queryFn: () => api<{ remarks: string[] }>(`/orgs/${slug}/exams/settings`),
+  })
+  const client = useQueryClient()
+  const [text, setText] = useState<string | null>(null)
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/orgs/${slug}/exams/settings`, {
+        method: "PUT",
+        body: { remarks: (text ?? "").split("\n") },
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["org", slug] })
+      onDone()
+    },
+  })
+  return (
+    <Dialog open onOpenChange={(open) => !open && onDone()}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Comment bank</DialogTitle>
+          <DialogDescription>
+            Remarks teachers can pick from, one per line. {"{name}"} becomes the
+            student&apos;s first name.
+          </DialogDescription>
+        </DialogHeader>
+        {!data ? (
+          <Loading error={error} />
+        ) : (
+          <Field label="Remarks">
+            <TextArea
+              className="min-h-64"
+              value={text ?? data.remarks.join("\n")}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </Field>
+        )}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
+        <DialogFooter>
+          <Button onClick={() => save.mutate()} disabled={text === null || save.isPending}>
+            Save
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -505,6 +564,9 @@ interface ExamDetail {
     name: string
     students: number
     canSeeResults: boolean
+    classTeacher: string | null
+    canRemark: boolean
+    remarks: number
     papers: Paper[]
   }[]
   sections: { id: string; name: string }[]
@@ -675,7 +737,21 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                 <Card key={c.groupId} className="pb-0" data-testid="exam-class">
                   <CardHeader>
                     <CardTitle>{c.name}</CardTitle>
-                    <CardDescription>{c.students} students</CardDescription>
+                    <CardDescription>
+                      {c.students} students
+                      {c.classTeacher && ` · Class teacher ${c.classTeacher}`}
+                    </CardDescription>
+                    {(c.canRemark || c.canSeeResults) && (
+                      <CardAction>
+                        <Link
+                          aria-label={`Remarks for ${c.name}`}
+                          href={`/orgs/${slug}/manage/exams/${examId}/remarks/${c.groupId}`}
+                          className={buttonVariants({ size: "sm", variant: "outline" })}
+                        >
+                          Remarks {Math.min(c.remarks, c.students)}/{c.students}
+                        </Link>
+                      </CardAction>
+                    )}
                   </CardHeader>
                   <Table>
                     <TableHeader>
@@ -1205,6 +1281,7 @@ interface Sheet {
     status: string
     marks: number | null
     absent: boolean
+    remark: string
   }[]
 }
 
@@ -1232,7 +1309,9 @@ export function MarksSheet({
     queryKey: key,
     queryFn: () => api<Sheet>(`/orgs/${slug}/exam-papers/${paperId}/marks`),
   })
-  const [draft, setDraft] = useState<Record<string, { text: string; absent: boolean }>>({})
+  const [draft, setDraft] = useState<
+    Record<string, { text: string; absent: boolean; remark: string }>
+  >({})
   const inputs = useRef<(HTMLInputElement | null)[]>([])
   useEffect(() => {
     if (!data) return
@@ -1240,7 +1319,11 @@ export function MarksSheet({
       Object.fromEntries(
         data.students.map((s) => [
           s.id,
-          { text: s.marks == null ? "" : String(s.marks), absent: s.absent },
+          {
+            text: s.marks == null ? "" : String(s.marks),
+            absent: s.absent,
+            remark: s.remark,
+          },
         ])
       )
     )
@@ -1251,7 +1334,11 @@ export function MarksSheet({
         const d = draft[s.id]
         if (!d) return false
         const was = s.marks == null ? "" : String(s.marks)
-        return d.absent !== s.absent || (!d.absent && d.text.trim() !== was)
+        return (
+          d.absent !== s.absent ||
+          (!d.absent && d.text.trim() !== was) ||
+          d.remark.trim() !== s.remark
+        )
       }) ?? [],
     [data, draft]
   )
@@ -1266,6 +1353,7 @@ export function MarksSheet({
               userId: s.id,
               absent: d.absent,
               marks: d.absent || d.text.trim() === "" ? null : Number(d.text),
+              remark: d.remark.trim(),
             }
           }),
         },
@@ -1344,12 +1432,13 @@ export function MarksSheet({
                 <TableHead className="w-14">Roll</TableHead>
                 <TableHead>Student</TableHead>
                 <TableHead className="w-32">Marks</TableHead>
-                <TableHead className="w-24">Absent</TableHead>
+                <TableHead className="w-20">Absent</TableHead>
+                <TableHead className="hidden md:table-cell">Remark</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.students.map((s, i) => {
-                const d = draft[s.id] ?? { text: "", absent: false }
+                const d = draft[s.id] ?? { text: "", absent: false, remark: "" }
                 const err = errors[i]
                 const n = Number(d.text)
                 const fails = !d.absent && d.text.trim() !== "" && !err && n < paper.passMarks
@@ -1397,6 +1486,18 @@ export function MarksSheet({
                         }
                       />
                     </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <TextInput
+                        aria-label={`Remark for ${s.name}`}
+                        maxLength={200}
+                        disabled={!data.canMark}
+                        value={d.remark}
+                        placeholder="Optional"
+                        onChange={(e) =>
+                          setDraft({ ...draft, [s.id]: { ...d, remark: e.target.value } })
+                        }
+                      />
+                    </TableCell>
                   </TableRow>
                 )
               })}
@@ -1414,7 +1515,14 @@ interface ReportCardData {
   org: { name: string; slug: string }
   student: { id: string; name: string; admissionNo: string | null }
   years: { id: string; name: string }[]
-  year: { id: string; name: string; class: string | null; rollNo: number | null; status: string }
+  year: {
+    id: string
+    name: string
+    class: string | null
+    rollNo: number | null
+    status: string
+    classTeacher: string | null
+  }
   scale: Band[]
   subjects: { subjectId: string; name: string; final: number | null; grade: string | null }[]
   exams: {
@@ -1437,6 +1545,8 @@ interface ReportCardData {
     result: string
     rank: number | null
     of: number
+    remark: string | null
+    subjectRemarks: { subject: string; text: string }[]
   }[]
   final: { percent: number; grade: string } | null
   viewer: "student" | "parent" | "staff"
@@ -1498,6 +1608,7 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
             ["Admission no.", data.student.admissionNo ?? "–"],
             ["Class", data.year.class ?? "–"],
             ["Roll no.", data.year.rollNo == null ? "–" : String(data.year.rollNo)],
+            ...(data.year.classTeacher ? [["Class teacher", data.year.classTeacher]] : []),
           ].map(([k, v]) => (
             <div key={k}>
               <dt className="text-caption text-muted-foreground">{k}</dt>
@@ -1614,6 +1725,28 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
             </table>
           </div>
         )}
+        {data.exams.some((e) => e.remark || e.subjectRemarks.length > 0) && (
+          <section className="grid gap-3" data-testid="report-remarks">
+            <h2 className="text-title-sm text-ink">Remarks</h2>
+            {data.exams
+              .filter((e) => e.remark || e.subjectRemarks.length > 0)
+              .map((e) => (
+                <div key={e.id} className="grid gap-1 text-body-sm">
+                  <div className="font-medium text-ink">{e.name}</div>
+                  {e.remark && <p className="text-ink">{e.remark}</p>}
+                  {e.subjectRemarks.length > 0 && (
+                    <ul className="grid gap-0.5 text-muted-foreground">
+                      {e.subjectRemarks.map((r) => (
+                        <li key={r.subject}>
+                          <span className="font-medium text-ink">{r.subject}:</span> {r.text}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+          </section>
+        )}
         <footer className="grid gap-1 border-t border-hairline pt-3 text-caption text-muted-foreground">
           <div>
             Grades:{" "}
@@ -1624,6 +1757,193 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
           </div>
         </footer>
       </article>
+    </>
+  )
+}
+
+/* ---------- overall remarks ---------- */
+
+interface RemarksData {
+  exam: { id: string; name: string; published: boolean }
+  class: { id: string; name: string }
+  classTeacher: string | null
+  canWrite: boolean
+  bank: string[]
+  students: {
+    id: string
+    name: string
+    rollNo: number | null
+    percent: number | null
+    grade: string | null
+    result: string
+    rank: number | null
+    remark: string
+    subjects: { subject: string; text: string }[]
+  }[]
+}
+
+const fill = (template: string, name: string) =>
+  template.replaceAll("{name}", name.trim().split(/\s+/)[0] || "The student")
+
+export function RemarksSheet({
+  slug,
+  examId,
+  groupId,
+}: {
+  slug: string
+  examId: string
+  groupId: string
+}) {
+  const client = useQueryClient()
+  const key = ["org", slug, "remarks", examId, groupId]
+  const url = `/orgs/${slug}/exams/${examId}/remarks/${groupId}`
+  const { data, error } = useQuery({ queryKey: key, queryFn: () => api<RemarksData>(url) })
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (data) setDraft(Object.fromEntries(data.students.map((s) => [s.id, s.remark])))
+  }, [data])
+  const dirty = useMemo(
+    () => data?.students.filter((s) => (draft[s.id] ?? s.remark).trim() !== s.remark) ?? [],
+    [data, draft]
+  )
+  const save = useMutation({
+    mutationFn: () =>
+      api<RemarksData>(url, {
+        method: "PUT",
+        body: { remarks: dirty.map((s) => ({ userId: s.id, text: (draft[s.id] ?? "").trim() })) },
+      }),
+    onSuccess: (next) => {
+      client.setQueryData(key, next)
+      void client.invalidateQueries({ queryKey: ["org", slug, "exam", examId] })
+    },
+  })
+  useEffect(() => {
+    if (dirty.length === 0) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener("beforeunload", warn)
+    return () => window.removeEventListener("beforeunload", warn)
+  }, [dirty.length])
+  if (!data) return <Loading error={error} />
+  const empty = data.students.filter((s) => !(draft[s.id] ?? "").trim()).length
+  return (
+    <>
+      <div className="mb-1 text-body-sm text-muted-foreground">
+        <Link href={`/orgs/${slug}/manage/exams`} className="hover:underline">
+          Exams
+        </Link>{" "}
+        ·{" "}
+        <Link href={`/orgs/${slug}/manage/exams/${examId}`} className="hover:underline">
+          {data.exam.name}
+        </Link>
+      </div>
+      <PageTitle
+        action={
+          data.canWrite && (
+            <Button onClick={() => save.mutate()} disabled={dirty.length === 0 || save.isPending}>
+              {dirty.length ? `Save ${dirty.length} remarks` : "Saved"}
+            </Button>
+          )
+        }
+      >
+        Remarks · {data.class.name}
+      </PageTitle>
+      <p className="mb-3 max-w-3xl text-body-sm text-muted-foreground">
+        {data.classTeacher ? `Class teacher: ${data.classTeacher}. ` : ""}
+        {data.exam.published
+          ? "The results are published, so remarks are locked."
+          : !data.canWrite
+            ? "Only the class teacher can write these."
+            : `${data.students.length - empty} of ${data.students.length} written. Pick from the comment bank or write your own; they show on the report card.`}
+      </p>
+      {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+      {save.isSuccess && dirty.length === 0 && (
+        <FormMessage message={{ text: "Remarks saved.", kind: "ok" }} />
+      )}
+      {data.students.length === 0 ? (
+        <Empty className="border border-dashed border-hairline">
+          <EmptyHeader>
+            <EmptyTitle>No students in this class that year</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="grid gap-3" data-testid="remarks">
+          {data.students.map((s) => {
+            const value = draft[s.id] ?? ""
+            return (
+              <Card key={s.id} size="sm" data-testid="remark-row">
+                <CardHeader>
+                  <CardTitle>
+                    {s.rollNo != null && (
+                      <span className="mr-2 text-muted-foreground tabular-nums">{s.rollNo}</span>
+                    )}
+                    {s.name}
+                  </CardTitle>
+                  <CardDescription>
+                    {s.percent == null ? "No marks yet" : `${fmt(s.percent)}% · ${s.grade}`}
+                    {s.rank != null && ` · rank ${s.rank}`}
+                    {s.result !== "none" && (
+                      <span className={cn("ml-1", RESULT[s.result]?.tone)}>
+                        · {RESULT[s.result]?.label}
+                      </span>
+                    )}
+                  </CardDescription>
+                  {data.canWrite && data.bank.length > 0 && (
+                    <CardAction>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              aria-label={`Pick a remark for ${s.name}`}
+                            />
+                          }
+                        >
+                          Comment bank
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="max-w-sm">
+                          {data.bank.map((b) => (
+                            <DropdownMenuItem
+                              key={b}
+                              onClick={() =>
+                                setDraft({
+                                  ...draft,
+                                  [s.id]: [value.trim(), fill(b, s.name)].filter(Boolean).join(" "),
+                                })
+                              }
+                            >
+                              {fill(b, s.name)}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </CardAction>
+                  )}
+                </CardHeader>
+                <CardContent className="grid gap-2">
+                  <TextArea
+                    aria-label={`Remark for ${s.name}`}
+                    maxLength={500}
+                    disabled={!data.canWrite}
+                    value={value}
+                    placeholder={data.canWrite ? "Write a remark" : "No remark"}
+                    onChange={(e) => setDraft({ ...draft, [s.id]: e.target.value })}
+                  />
+                  {s.subjects.length > 0 && (
+                    <ul className="grid gap-0.5 text-caption text-muted-foreground">
+                      {s.subjects.map((r) => (
+                        <li key={r.subject}>
+                          <span className="font-medium">{r.subject}:</span> {r.text}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </>
   )
 }

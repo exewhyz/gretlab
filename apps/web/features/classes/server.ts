@@ -206,7 +206,13 @@ export async function teachersOf(cc: ClassContext) {
 
 /** The people given teaching for a group (or a group above it), with their roles. */
 export async function teachersOfGroup(ctx: OrgContext, groupId: string) {
-  const cc = { ctx, groupId }
+  return (await teachersOfGroups(ctx, [groupId])).get(groupId) ?? []
+}
+
+/** teachersOfGroup for many groups at once, with one query. */
+export async function teachersOfGroups(ctx: OrgContext, groupIds: string[]) {
+  const out = new Map<string, { id: string; name: string; roles: string[] }[]>()
+  if (groupIds.length === 0) return out
   const rows = await getDb()
     .select({
       id: users.id,
@@ -221,7 +227,26 @@ export async function teachersOfGroup(ctx: OrgContext, groupId: string) {
     .from(roleAssignments)
     .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
     .innerJoin(users, eq(roleAssignments.userId, users.id))
-    .where(eq(roleAssignments.orgId, cc.ctx.org.id))
+    .where(eq(roleAssignments.orgId, ctx.org.id))
+  for (const groupId of groupIds) {
+    out.set(groupId, teachersAmong(rows, { ctx, groupId }))
+  }
+  return out
+}
+
+function teachersAmong(
+  rows: {
+    id: string
+    name: string | null
+    email: string
+    handle: string | null
+    groupId: string | null
+    role: string
+    systemKey: string | null
+    permissions: string[]
+  }[],
+  cc: { ctx: OrgContext; groupId: string }
+) {
   const above = groupChain(cc.ctx, cc.groupId)
   const seen = new Map<string, { id: string; name: string; roles: string[] }>()
   for (const r of rows) {

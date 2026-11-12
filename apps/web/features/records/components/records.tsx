@@ -109,6 +109,7 @@ export function AcademicYears({ slug }: { slug: string }) {
   const [editing, setEditing] = useState<Year | "new" | null>(null)
   const [current, setCurrent] = useState<Year | null>(null)
   const [removing, setRemoving] = useState<Year | null>(null)
+  const [leads, setLeads] = useState<Year | null>(null)
   const refresh = () => client.invalidateQueries({ queryKey: ["org", slug] })
   const act = useMutation({
     mutationFn: (v: { year: Year; kind: "current" | "delete" }) =>
@@ -212,6 +213,9 @@ export function AcademicYears({ slug }: { slug: string }) {
                           <DropdownMenuItem onClick={() => setEditing(y)}>
                             Edit
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setLeads(y)}>
+                            Class teachers
+                          </DropdownMenuItem>
                           {!y.isCurrent && (
                             <DropdownMenuItem onClick={() => setCurrent(y)}>
                               Make current
@@ -241,6 +245,13 @@ export function AcademicYears({ slug }: { slug: string }) {
           onDone={(changed) => (setEditing(null), changed && void refresh())}
         />
       )}
+      {leads && (
+        <ClassTeachersDialog
+          slug={slug}
+          year={leads}
+          onDone={() => setLeads(null)}
+        />
+      )}
       {current && (
         <ConfirmDialog
           open
@@ -263,6 +274,95 @@ export function AcademicYears({ slug }: { slug: string }) {
         />
       )}
     </>
+  )
+}
+
+interface LeadSection {
+  groupId: string
+  name: string
+  teacherId: string | null
+  options: { id: string; name: string }[]
+}
+
+/** Each section's class teacher for a year: they write the report card remarks. */
+function ClassTeachersDialog({
+  slug,
+  year,
+  onDone,
+}: {
+  slug: string
+  year: Year
+  onDone: () => void
+}) {
+  const url = `/orgs/${slug}/academic-years/${year.id}/class-teachers`
+  const { data, error } = useQuery({
+    queryKey: ["org", slug, "class-teachers", year.id],
+    queryFn: () => api<{ sections: LeadSection[] }>(url),
+  })
+  const [chosen, setChosen] = useState<Record<string, string>>({})
+  const save = useMutation({
+    mutationFn: () =>
+      api(url, {
+        method: "PUT",
+        body: {
+          assignments: Object.entries(chosen).map(([groupId, teacherId]) => ({
+            groupId,
+            teacherId: teacherId || null,
+          })),
+        },
+      }),
+    onSuccess: onDone,
+  })
+  return (
+    <Dialog open onOpenChange={(open) => !open && onDone()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Class teachers, {year.name}</DialogTitle>
+          <DialogDescription>
+            The class teacher writes each student&apos;s report card remarks.
+            Choose from those who teach the section.
+          </DialogDescription>
+        </DialogHeader>
+        {!data ? (
+          <Loading error={error} />
+        ) : data.sections.length === 0 ? (
+          <p className="text-body-sm text-muted-foreground">No sections yet.</p>
+        ) : (
+          <div className="grid max-h-[55vh] gap-3 overflow-y-auto pr-1" data-testid="class-teachers">
+            {data.sections.map((sec) => (
+              <Field key={sec.groupId} label={sec.name}>
+                <SelectInput
+                  value={chosen[sec.groupId] ?? sec.teacherId ?? ""}
+                  onChange={(e) =>
+                    setChosen({ ...chosen, [sec.groupId]: e.target.value })
+                  }
+                >
+                  <option value="">
+                    {sec.options.length ? "No class teacher" : "Nobody teaches it yet"}
+                  </option>
+                  {sec.options.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </SelectInput>
+              </Field>
+            ))}
+          </div>
+        )}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
+        <DialogFooter>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={Object.keys(chosen).length === 0 || save.isPending}
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

@@ -6,7 +6,9 @@
  * a class's results (totals, grades, pass and fail, ranks); publishing (refused with marks
  * missing unless forced, students and parents told, marks locked); report cards (the
  * student, their parent, staff; drafts hidden from the family; the year's weighted
- * result); the log; the pages, on a phone too.
+ * result); class teachers for the year and report card remarks (theirs, a subject teacher's
+ * with the marks, a coordinator's; the comment bank; locked once published); the log; the
+ * pages, on a phone too.
  *   node e2e/exams.mjs [base-url] [screenshot-dir]
  */
 import { execFileSync } from "node:child_process"
@@ -174,7 +176,42 @@ check("unpublishing hides it again", (await pub({ published: false })).json?.pub
 check("...and unlocks marks", (await put(t2, sA, [{ userId: s1.id, marks: 86 }])).status === 200)
 const log = (await owner(`${O}/audit?category=exam&limit=100`)).json?.entries ?? []
 check("exams are in the log", ["exam.create", "exam.papers", "exam.marks", "exam.marks_correct", "exam.publish", "exam.unpublish"].every((a) => log.some((e) => e.action === a)), log.map((e) => e.action).join())
+
+// ---------- class teachers and remarks
+const leads = (body, who = owner) => who(`${O}/academic-years/${year.id}/class-teachers`, { method: "PUT", body: { assignments: body } })
+check("only someone teaching a section can be its class teacher", (await leads([{ groupId: a5.id, teacherId: uid("exm-out") }])).status === 400)
+check("...and not of a section they don't teach", (await leads([{ groupId: b5.id, teacherId: uid("exm-t2") }])).status === 400)
+check("a teacher can't choose class teachers", (await leads([{ groupId: a5.id, teacherId: uid("exm-t2") }], t1)).status === 403)
+const set = (await leads([{ groupId: a5.id, teacherId: uid("exm-t2") }, { groupId: b5.id, teacherId: uid("exm-t1") }])).json
+check("class teachers are set for the year", set?.sections.find((x) => x.groupId === a5.id)?.teacherId === uid("exm-t2") && set.sections.find((x) => x.groupId === a5.id).options.length === 2, JSON.stringify(set?.sections))
+const R = (who, groupId = a5.id) => ({
+  get: () => who(`${O}/exams/${half.id}/remarks/${groupId}`),
+  put: (remarks) => who(`${O}/exams/${half.id}/remarks/${groupId}`, { method: "PUT", body: { remarks } }),
+})
+const sheetR = (await R(t2).get()).json
+check("the class teacher gets the remarks sheet with results and the comment bank", sheetR?.canWrite === true && sheetR.students.length === 3 && sheetR.students[0].grade === "A2" && sheetR.bank.length === 8, JSON.stringify(sheetR)?.slice(0, 200))
+check("the class teacher writes remarks", (await R(t2).put([{ userId: s1.id, text: "Asha is curious and careful." }, { userId: s2.id, text: "Bilal should revise science." }])).json?.students.find((x) => x.id === s1.id)?.remark === "Asha is curious and careful.")
+check("another teacher of the class can read them but not write", (await R(t1).get()).json?.canWrite === false && (await R(t1).put([{ userId: s1.id, text: "Hijack" }])).status === 403)
+check("someone with nothing to do with the class can't", (await R(out).get()).status === 404)
+check("a remark of over 500 characters is refused", (await R(t2).put([{ userId: s1.id, text: "x".repeat(501) }])).status === 400)
+check("a student of another class is refused", (await R(t2).put([{ userId: s4.id, text: "Hi" }])).status === 400)
+check("an empty remark removes it", (await R(t2).put([{ userId: s2.id, text: "" }])).json?.students.find((x) => x.id === s2.id)?.remark === "")
+check("the subject teacher's remark goes with the marks", (await put(t2, sA, [{ userId: s1.id, marks: 86, remark: "Great experiments." }])).json?.students.find((x) => x.id === s1.id)?.remark === "Great experiments.")
+check("...and shows on the class teacher's sheet", (await R(t2).get()).json?.students.find((x) => x.id === s1.id)?.subjects[0]?.text === "Great experiments.")
+const coordRole = (await owner(`${O}/roles`, { body: { name: "Coordinator", permissions: ["exams.remarks"] } })).json
+await owner(`${O}/members/${uid("exm-out")}/roles`, { body: { roleId: coordRole.id, groupId: g5.id } })
+check("a coordinator with Write remarks can write any section's", (await R(out, b5.id).put([{ userId: s4.id, text: "Dev is improving." }])).status === 200)
+const examT2 = (await t2(`${O}/exams/${half.id}`)).json
+check("the exam page names the class teacher and counts remarks", examT2?.classes[0].classTeacher === "Exm t2" && examT2.classes[0].remarks === 1 && examT2.classes[0].canRemark === true, JSON.stringify(examT2?.classes[0])?.slice(0, 200))
+check("a teacher can't change the comment bank", (await t1(`${O}/exams/settings`, { method: "PUT", body: { remarks: ["Hi"] } })).status === 403)
+const bank = (await owner(`${O}/exams/settings`, { method: "PUT", body: { remarks: ["Fine work, {name}.", " fine work,  {name}. ", "", "Keep reading, {name}."] } })).json
+check("the comment bank is cleaned up when saved", bank?.remarks?.join("|") === "Fine work, {name}.|Keep reading, {name}.", JSON.stringify(bank?.remarks))
 await pub({ published: true, force: true })
+check("published remarks are locked", (await R(t2).put([{ userId: s1.id, text: "Late change" }])).status === 409)
+const withRemarks = (await k1(`${O}/report-cards/me`)).json
+check("the report card shows the class teacher and remarks", withRemarks?.year.classTeacher === "Exm t2" && withRemarks.exams[0].remark === "Asha is curious and careful." && withRemarks.exams[0].subjectRemarks[0]?.subject === "Science", JSON.stringify(withRemarks?.exams?.[0])?.slice(0, 300))
+const rlog = (await owner(`${O}/audit?category=exam&limit=100`)).json?.entries ?? []
+check("remarks and the bank are in the log", ["exam.remarks", "exam.remark_bank"].every((a) => rlog.some((e) => e.action === a)) && (await owner(`${O}/audit?category=records&limit=50`)).json?.entries.some((e) => e.action === "records.class_teachers"))
 
 // ---------- the pages
 const browser = await chromium.launch()
@@ -224,11 +261,30 @@ await t.getByText("Marks saved.").waitFor({ timeout: 15000 })
 check("the teacher saves marks from the page", psql(`select string_agg(coalesce(marks::text,'AB'), ',' order by marks) from exam_marks m join exam_papers p on p.id=m.paper_id where p.exam_id='${unit}'`) === "18,44.5,AB")
 await t.screenshot({ path: SHOTS + "exam-marks.png", fullPage: true })
 
+await pub({ published: false })
+await t.goto(`${BASE}${O}/manage/exams/${half.id}`)
+await t.getByRole("link", { name: "Remarks for Grade 5 › A" }).click()
+await t.getByTestId("remark-row").first().waitFor({ timeout: 30000 })
+await t.getByRole("button", { name: "Pick a remark for Exm Bilal" }).click()
+await t.getByRole("menuitem", { name: "Keep reading, Exm." }).click()
+check("a remark is picked from the comment bank", (await t.getByRole("textbox", { name: "Remark for Exm Bilal" }).inputValue()) === "Keep reading, Exm.")
+await t.getByRole("button", { name: "Save 1 remarks" }).click()
+await t.getByText("Remarks saved.").waitFor({ timeout: 15000 })
+check("the class teacher saves remarks from the page", psql(`select text from report_remarks where user_id='${s2.id}' and paper_id is null`) === "Keep reading, Exm.")
+await t.screenshot({ path: SHOTS + "exam-remarks.png", fullPage: true })
+await pub({ published: true, force: true })
+const yp = await view("exm-o@example.com", 1440)
+await yp.goto(`${BASE}${O}/manage/academic-years`)
+await yp.getByRole("button", { name: "Actions for 2026-2027" }).click()
+await yp.getByRole("menuitem", { name: "Class teachers" }).click()
+await yp.getByTestId("class-teachers").waitFor({ timeout: 15000 })
+check("the class teachers dialog shows each section's", (await yp.getByLabel("Grade 5 › A").inputValue()) === uid("exm-t2"))
+
 const kid = await view("exm-s1@example.com", 390)
 await kid.goto(`${BASE}${O}/results/me`)
 await kid.getByTestId("report-card").waitFor({ timeout: 30000 })
 await kid.waitForLoadState("networkidle")
-check("the student's report card shows their marks", (await kid.getByTestId("report-subject").count()) === 3 && (await kid.getByTestId("report-card").innerText()).includes("Exm Asha"))
+check("the student's report card shows their marks and remarks", (await kid.getByTestId("report-subject").count()) === 3 && (await kid.getByTestId("report-card").innerText()).includes("Exm Asha") && (await kid.getByTestId("report-remarks").innerText()).includes("Asha is curious and careful."))
 check("no sideways scrolling on a phone", await kid.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
 await kid.screenshot({ path: SHOTS + "report-card-phone.png", fullPage: true })
 const home = await view("exm-s1@example.com", 1440)

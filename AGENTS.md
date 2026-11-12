@@ -311,6 +311,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - Students and their parents see only their own report card, and only published exams. Staff see drafts, marked as drafts. Anyone else gets 404, so they can't tell a student exists.
 - **Publishing** refuses while marks are missing (409 `incomplete`) unless forced. It tells each student (kind `results`, under "Marks and feedback"), and their parents get a copy. While an exam is published its marks, papers and the exam itself are locked; unpublishing unlocks them.
 - Audited as `exam.*`. A change to a mark already entered is logged as `exam.marks_correct`, separately from first entry.
+- **Class teachers and remarks:**
+  - Each section has a class teacher per academic year (`class_teachers`), chosen on Manage › Academic years › Class teachers by someone with "Academic years". They're picked from people teaching the section (`teachersOfGroups` in `features/classes/server.ts`, one query for many groups).
+  - `report_remarks` holds two kinds:
+    - the overall remark per exam and student (no paper), written by the class teacher, "Set up exams", or "Write remarks" (`exams.remarks`, scoped, for a coordinator);
+    - a subject remark per paper and student, written with the marks by whoever may enter them.
+  - Both have partial unique indexes, so saving deletes then inserts in one transaction. Saving an empty remark removes it. Remarks lock when the exam is published, and show on the report card with the class teacher's name.
+  - The comment bank lives in `module_settings.exams.remarks`; there are defaults in `DEFAULT_REMARKS`, cleaned by `cleanRemarkBank`. `{name}` becomes the first name (`fillRemark`). Audited as `exam.remarks`, `exam.remark_bank` and `records.class_teachers`.
 - **Pages:**
   - Manage › Exams: the year's exams, the grading scale, adding an exam.
   - An exam: papers by class with marking progress, adding papers, publishing; a Results tab with each class's table, stats and ranks.
@@ -534,7 +541,8 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - The scale; exams (duplicates, dates, who may); papers per subject per section (including the grade's subjects; adding twice adds nothing).
   - Marks by the subject teacher, an exam-cell role and nobody else; halves, limits, absences, students of another class; corrections logged separately.
   - Results and ranks; publishing (asks with marks missing, tells students and parents, locks marks); report cards for the student, their parent and staff (drafts hidden from the family); unpublishing; the log.
-  - The pages: adding an exam and papers, the results tab, entering marks with the keyboard, the report card on a phone and from the parent's child page.
+  - Class teachers (only those teaching the section), overall remarks (class teacher, coordinator, nobody else), subject remarks with marks, the comment bank, locked when published, on the report card.
+  - The pages: adding an exam and papers, the results tab, entering marks with the keyboard, picking a remark from the bank, the class teachers dialog, the report card on a phone and from the parent's child page.
 - `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.

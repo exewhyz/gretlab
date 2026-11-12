@@ -1326,6 +1326,68 @@ export const examMarks = pgTable(
   ]
 )
 
+/** Each section's class teacher for a year (Student records): they write report card remarks. */
+export const classTeachers = pgTable(
+  "class_teachers",
+  {
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    yearId: uuid("year_id")
+      .notNull()
+      .references(() => academicYears.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    teacherId: uuid("teacher_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.yearId, table.groupId] }),
+    index("class_teachers_teacher").on(table.teacherId),
+  ]
+)
+
+/**
+ * A report card remark: the class teacher's for a student in an exam (no paper), or a
+ * subject teacher's on one paper.
+ */
+export const reportRemarks = pgTable(
+  "report_remarks",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    examId: uuid("exam_id")
+      .notNull()
+      .references(() => termExams.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    paperId: uuid("paper_id").references(() => examPapers.id, {
+      onDelete: "cascade",
+    }),
+    text: text("text").notNull(),
+    writtenBy: uuid("written_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("report_remarks_overall")
+      .on(table.examId, table.userId)
+      .where(sql`${table.paperId} is null`),
+    uniqueIndex("report_remarks_paper")
+      .on(table.paperId, table.userId)
+      .where(sql`${table.paperId} is not null`),
+    index("report_remarks_user").on(table.userId),
+  ]
+)
+
 /** The organization's daily periods, in order (Timetable module). */
 export const timetablePeriods = pgTable(
   "timetable_periods",
