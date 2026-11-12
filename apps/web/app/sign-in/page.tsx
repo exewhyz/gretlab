@@ -1,5 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { redirect } from "next/navigation"
+
+import { readSession } from "@/features/auth/current-user"
 
 import { DEV_LOGIN_ENABLED } from "@/features/auth/options"
 import { SignInForm } from "@/features/auth/sign-in-button"
@@ -20,6 +23,10 @@ function safePath(path: string | undefined) {
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const { callbackUrl, error } = await searchParams
+  // Signed in with Google but owing the second step: finish that instead.
+  if ((await readSession()).pending) {
+    redirect(`/sign-in/continue?next=${encodeURIComponent(safePath(callbackUrl))}`)
+  }
 
   return (
     <main className="mx-auto grid min-h-dvh max-w-md content-center gap-4 px-4 text-body-sm text-body">

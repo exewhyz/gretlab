@@ -965,6 +965,39 @@ export const hostelResidents = pgTable(
   ]
 )
 
+/**
+ * A person's second sign-in step (apps/web/features/auth/two-factor.ts): an authenticator
+ * app (its secret encrypted with the auth secret), codes by email, or both, and one-time
+ * backup codes, hashed. While the app is being set up, its new secret and codes wait in
+ * the pending columns.
+ */
+export const twoFactor = pgTable("two_factor", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  secret: text("secret"),
+  /** When it was turned on; a session must have passed the second step since. */
+  enabledAt: timestamp("enabled_at", { withTimezone: true }),
+  /** The last 30-second step accepted, so a code can't be used twice. */
+  lastStep: integer("last_step"),
+  backupCodes: jsonb("backup_codes").$type<string[]>().notNull().default([]),
+  pendingSecret: text("pending_secret"),
+  pendingBackupCodes: jsonb("pending_backup_codes").$type<string[]>().notNull().default([]),
+  failures: integer("failures").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  /** Codes by email: on or off, and the one code waiting to be typed (hashed). */
+  emailOn: boolean("email_on").notNull().default(false),
+  emailCode: text("email_code"),
+  emailCodeExpires: timestamp("email_code_expires", { withTimezone: true }),
+  emailCodeTries: integer("email_code_tries").notNull().default(0),
+  emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+  emailSends: integer("email_sends").notNull().default(0),
+  emailWindowStart: timestamp("email_window_start", { withTimezone: true }),
+  /** Raised to forget every browser trusted for 30 days. */
+  trustVersion: integer("trust_version").notNull().default(0),
+  updatedAt: updatedAt(),
+})
+
 /** A link or code that lets people join, optionally into a group and with a role. */
 export const orgInvites = pgTable(
   "org_invites",

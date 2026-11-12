@@ -13,6 +13,7 @@ export const AUDIT_CATEGORIES: Record<string, string> = {
   role: "Roles",
   staff: "Platform staff",
   user: "Accounts",
+  security: "Security",
   notifications: "Notifications",
   lti: "LMS",
   assignment: "Assignments",

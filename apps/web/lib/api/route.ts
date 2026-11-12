@@ -4,28 +4,17 @@ import { z, type ZodType } from "zod"
 
 import { isPlatformPermission, type PlatformPermission } from "@workspace/judge"
 
-import { getCurrentUser } from "@/features/auth/current-user"
+import { readSession } from "@/features/auth/current-user"
+import { mustUseTwoFactor } from "@/features/auth/two-factor"
 import { platformCan } from "@/features/platform/access"
 
 import { clientIp } from "./client-ip"
+import { ApiError } from "./errors"
 import { withRequest } from "./request-context"
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024
 
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-    /** Seconds, sent as Retry-After, when the server is shedding load. */
-    readonly retryAfter?: number
-  ) {
-    super(message)
-  }
-}
-
-export const notFound = (what = "Not found") =>
-  new ApiError(404, "not_found", what)
+export { ApiError, notFound } from "./errors"
 
 /**
  * Who may call a route: anyone, any signed-in person, platform staff by account role
@@ -89,14 +78,34 @@ interface Handler<A extends Access, B> {
  * error shape. Handlers stay short; business logic belongs in features/x/server.
  */
 export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
-  options: { access: A; body?: S },
+  options: {
+    access: A
+    body?: S
+    /** Reachable by someone the platform requires to use two-factor before they have (their security page). */
+    beforeTwoFactor?: boolean
+  },
   handler: (context: Handler<A, z.infer<S>>) => Promise<unknown>
 ) {
   return async (request: NextRequest, context: RouteContext) => {
     try {
       assertSameOrigin(request)
-      const user = await getCurrentUser()
+      const session = await readSession()
+      const user = session.user
       await authorize(user, options.access)
+      // Required two-factor not yet on: only the security page's routes until it is.
+      if (
+        user &&
+        options.access !== "public" &&
+        !options.beforeTwoFactor &&
+        !session.twoFactor &&
+        (await mustUseTwoFactor(user))
+      ) {
+        throw new ApiError(
+          403,
+          "two_factor_required",
+          "Your account needs two-factor sign-in. Turn it on under Security first."
+        )
+      }
 
       let body: unknown
       if (options.body) {

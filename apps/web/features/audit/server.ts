@@ -2,7 +2,7 @@ import { auditLog, getDb, sql, users, type User } from "@workspace/db"
 import { auditCategory, categoryLabel, describeDevice } from "@workspace/judge"
 import { z } from "zod"
 
-import { ApiError } from "@/lib/api/route"
+import { ApiError } from "@/lib/api/errors"
 import { requestInfo } from "@/lib/api/request-context"
 
 /*

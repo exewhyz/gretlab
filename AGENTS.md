@@ -245,6 +245,18 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - Changes are audited as `hostel.*`.
 - A resident is told when they get a bed, move, or move out (`campus.update`, kind `hostel`, copied to their parents). Their bed shows on My classes and on the parent's child page (`campusOf` → `hostel.stay`).
 
+## Two-factor sign-in
+
+- After Google, a second step (Account › Security). The methods are **an authenticator app** (TOTP, RFC 6238: SHA-1, 30-second steps, 6 digits, one step of drift) and **codes by email** (6 random digits, 10 minutes, single-use), on alone or together, plus ten one-time **backup codes** that come with the first method. Code rules live in `packages/judge/src/totp.ts`, a server-only entry point (`@workspace/judge/totp`; it uses node:crypto), tested against the RFC's own values. Never export it from the judge index, which browser code imports.
+- Storage (`two_factor`): the app secret is sealed with AES-256-GCM under a key derived from NEXTAUTH_SECRET (changing that secret means setting the app up again). Backup and emailed codes are hashed. `last_step` stops an app code being used twice. Emailed codes go at most once a minute and five an hour. Five wrong codes of any kind lock the step for 15 minutes. App setup keeps its secret in `pending_*` until a code confirms it.
+- **The session is a JWT.** Codes are checked in NextAuth's jwt callback (`features/auth/options.ts`: `secondStep`, `confirmApp`, `confirmEmail`), reached by POSTing the session update (`features/auth/session-step.ts`). Only a right code writes `mfaAt` into the signed cookie; never a client-sent flag. `readSession()` (`features/auth/current-user.ts`) counts someone with two-factor on as signed in only when `mfaAt` is at or after `enabled_at`, or when their browser holds a valid trust cookie. Otherwise they're `pending`: signed out for every page and API, and `/me` says `twoFactorPending`.
+- Every sign-in goes through `/sign-in/continue?next=`: straight on, or the second step (app, "Email me a code" via `POST /auth/two-factor/email`, which acts only on the pending session's person, or a backup code), then a full page load of `next`.
+- **"Don't ask again on this browser for 30 days":** `gl-2fa-trust`, an httpOnly cookie signed (HMAC) over the person, its expiry, `trust_version` and `enabled_at`. "Forget trusted browsers" raises the version; turning two-factor off and on voids it too.
+- Removing a method, or making new backup codes, needs a current code from any method (the dialog can email one). Removing the last method turns two-factor off.
+- Every change is emailed to the person ("Security: …", through the outbox, sent straight away) and logged on the platform under Security: `security.2fa_on/method_add/method_remove/2fa_off/backup_code/backup_codes/forget_browsers/2fa_reset`.
+- Platform setting `security.require_2fa` (off, staff, everyone; staff means platform staff or anyone holding an organization role that grants something). Someone required to use it who hasn't turned it on gets 403 `two_factor_required` from every API route except those marked `beforeTwoFactor` (their security page), and a banner explains why. Their last method can't be removed. An admin can't require it before turning it on for themselves.
+- Lost every method and code: platform staff with "Manage users" turn their two-factor off from Dashboard › Users. That's refused for someone with more access than you, and never for yourself; the person is emailed. If every admin is locked out, delete their `two_factor` row in the database.
+
 ## Audit log
 
 - One table (`audit_log`) for organizations (`org_id` set) and the platform (null). Always write entries through `writeEntry` in `features/audit/server.ts`; inside organizations, use the `audit()` / `writeAudit()` wrappers, which call it. Each entry records:
@@ -426,6 +438,13 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - Changing rooms: fewer beds never removes an occupied one, more beds add letters, duplicate room names are refused, and occupied rooms and hostels can't be removed.
   - A list with first-free and named beds and a report. Who sees whose names. Moving out. The numbers. The audit.
   - Pages: the page and its hostel, rooms and bed dialogs, My classes, and a phone width.
+- `e2e/two-factor.mjs`:
+  - Setup: the QR code and key, sealed at rest, a wrong code, confirming through the session update.
+  - Older sessions owe the second step (signed out everywhere). Codes can't be reused; one step of drift is allowed. Backup codes work once. Five wrong codes lock the step.
+  - New backup codes, and turning off with a code.
+  - Required for staff or everyone: blocked until turned on, can't be turned off, and an admin can't require it before using it.
+  - Platform reset, the users list, the security log.
+  - Pages: the Security page, finishing sign-in from a public page and from a redirect, and a phone width.
 - `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.

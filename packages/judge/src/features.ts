@@ -91,6 +91,19 @@ export const SETTINGS = {
     schema: z.array(z.string().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/)).max(50),
     default: [] as string[],
   },
+  "security.require_2fa": {
+    label: "Require two-factor sign-in",
+    description:
+      "Who must use an authenticator app as well as Google to sign in. Anyone may turn it on for themselves.",
+    group: "Accounts",
+    schema: z.enum(["off", "staff", "everyone"]),
+    default: "off" as "off" | "staff" | "everyone",
+    choices: {
+      off: "No one",
+      staff: "Staff: platform staff and anyone with a role that manages something",
+      everyone: "Everyone",
+    },
+  },
   "practice.enabled": {
     label: "Practice problems",
     description: "The public problem list. Turn off to run contests only.",

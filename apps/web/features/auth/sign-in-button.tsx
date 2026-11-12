@@ -7,13 +7,15 @@ import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 
 export function SignInForm({
-  callbackUrl,
+  callbackUrl: next,
   devLogin,
 }: {
   callbackUrl: string
   devLogin: boolean
 }) {
   const [email, setEmail] = useState("")
+  // Every sign-in passes /sign-in/continue, which asks for the second step when it's owed.
+  const callbackUrl = `/sign-in/continue?next=${encodeURIComponent(next)}`
   return (
     <div className="grid gap-3">
       <div>

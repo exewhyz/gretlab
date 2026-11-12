@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { User } from "@workspace/db"
 import { useState } from "react"
 
-import { ConfirmDialog } from "@/components/confirm"
+import { ConfirmButton, ConfirmDialog } from "@/components/confirm"
 import Link from "next/link"
 
 import { TextInput } from "@/components/form"
@@ -22,11 +22,20 @@ export function AdminUsers() {
   const { data, error } = useQuery({
     queryKey: ["admin", "users", search],
     queryFn: () =>
-      api<User[]>(`/admin/users?search=${encodeURIComponent(search)}`),
+      api<(User & { twoFactor: boolean })[]>(
+        `/admin/users?search=${encodeURIComponent(search)}`
+      ),
   })
   const update = useMutation({
     mutationFn: ({ id, ...change }: { id: string } & Partial<User>) =>
       api(`/admin/users/${id}`, { method: "PATCH", body: change }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+  })
+  // For someone who lost their phone and backup codes.
+  const reset = useMutation({
+    mutationFn: (id: string) =>
+      api(`/admin/users/${id}/two-factor`, { method: "DELETE" }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
   })
@@ -46,15 +55,15 @@ export function AdminUsers() {
       >
         Users
       </PageTitle>
-      {update.error && (
+      {(update.error ?? reset.error) && (
         <p role="alert" className="mb-3 text-body-sm text-destructive">
-          {update.error.message}
+          {(update.error ?? reset.error)!.message}
         </p>
       )}
       {!data ? (
         <Loading error={error} />
       ) : (
-        <Table headers={["Email", "Name", "Role", "Access"]}>
+        <Table headers={["Email", "Name", "Role", "Two-factor", "Access"]}>
           {data.map((user) => {
             const isSelf = user.id === viewer?.user?.id
             return (
@@ -68,6 +77,27 @@ export function AdminUsers() {
                     <Link href="/admin/staff" className="underline-offset-2 hover:underline">
                       Platform staff
                     </Link>
+                  )}
+                </td>
+                <td className="text-body" data-testid={`two-factor-${user.email}`}>
+                  {user.twoFactor ? (
+                    <span className="flex items-center gap-2">
+                      On
+                      {!isSelf && (
+                        <ConfirmButton
+                          size="sm"
+                          variant="ghost"
+                          title={`Turn off two-factor sign-in for ${user.email}?`}
+                          description="For someone who lost their phone and backup codes. Check it's really them first. They can turn it on again."
+                          confirmLabel="Turn off"
+                          onConfirm={() => reset.mutate(user.id)}
+                        >
+                          Turn off
+                        </ConfirmButton>
+                      )}
+                    </span>
+                  ) : (
+                    "—"
                   )}
                 </td>
                 <td>

@@ -8,6 +8,7 @@ import { freeHandle } from "@/features/catalog/server"
 import { getSettings } from "@/features/settings/server"
 import { isAdminEmail } from "@/lib/admin-emails"
 
+import { confirmApp, confirmEmail, verifySecondStep } from "./two-factor"
 
 /** Sign in as anyone without a password, so never available in a production build. */
 export const DEV_LOGIN_ENABLED =
@@ -84,6 +85,51 @@ export const authOptions: NextAuthOptions = {
         return false
       }
       return user.email ? admit(user.email, user.name) : false
+    },
+    /**
+     * The second sign-in step happens here, on the server: the client calls the session's
+     * update() with a code, and only a right code records `mfaAt` in the signed cookie.
+     * A fresh sign-in starts without it (features/auth/two-factor.ts).
+     */
+    async jwt({ token, trigger, session }) {
+      if (trigger === "signIn") {
+        delete token.mfaAt
+        delete token.mfaError
+      }
+      if (
+        trigger === "update" &&
+        token.email &&
+        session &&
+        typeof session === "object"
+      ) {
+        const data = session as {
+          secondStep?: unknown
+          confirmApp?: unknown
+          confirmEmail?: unknown
+        }
+        const result =
+          typeof data.confirmApp === "string"
+            ? await confirmApp(token.email, data.confirmApp)
+            : typeof data.confirmEmail === "string"
+              ? await confirmEmail(token.email, data.confirmEmail)
+              : typeof data.secondStep === "string"
+                ? await verifySecondStep(token.email, data.secondStep)
+                : null
+        if (result?.ok) {
+          token.mfaAt = result.at
+          delete token.mfaError
+        } else if (result) {
+          token.mfaError = result.reason
+        }
+      }
+      return token
+    },
+    session({ session, token }) {
+      return {
+        ...session,
+        mfaAt: typeof token.mfaAt === "number" ? token.mfaAt : null,
+        mfaError: typeof token.mfaError === "string" ? token.mfaError : null,
+      }
     },
   },
 }

@@ -224,7 +224,14 @@ export function AccountMenu() {
 
   if (!viewer) return <span className="w-20" aria-hidden />
   if (!user) {
-    return (
+    return viewer.twoFactorPending ? (
+      <Link
+        href={`/sign-in/continue?next=${encodeURIComponent(pathname)}`}
+        className={cn(buttonVariants({ size: "sm" }))}
+      >
+        Finish signing in
+      </Link>
+    ) : (
       <Link
         href={`/sign-in?callbackUrl=${encodeURIComponent(pathname)}`}
         className={cn(buttonVariants({ size: "sm" }))}
@@ -293,6 +300,9 @@ export function AccountMenu() {
             My lists
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem render={<Link href="/account/security" />}>
+          Security
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })}>
           Sign out

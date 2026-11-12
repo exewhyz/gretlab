@@ -12,7 +12,7 @@ import { useState } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { Switch } from "@workspace/ui/components/switch"
 
-import { TextInput } from "@/components/form"
+import { SelectInput, TextInput } from "@/components/form"
 import { api } from "@/lib/api/client"
 
 import { Card, Loading, PageTitle } from "./shell"
@@ -89,6 +89,27 @@ function SettingRow({
       <div className="text-caption">{description}</div>
     </div>
   )
+
+  const choices = (SETTINGS[settingKey] as { choices?: Record<string, string> }).choices
+  if (choices) {
+    return (
+      <div className="flex flex-wrap items-start gap-3">
+        {text}
+        <SelectInput
+          aria-label={label}
+          className="w-full min-[901px]:w-80"
+          value={String(value)}
+          onChange={(event) => onSave(event.target.value as Settings[SettingKey])}
+        >
+          {Object.entries(choices).map(([key, name]) => (
+            <option key={key} value={key}>
+              {name}
+            </option>
+          ))}
+        </SelectInput>
+      </div>
+    )
+  }
 
   if (typeof value === "boolean") {
     return (

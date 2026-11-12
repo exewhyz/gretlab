@@ -15,6 +15,7 @@ import { z } from "zod"
 import { ApiError, notFound } from "@/lib/api/route"
 import { platformAccess } from "@/features/platform/access"
 import { writePlatformAudit } from "@/features/platform/staff"
+import { twoFactorOn } from "@/features/auth/two-factor"
 import { invalidateLanguages } from "@/features/settings/server"
 
 const { and, asc, count, desc, eq, gte, ilike, lt, or } = sql
@@ -46,12 +47,14 @@ export async function listUsers(search: string | null) {
   const filter = search
     ? or(ilike(users.email, `%${search}%`), ilike(users.name, `%${search}%`))
     : undefined
-  return db
+  const list = await db
     .select()
     .from(users)
     .where(filter)
     .orderBy(asc(users.email))
     .limit(200)
+  const on = await twoFactorOn(list.map((u) => u.id))
+  return list.map((u) => ({ ...u, twoFactor: on.has(u.id) }))
 }
 
 export async function updateUser(

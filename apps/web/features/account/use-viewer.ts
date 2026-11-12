@@ -9,6 +9,7 @@ import type { EffectiveLanguage } from "@/features/settings/server"
 
 export interface Viewer {
   siteTitle: string
+  twoFactorPending: boolean
   user: {
     id: string
     handle: string
@@ -17,6 +18,7 @@ export interface Viewer {
     role: "student" | "teacher" | "admin"
     teaches: boolean
     parent: boolean
+    security: { twoFactor: boolean; mustEnroll: boolean }
     platform: { permissions: PlatformPermission[]; role: string | null; owner: boolean }
   } | null
   features: {
