@@ -1,16 +1,33 @@
 import type { Metadata } from "next"
 
 import { PageHeader } from "@/components/page-header"
+import { getCurrentUser } from "@/features/auth/current-user"
+import { OrgHome } from "@/features/home/components/home"
+import { OrgShell } from "@/features/home/components/org-shell"
+import { homeViews } from "@/features/home/server"
 import { OrgProfileView } from "@/features/orgs/components/public"
 
 export const metadata: Metadata = { title: "Organization" }
 
+/**
+ * The school's home for the people who run or teach in it (the dashboards in the school
+ * frame); its public profile for everyone else.
+ */
 export default async function OrgPage({
   params,
 }: {
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
+  const user = await getCurrentUser()
+  const views = user ? await homeViews(slug, user) : []
+  if (views.includes("admin") || views.includes("teacher")) {
+    return (
+      <OrgShell slug={slug}>
+        <OrgHome slug={slug} />
+      </OrgShell>
+    )
+  }
   return (
     <div className="min-h-dvh">
       <PageHeader />

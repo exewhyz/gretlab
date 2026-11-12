@@ -68,7 +68,7 @@ await ctx.addCookies([{ name: "next-auth.session-token", value: await encode({ t
 const page = await ctx.newPage()
 const navOf = async (slug) => {
   await page.goto(`${BASE}/orgs/${slug}/manage`)
-  await page.locator('nav[aria-label="Organization"]').getByText("Overview").waitFor({ timeout: 30000 })
+  await page.locator('nav[aria-label="Organization"]').getByText("Home", { exact: true }).waitFor({ timeout: 30000 })
   return page.locator('nav[aria-label="Organization"]').innerText()
 }
 check("a school's sidebar calls groups Classes", (await navOf("typ-school")).includes("Classes"))

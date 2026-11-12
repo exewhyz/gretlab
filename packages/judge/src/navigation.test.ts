@@ -44,9 +44,9 @@ test("permissions filter items, and empty groups disappear", () => {
   })
   assert.deepEqual(
     nav.map((g) => g.group),
-    ["Overview", "Communication"]
+    ["Overview", "Every day"]
   )
-  const comm = nav.find((g) => g.group === "Communication")
+  const comm = nav.find((g) => g.group === "Every day")
   assert.deepEqual(
     comm?.items.map((i) => i.key),
     ["notices"]

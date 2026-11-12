@@ -270,6 +270,27 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Edits that matter record what changed, in `detail.changes` (`{field, from, to}` from `changesBetween`) and `detail.lists` (`{label, added, removed}` from `listChanges`), using labels people read rather than keys. Current examples are organization settings (fields and modules), and roles in organizations and on the platform (name, description, permissions by label). Add the same to any new edit that changes several things.
 - Reading: `readAudit(orgId | null, filters)` returns a page, newest first: `q`, `category`, `actor`, `from`/`to` (days), `before` (the last entry's "time|id"), and `limit` (default 50, at most 200). It also returns the areas and people to filter by. Malformed filters are a 400. `auditCsv` downloads up to 10,000 entries; fields that look like formulas are made safe, and the download itself is logged. Manage › Activity and Dashboard › Activity both use `AuditLog` (`features/audit/components`).
 
+## The school home and frame
+
+- **The frame.** Every school page (the home at `/orgs/:slug` and all of `/orgs/:slug/manage/*`) sits in `OrgShell` (`features/home/components/org-shell.tsx`), built on shadcn's Sidebar (`packages/ui`):
+  - full sidebar from 1024px, an icon rail with tooltips from 768px, a slide-out menu below that;
+  - the header holds the school, your role here, the bell, the theme toggle and the account menu;
+  - the menu groups are wrapped in `nav[aria-label="Organization"]` (tests use it).
+- **The sidebar** comes from `GET /orgs/:slug/shell` (`orgShell` in `features/home/server.ts`): your views, roles, permissions and modules, pending join requests, and your children. Staff items come from `ORG_NAV` / `visibleOrgNav` (groups: People, Academics, Every day, Campus, Coding lab, School), filtered by permission and module. Students get their learning and coding-lab links, and parents a link per child.
+- **Views** (`viewsOf`), in this order:
+  - `admin`: holds an organization-wide `org.members.view`, `org.settings.manage` or `reports.view`;
+  - `teacher`: a teaching role (`attendance.mark` / `teaching.log`) given for particular groups;
+  - `student`: an active member sitting in a group and holding no permissions;
+  - `parent`: linked to a child, with the Parent accounts module on.
+- **The home** (`GET /orgs/:slug/home`, `orgHome`) computes only the views the person has. Someone with both admin and teacher views switches between them with tabs. For now, students, parents and visitors still get the public profile at `/orgs/:slug`.
+  - **School view:**
+    - the setup checklist, shown until every step is done, with steps only for modules that are on;
+    - students, teachers, classes and present today. Students are members holding no role, and teachers hold a teaching role that isn't owner or admin;
+    - attendance class by class today, the last ten days with registers (a shadcn Chart);
+    - needs attention, coverage, and shortcuts limited by permission.
+  - **Teaching view:** today's lessons from the timetable, registers to take, students below 75% (four or more marks), and their classes.
+- Built only from shadcn components (Card, Badge, Progress, Chart, Empty, Skeleton, Tabs, Sidebar) and Gretlab's theme tokens. The sidebar and chart tokens are in `packages/ui/src/styles/globals.css`. Add components with the shadcn CLI from `packages/ui` and never overwrite existing ones.
+
 ## Organizations and permissions
 
 - The platform dashboard is run by platform staff roles (see "Platform staff and roles"; `users.role` is kept in step for older checks). Inside an organization, access comes only from organization roles.
@@ -446,6 +467,12 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - Required for staff or everyone: blocked until turned on, can't be turned off, and an admin can't require it before using it.
   - Platform reset, the users list, the security log.
   - Pages: the Security page, finishing sign-in from a public page and from a redirect, and a phone width.
+- `e2e/home.mjs`:
+  - Who gets which view: admin, teacher, student or parent.
+  - The school view's numbers against a seeded school (students, teachers without owners, classes, present today and open registers, recent days, checklist, needs attention, coverage).
+  - The teacher's day from the timetable, their own classes, registers to take and low attendance.
+  - The sidebar's groups by permission, manage pages in the same frame, and the phone menu.
+  - Every width (1920, 1440, 834, 390) without sideways scrolling.
 - `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.

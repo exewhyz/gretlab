@@ -5,14 +5,11 @@ import {
   MODULE_KEYS,
   MODULES,
   moduleAvailable,
-  ORG_NAV,
   PERMISSIONS,
-  visibleOrgNav,
   type ModuleKey,
   type Permission,
 } from "@workspace/judge"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { useState, type ReactNode } from "react"
 
 import { Button } from "@workspace/ui/components/button"
@@ -45,7 +42,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
-import { PageHeader } from "@/components/page-header"
 import {
   Card,
   Loading,
@@ -55,6 +51,7 @@ import {
 import { useViewer } from "@/features/account/use-viewer"
 import { OwnerProvider } from "@/features/admin/owner"
 import { AuditLog } from "@/features/audit/components/audit-log"
+import { OrgShell } from "@/features/home/components/org-shell"
 import { api } from "@/lib/api/client"
 import { PermissionPicker } from "./permission-picker"
 
@@ -86,81 +83,17 @@ export function ManageShell({
   slug: string
   children: ReactNode
 }) {
-  const pathname = usePathname()
   const { data, error } = useSummary(slug)
-  const base = `/orgs/${slug}/manage`
-  const groups = data
-    ? visibleOrgNav(ORG_NAV, {
-        orgType: data.org.type,
-        can: (p) => data.permissions.includes(p),
-        enabledModules: new Set(data.org.modules),
-      })
-    : []
-
+  // The school frame (features/home/components/org-shell.tsx) draws the sidebar and header.
   return (
-    <div className="min-h-dvh">
-      <PageHeader />
-      <div className="grid gap-4 p-4 min-[901px]:grid-cols-[220px_minmax(0,1fr)]">
-        <nav
-          aria-label="Organization"
-          className="flex flex-wrap gap-1 self-start min-[901px]:sticky min-[901px]:top-18 min-[901px]:grid"
-        >
-          {data && (
-            <div className="mb-2 hidden px-3 min-[901px]:block">
-              <Link
-                href={`/orgs/${slug}`}
-                className="text-title-sm text-ink hover:underline"
-              >
-                {data.org.name}
-              </Link>
-              <div className="text-xs text-body">
-                {ORG_TYPE[data.org.type]}
-                {!data.org.active && " · Suspended"}
-              </div>
-            </div>
-          )}
-          {groups.map((group) => (
-            <div key={group.group} className="grid gap-0.5 min-[901px]:mb-1.5">
-              {group.group !== "Overview" && (
-                <div className="px-3 pt-1.5 text-caption-upper text-body uppercase">
-                  {group.group}
-                </div>
-              )}
-              {group.items.map((item) => {
-                const href = `${base}${item.path}`
-                const active =
-                  href === base ? pathname === base : pathname.startsWith(href)
-                const label =
-                  item.key === "members" && data?.counts.pending
-                    ? `${item.label} (${data.counts.pending} waiting)`
-                    : item.label
-                return (
-                  <Link
-                    key={item.key}
-                    href={href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "rounded-sm px-3 py-1.5 text-nav text-body hover:bg-muted hover:text-ink",
-                      active && "bg-muted text-ink"
-                    )}
-                  >
-                    {label}
-                  </Link>
-                )
-              })}
-            </div>
-          ))}
-        </nav>
-        <main className="min-w-0">
-          {data ? (
-            // The shared dashboard editors work for this organization inside here.
-            <OwnerProvider orgSlug={slug}>{children}</OwnerProvider>
-          ) : (
-            <Loading error={error} />
-          )}
-        </main>
-      </div>
-    </div>
+    <OrgShell slug={slug}>
+      {data ? (
+        // The shared dashboard editors work for this organization inside here.
+        <OwnerProvider orgSlug={slug}>{children}</OwnerProvider>
+      ) : (
+        <Loading error={error} />
+      )}
+    </OrgShell>
   )
 }
 

@@ -186,7 +186,7 @@ function needSubset(
 }
 
 /** Permissions this person has somewhere in the organization, org-wide or in a group. */
-function heldAnywhere(ctx: OrgContext) {
+export function heldAnywhere(ctx: OrgContext) {
   return (Object.keys(PERMISSIONS) as Permission[]).filter((p) => {
     const scope = scopeOf(ctx, p)
     return scope === "all" || scope.size > 0

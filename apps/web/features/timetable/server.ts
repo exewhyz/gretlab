@@ -81,7 +81,7 @@ const pathOf = (ctx: OrgContext, groupId: string) => {
   return names.join(" › ")
 }
 
-const periodsOf = (orgId: string) =>
+export const periodsOf = (orgId: string) =>
   getDb()
     .select()
     .from(timetablePeriods)
@@ -89,7 +89,7 @@ const periodsOf = (orgId: string) =>
     .orderBy(asc(timetablePeriods.position))
 
 /** Slots of some groups, with subject and teacher. */
-async function slotsOf(
+export async function slotsOf(
   orgId: string,
   groupIds: string[] | null,
   teacherId?: string
