@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  AirplaneTiltIcon,
   BedIcon,
   BookOpenIcon,
   BooksIcon,
@@ -74,6 +75,7 @@ export interface Shell {
   modules: string[]
   pending: number
   children: { id: string; name: string }[]
+  leavePending?: number
 }
 
 export function useShell(slug: string) {
@@ -96,6 +98,7 @@ const ICONS: Record<string, Icon> = {
   "academic-years": CalendarCheckIcon,
   exams: ExamIcon,
   results: ExamIcon,
+  leave: AirplaneTiltIcon,
   subjects: BookOpenIcon,
   timetable: CalendarDotsIcon,
   "my-timetable": CalendarDotsIcon,
@@ -195,6 +198,16 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
   groups.push({
     group: "This school",
     items: [
+      ...(shell.modules.includes("leave")
+        ? [
+            {
+              key: "leave",
+              label: "Leave",
+              href: `${base}/leave`,
+              badge: shell.leavePending ? String(shell.leavePending) : undefined,
+            },
+          ]
+        : []),
       { key: "profile", label: "About the school", href: `${base}/about` },
     ],
   })

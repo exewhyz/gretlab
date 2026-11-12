@@ -47,6 +47,13 @@ export const MODULES = {
     for: ["school", "college"],
     ready: true,
   },
+  leave: {
+    label: "Leave",
+    description:
+      "Students (or their parents) and staff ask for leave; class teachers and the office approve it. Approved student leave is excused in attendance.",
+    for: ["school", "college"],
+    ready: true,
+  },
   attendance: {
     label: "Attendance",
     description:
@@ -117,13 +124,13 @@ export const ORG_TYPE_CONFIG: Record<OrgType, OrgTypeConfig> = {
     label: "School",
     groupLevels: ["Grade", "Section"],
     groupsLabel: "Classes",
-    modules: ["records", "exams", "attendance", "timetable", "subjects", "parents"],
+    modules: ["records", "exams", "leave", "attendance", "timetable", "subjects", "parents"],
   },
   college: {
     label: "College",
     groupLevels: ["Branch", "Batch"],
     groupsLabel: "Batches",
-    modules: ["records", "exams", "attendance", "timetable", "subjects"],
+    modules: ["records", "exams", "leave", "attendance", "timetable", "subjects"],
   },
   cohort: {
     label: "Cohort program",

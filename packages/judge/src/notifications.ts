@@ -118,6 +118,20 @@ export const NOTIFICATION_EVENTS = {
     kinds: ["staff_assignment_published"],
     emailByDefault: false,
   },
+  "leave.request": {
+    label: "Leave to decide",
+    description: "Someone you approve leave for asks for it.",
+    audience: "staff",
+    kinds: ["leave_request"],
+    emailByDefault: true,
+  },
+  "leave.decision": {
+    label: "Leave decided",
+    description: "Leave you asked for is approved or refused.",
+    audience: "everyone",
+    kinds: ["leave_decision"],
+    emailByDefault: true,
+  },
   "staff.join_request": {
     label: "Request to join",
     description:

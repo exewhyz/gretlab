@@ -324,6 +324,27 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - Marks entry (`/manage/exams/[id]/papers/[paperId]`): Enter moves to the next student, bad marks are flagged before saving, and leaving with unsaved marks warns.
   - The report card at `/orgs/[slug]/results/[studentId]` (`me` for your own): printable. Linked from the student's sidebar (Results), the parent's child page and the staff student profile.
 
+## Leave (module)
+
+- On by default for schools and colleges. Code in `features/leave`; rules in `packages/judge/src/leave.ts`, unit-tested. The rules cover school days in a span (the timetable's days, Mon–Fri by default), half days (0.5), a request's limits (at most 90 days at once, at most 30 days after the fact), overlaps, staff leave types and balances.
+- One table, `leave_requests`. A request has a `kind`:
+  - `student`, asked by the student or a linked parent. Its `type` is a reason: sick, family, event or other.
+  - `staff`, asked by the staff member themselves. Its `type` is a key of the school's staff leave types (`module_settings.leave.types`: Casual 12, Sick 10, Earned 15 and Unpaid with no limit by default).
+  - `days` is counted when the request is made.
+  - Status goes pending → approved or rejected, or cancelled (taken back while waiting, or before approved leave starts).
+- "Staff" means an active member holding any permission (`heldAnywhere`). A student asking without naming anyone asks for themselves.
+- **Who decides:**
+  - Student leave: the current year's class teacher of the student's section (`class_teachers`), or "Approve student leave" (`leave.students`, scoped).
+  - Staff leave: "Approve staff leave" (`leave.staff`, organization-wide), which also sets the kinds of leave.
+  - Nobody decides their own.
+  - Notifications go to the class teacher (else the school-wide approvers) and to the office. Kinds are `leave_request` and `leave_decision`, in events `leave.request` and `leave.decision`.
+- **Balances** count approved and waiting staff days in the current academic year (else the calendar year). A request beyond what's left is refused (409 `not_enough`), and overlapping leave is refused (409 `overlaps`).
+- **Attendance:**
+  - Approving student leave turns that student's `absent` marks in those days into `excused`.
+  - `getRegister` returns `onLeave` per student, and the register starts them as excused with an "On leave" tag.
+  - `saveRegister` doesn't send parents an absence alert for a day their child is on approved leave.
+- The sidebar has Leave under "This school" for everyone, with a count of requests waiting for you (`orgShell().leavePending`). The page has tabs: To decide, Mine, Decided (filtered by status and student/staff, 50 a page). Audited as `leave.*`.
+
 ## The school home and frame
 
 - **The frame.** Every school page (the home at `/orgs/:slug` and all of `/orgs/:slug/manage/*`) sits in `OrgShell` (`features/home/components/org-shell.tsx`), built on shadcn's Sidebar (`packages/ui`):
@@ -537,6 +558,11 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
   - The pages and the add sheet, at laptop and phone width.
 - `e2e/promotion.mjs`: import (bad rows refused, nothing half-written, scoped to the importer's grade), creating records for existing members, the promotion plan's suggestions, a preview, applying with exceptions, running twice, making the new year current, who may promote, and the wizard at laptop and phone width.
+- `e2e/leave.mjs`:
+  - Who can ask (parent, student, staff); the class teacher decides their class, the school-wide approvers when there's none, the office staff; nobody decides their own.
+  - School days, weekends, half days, overlaps, balances and unpaid leave; refusing with a reason; taking back.
+  - Leave after the fact excuses an absence; registers mark who's on leave; no absence alert for leave asked for; kinds of staff leave; the log.
+  - The pages: asking on a phone, approving from the page, the sidebar count, the register's "On leave" tag.
 - `e2e/exams.mjs`:
   - The scale; exams (duplicates, dates, who may); papers per subject per section (including the grade's subjects; adding twice adds nothing).
   - Marks by the subject teacher, an exam-cell role and nobody else; halves, limits, absences, students of another class; corrections logged separately.

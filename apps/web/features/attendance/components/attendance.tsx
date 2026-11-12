@@ -28,7 +28,12 @@ interface Register {
   canMark: boolean
   taken: boolean
   takenBy: string | null
-  students: { id: string; name: string; status: AttendanceStatus | null }[]
+  students: {
+    id: string
+    name: string
+    status: AttendanceStatus | null
+    onLeave?: string | null
+  }[]
 }
 
 const STATUSES: { value: AttendanceStatus; label: string; short: string }[] = [
@@ -150,10 +155,13 @@ function RegisterSheet({
   } | null>(null)
   useEffect(() => {
     if (!data) return
-    // A register not taken yet starts with everyone present.
+    // A register not taken yet starts with everyone present, and those on leave excused.
     setMarks(
       Object.fromEntries(
-        data.students.map((s) => [s.id, s.status ?? "present"])
+        data.students.map((s) => [
+          s.id,
+          s.status ?? (s.onLeave ? "excused" : "present"),
+        ])
       )
     )
   }, [data])
@@ -220,7 +228,17 @@ function RegisterSheet({
             data-testid="register-row"
             className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline py-2"
           >
-            <span className="text-body-sm text-ink">{s.name}</span>
+            <span className="text-body-sm text-ink">
+              {s.name}
+              {s.onLeave && (
+                <span
+                  className="ml-2 rounded-full bg-muted px-2 py-0.5 text-caption text-muted-foreground"
+                  data-testid="on-leave"
+                >
+                  On leave · {s.onLeave}
+                </span>
+              )}
+            </span>
             <span
               className="flex gap-1"
               role="group"

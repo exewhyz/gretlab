@@ -59,6 +59,7 @@ node e2e/home.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/records.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/promotion.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/exams.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+node e2e/leave.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 
 kill $RUNNER 2>/dev/null
 lsof -ti:3100 | xargs kill 2>/dev/null

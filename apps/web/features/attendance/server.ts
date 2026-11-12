@@ -23,6 +23,7 @@ import {
   writeAudit,
   type OrgContext,
 } from "@/features/orgs/server"
+import { onLeave } from "@/features/leave/server"
 import { tellParents } from "@/features/notifications/server"
 import { ApiError, notFound } from "@/lib/api/route"
 
@@ -101,6 +102,9 @@ export async function getRegister(
     studentsIn(cc),
     findRegister(input.groupId, input.day, input.period),
   ])
+  const away = enabledModules(cc.ctx.org.type, cc.ctx.org.modules).has("leave")
+    ? await onLeave(cc.ctx.org.id, students.map((s) => s.id), input.day)
+    : new Map<string, string>()
   const marks = register
     ? await getDb()
         .select({ userId: attendance.userId, status: attendance.status })
@@ -128,6 +132,8 @@ export async function getRegister(
       status:
         (marks.find((m) => m.userId === s.id)?.status as
           AttendanceStatus | undefined) ?? null,
+      /** On approved leave that day (Leave module): the reason's name. */
+      onLeave: away.get(s.id) ?? null,
     })),
   }
 }
@@ -213,7 +219,12 @@ export async function saveRegister(
       .map((m) => m.userId)
     return { id, corrected: Boolean(existing), newlyAbsent }
   })
-  // Parents hear about an absence the same day (or the next, for a late register), once.
+  // Parents hear about an absence the same day (or the next, for a late register), once;
+  // not for a child on leave they already know about.
+  if (result.newlyAbsent.length && enabledModules(cc.ctx.org.type, cc.ctx.org.modules).has("leave")) {
+    const away = await onLeave(cc.ctx.org.id, result.newlyAbsent, input.day)
+    result.newlyAbsent = result.newlyAbsent.filter((id) => !away.has(id))
+  }
   if (result.newlyAbsent.length && input.day >= dayBefore(await today())) {
     const when = input.day === (await today()) ? "today" : `on ${input.day}`
     await tellParents(cc.ctx.org.id, result.newlyAbsent, (child) => ({

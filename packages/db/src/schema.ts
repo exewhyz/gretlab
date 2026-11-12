@@ -1388,6 +1388,48 @@ export const reportRemarks = pgTable(
   ]
 )
 
+/**
+ * A request for leave (Leave module): a student's (asked by them or a parent) or a staff
+ * member's. `days` counts school days when asked; `type` is a student reason or a staff
+ * leave type key (module settings).
+ */
+export const leaveRequests = pgTable(
+  "leave_requests",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Who is away. */
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** student or staff. */
+    kind: text("kind").notNull(),
+    type: text("type").notNull(),
+    startsOn: text("starts_on").notNull(),
+    endsOn: text("ends_on").notNull(),
+    halfDay: boolean("half_day").notNull().default(false),
+    days: doublePrecision("days").notNull(),
+    reason: text("reason").notNull().default(""),
+    /** pending, approved, rejected or cancelled. */
+    status: text("status").notNull().default("pending"),
+    requestedBy: uuid("requested_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedBy: uuid("decided_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    note: text("note").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("leave_requests_org").on(table.orgId, table.status),
+    index("leave_requests_user").on(table.userId, table.startsOn),
+  ]
+)
+
 /** The organization's daily periods, in order (Timetable module). */
 export const timetablePeriods = pgTable(
   "timetable_periods",

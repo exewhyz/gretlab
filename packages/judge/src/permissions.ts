@@ -133,6 +133,12 @@ export const PERMISSIONS = {
       "Exams, their papers, marks, the grading scale and publishing results (Exams module). Grant this, or the finer actions under it.",
     module: "Teaching",
   },
+  "leave.manage": {
+    label: "Manage leave",
+    description:
+      "Approve or refuse leave for students and staff, and set the kinds of staff leave (Leave module). Grant this, or the finer actions under it.",
+    module: "Members",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:
@@ -446,6 +452,20 @@ export const PERMISSIONS = {
     description: "See marks, results and report cards of the students of the groups this applies to.",
     module: "Teaching",
     parent: "exams.manage",
+  },
+  "leave.students": {
+    label: "Approve student leave",
+    description:
+      "Approve or refuse leave for students of the groups this applies to. Class teachers can always decide for their own class.",
+    module: "Members",
+    parent: "leave.manage",
+  },
+  "leave.staff": {
+    label: "Approve staff leave",
+    description:
+      "Approve or refuse staff leave, see everyone's balances, and set the kinds of leave and how many days a year each allows.",
+    module: "Members",
+    parent: "leave.manage",
   },
   "org.members.assign_roles": {
     label: "Assign roles",
