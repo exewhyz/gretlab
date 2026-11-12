@@ -89,6 +89,14 @@ export const ORG_NAV: NavItem[] = [
     anyOf: ["org.members.import"],
   },
   {
+    key: "admissions",
+    label: "Admissions",
+    path: "/admissions",
+    group: "People",
+    anyOf: ["admissions.manage"],
+    module: "admissions",
+  },
+  {
     key: "students",
     label: "Students",
     path: "/students",

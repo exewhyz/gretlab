@@ -94,7 +94,7 @@ const setPlatform = (changes) => admin("/admin/notifications", { method: "PUT", 
 // ---------- who may manage
 check("students can't see the organization's switches", [403, 404].includes((await s1(N)).status))
 check("teachers can't change them", [403, 404].includes((await t1(N, { method: "PUT", body: {} })).status))
-check("its owner can", (await owner(N)).json?.events.length === 16)
+check("its owner can", (await owner(N)).json?.events.length === 18)
 // A role with only notification management can manage them, nothing else in settings.
 const comms = (await owner(`${O}/roles`, { body: { name: "Comms", permissions: ["org.notifications.manage"] } })).json
 await owner(`${O}/members/${uid("ntf-t1")}/roles`, { body: { roleId: comms.id, groupId: null } })
@@ -210,7 +210,7 @@ const page = async (email, width = 1280) => {
 const ap = await page("admin@example.com")
 await ap.goto(`${BASE}/admin/notifications`)
 await ap.getByTestId("policy-class.notice").waitFor({ timeout: 30000 })
-check("the platform's page lists every event", (await ap.locator('[data-testid^="policy-"]').count()) === 16)
+check("the platform's page lists every event", (await ap.locator('[data-testid^="policy-"]').count()) === 18)
 await ap.screenshot({ path: SHOTS + "notifications-platform.png", fullPage: true })
 
 await setPlatform({ "certificate.issued": { email: false } })

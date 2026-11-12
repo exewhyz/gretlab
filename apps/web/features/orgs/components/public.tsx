@@ -15,6 +15,7 @@ import { useViewer } from "@/features/account/use-viewer"
 import { ORG_TYPE_CONFIG, ORG_TYPES, type OrgType } from "@workspace/judge"
 
 import { Loading } from "@/features/admin/components/shell"
+import { ApplyButton } from "@/features/admissions/components/admissions"
 import { api } from "@/lib/api/client"
 import { formatDate, formatDateTime } from "@/lib/format"
 
@@ -58,6 +59,7 @@ interface OrgProfile {
     roles: string[]
   } | null
   canManage: boolean
+  admissionsOpen?: boolean
 }
 
 function TypeBadge({ type }: { type: OrgType }) {
@@ -411,6 +413,20 @@ export function OrgProfileView({ slug }: { slug: string }) {
         )}
         <FormMessage message={message} />
       </div>
+      {data.admissionsOpen && member?.status !== "active" && (
+        <div
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-card p-4"
+          data-testid="admissions-open"
+        >
+          <div>
+            <div className="font-medium text-ink">Admissions are open</div>
+            <div className="text-body-sm text-body">
+              Apply online; the school replies here and by email.
+            </div>
+          </div>
+          <ApplyButton slug={slug} />
+        </div>
+      )}
       {member?.status === "active" && <OrgFeed slug={slug} />}
     </>
   )

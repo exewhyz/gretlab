@@ -2,6 +2,7 @@
 
 import {
   AirplaneTiltIcon,
+  ClipboardTextIcon,
   FingerprintIcon,
   BedIcon,
   BookOpenIcon,
@@ -77,6 +78,7 @@ export interface Shell {
   pending: number
   children: { id: string; name: string }[]
   leavePending?: number
+  admissionsNew?: number
 }
 
 export function useShell(slug: string) {
@@ -101,6 +103,7 @@ const ICONS: Record<string, Icon> = {
   results: ExamIcon,
   leave: AirplaneTiltIcon,
   "my-attendance": FingerprintIcon,
+  admissions: ClipboardTextIcon,
   "staff-attendance": IdentificationBadgeIcon,
   subjects: BookOpenIcon,
   timetable: CalendarDotsIcon,
@@ -159,7 +162,9 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
         badge:
           i.key === "members" && shell.pending
             ? String(shell.pending)
-            : undefined,
+            : i.key === "admissions" && shell.admissionsNew
+              ? String(shell.admissionsNew)
+              : undefined,
       }))
     if (items.length) groups.push({ group: g.group, items })
   }

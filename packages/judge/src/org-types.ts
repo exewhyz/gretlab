@@ -47,6 +47,13 @@ export const MODULES = {
     for: ["school", "college"],
     ready: true,
   },
+  admissions: {
+    label: "Admissions",
+    description:
+      "Parents apply online; the office reviews, waitlists or admits, and admitting creates the student's record and links the parent. Needs Student records.",
+    for: ["school", "college"],
+    ready: true,
+  },
   leave: {
     label: "Leave",
     description:
@@ -131,13 +138,13 @@ export const ORG_TYPE_CONFIG: Record<OrgType, OrgTypeConfig> = {
     label: "School",
     groupLevels: ["Grade", "Section"],
     groupsLabel: "Classes",
-    modules: ["records", "exams", "leave", "staffAttendance", "attendance", "timetable", "subjects", "parents"],
+    modules: ["records", "admissions", "exams", "leave", "staffAttendance", "attendance", "timetable", "subjects", "parents"],
   },
   college: {
     label: "College",
     groupLevels: ["Branch", "Batch"],
     groupsLabel: "Batches",
-    modules: ["records", "exams", "leave", "staffAttendance", "attendance", "timetable", "subjects"],
+    modules: ["records", "admissions", "exams", "leave", "staffAttendance", "attendance", "timetable", "subjects"],
   },
   cohort: {
     label: "Cohort program",

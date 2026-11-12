@@ -474,7 +474,7 @@ function pathIds(ctx: OrgContext, groupId: string) {
   return out
 }
 
-async function suggestAdmissionNo(ctx: OrgContext) {
+export async function suggestAdmissionNo(ctx: OrgContext) {
   const year = await currentYear(getDb(), ctx.org.id)
   const startYear = Number((year?.startsOn ?? (await today())).slice(0, 4))
   const prefix = admissionPrefix(ctx.org.name, startYear)
@@ -502,7 +502,7 @@ export async function nextNumber(slug: string, user: User) {
   return { admissionNo: await suggestAdmissionNo(ctx) }
 }
 
-async function admissionFree(ctx: OrgContext, no: string, except?: string) {
+export async function admissionFree(ctx: OrgContext, no: string, except?: string) {
   const [clash] = await getDb()
     .select({ userId: studentRecords.userId })
     .from(studentRecords)
@@ -543,7 +543,12 @@ const sealed = (v: string) => (v ? seal(SEAL, v) : null)
  * Creates one student inside a transaction: their account (found by email, or a no-login
  * one), membership, record and, with a group and a current year, enrolment and place.
  */
-async function createInTx(
+/**
+ * Creates a student (and their account, if new) with a record, and enrols them in a year's
+ * section. Their place now (group_members) changes only for the current year. Shared with
+ * Admissions (features/admissions), which admits into next year as well.
+ */
+export async function createInTx(
   tx: Tx,
   ctx: OrgContext,
   input: z.infer<typeof studentSchema>,
@@ -604,7 +609,7 @@ async function createInTx(
       groupId: input.groupId,
       rollNo: input.rollNo,
     })
-    await place(tx, ctx, person.id, input.groupId)
+    if (year.isCurrent) await place(tx, ctx, person.id, input.groupId)
   }
   return person.id
 }

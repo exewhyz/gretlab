@@ -118,6 +118,20 @@ export const NOTIFICATION_EVENTS = {
     kinds: ["staff_assignment_published"],
     emailByDefault: false,
   },
+  "admission.new": {
+    label: "New application",
+    description: "Someone applies for admission.",
+    audience: "staff",
+    kinds: ["admission_new"],
+    emailByDefault: true,
+  },
+  "admission.update": {
+    label: "Your application",
+    description: "An application you made for admission is reviewed, waitlisted, decided or admitted.",
+    audience: "everyone",
+    kinds: ["admission_update"],
+    emailByDefault: true,
+  },
   "leave.request": {
     label: "Leave to decide",
     description: "Someone you approve leave for asks for it.",

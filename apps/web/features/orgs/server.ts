@@ -23,6 +23,7 @@ import {
   type Audience,
   domainMatches,
   enabledModules,
+  readAdmissionSettings,
   grantsPermission,
   isModuleKey,
   moduleAvailable,
@@ -469,6 +470,12 @@ export async function getOrganization(slug: string, viewer: User | null) {
     /** Management permissions this viewer has anywhere in the organization. */
     permissions,
     canManage: permissions.length > 0,
+    /** Taking applications now (Admissions module): the page offers to apply. */
+    admissionsOpen: (() => {
+      const modules = enabledModules(org.type, org.modules)
+      const a = readAdmissionSettings(org.moduleSettings)
+      return modules.has("admissions") && modules.has("records") && a.open && !!a.yearId
+    })(),
   }
 }
 

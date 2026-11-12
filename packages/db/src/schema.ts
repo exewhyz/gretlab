@@ -1461,6 +1461,60 @@ export const staffAttendance = pgTable(
   ]
 )
 
+/**
+ * An application for admission (Admissions module), made by a signed-in applicant (a
+ * parent, or the student themselves) for a grade in an academic year. Birth date, phone
+ * and address are sealed (apps/web/lib/sealed.ts). Admitting creates the student
+ * (`student_id`) through Student records.
+ */
+export const admissionApplications = pgTable(
+  "admission_applications",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** "APP-2026-0001", unique per organization. */
+    number: text("number").notNull(),
+    yearId: uuid("year_id").references(() => academicYears.id, {
+      onDelete: "set null",
+    }),
+    gradeId: uuid("grade_id").references(() => orgGroups.id, {
+      onDelete: "set null",
+    }),
+    applicantId: uuid("applicant_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    studentName: text("student_name").notNull(),
+    birthDate: text("birth_date").notNull(),
+    gender: text("gender").notNull().default(""),
+    previousSchool: text("previous_school").notNull().default(""),
+    parentName: text("parent_name").notNull(),
+    /** mother, father, guardian, or self when the student applies. */
+    relation: text("relation").notNull().default(""),
+    phone: text("phone").notNull(),
+    address: text("address"),
+    notes: text("notes").notNull().default(""),
+    /** submitted, reviewing, waitlisted, rejected, admitted or withdrawn. */
+    status: text("status").notNull().default("submitted"),
+    /** What the school tells the applicant with its last decision. */
+    message: text("message").notNull().default(""),
+    studentId: uuid("student_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedBy: uuid("decided_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("admission_applications_number").on(table.orgId, table.number),
+    index("admission_applications_status").on(table.orgId, table.status),
+    index("admission_applications_applicant").on(table.applicantId),
+  ]
+)
+
 /** The organization's daily periods, in order (Timetable module). */
 export const timetablePeriods = pgTable(
   "timetable_periods",

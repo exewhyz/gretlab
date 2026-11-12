@@ -139,6 +139,12 @@ export const PERMISSIONS = {
       "Approve or refuse leave for students and staff, and set the kinds of staff leave (Leave module). Grant this, or the finer actions under it.",
     module: "Members",
   },
+  "admissions.manage": {
+    label: "Manage admissions",
+    description:
+      "Open and close admissions, review applications, waitlist or turn them down, and admit students, which creates their record and links the parent (Admissions module).",
+    module: "Members",
+  },
   "staff_attendance.mark": {
     label: "Take staff attendance",
     description:

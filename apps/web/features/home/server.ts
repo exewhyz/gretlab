@@ -35,6 +35,7 @@ import { today } from "@/features/catalog/server"
 import { classAttendance, classStream } from "@/features/classes/server"
 import { listContests } from "@/features/contests/server"
 import { pendingLeaveCount } from "@/features/leave/server"
+import { newApplications } from "@/features/admissions/server"
 import { childOverview } from "@/features/parents/server"
 import { rolePermissions } from "@/features/orgs/access"
 import {
@@ -218,6 +219,7 @@ export async function orgShell(slug: string, user: User) {
     modules: [...modules],
     pending: Number(pending?.n ?? 0),
     leavePending: await pendingLeaveCount(ctx),
+    admissionsNew: await newApplications(ctx),
     children: children.map((c) => ({ id: c.id, name: c.name ?? c.email })),
   }
 }
