@@ -282,7 +282,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - `teacher`: a teaching role (`attendance.mark` / `teaching.log`) given for particular groups;
   - `student`: an active member sitting in a group and holding no permissions;
   - `parent`: linked to a child, with the Parent accounts module on.
-- **The home** (`GET /orgs/:slug/home`, `orgHome`) computes only the views the person has, and someone with several switches between them with tabs. Everyone with a view gets the home at `/orgs/:slug`; visitors get the public profile.
+- **The home** (`GET /orgs/:slug/home`, `orgHome`) computes only the views the person has, and someone with several switches between them with tabs. Everyone with a view gets the home at `/orgs/:slug`; visitors get the public profile. That profile also lives at `/orgs/:slug/about` (in the frame for people with a place there; "About the school" in every sidebar). It carries the member's own controls, so keep it reachable: sharing practice progress, leaving, the organization's notices, work, problems and contests, and rating classes.
   - **School view:**
     - the setup checklist, shown until every step is done, with steps only for modules that are on;
     - students, teachers, classes and present today. Students are members holding no role, and teachers hold a teaching role that isn't owner or admin;

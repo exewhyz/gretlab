@@ -141,6 +141,12 @@ for (const width of [1440, 390]) {
   check(`a student's home fits at ${width}px`, await sp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
   if (width === 1440) {
     check("a student's sidebar has their learning links", (await sp.locator('nav[aria-label="Organization"]').innerText()).includes("My classes"))
+    check("...and About the school", (await sp.locator('nav[aria-label="Organization"]').innerText()).includes("About the school"))
+    await sp.goto(`${BASE}${O}/about`)
+    await sp.getByRole("button", { name: "Leave" }).waitFor({ timeout: 30000 }).catch(() => {})
+    check("About the school keeps a student's membership: leave and sharing", (await sp.getByRole("button", { name: "Leave" }).count()) === 1 && (await sp.locator('nav[aria-label="Organization"]').count()) === 1)
+    await sp.goto(`${BASE}${O}`)
+    await sp.getByTestId("student-home").waitFor({ timeout: 30000 })
     await sp.screenshot({ path: SHOTS + "home-student.png", fullPage: true })
   }
   const pp = await view("gf-parent@example.com", width)

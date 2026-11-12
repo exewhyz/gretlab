@@ -181,6 +181,13 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
       })),
     })
   }
+  // Everyone: the school's profile, membership and what it shares with members.
+  groups.push({
+    group: "This school",
+    items: [
+      { key: "profile", label: "About the school", href: `${base}/about` },
+    ],
+  })
   return groups
 }
 
