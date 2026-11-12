@@ -270,6 +270,27 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Edits that matter record what changed, in `detail.changes` (`{field, from, to}` from `changesBetween`) and `detail.lists` (`{label, added, removed}` from `listChanges`), using labels people read rather than keys. Current examples are organization settings (fields and modules), and roles in organizations and on the platform (name, description, permissions by label). Add the same to any new edit that changes several things.
 - Reading: `readAudit(orgId | null, filters)` returns a page, newest first: `q`, `category`, `actor`, `from`/`to` (days), `before` (the last entry's "time|id"), and `limit` (default 50, at most 200). It also returns the areas and people to filter by. Malformed filters are a 400. `auditCsv` downloads up to 10,000 entries; fields that look like formulas are made safe, and the download itself is logged. Manage › Activity and Dashboard › Activity both use `AuditLog` (`features/audit/components`).
 
+## Student records (module)
+
+- On by default for schools and colleges. The tables:
+  - `academic_years`: name, `starts_on`/`ends_on` as "YYYY-MM-DD". A partial unique index allows at most one current year per organization.
+  - `student_records`, keyed by org and user: admission number (unique per org), gender, and `birth_date`, `phone`, `address` sealed with `lib/sealed.ts` (AES-256-GCM, a key per purpose derived from NEXTAUTH_SECRET).
+  - `enrolments`: one per student per year, holding the group (a leaf, a section), a roll number, and a status of active, transferred, graduated or withdrawn.
+  - Rules are in `packages/judge/src/records.ts`, unit-tested.
+- **Places follow the current year.** The current year's *active* enrolments are the students' rows in `group_members`, so registers, timetables, class pages, parents and homes need no change.
+  - `features/records/server.ts` rewrites them whenever a student is placed, moved, withdrawn or restored (`place`), and for everyone when another year becomes current (`syncPlaces`).
+  - Students with no enrolment in the new current year are left without a class. Their history stays.
+  - Never edit a student's `group_members` around this module; go through it.
+- **Students who don't sign in** (young children) still get a user: `noLoginEmail()` is on the reserved `.invalid` domain, which Google can't sign in to. `queueEmails` drops every `.invalid` address, so nothing ever mails them. Such a student can later be given a real email to sign in with.
+- **Permissions:**
+  - "Manage student records" (`students.manage`) has three finer actions under it:
+    - "See student records" (`students.view`, which the Teacher role has);
+    - "Add and edit students" (`students.edit`). Both are scoped to the students' groups; students without a class count as organization-wide.
+    - "Academic years" (`students.years`, organization-wide).
+  - Placing a student needs a current year and a section (a group with nothing inside).
+  - Changes are audited as `records.*`. Personal details are logged only as "changed", never their values.
+- **Pages:** Manage › Students (search by name, email or admission number; filter by class (a grade includes its sections) and status; pages of 50; a sheet to add or edit), Manage › Students › one student (details, parents, attendance, campus, class by year; mark transferred, graduated or withdrawn, or back), and Manage › Academic years. The admin home's checklist gains "Current academic year".
+
 ## The school home and frame
 
 - **The frame.** Every school page (the home at `/orgs/:slug` and all of `/orgs/:slug/manage/*`) sits in `OrgShell` (`features/home/components/org-shell.tsx`), built on shadcn's Sidebar (`packages/ui`):
@@ -475,6 +496,13 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - The teacher's day from the timetable, their own classes, registers to take and low attendance.
   - The sidebar's groups by permission, manage pages in the same frame, and the phone menu.
   - Every width (1920, 1440, 834, 390) without sideways scrolling.
+- `e2e/records.mjs`:
+  - The module, and academic years: bad dates, duplicates, one current. Making another year current empties classes, and switching back restores them; only an empty year can be deleted.
+  - Adding students with and without a sign-in, suggested and unique admission numbers, sections only.
+  - Who may do what: an office role scoped to a grade, teachers limited to their class, students with no access.
+  - Personal details sealed at rest; search and filters; moving, withdrawing, restoring.
+  - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
+  - The pages and the add sheet, at laptop and phone width.
 - `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.

@@ -56,6 +56,7 @@ node e2e/hostel.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/audit.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/two-factor.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/home.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+node e2e/records.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 
 kill $RUNNER 2>/dev/null
 lsof -ti:3100 | xargs kill 2>/dev/null

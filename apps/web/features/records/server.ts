@@ -1,0 +1,880 @@
+import { randomUUID } from "node:crypto"
+
+import {
+  academicYears,
+  attendance,
+  enrolments,
+  getDb,
+  groupMembers,
+  guardians,
+  orgMembers,
+  sql,
+  studentRecords,
+  teachingSessions,
+  users,
+  type User,
+} from "@workspace/db"
+import {
+  admissionPrefix,
+  changesBetween,
+  enabledModules,
+  ENROLMENT_STATUSES,
+  isNoLoginEmail,
+  nextAdmissionNo,
+  noLoginEmail,
+  yearProblem,
+  type Permission,
+} from "@workspace/judge"
+import { z } from "zod"
+
+import { anyGroupGrant, covers, pathName } from "@/features/campus/people"
+import { campusOf } from "@/features/campus/server"
+import { today } from "@/features/catalog/server"
+import {
+  canFor,
+  orgContext,
+  userByEmail,
+  writeAudit,
+  type OrgContext,
+} from "@/features/orgs/server"
+import { ApiError, notFound } from "@/lib/api/errors"
+import { seal, unseal } from "@/lib/sealed"
+
+/*
+ * Student records (a module): academic years, each student's record (admission number,
+ * gender, and phone, date of birth and address sealed), and an enrolment per student per
+ * year placing them in a group with a roll number and a status. The current year's
+ * active enrolments are the students' places (group_members), so registers, timetables,
+ * parents and the rest follow them: making another year current, or placing, moving or
+ * withdrawing a student, rewrites their places (place / syncPlaces). A student may never
+ * sign in: their account then has an address on .invalid (noLoginEmail), which Google
+ * can't sign in and the outbox never mails. Rules in packages/judge/src/records.ts.
+ */
+
+const { and, asc, count, desc, eq, ilike, inArray, ne, or } = sql
+
+const SEAL = "student record"
+
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Give a date")
+
+export const yearSchema = z.object({
+  name: z.string().trim().min(2).max(40),
+  startsOn: day,
+  endsOn: day,
+  isCurrent: z.boolean().optional(),
+})
+
+export const studentSchema = z.object({
+  name: z.string().trim().min(1, "Give the student's name").max(120),
+  /** Empty: a student who doesn't sign in. */
+  email: z.union([z.literal(""), z.email("Not an email address")]).default(""),
+  admissionNo: z.string().trim().max(40).default(""),
+  gender: z.enum(["", "female", "male", "other"]).default(""),
+  birthDate: z.union([z.literal(""), day]).default(""),
+  phone: z.string().trim().max(30).default(""),
+  address: z.string().trim().max(300).default(""),
+  /** The group (section) for the current year; null: not placed. */
+  groupId: z.uuid().nullable().default(null),
+  rollNo: z.number().int().min(1).max(9999).nullable().default(null),
+})
+
+export const statusSchema = z.object({ status: z.enum(ENROLMENT_STATUSES) })
+
+const forbidden = (message: string) => new ApiError(403, "forbidden", message)
+
+function needModule(ctx: OrgContext) {
+  if (!enabledModules(ctx.org.type, ctx.org.modules).has("records")) {
+    throw notFound("Student records aren't switched on for this organization.")
+  }
+}
+
+const isLeaf = (ctx: OrgContext, groupId: string) =>
+  ctx.groups.some((g) => g.id === groupId) &&
+  !ctx.groups.some((g) => g.parentId === groupId)
+
+/** Whether a permission covers a student placed in this group (or, unplaced, the whole org). */
+const coversGroup = (ctx: OrgContext, p: Permission, groupId: string | null) =>
+  covers(ctx, p, groupId ? [groupId] : [])
+
+type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0]
+type Db = ReturnType<typeof getDb> | Tx
+
+async function currentYear(db: Db, orgId: string) {
+  const [y] = await db
+    .select()
+    .from(academicYears)
+    .where(
+      and(eq(academicYears.orgId, orgId), eq(academicYears.isCurrent, true))
+    )
+  return y ?? null
+}
+
+/** Seats one student in exactly this group of the organization (or none). */
+async function place(
+  db: Db,
+  ctx: OrgContext,
+  userId: string,
+  groupId: string | null
+) {
+  const ids = ctx.groups.map((g) => g.id)
+  if (ids.length) {
+    await db
+      .delete(groupMembers)
+      .where(
+        and(eq(groupMembers.userId, userId), inArray(groupMembers.groupId, ids))
+      )
+  }
+  if (groupId)
+    await db
+      .insert(groupMembers)
+      .values({ groupId, userId })
+      .onConflictDoNothing()
+}
+
+/** Every student's place becomes their active enrolment in this year. */
+async function syncPlaces(db: Db, ctx: OrgContext, yearId: string) {
+  const students = await db
+    .select({ userId: studentRecords.userId })
+    .from(studentRecords)
+    .where(eq(studentRecords.orgId, ctx.org.id))
+  const ids = students.map((s) => s.userId)
+  if (ids.length === 0) return
+  const groupIds = ctx.groups.map((g) => g.id)
+  if (groupIds.length) {
+    await db
+      .delete(groupMembers)
+      .where(
+        and(
+          inArray(groupMembers.userId, ids),
+          inArray(groupMembers.groupId, groupIds)
+        )
+      )
+  }
+  const seats = await db
+    .select({ userId: enrolments.userId, groupId: enrolments.groupId })
+    .from(enrolments)
+    .where(and(eq(enrolments.yearId, yearId), eq(enrolments.status, "active")))
+  const rows = seats.filter((s): s is { userId: string; groupId: string } =>
+    Boolean(s.groupId)
+  )
+  if (rows.length)
+    await db.insert(groupMembers).values(rows).onConflictDoNothing()
+}
+
+/* ---------- academic years ---------- */
+
+export async function listYears(slug: string, user: User) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  const can = { years: canFor(ctx, "students.years", []) }
+  if (
+    !can.years &&
+    !anyGroupGrant(ctx, "students.view") &&
+    !anyGroupGrant(ctx, "students.edit")
+  ) {
+    throw forbidden("Student records aren't part of your role.")
+  }
+  const db = getDb()
+  const [years, counts] = await Promise.all([
+    db
+      .select()
+      .from(academicYears)
+      .where(eq(academicYears.orgId, ctx.org.id))
+      .orderBy(desc(academicYears.startsOn)),
+    db
+      .select({ yearId: enrolments.yearId, n: count() })
+      .from(enrolments)
+      .where(eq(enrolments.orgId, ctx.org.id))
+      .groupBy(enrolments.yearId),
+  ])
+  return {
+    can,
+    years: years.map((y) => ({
+      id: y.id,
+      name: y.name,
+      startsOn: y.startsOn,
+      endsOn: y.endsOn,
+      isCurrent: y.isCurrent,
+      enrolled: Number(counts.find((c) => c.yearId === y.id)?.n ?? 0),
+    })),
+  }
+}
+
+async function yearOf(ctx: OrgContext, id: string) {
+  if (!z.uuid().safeParse(id).success) throw notFound("Academic year not found")
+  const [y] = await getDb()
+    .select()
+    .from(academicYears)
+    .where(and(eq(academicYears.id, id), eq(academicYears.orgId, ctx.org.id)))
+  if (!y) throw notFound("Academic year not found")
+  return y
+}
+
+async function nameFree(ctx: OrgContext, name: string, except?: string) {
+  const [clash] = await getDb()
+    .select({ id: academicYears.id })
+    .from(academicYears)
+    .where(
+      and(eq(academicYears.orgId, ctx.org.id), ilike(academicYears.name, name))
+    )
+  if (clash && clash.id !== except)
+    throw new ApiError(
+      409,
+      "duplicate",
+      `There's already a year called ${name}.`
+    )
+}
+
+/** Makes a year the current one: every student moves to their place in it. */
+async function makeCurrent(tx: Tx, ctx: OrgContext, yearId: string) {
+  await tx
+    .update(academicYears)
+    .set({ isCurrent: false })
+    .where(
+      and(eq(academicYears.orgId, ctx.org.id), ne(academicYears.id, yearId))
+    )
+  await tx
+    .update(academicYears)
+    .set({ isCurrent: true })
+    .where(eq(academicYears.id, yearId))
+  await syncPlaces(tx, ctx, yearId)
+}
+
+export async function addYear(
+  slug: string,
+  user: User,
+  input: z.infer<typeof yearSchema>
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!canFor(ctx, "students.years", []))
+    throw forbidden("Academic years aren't part of your role.")
+  const problem = yearProblem(input)
+  if (problem) throw new ApiError(400, "bad_year", problem)
+  await nameFree(ctx, input.name)
+  const id = await getDb().transaction(async (tx) => {
+    const [y] = await tx
+      .insert(academicYears)
+      .values({
+        orgId: ctx.org.id,
+        name: input.name,
+        startsOn: input.startsOn,
+        endsOn: input.endsOn,
+      })
+      .returning({ id: academicYears.id })
+    if (input.isCurrent) await makeCurrent(tx, ctx, y!.id)
+    return y!.id
+  })
+  await writeAudit(
+    ctx,
+    "records.year_add",
+    `Added the academic year ${input.name}${input.isCurrent ? " (current)" : ""}`
+  )
+  return { id }
+}
+
+export async function updateYear(
+  slug: string,
+  user: User,
+  id: string,
+  input: Partial<z.infer<typeof yearSchema>>
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!canFor(ctx, "students.years", []))
+    throw forbidden("Academic years aren't part of your role.")
+  const year = await yearOf(ctx, id)
+  const next = {
+    name: input.name ?? year.name,
+    startsOn: input.startsOn ?? year.startsOn,
+    endsOn: input.endsOn ?? year.endsOn,
+  }
+  const problem = yearProblem(next)
+  if (problem) throw new ApiError(400, "bad_year", problem)
+  if (input.name) await nameFree(ctx, input.name, id)
+  await getDb().transaction(async (tx) => {
+    await tx.update(academicYears).set(next).where(eq(academicYears.id, id))
+    if (input.isCurrent === true && !year.isCurrent)
+      await makeCurrent(tx, ctx, id)
+    if (input.isCurrent === false && year.isCurrent) {
+      await tx
+        .update(academicYears)
+        .set({ isCurrent: false })
+        .where(eq(academicYears.id, id))
+    }
+  })
+  const changes = changesBetween(
+    { ...year, isCurrent: year.isCurrent },
+    { ...next, isCurrent: input.isCurrent ?? year.isCurrent },
+    { name: "Name", startsOn: "Starts", endsOn: "Ends", isCurrent: "Current" }
+  )
+  await writeAudit(
+    ctx,
+    input.isCurrent === true && !year.isCurrent
+      ? "records.year_current"
+      : "records.year_edit",
+    input.isCurrent === true && !year.isCurrent
+      ? `Made ${next.name} the current academic year`
+      : `Changed the academic year ${next.name}`,
+    { changes }
+  )
+  return { saved: true }
+}
+
+export async function deleteYear(slug: string, user: User, id: string) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!canFor(ctx, "students.years", []))
+    throw forbidden("Academic years aren't part of your role.")
+  const year = await yearOf(ctx, id)
+  const [{ n } = { n: 0 }] = await getDb()
+    .select({ n: count() })
+    .from(enrolments)
+    .where(eq(enrolments.yearId, id))
+  if (Number(n) > 0) {
+    throw new ApiError(
+      400,
+      "in_use",
+      `${n} students are enrolled in ${year.name}. Only a year with no one in it can be deleted.`
+    )
+  }
+  await getDb().delete(academicYears).where(eq(academicYears.id, id))
+  await writeAudit(
+    ctx,
+    "records.year_delete",
+    `Deleted the academic year ${year.name}`
+  )
+  return { deleted: true }
+}
+
+/* ---------- students ---------- */
+
+const PAGE = 50
+
+/** Manage › Students: the records this person may see, filtered, a page at a time. */
+export async function listStudents(
+  slug: string,
+  user: User,
+  filters: { q?: string; groupId?: string; status?: string; page?: number }
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  const can = {
+    view: anyGroupGrant(ctx, "students.view"),
+    edit: anyGroupGrant(ctx, "students.edit"),
+    years: canFor(ctx, "students.years", []),
+  }
+  if (!can.view && !can.edit)
+    throw forbidden("Student records aren't part of your role.")
+  const db = getDb()
+  const year = await currentYear(db, ctx.org.id)
+  const term = filters.q?.trim()
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      admissionNo: studentRecords.admissionNo,
+      gender: studentRecords.gender,
+      groupId: enrolments.groupId,
+      rollNo: enrolments.rollNo,
+      status: enrolments.status,
+    })
+    .from(studentRecords)
+    .innerJoin(users, eq(studentRecords.userId, users.id))
+    .leftJoin(
+      enrolments,
+      and(
+        eq(enrolments.userId, studentRecords.userId),
+        eq(
+          enrolments.yearId,
+          year?.id ?? "00000000-0000-0000-0000-000000000000"
+        )
+      )
+    )
+    .where(
+      and(
+        eq(studentRecords.orgId, ctx.org.id),
+        term
+          ? or(
+              ilike(users.name, `%${term}%`),
+              ilike(users.email, `%${term}%`),
+              ilike(studentRecords.admissionNo, `%${term}%`)
+            )
+          : undefined
+      )
+    )
+    .orderBy(asc(studentRecords.admissionNo))
+  const inside = filters.groupId
+    ? new Set(
+        ctx.groups
+          .filter((g) => pathIds(ctx, g.id).includes(filters.groupId!))
+          .map((g) => g.id)
+      )
+    : null
+  const visible = rows.filter(
+    (r) =>
+      (coversGroup(ctx, "students.view", r.groupId) ||
+        coversGroup(ctx, "students.edit", r.groupId)) &&
+      (!inside || (r.groupId && inside.has(r.groupId))) &&
+      (!filters.status ||
+        (filters.status === "unplaced"
+          ? !r.groupId || r.status !== "active"
+          : (r.status ?? "") === filters.status))
+  )
+  const page = Math.max(1, filters.page ?? 1)
+  return {
+    can,
+    year: year ? { id: year.id, name: year.name } : null,
+    total: visible.length,
+    page,
+    pages: Math.max(1, Math.ceil(visible.length / PAGE)),
+    students: visible.slice((page - 1) * PAGE, page * PAGE).map((r) => ({
+      id: r.id,
+      name: r.name ?? r.email,
+      admissionNo: r.admissionNo,
+      gender: r.gender,
+      login: !isNoLoginEmail(r.email),
+      group: r.groupId
+        ? { id: r.groupId, path: pathName(ctx, r.groupId) }
+        : null,
+      rollNo: r.rollNo,
+      status: r.status ?? null,
+    })),
+    groups: ctx.groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      parentId: g.parentId,
+    })),
+    levels: ctx.org.groupLevels,
+    choosable: ctx.groups
+      .filter(
+        (g) => isLeaf(ctx, g.id) && canFor(ctx, "students.edit", [[g.id]])
+      )
+      .map((g) => g.id),
+  }
+}
+
+/** A group and its ancestors' ids, own first. */
+function pathIds(ctx: OrgContext, groupId: string) {
+  const out: string[] = []
+  for (
+    let g = ctx.groups.find((x) => x.id === groupId);
+    g;
+    g = g.parentId ? ctx.groups.find((x) => x.id === g!.parentId) : undefined
+  ) {
+    out.push(g.id)
+  }
+  return out
+}
+
+async function suggestAdmissionNo(ctx: OrgContext) {
+  const year = await currentYear(getDb(), ctx.org.id)
+  const startYear = Number((year?.startsOn ?? (await today())).slice(0, 4))
+  const prefix = admissionPrefix(ctx.org.name, startYear)
+  const used = await getDb()
+    .select({ no: studentRecords.admissionNo })
+    .from(studentRecords)
+    .where(
+      and(
+        eq(studentRecords.orgId, ctx.org.id),
+        ilike(studentRecords.admissionNo, `${prefix}%`)
+      )
+    )
+  return nextAdmissionNo(
+    prefix,
+    used.map((u) => u.no)
+  )
+}
+
+/** The next free admission number, for the Add student form. */
+export async function nextNumber(slug: string, user: User) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!anyGroupGrant(ctx, "students.edit"))
+    throw forbidden("Adding students isn't part of your role.")
+  return { admissionNo: await suggestAdmissionNo(ctx) }
+}
+
+async function admissionFree(ctx: OrgContext, no: string, except?: string) {
+  const [clash] = await getDb()
+    .select({ userId: studentRecords.userId })
+    .from(studentRecords)
+    .where(
+      and(
+        eq(studentRecords.orgId, ctx.org.id),
+        eq(studentRecords.admissionNo, no)
+      )
+    )
+  if (clash && clash.userId !== except)
+    throw new ApiError(
+      409,
+      "duplicate",
+      `Admission number ${no} is already used.`
+    )
+}
+
+function needPlace(ctx: OrgContext, groupId: string | null) {
+  if (groupId && !isLeaf(ctx, groupId)) {
+    throw new ApiError(
+      400,
+      "not_a_section",
+      "Choose a class or section with no groups inside it."
+    )
+  }
+  if (!coversGroup(ctx, "students.edit", groupId)) {
+    throw forbidden(
+      groupId
+        ? "Adding students to that group isn't part of your role."
+        : "Adding students outside your groups isn't part of your role."
+    )
+  }
+}
+
+const sealed = (v: string) => (v ? seal(SEAL, v) : null)
+
+export async function addStudent(
+  slug: string,
+  user: User,
+  input: z.infer<typeof studentSchema>
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  needPlace(ctx, input.groupId)
+  const db = getDb()
+  const year = await currentYear(db, ctx.org.id)
+  if (input.groupId && !year)
+    throw new ApiError(
+      400,
+      "no_year",
+      "Add the current academic year before placing students."
+    )
+  const admissionNo = input.admissionNo || (await suggestAdmissionNo(ctx))
+  await admissionFree(ctx, admissionNo)
+  const email = input.email
+    ? input.email.toLowerCase()
+    : noLoginEmail(randomUUID())
+  const id = await db.transaction(async (tx) => {
+    const person = await userByEmail(tx, email)
+    const [already] = await tx
+      .select({ id: studentRecords.userId })
+      .from(studentRecords)
+      .where(
+        and(
+          eq(studentRecords.orgId, ctx.org.id),
+          eq(studentRecords.userId, person.id)
+        )
+      )
+    if (already)
+      throw new ApiError(
+        409,
+        "already_a_student",
+        `${email} already has a student record here.`
+      )
+    if (!person.name || !input.email)
+      await tx
+        .update(users)
+        .set({ name: input.name })
+        .where(eq(users.id, person.id))
+    await tx
+      .insert(orgMembers)
+      .values({
+        orgId: ctx.org.id,
+        userId: person.id,
+        status: "active",
+        joinedVia: "created",
+      })
+      .onConflictDoUpdate({
+        target: [orgMembers.orgId, orgMembers.userId],
+        set: { status: "active" },
+      })
+    await tx.insert(studentRecords).values({
+      orgId: ctx.org.id,
+      userId: person.id,
+      admissionNo,
+      gender: input.gender,
+      birthDate: sealed(input.birthDate),
+      phone: sealed(input.phone),
+      address: sealed(input.address),
+      admittedOn: await today(),
+    })
+    if (input.groupId && year) {
+      await tx.insert(enrolments).values({
+        orgId: ctx.org.id,
+        yearId: year.id,
+        userId: person.id,
+        groupId: input.groupId,
+        rollNo: input.rollNo,
+      })
+      await place(tx, ctx, person.id, input.groupId)
+    }
+    return person.id
+  })
+  await writeAudit(
+    ctx,
+    "records.student_add",
+    `Added ${input.name} (${admissionNo})${input.groupId ? ` to ${pathName(ctx, input.groupId)}` : ""}`,
+    { login: Boolean(input.email) }
+  )
+  return { id, admissionNo }
+}
+
+async function recordOf(ctx: OrgContext, id: string) {
+  if (!z.uuid().safeParse(id).success) throw notFound("Student not found")
+  const db = getDb()
+  const year = await currentYear(db, ctx.org.id)
+  const [row] = await db
+    .select({ record: studentRecords, user: users })
+    .from(studentRecords)
+    .innerJoin(users, eq(studentRecords.userId, users.id))
+    .where(
+      and(eq(studentRecords.orgId, ctx.org.id), eq(studentRecords.userId, id))
+    )
+  if (!row) throw notFound("Student not found")
+  const [enrolment] = year
+    ? await db
+        .select()
+        .from(enrolments)
+        .where(and(eq(enrolments.yearId, year.id), eq(enrolments.userId, id)))
+    : []
+  return { ...row, year, enrolment: enrolment ?? null }
+}
+
+export async function updateStudent(
+  slug: string,
+  user: User,
+  id: string,
+  input: z.infer<typeof studentSchema>
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  const { record, user: person, year, enrolment } = await recordOf(ctx, id)
+  const from =
+    enrolment?.status === "active" ? (enrolment.groupId ?? null) : null
+  needPlace(ctx, from)
+  if (input.groupId !== from) needPlace(ctx, input.groupId)
+  if (input.groupId && !year)
+    throw new ApiError(
+      400,
+      "no_year",
+      "Add the current academic year before placing students."
+    )
+  const admissionNo = input.admissionNo || record.admissionNo
+  await admissionFree(ctx, admissionNo, id)
+  const db = getDb()
+  await db.transaction(async (tx) => {
+    await tx.update(users).set({ name: input.name }).where(eq(users.id, id))
+    // A student who didn't sign in may be given an address to sign in with.
+    if (input.email && isNoLoginEmail(person.email)) {
+      const [taken] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, input.email.toLowerCase()))
+      if (taken)
+        throw new ApiError(
+          409,
+          "email_taken",
+          `${input.email} already has an account.`
+        )
+      await tx
+        .update(users)
+        .set({ email: input.email.toLowerCase() })
+        .where(eq(users.id, id))
+    }
+    await tx
+      .update(studentRecords)
+      .set({
+        admissionNo,
+        gender: input.gender,
+        birthDate: sealed(input.birthDate),
+        phone: sealed(input.phone),
+        address: sealed(input.address),
+      })
+      .where(
+        and(eq(studentRecords.orgId, ctx.org.id), eq(studentRecords.userId, id))
+      )
+    if (year) {
+      if (input.groupId) {
+        await tx
+          .insert(enrolments)
+          .values({
+            orgId: ctx.org.id,
+            yearId: year.id,
+            userId: id,
+            groupId: input.groupId,
+            rollNo: input.rollNo,
+          })
+          .onConflictDoUpdate({
+            target: [enrolments.yearId, enrolments.userId],
+            set: {
+              groupId: input.groupId,
+              rollNo: input.rollNo,
+              status: "active",
+            },
+          })
+      } else if (enrolment) {
+        await tx.delete(enrolments).where(eq(enrolments.id, enrolment.id))
+      }
+      await place(tx, ctx, id, input.groupId)
+    }
+  })
+  const before = {
+    name: person.name,
+    admissionNo: record.admissionNo,
+    gender: record.gender,
+    group: from ? pathName(ctx, from) : "",
+    rollNo: enrolment?.rollNo ?? null,
+  }
+  const after = {
+    name: input.name,
+    admissionNo,
+    gender: input.gender,
+    group: input.groupId ? pathName(ctx, input.groupId) : "",
+    rollNo: input.rollNo,
+  }
+  const personal =
+    unseal(SEAL, record.birthDate) !== (input.birthDate || null) ||
+    unseal(SEAL, record.phone) !== (input.phone || null) ||
+    unseal(SEAL, record.address) !== (input.address || null)
+  await writeAudit(
+    ctx,
+    "records.student_edit",
+    `Changed ${input.name}'s record (${admissionNo})`,
+    {
+      changes: [
+        ...changesBetween(before, after, {
+          name: "Name",
+          admissionNo: "Admission number",
+          gender: "Gender",
+          group: "Class",
+          rollNo: "Roll number",
+        }),
+        // Personal details are sealed; the log says they changed, not what to.
+        ...(personal
+          ? [{ field: "Personal details", from: "—", to: "changed" }]
+          : []),
+      ],
+    }
+  )
+  return { saved: true }
+}
+
+/** Marks a student transferred, graduated or withdrawn this year (they leave their class), or active again. */
+export async function setStatus(
+  slug: string,
+  user: User,
+  id: string,
+  status: (typeof ENROLMENT_STATUSES)[number]
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  const { user: person, year, enrolment } = await recordOf(ctx, id)
+  if (!year || !enrolment)
+    throw new ApiError(
+      400,
+      "not_enrolled",
+      "The student has no class this year."
+    )
+  needPlace(ctx, enrolment.groupId)
+  await getDb().transaction(async (tx) => {
+    await tx
+      .update(enrolments)
+      .set({ status })
+      .where(eq(enrolments.id, enrolment.id))
+    await place(tx, ctx, id, status === "active" ? enrolment.groupId : null)
+  })
+  await writeAudit(
+    ctx,
+    "records.student_status",
+    `Marked ${person.name ?? person.email} ${status} in ${year.name}`
+  )
+  return { status }
+}
+
+/** One student's record: details (unsealed), class by year, parents, attendance, campus. */
+export async function getStudent(slug: string, user: User, id: string) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  const { record, user: person, year, enrolment } = await recordOf(ctx, id)
+  const groupId = enrolment?.status === "active" ? enrolment.groupId : null
+  if (
+    !coversGroup(ctx, "students.view", groupId) &&
+    !coversGroup(ctx, "students.edit", groupId)
+  ) {
+    throw notFound("Student not found")
+  }
+  const db = getDb()
+  const [history, parents, marks, campus] = await Promise.all([
+    db
+      .select({
+        year: academicYears.name,
+        startsOn: academicYears.startsOn,
+        groupId: enrolments.groupId,
+        rollNo: enrolments.rollNo,
+        status: enrolments.status,
+      })
+      .from(enrolments)
+      .innerJoin(academicYears, eq(enrolments.yearId, academicYears.id))
+      .where(and(eq(enrolments.orgId, ctx.org.id), eq(enrolments.userId, id)))
+      .orderBy(desc(academicYears.startsOn)),
+    db
+      .select({
+        name: users.name,
+        email: users.email,
+        relation: guardians.relation,
+      })
+      .from(guardians)
+      .innerJoin(users, eq(guardians.parentId, users.id))
+      .where(and(eq(guardians.orgId, ctx.org.id), eq(guardians.studentId, id))),
+    db
+      .select({ status: attendance.status, present: attendance.present })
+      .from(attendance)
+      .innerJoin(
+        teachingSessions,
+        eq(attendance.sessionId, teachingSessions.id)
+      )
+      .where(
+        and(eq(attendance.userId, id), eq(teachingSessions.orgId, ctx.org.id))
+      ),
+    campusOf(ctx.org, id),
+  ])
+  const counted = marks.filter((m) => m.status !== "excused")
+  return {
+    id,
+    name: person.name ?? person.email,
+    email: isNoLoginEmail(person.email) ? null : person.email,
+    admissionNo: record.admissionNo,
+    gender: record.gender,
+    birthDate: unseal(SEAL, record.birthDate) ?? "",
+    phone: unseal(SEAL, record.phone) ?? "",
+    address: unseal(SEAL, record.address) ?? "",
+    admittedOn: record.admittedOn,
+    current: year
+      ? {
+          year: year.name,
+          group: groupId ? { id: groupId, path: pathName(ctx, groupId) } : null,
+          rollNo: enrolment?.rollNo ?? null,
+          status: enrolment?.status ?? null,
+        }
+      : null,
+    history: history.map((h) => ({
+      ...h,
+      group: h.groupId ? pathName(ctx, h.groupId) : null,
+    })),
+    parents: parents.map((p) => ({
+      name: p.name ?? p.email,
+      email: p.email,
+      relation: p.relation,
+    })),
+    attendance: counted.length
+      ? {
+          marked: counted.length,
+          percent: Math.round(
+            (100 * counted.filter((m) => m.present).length) / counted.length
+          ),
+        }
+      : null,
+    campus,
+    can: { edit: coversGroup(ctx, "students.edit", groupId) },
+  }
+}

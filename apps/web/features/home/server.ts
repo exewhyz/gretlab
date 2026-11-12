@@ -1,4 +1,5 @@
 import {
+  academicYears,
   attendance,
   getDb,
   groupMembers,
@@ -474,6 +475,21 @@ async function adminHome(ctx: OrgContext) {
         : null,
     ])
 
+  const hasCurrentYear = modules.has("records")
+    ? (
+        await db
+          .select({ id: academicYears.id })
+          .from(academicYears)
+          .where(
+            and(
+              eq(academicYears.orgId, ctx.org.id),
+              eq(academicYears.isCurrent, true)
+            )
+          )
+          .limit(1)
+      ).length > 0
+    : false
+
   const steps = [
     {
       key: "profile",
@@ -481,6 +497,16 @@ async function adminHome(ctx: OrgContext) {
       done: ctx.org.description.trim().length > 0,
       href: "/settings",
     },
+    ...(modules.has("records")
+      ? [
+          {
+            key: "year",
+            label: "Current academic year",
+            done: hasCurrentYear,
+            href: "/academic-years",
+          },
+        ]
+      : []),
     {
       key: "classes",
       label: "Classes and sections",
@@ -497,7 +523,7 @@ async function adminHome(ctx: OrgContext) {
       key: "students",
       label: "Add students",
       done: students.size > 0,
-      href: "/import",
+      href: modules.has("records") ? "/students" : "/import",
     },
     ...(modules.has("subjects")
       ? [

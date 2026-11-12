@@ -121,6 +121,12 @@ export const PERMISSIONS = {
       "Hostels, their rooms and beds, and who stays where (Hostel module). Grant this, or the finer actions under it.",
     module: "Campus",
   },
+  "students.manage": {
+    label: "Manage student records",
+    description:
+      "Students' records (admission number, personal details) and their class for each academic year (Student records module). Grant this, or the finer actions under it.",
+    module: "Members",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:
@@ -390,6 +396,24 @@ export const PERMISSIONS = {
     module: "Campus",
     parent: "hostel.manage",
   },
+  "students.view": {
+    label: "See student records",
+    description: "See the records of the students of the groups this applies to, personal details included.",
+    module: "Members",
+    parent: "students.manage",
+  },
+  "students.edit": {
+    label: "Add and edit students",
+    description: "Add students (with or without a sign-in), edit their records, and place, move or withdraw them in the groups this applies to.",
+    module: "Members",
+    parent: "students.manage",
+  },
+  "students.years": {
+    label: "Academic years",
+    description: "Add and edit the organization's academic years and choose the current one, which moves every student to that year's class.",
+    module: "Members",
+    parent: "students.manage",
+  },
   "org.members.assign_roles": {
     label: "Assign roles",
     description:
@@ -472,6 +496,7 @@ export const SYSTEM_ROLES = {
       "attendance.mark",
       "attendance.view",
       "parents.view",
+      "students.view",
     ] as Permission[],
   },
   member: {

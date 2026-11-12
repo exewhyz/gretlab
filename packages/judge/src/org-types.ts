@@ -33,6 +33,13 @@ export interface OrgTypeConfig {
 }
 
 export const MODULES = {
+  records: {
+    label: "Student records",
+    description:
+      "Academic years, admission numbers and each student's record, with their class for each year.",
+    for: ["school", "college"],
+    ready: true,
+  },
   attendance: {
     label: "Attendance",
     description:
@@ -103,13 +110,13 @@ export const ORG_TYPE_CONFIG: Record<OrgType, OrgTypeConfig> = {
     label: "School",
     groupLevels: ["Grade", "Section"],
     groupsLabel: "Classes",
-    modules: ["attendance", "timetable", "subjects", "parents"],
+    modules: ["records", "attendance", "timetable", "subjects", "parents"],
   },
   college: {
     label: "College",
     groupLevels: ["Branch", "Batch"],
     groupsLabel: "Batches",
-    modules: ["attendance", "timetable", "subjects"],
+    modules: ["records", "attendance", "timetable", "subjects"],
   },
   cohort: {
     label: "Cohort program",

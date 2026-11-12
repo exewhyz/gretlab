@@ -998,6 +998,87 @@ export const twoFactor = pgTable("two_factor", {
   updatedAt: updatedAt(),
 })
 
+/** A school year of an organization (Student records module); one at most is current. */
+export const academicYears = pgTable(
+  "academic_years",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** "YYYY-MM-DD". */
+    startsOn: text("starts_on").notNull(),
+    endsOn: text("ends_on").notNull(),
+    isCurrent: boolean("is_current").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("academic_years_name").on(table.orgId, table.name),
+    uniqueIndex("academic_years_current").on(table.orgId).where(sql`${table.isCurrent}`),
+  ]
+)
+
+/**
+ * A student's record in an organization: admission number and details. Phone, date of
+ * birth and address are sealed (apps/web/lib/sealed.ts). The person is a user, possibly
+ * one who never signs in (packages/judge/src/records.ts, noLoginEmail).
+ */
+export const studentRecords = pgTable(
+  "student_records",
+  {
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    admissionNo: text("admission_no").notNull(),
+    gender: text("gender").notNull().default(""),
+    birthDate: text("birth_date"),
+    phone: text("phone"),
+    address: text("address"),
+    admittedOn: text("admitted_on").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.orgId, table.userId] }),
+    uniqueIndex("student_records_admission").on(table.orgId, table.admissionNo),
+  ]
+)
+
+/**
+ * Where a student sits in one academic year: a group (section), a roll number, a status.
+ * One per student per year. The current year's active ones are the students' places
+ * (group_members), kept in step by apps/web/features/records/server.ts.
+ */
+export const enrolments = pgTable(
+  "enrolments",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    yearId: uuid("year_id")
+      .notNull()
+      .references(() => academicYears.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id").references(() => orgGroups.id, {
+      onDelete: "set null",
+    }),
+    rollNo: integer("roll_no"),
+    /** active, transferred, graduated or withdrawn. */
+    status: text("status").notNull().default("active"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("enrolments_year_user").on(table.yearId, table.userId),
+    index("enrolments_group").on(table.groupId),
+  ]
+)
+
 /** A link or code that lets people join, optionally into a group and with a role. */
 export const orgInvites = pgTable(
   "org_invites",

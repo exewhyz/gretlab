@@ -89,6 +89,14 @@ export const ORG_NAV: NavItem[] = [
     anyOf: ["org.members.import"],
   },
   {
+    key: "students",
+    label: "Students",
+    path: "/students",
+    group: "People",
+    anyOf: ["students.view", "students.edit"],
+    module: "records",
+  },
+  {
     key: "parents",
     label: "Parents",
     path: "/parents",
@@ -103,6 +111,14 @@ export const ORG_NAV: NavItem[] = [
     path: "/assignments",
     group: "Coding lab",
     anyOf: ["assignments.manage", "gradebook.view"],
+  },
+  {
+    key: "academic-years",
+    label: "Academic years",
+    path: "/academic-years",
+    group: "Academics",
+    anyOf: ["students.years"],
+    module: "records",
   },
   {
     key: "subjects",

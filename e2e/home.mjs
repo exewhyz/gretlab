@@ -28,6 +28,7 @@ await admin("/admin/organizations", { body: { name: "Greenfield School", slug: "
 const O = "/orgs/greenfield", orgId = psql(`select id from organizations where slug='greenfield'`)
 const owner = await client("gf-0@example.com"), teacherC = await client("gf-1@example.com")
 await owner(O, { method: "PATCH", body: { description: "A school", modules: { library: true, transport: true } } })
+await owner(`${O}/academic-years`, { body: { name: "2026-2027", startsOn: "2026-06-01", endsOn: "2027-05-31", isCurrent: true } })
 const g3 = await owner(`${O}/groups`, { body: { name: "Grade 3" } }), g5 = await owner(`${O}/groups`, { body: { name: "Grade 5" } })
 const a3 = await owner(`${O}/groups`, { body: { name: "A", parentId: g3.id } }), b3 = await owner(`${O}/groups`, { body: { name: "B", parentId: g3.id } }), a5 = await owner(`${O}/groups`, { body: { name: "A", parentId: g5.id } })
 H.slice(1).forEach((h) => psql(`insert into org_members(org_id,user_id,status,joined_via) values ('${orgId}','${uid(h)}','active','created')`))

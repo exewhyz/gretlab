@@ -1,5 +1,9 @@
 import { emailOutbox, getDb, sql } from "@workspace/db"
-import { afterFailure, OUTBOX_STUCK_SECONDS } from "@workspace/judge"
+import {
+  afterFailure,
+  isNoLoginEmail,
+  OUTBOX_STUCK_SECONDS,
+} from "@workspace/judge"
 
 import {
   mailEnabled,
@@ -55,6 +59,8 @@ export async function queueEmails(
   emails: QueuedEmail[],
   options: QueueOptions = {}
 ) {
+  // Students who don't sign in have an address on .invalid: never mail it.
+  emails = emails.filter((e) => !isNoLoginEmail(e.to))
   if (!mailEnabled() || emails.length === 0) return
   const expiresAt = options.expiresInMs
     ? new Date(Date.now() + options.expiresInMs)
