@@ -112,7 +112,7 @@ check("a leaving date before admission is refused", (await owner(tcUrl(s3), { bo
 const tc = (await owner(tcUrl(s1), { body: { leavingDate: today, reason: "Family moving to Pune", conduct: "Very good" } })).json
 check("issuing numbers it in a series", new RegExp(`^TC-${today.slice(0, 4)}-0001$`).test(tc?.number ?? ""), JSON.stringify(tc))
 check("...and marks the student transferred", psql(`select status from enrolments where user_id='${s1.id}' and year_id='${year.id}'`) === "transferred")
-check("...and is kept sealed as issued", psql(`select count(*) from transfer_certificates where id='${tc.id}' and details like '%Zo%'`) === "0")
+check("...and is kept sealed as issued", psql(`select count(*) from transfer_certificates where id='${tc.id}' and (details like '%"name"%' or details like '%Müller%')`) === "0")
 const tcPdf = await owner.pdf(`${O}/transfer-certificates/${tc.id}/pdf`)
 save("transfer-certificate.pdf", tcPdf)
 check("the certificate prints as a PDF", tcPdf.status === 200 && tcPdf.doc?.getPageCount() === 1 && tcPdf.doc.getTitle().includes(tc.number))
