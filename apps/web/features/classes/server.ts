@@ -19,6 +19,7 @@ import {
 import {
   summarizeAttendance,
   coAttainment,
+  enabledModules,
   poAttainment,
   type Audience,
   type OutcomeMarks,
@@ -284,6 +285,7 @@ export async function classOverview(slug: string, user: User, groupId: string) {
     students: students.length,
     teachers: teachers.map(({ name, roles }) => ({ name, roles })),
     viewer: { teaches: cc.teaches, sits: cc.sits },
+    modules: [...enabledModules(ctx.org.type, ctx.org.modules)],
     can: {
       assignments: can("assignments.manage"),
       contests: can("contests.manage"),

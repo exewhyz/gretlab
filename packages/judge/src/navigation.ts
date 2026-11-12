@@ -110,6 +110,22 @@ export const ORG_NAV: NavItem[] = [
     module: "subjects",
   },
   {
+    key: "timetable",
+    label: "Timetable",
+    path: "/timetable",
+    group: "Teaching",
+    anyOf: ["timetable.periods", "timetable.edit"],
+    module: "timetable",
+  },
+  {
+    key: "my-timetable",
+    label: "My timetable",
+    path: "/my-timetable",
+    group: "Teaching",
+    anyOf: ["teaching.log", "attendance.mark"],
+    module: "timetable",
+  },
+  {
     key: "attendance",
     label: "Attendance",
     path: "/attendance",

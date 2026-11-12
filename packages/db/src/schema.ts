@@ -652,6 +652,11 @@ export const organizations = pgTable("organizations", {
     .$type<Record<string, boolean>>()
     .notNull()
     .default({}),
+  /** Each module's own settings, by module key (e.g. timetable: { days }). */
+  moduleSettings: jsonb("module_settings")
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
   /** The week (its Monday, YYYY-MM-DD) of the last weekly summary sent, so each goes once. */
   digestWeek: text("digest_week"),
   createdAt: createdAt(),
@@ -898,6 +903,52 @@ export const classSubjects = pgTable(
   (table) => [
     uniqueIndex("class_subjects_unique").on(table.groupId, table.subjectId),
     index("class_subjects_org").on(table.orgId),
+  ]
+)
+
+/** The organization's daily periods, in order (Timetable module). */
+export const timetablePeriods = pgTable(
+  "timetable_periods",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** "09:00", 24-hour. */
+    starts: text("starts").notNull(),
+    ends: text("ends").notNull(),
+    /** A break (lunch, recess): shown in the grid, never scheduled. */
+    isBreak: boolean("is_break").notNull().default(false),
+    position: integer("position").notNull(),
+  },
+  (table) => [index("timetable_periods_org").on(table.orgId, table.position)]
+)
+
+/** One cell of a class's week: on this day, in this period, this class subject. */
+export const timetableSlots = pgTable(
+  "timetable_slots",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    /** 1 = Monday ... 7 = Sunday. */
+    day: integer("day").notNull(),
+    periodId: uuid("period_id")
+      .notNull()
+      .references(() => timetablePeriods.id, { onDelete: "cascade" }),
+    classSubjectId: uuid("class_subject_id")
+      .notNull()
+      .references(() => classSubjects.id, { onDelete: "cascade" }),
+    room: text("room").notNull().default(""),
+  },
+  (table) => [
+    uniqueIndex("timetable_slot_unique").on(table.groupId, table.day, table.periodId),
+    index("timetable_slots_org").on(table.orgId),
   ]
 )
 

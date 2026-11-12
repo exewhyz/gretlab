@@ -44,7 +44,7 @@ export const MODULES = {
     label: "Timetable",
     description: "Weekly periods for every subject, per class or section.",
     for: ["school", "college"],
-    ready: false,
+    ready: true,
   },
   subjects: {
     label: "Subjects",

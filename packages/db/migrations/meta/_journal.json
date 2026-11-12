@@ -309,6 +309,13 @@
       "when": 1794460274157,
       "tag": "0043_subjects",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794460988071,
+      "tag": "0044_timetable",
+      "breakpoints": true
     }
   ]
 }

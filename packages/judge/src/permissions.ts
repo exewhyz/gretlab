@@ -92,6 +92,11 @@ export const PERMISSIONS = {
       "The subjects the organization teaches, and which classes take them and who teaches them. Grant this, or the finer actions under it.",
     module: "Teaching",
   },
+  "timetable.manage": {
+    label: "Manage timetables",
+    description: "The organization's periods and school days, and each class's weekly timetable. Grant this, or the finer actions under it.",
+    module: "Teaching",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:
@@ -300,6 +305,18 @@ export const PERMISSIONS = {
       "Choose which classes take a subject and who teaches it there, for the groups this applies to.",
     module: "Teaching",
     parent: "subjects.manage",
+  },
+  "timetable.periods": {
+    label: "Set periods and days",
+    description: "Set the organization's periods (times, breaks) and school days.",
+    module: "Teaching",
+    parent: "timetable.manage",
+  },
+  "timetable.edit": {
+    label: "Edit class timetables",
+    description: "Fill in the weekly timetable of the classes this applies to.",
+    module: "Teaching",
+    parent: "timetable.manage",
   },
   "org.members.assign_roles": {
     label: "Assign roles",

@@ -12,6 +12,7 @@ import { NeedsAttention } from "@/features/classes/components/needs-attention"
 import { Discussion } from "@/features/discussions/components/discussion"
 import { ClassCourses } from "@/features/courses/components/class-courses"
 import { ClassOutcomes } from "@/features/outcomes/components/class-outcomes"
+import { ClassTimetable } from "@/features/timetable/components/timetable"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, type ReactNode } from "react"
@@ -63,6 +64,7 @@ interface Overview {
   students: number
   teachers: { name: string; roles: string[] }[]
   viewer: { teaches: boolean; sits: boolean }
+  modules: string[]
   can: {
     assignments: boolean
     contests: boolean
@@ -151,6 +153,7 @@ const TABS = [
   "people",
   "grades",
   "classes",
+  "timetable",
   "outcomes",
   "insights",
 ] as const
@@ -187,6 +190,9 @@ export function ClassPage({
     ["people", "People"],
     ["grades", "Grades"],
     ["classes", teacher ? "Syllabus and log" : "Syllabus"],
+    ...(data.modules.includes("timetable")
+      ? ([["timetable", "Timetable"]] as [Tab, string][])
+      : []),
     ...(teacher && data.can.grades
       ? ([["outcomes", "Outcomes"]] as [Tab, string][])
       : []),
@@ -331,6 +337,11 @@ export function ClassPage({
             <MySyllabus slug={slug} groupId={groupId} />
           )}
         </TabsContent>
+        {data.modules.includes("timetable") && (
+          <TabsContent value="timetable" className="pt-3">
+            <ClassTimetable slug={slug} groupId={groupId} />
+          </TabsContent>
+        )}
         {teacher && data.can.grades && (
           <TabsContent value="outcomes" className="pt-3">
             <ClassOutcomes slug={slug} groupId={groupId} />
