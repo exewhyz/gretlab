@@ -17,6 +17,7 @@ import {
   type User,
 } from "@workspace/db"
 import {
+  summarizeAttendance,
   coAttainment,
   poAttainment,
   type Audience,
@@ -69,6 +70,8 @@ export const TEACHING: Permission[] = [
   "gradebook.view",
   "notices.manage",
   "reports.view",
+  "attendance.mark",
+  "attendance.view",
 ]
 
 export interface ClassContext {
@@ -217,7 +220,9 @@ export async function teachersOf(cc: ClassContext) {
   for (const r of rows) {
     // Owners and admins run everything; only people given teaching count as teachers.
     if (r.systemKey === "owner" || r.systemKey === "admin") continue
-    if (!rolePermissions(r).includes("teaching.log")) continue
+    // People who log teaching or take attendance are staff of the class.
+    const perms = rolePermissions(r)
+    if (!perms.includes("teaching.log") && !perms.includes("attendance.mark")) continue
     if (r.groupId && !above.includes(r.groupId)) continue
     const t = seen.get(r.id) ?? {
       id: r.id,
@@ -380,7 +385,12 @@ export async function classStream(slug: string, user: User, groupId: string) {
       })
       .from(teachingSessions)
       .leftJoin(users, eq(teachingSessions.teacherId, users.id))
-      .where(inArray(teachingSessions.groupId, cc.inside))
+      .where(
+        and(
+          inArray(teachingSessions.groupId, cc.inside),
+          eq(teachingSessions.kind, "class")
+        )
+      )
       .orderBy(desc(teachingSessions.createdAt))
       .limit(50),
     classwork(slug, user, groupId),
@@ -579,13 +589,10 @@ export async function classAttendance(
         )
     : []
   const summarize = (userId: string) => {
-    const own = marks.filter((m) => m.userId === userId)
-    const present = own.filter((m) => m.present).length
-    return {
-      marked: own.length,
-      present,
-      percent: own.length ? Math.round((100 * present) / own.length) : null,
-    }
+    const s = summarizeAttendance(
+      marks.filter((m) => m.userId === userId).map((m) => m.status)
+    )
+    return { marked: s.counted, present: s.present + s.late, percent: s.percent }
   }
   const staff =
     canFor(cc.ctx, "teaching.log", [[groupId]]) ||

@@ -118,7 +118,12 @@ export async function getGroupTeaching(
       })
       .from(teachingSessions)
       .leftJoin(users, eq(teachingSessions.teacherId, users.id))
-      .where(eq(teachingSessions.groupId, groupId))
+      .where(
+        and(
+          eq(teachingSessions.groupId, groupId),
+          eq(teachingSessions.kind, "class")
+        )
+      )
       .orderBy(desc(teachingSessions.day), desc(teachingSessions.createdAt))
       .limit(500),
   ])
@@ -234,7 +239,13 @@ export async function logSession(
     if (marks.length) {
       await tx
         .insert(attendance)
-        .values(marks.map((m) => ({ ...m, sessionId: session!.id })))
+        .values(
+          marks.map((m) => ({
+            ...m,
+            status: m.present ? ("present" as const) : ("absent" as const),
+            sessionId: session!.id,
+          }))
+        )
         .onConflictDoNothing()
     }
     return session
@@ -313,7 +324,12 @@ export async function teacherHome(user: User) {
               teacherId: teachingSessions.teacherId,
             })
             .from(teachingSessions)
-            .where(inArray(teachingSessions.groupId, ids)),
+            .where(
+              and(
+                inArray(teachingSessions.groupId, ids),
+                eq(teachingSessions.kind, "class")
+              )
+            ),
         ])
       : [[], [], []]
     const groups = ctx.groups
@@ -627,7 +643,12 @@ export async function orgReport(
           })
           .from(teachingSessions)
           .leftJoin(users, eq(teachingSessions.teacherId, users.id))
-          .where(inArray(teachingSessions.groupId, groupIds)),
+          .where(
+            and(
+              inArray(teachingSessions.groupId, groupIds),
+              eq(teachingSessions.kind, "class")
+            )
+          ),
       ])
     : [[], []]
   const monthAgo = daysAgo(day, 30)
@@ -800,6 +821,7 @@ export async function classesToRate(slug: string, user: User) {
       .where(
         and(
           eq(teachingSessions.orgId, ctx.org.id),
+          eq(teachingSessions.kind, "class"),
           inArray(teachingSessions.groupId, [...reachable]),
           gte(teachingSessions.day, daysAgo(day, FEEDBACK_DAYS))
         )

@@ -834,9 +834,21 @@ export const teachingSessions = pgTable(
     minutes: integer("minutes").notNull(),
     topicIds: jsonb("topic_ids").$type<string[]>().notNull().default([]),
     note: text("note").notNull().default(""),
+    /**
+     * "class": a class taught (minutes, topics), from the teaching log. "register": an
+     * attendance register only (Attendance module), no minutes or topics. Teaching views
+     * read only classes; attendance reads both.
+     */
+    kind: text("kind").$type<"class" | "register">().notNull().default("class"),
+    /** A register's period or subject ("Period 3", "Physics"); "" for a whole-day register. */
+    period: text("period").notNull().default(""),
     createdAt: createdAt(),
   },
   (table) => [
+    // One register per group, day and period.
+    uniqueIndex("attendance_register_unique")
+      .on(table.groupId, table.day, table.period)
+      .where(sql`${table.kind} = 'register'`),
     index("teaching_sessions_group").on(table.groupId, table.day),
     index("teaching_sessions_teacher").on(table.teacherId, table.day),
   ]
@@ -869,7 +881,13 @@ export const attendance = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /** Counted as there: present or late. Kept in step with `status`. */
     present: boolean("present").notNull(),
+    /** present, absent, late, or excused (left out of percentages). */
+    status: text("status")
+      .$type<"present" | "absent" | "late" | "excused">()
+      .notNull()
+      .default("present"),
   },
   (table) => [
     primaryKey({ columns: [table.sessionId, table.userId] }),

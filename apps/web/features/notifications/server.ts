@@ -154,7 +154,8 @@ async function remindersFor(user: User): Promise<Reminder[]> {
   if (settings["assignments.enabled"]) {
     for (const a of await listAssignments(user).catch(() => [])) {
       const left = new Date(a.dueAt).getTime() - now
-      if (!a.published || a.phase !== "open" || left > DAY_MS || left <= 0) continue
+      if (!a.published || a.phase !== "open" || left > DAY_MS || left <= 0)
+        continue
       if (a.total > 0 && a.earned >= a.total) continue
       out.push({
         id: `due:${a.slug}`,
@@ -186,7 +187,11 @@ async function remindersFor(user: User): Promise<Reminder[]> {
       groupId: teachingSessions.groupId,
       group: orgGroups.name,
       orgSlug: organizations.slug,
-      total: count(),
+      // Excused marks are left out of attendance figures.
+      total:
+        sql.sql<number>`count(*) filter (where ${attendance.status} <> 'excused')`.mapWith(
+          Number
+        ),
       present: sql.sql<number>`count(*) filter (where ${attendance.present})`,
     })
     .from(attendance)
@@ -196,8 +201,9 @@ async function remindersFor(user: User): Promise<Reminder[]> {
     .where(eq(attendance.userId, user.id))
     .groupBy(teachingSessions.groupId, orgGroups.name, organizations.slug)
   for (const r of rows) {
+    if (r.total < 4) continue
     const percent = Math.round((100 * Number(r.present)) / r.total)
-    if (r.total < 4 || percent >= 75) continue
+    if (percent >= 75) continue
     out.push({
       id: `attendance:${r.groupId}`,
       kind: "attendance_low",
@@ -230,7 +236,9 @@ export async function myNotifications(user: User) {
     getDb()
       .select({ n: count() })
       .from(notifications)
-      .where(and(eq(notifications.userId, user.id), isNull(notifications.readAt))),
+      .where(
+        and(eq(notifications.userId, user.id), isNull(notifications.readAt))
+      ),
   ])
   const [me] = await getDb()
     .select({ email: users.emailNotifications })

@@ -38,7 +38,7 @@ export const MODULES = {
     description:
       "A daily register for each class or section, and attendance reports.",
     for: ["school", "college", "cohort"],
-    ready: false,
+    ready: true,
   },
   timetable: {
     label: "Timetable",

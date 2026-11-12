@@ -97,6 +97,14 @@ export const ORG_NAV: NavItem[] = [
     anyOf: ["assignments.manage", "gradebook.view"],
   },
   {
+    key: "attendance",
+    label: "Attendance",
+    path: "/attendance",
+    group: "Teaching",
+    anyOf: ["attendance.mark", "attendance.view"],
+    module: "attendance",
+  },
+  {
     key: "templates",
     label: "Templates",
     path: "/templates",
@@ -146,6 +154,14 @@ export const ORG_NAV: NavItem[] = [
     path: "/reports",
     group: "Reports",
     anyOf: ["reports.view"],
+  },
+  {
+    key: "attendance-report",
+    label: "Attendance report",
+    path: "/attendance-report",
+    group: "Reports",
+    anyOf: ["attendance.view", "attendance.mark"],
+    module: "attendance",
   },
   {
     key: "outcomes",

@@ -86,6 +86,18 @@ export const PERMISSIONS = {
       "Keep the syllabus of the groups this applies to and log the classes taught.",
     module: "Teaching",
   },
+  "attendance.mark": {
+    label: "Take attendance",
+    description:
+      "Take and correct the attendance register for the groups this applies to (Attendance module).",
+    module: "Teaching",
+  },
+  "attendance.view": {
+    label: "See attendance",
+    description:
+      "See attendance registers and reports for the groups this applies to.",
+    module: "Teaching",
+  },
   "reports.view": {
     label: "See reports",
     description:
@@ -337,6 +349,8 @@ export const SYSTEM_ROLES = {
       "notices.manage",
       "teaching.log",
       "reports.view",
+      "attendance.mark",
+      "attendance.view",
     ] as Permission[],
   },
   member: {

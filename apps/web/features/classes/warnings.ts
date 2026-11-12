@@ -44,7 +44,8 @@ export async function classWarnings(slug: string, user: User, groupId: string) {
       ? getDb()
           .select({
             userId: attendance.userId,
-            total: sql.count(),
+            // Excused marks are left out of attendance figures.
+            total: sql.sql<number>`count(*) filter (where ${attendance.status} <> 'excused')`.mapWith(Number),
             present: sql.sql<number>`count(*) filter (where ${attendance.present})`,
           })
           .from(attendance)
