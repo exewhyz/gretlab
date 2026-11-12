@@ -289,6 +289,11 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
     - "Academic years" (`students.years`, organization-wide).
   - Placing a student needs a current year and a section (a group with nothing inside).
   - Changes are audited as `records.*`. Personal details are logged only as "changed", never their values.
+- **Promotion** (Manage › Academic years › Promote students; `promotion` in `features/records/server.ts`):
+  - Pick a from-year and a to-year. Each section of the from-year is suggested a destination by `suggestPromotion` (the same-named section of the next grade, else that grade's first section; the top grade graduates). A section can instead repeat, graduate or withdraw, and single students can be made exceptions.
+  - A preview counts moved, repeated, graduated, withdrawn and skipped (already enrolled in the to-year), so running it twice is safe. Applying writes to-year enrolments and graduated/withdrawn statuses in one transaction, optionally makes the to-year current, and is audited as `records.promote`.
+- **Import** (Manage › Students › Import): a CSV file or pasted text. Every row is checked first (name, email, gender, day-first birth date, class path to a section the importer may edit, roll, unique admission number) and nothing is written unless all rows pass; then all are added in one transaction (`records.import`).
+- **People already in classes without a record** (from before the module) show as a banner on Manage › Students; "Create records" gives each an admission number and a current-year enrolment (`records.adopt`).
 - **Pages:** Manage › Students (search by name, email or admission number; filter by class (a grade includes its sections) and status; pages of 50; a sheet to add or edit), Manage › Students › one student (details, parents, attendance, campus, class by year; mark transferred, graduated or withdrawn, or back), and Manage › Academic years. The admin home's checklist gains "Current academic year".
 
 ## The school home and frame
@@ -503,6 +508,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - Personal details sealed at rest; search and filters; moving, withdrawing, restoring.
   - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
   - The pages and the add sheet, at laptop and phone width.
+- `e2e/promotion.mjs`: import (bad rows refused, nothing half-written, scoped to the importer's grade), creating records for existing members, the promotion plan's suggestions, a preview, applying with exceptions, running twice, making the new year current, who may promote, and the wizard at laptop and phone width.
 - `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.

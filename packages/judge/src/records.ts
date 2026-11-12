@@ -59,3 +59,46 @@ export const NO_LOGIN_DOMAIN = "students.gretlab.invalid"
 export const noLoginEmail = (id: string) => `no-login+${id}@${NO_LOGIN_DOMAIN}`
 
 export const isNoLoginEmail = (email: string) => email.toLowerCase().endsWith(".invalid")
+
+/* ---------- promotion ---------- */
+
+export interface TreeGroup {
+  id: string
+  name: string
+  parentId: string | null
+}
+
+const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+
+/**
+ * Where each section's students go next year: the same-named section of the next group
+ * at its parent's level ("Grade 3 › A" → "Grade 4 › A", grades in natural order), or
+ * "graduate" when there's no next one (the top grade). A section whose next grade has no
+ * section of that name goes to that grade's first section. A section without a parent
+ * (no grades) stays where it is.
+ */
+export function suggestPromotion(groups: readonly TreeGroup[], sectionIds: readonly string[]) {
+  const byId = new Map(groups.map((g) => [g.id, g]))
+  const childrenOf = (id: string | null) =>
+    groups.filter((g) => g.parentId === id).sort((a, b) => natural(a.name, b.name))
+  const out: Record<string, string> = {}
+  for (const id of sectionIds) {
+    const section = byId.get(id)
+    if (!section) continue
+    if (!section.parentId) {
+      out[id] = id
+      continue
+    }
+    const grade = byId.get(section.parentId)!
+    const grades = childrenOf(grade.parentId)
+    const next = grades[grades.findIndex((g) => g.id === grade.id) + 1]
+    if (!next) {
+      out[id] = "graduate"
+      continue
+    }
+    const sections = childrenOf(next.id)
+    const same = sections.find((s) => s.name.toLowerCase() === section.name.toLowerCase())
+    out[id] = (same ?? sections[0] ?? next).id
+  }
+  return out
+}

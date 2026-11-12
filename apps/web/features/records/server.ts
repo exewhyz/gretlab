@@ -8,6 +8,8 @@ import {
   groupMembers,
   guardians,
   orgMembers,
+  orgRoles as roleOf,
+  roleAssignments as roleAssignmentsUser,
   sql,
   studentRecords,
   teachingSessions,
@@ -22,6 +24,7 @@ import {
   isNoLoginEmail,
   nextAdmissionNo,
   noLoginEmail,
+  suggestPromotion,
   yearProblem,
   type Permission,
 } from "@workspace/judge"
@@ -29,6 +32,7 @@ import { z } from "zod"
 
 import { anyGroupGrant, covers, pathName } from "@/features/campus/people"
 import { campusOf } from "@/features/campus/server"
+import { rolePermissions } from "@/features/orgs/access"
 import { today } from "@/features/catalog/server"
 import {
   canFor,
@@ -533,6 +537,76 @@ function needPlace(ctx: OrgContext, groupId: string | null) {
 
 const sealed = (v: string) => (v ? seal(SEAL, v) : null)
 
+/**
+ * Creates one student inside a transaction: their account (found by email, or a no-login
+ * one), membership, record and, with a group and a current year, enrolment and place.
+ */
+async function createInTx(
+  tx: Tx,
+  ctx: OrgContext,
+  input: z.infer<typeof studentSchema>,
+  admissionNo: string,
+  year: typeof academicYears.$inferSelect | null
+) {
+  const email = input.email
+    ? input.email.toLowerCase()
+    : noLoginEmail(randomUUID())
+  const person = await userByEmail(tx, email)
+  const [already] = await tx
+    .select({ id: studentRecords.userId })
+    .from(studentRecords)
+    .where(
+      and(
+        eq(studentRecords.orgId, ctx.org.id),
+        eq(studentRecords.userId, person.id)
+      )
+    )
+  if (already)
+    throw new ApiError(
+      409,
+      "already_a_student",
+      `${email} already has a student record here.`
+    )
+  if (!person.name || !input.email)
+    await tx
+      .update(users)
+      .set({ name: input.name })
+      .where(eq(users.id, person.id))
+  await tx
+    .insert(orgMembers)
+    .values({
+      orgId: ctx.org.id,
+      userId: person.id,
+      status: "active",
+      joinedVia: "created",
+    })
+    .onConflictDoUpdate({
+      target: [orgMembers.orgId, orgMembers.userId],
+      set: { status: "active" },
+    })
+  await tx.insert(studentRecords).values({
+    orgId: ctx.org.id,
+    userId: person.id,
+    admissionNo,
+    gender: input.gender,
+    birthDate: sealed(input.birthDate),
+    phone: sealed(input.phone),
+    address: sealed(input.address),
+    admittedOn: await today(),
+  })
+  if (input.groupId && year) {
+    await tx.insert(enrolments).values({
+      orgId: ctx.org.id,
+      yearId: year.id,
+      userId: person.id,
+      groupId: input.groupId,
+      rollNo: input.rollNo,
+    })
+    await place(tx, ctx, person.id, input.groupId)
+  }
+  return person.id
+}
+
 export async function addStudent(
   slug: string,
   user: User,
@@ -551,65 +625,9 @@ export async function addStudent(
     )
   const admissionNo = input.admissionNo || (await suggestAdmissionNo(ctx))
   await admissionFree(ctx, admissionNo)
-  const email = input.email
-    ? input.email.toLowerCase()
-    : noLoginEmail(randomUUID())
-  const id = await db.transaction(async (tx) => {
-    const person = await userByEmail(tx, email)
-    const [already] = await tx
-      .select({ id: studentRecords.userId })
-      .from(studentRecords)
-      .where(
-        and(
-          eq(studentRecords.orgId, ctx.org.id),
-          eq(studentRecords.userId, person.id)
-        )
-      )
-    if (already)
-      throw new ApiError(
-        409,
-        "already_a_student",
-        `${email} already has a student record here.`
-      )
-    if (!person.name || !input.email)
-      await tx
-        .update(users)
-        .set({ name: input.name })
-        .where(eq(users.id, person.id))
-    await tx
-      .insert(orgMembers)
-      .values({
-        orgId: ctx.org.id,
-        userId: person.id,
-        status: "active",
-        joinedVia: "created",
-      })
-      .onConflictDoUpdate({
-        target: [orgMembers.orgId, orgMembers.userId],
-        set: { status: "active" },
-      })
-    await tx.insert(studentRecords).values({
-      orgId: ctx.org.id,
-      userId: person.id,
-      admissionNo,
-      gender: input.gender,
-      birthDate: sealed(input.birthDate),
-      phone: sealed(input.phone),
-      address: sealed(input.address),
-      admittedOn: await today(),
-    })
-    if (input.groupId && year) {
-      await tx.insert(enrolments).values({
-        orgId: ctx.org.id,
-        yearId: year.id,
-        userId: person.id,
-        groupId: input.groupId,
-        rollNo: input.rollNo,
-      })
-      await place(tx, ctx, person.id, input.groupId)
-    }
-    return person.id
-  })
+  const id = await db.transaction((tx) =>
+    createInTx(tx, ctx, input, admissionNo, year)
+  )
   await writeAudit(
     ctx,
     "records.student_add",
@@ -877,4 +895,521 @@ export async function getStudent(slug: string, user: User, id: string) {
     campus,
     can: { edit: coversGroup(ctx, "students.edit", groupId) },
   }
+}
+
+/* ---------- promotion to another year ---------- */
+
+const target = z.union([
+  z.uuid(),
+  z.literal("graduate"),
+  z.literal("repeat"),
+  z.literal("withdraw"),
+])
+
+export const promoteSchema = z.object({
+  fromYearId: z.uuid(),
+  toYearId: z.uuid(),
+  /** Each section's students go to a group, graduate, stay (repeat) or leave. */
+  sections: z.record(z.string(), target),
+  /** One student's own destination, over their section's. */
+  exceptions: z.record(z.string(), target).default({}),
+  makeCurrent: z.boolean().default(false),
+  /** false: only count what would happen. */
+  apply: z.boolean().default(false),
+})
+
+function needPromote(ctx: OrgContext) {
+  if (!canFor(ctx, "students.years", []) || !canFor(ctx, "students.edit", [])) {
+    throw forbidden(
+      "Promoting students needs Academic years and Add and edit students for the whole organization."
+    )
+  }
+}
+
+/** Every active student of a year, by section, with a suggested destination for each section. */
+export async function promotionPlan(
+  slug: string,
+  user: User,
+  fromYearId: string,
+  toYearId: string
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  needPromote(ctx)
+  const [from, to] = await Promise.all([
+    yearOf(ctx, fromYearId),
+    yearOf(ctx, toYearId),
+  ])
+  if (from.id === to.id)
+    throw new ApiError(400, "same_year", "Choose two different years.")
+  const db = getDb()
+  const [rows, already] = await Promise.all([
+    db
+      .select({
+        userId: enrolments.userId,
+        groupId: enrolments.groupId,
+        rollNo: enrolments.rollNo,
+        name: users.name,
+        email: users.email,
+      })
+      .from(enrolments)
+      .innerJoin(users, eq(enrolments.userId, users.id))
+      .where(
+        and(eq(enrolments.yearId, from.id), eq(enrolments.status, "active"))
+      )
+      .orderBy(asc(enrolments.rollNo), asc(users.name)),
+    db
+      .select({ userId: enrolments.userId })
+      .from(enrolments)
+      .where(eq(enrolments.yearId, to.id)),
+  ])
+  const placed = new Set(already.map((a) => a.userId))
+  const sectionIds = [
+    ...new Set(rows.flatMap((r) => (r.groupId ? [r.groupId] : []))),
+  ]
+  const suggested = suggestPromotion(ctx.groups, sectionIds)
+  return {
+    from: { id: from.id, name: from.name, isCurrent: from.isCurrent },
+    to: { id: to.id, name: to.name, isCurrent: to.isCurrent },
+    sections: sectionIds
+      .map((id) => ({
+        groupId: id,
+        path: pathName(ctx, id),
+        suggested: suggested[id] ?? "repeat",
+        students: rows
+          .filter((r) => r.groupId === id)
+          .map((r) => ({
+            id: r.userId,
+            name: r.name ?? r.email,
+            rollNo: r.rollNo,
+            already: placed.has(r.userId),
+          })),
+      }))
+      .sort((a, b) =>
+        a.path.localeCompare(b.path, undefined, { numeric: true })
+      ),
+    targets: ctx.groups
+      .filter((g) => isLeaf(ctx, g.id))
+      .map((g) => ({ id: g.id, path: pathName(ctx, g.id) }))
+      .sort((a, b) =>
+        a.path.localeCompare(b.path, undefined, { numeric: true })
+      ),
+  }
+}
+
+/**
+ * Moves a year's students on: each gets an enrolment in the other year (their section's
+ * destination, or their own), or graduates or leaves (their enrolment this year says so).
+ * Anyone already enrolled in the other year is skipped, so it can be run again. Places
+ * change only if the other year is made current here (or later).
+ */
+export async function promote(
+  slug: string,
+  user: User,
+  input: z.infer<typeof promoteSchema>
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  needPromote(ctx)
+  const [from, to] = await Promise.all([
+    yearOf(ctx, input.fromYearId),
+    yearOf(ctx, input.toYearId),
+  ])
+  if (from.id === to.id)
+    throw new ApiError(400, "same_year", "Choose two different years.")
+  for (const t of [
+    ...Object.values(input.sections),
+    ...Object.values(input.exceptions),
+  ]) {
+    if (!["graduate", "repeat", "withdraw"].includes(t) && !isLeaf(ctx, t)) {
+      throw new ApiError(
+        400,
+        "not_a_section",
+        "Every destination must be a class or section with nothing inside it."
+      )
+    }
+  }
+  const db = getDb()
+  const [rows, already] = await Promise.all([
+    db
+      .select({
+        id: enrolments.id,
+        userId: enrolments.userId,
+        groupId: enrolments.groupId,
+        rollNo: enrolments.rollNo,
+      })
+      .from(enrolments)
+      .where(
+        and(eq(enrolments.yearId, from.id), eq(enrolments.status, "active"))
+      ),
+    db
+      .select({ userId: enrolments.userId })
+      .from(enrolments)
+      .where(eq(enrolments.yearId, to.id)),
+  ])
+  const placed = new Set(already.map((a) => a.userId))
+  const plan = rows.map((r) => {
+    const t =
+      input.exceptions[r.userId] ??
+      (r.groupId ? input.sections[r.groupId] : undefined) ??
+      "repeat"
+    const kind = placed.has(r.userId)
+      ? "skipped"
+      : t === "graduate"
+        ? "graduated"
+        : t === "withdraw"
+          ? "withdrawn"
+          : t === "repeat"
+            ? "repeated"
+            : "moved"
+    return { ...r, to: t === "repeat" ? r.groupId : t, kind }
+  })
+  const counts = {
+    moved: 0,
+    repeated: 0,
+    graduated: 0,
+    withdrawn: 0,
+    skipped: 0,
+  }
+  for (const p of plan) counts[p.kind as keyof typeof counts]++
+  if (!input.apply) return { applied: false, counts }
+  await db.transaction(async (tx) => {
+    for (const p of plan) {
+      if (p.kind === "skipped") continue
+      if (p.kind === "graduated" || p.kind === "withdrawn") {
+        await tx
+          .update(enrolments)
+          .set({ status: p.kind })
+          .where(eq(enrolments.id, p.id))
+        continue
+      }
+      await tx
+        .insert(enrolments)
+        .values({
+          orgId: ctx.org.id,
+          yearId: to.id,
+          userId: p.userId,
+          groupId: p.to,
+          rollNo: p.kind === "repeated" ? p.rollNo : null,
+        })
+    }
+    if (input.makeCurrent) await makeCurrent(tx, ctx, to.id)
+    // Graduates and leavers of the current year leave their classes now.
+    else if (from.isCurrent) await syncPlaces(tx, ctx, from.id)
+  })
+  await writeAudit(
+    ctx,
+    "records.promote",
+    `Promoted ${from.name} to ${to.name}: ${counts.moved} moved up, ${counts.repeated} staying, ${counts.graduated} graduated, ${counts.withdrawn} leaving${input.makeCurrent ? `; ${to.name} is now current` : ""}`,
+    { counts }
+  )
+  return { applied: true, counts }
+}
+
+/* ---------- import ---------- */
+
+export const importSchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        name: z.string().default(""),
+        email: z.string().default(""),
+        admissionNo: z.string().default(""),
+        gender: z.string().default(""),
+        birthDate: z.string().default(""),
+        phone: z.string().default(""),
+        address: z.string().default(""),
+        class: z.string().default(""),
+        rollNo: z.string().default(""),
+      })
+    )
+    .min(1)
+    .max(3000),
+  commit: z.boolean().default(false),
+})
+
+const GENDERS: Record<string, "" | "female" | "male" | "other"> = {
+  "": "",
+  f: "female",
+  female: "female",
+  girl: "female",
+  m: "male",
+  male: "male",
+  boy: "male",
+  o: "other",
+  other: "other",
+}
+
+/** "2019-04-02", "02/04/2019" (day first) or "2/4/2019", as "YYYY-MM-DD"; null if neither. */
+function asDay(text: string) {
+  const t = text.trim()
+  if (!t) return ""
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t
+  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(t)
+  return m
+    ? `${m[3]}-${m[2]!.padStart(2, "0")}-${m[1]!.padStart(2, "0")}`
+    : null
+}
+
+/** A class written as a path, "Grade 3 / A" or "Grade 3 › A", to its group. */
+function groupByPath(ctx: OrgContext, path: string) {
+  const parts = path
+    .split(/\s*(?:\/|›|>)\s*/)
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean)
+  let parent: string | null = null
+  let found: (typeof ctx.groups)[number] | undefined
+  for (const part of parts) {
+    found = ctx.groups.find(
+      (g) => g.parentId === parent && g.name.toLowerCase() === part
+    )
+    if (!found) return null
+    parent = found.id
+  }
+  return found ?? null
+}
+
+/** Students from a spreadsheet: a report per line, then (commit) all of them at once. */
+export async function importStudents(
+  slug: string,
+  user: User,
+  input: z.infer<typeof importSchema>
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!anyGroupGrant(ctx, "students.edit"))
+    throw forbidden("Adding students isn't part of your role.")
+  const db = getDb()
+  const year = await currentYear(db, ctx.org.id)
+  const [records, existing] = await Promise.all([
+    db
+      .select({ no: studentRecords.admissionNo, userId: studentRecords.userId })
+      .from(studentRecords)
+      .where(eq(studentRecords.orgId, ctx.org.id)),
+    db
+      .select({ email: users.email })
+      .from(studentRecords)
+      .innerJoin(users, eq(studentRecords.userId, users.id))
+      .where(eq(studentRecords.orgId, ctx.org.id)),
+  ])
+  const usedNos = new Set(records.map((r) => r.no.toLowerCase()))
+  const students = new Set(existing.map((e) => e.email.toLowerCase()))
+  const prefix = admissionPrefix(
+    ctx.org.name,
+    Number((year?.startsOn ?? (await today())).slice(0, 4))
+  )
+  const allNos = records.map((r) => r.no)
+  const seenEmails = new Set<string>()
+  const report = input.rows.map((row, i) => {
+    const line = i + 1
+    const fail = (note: string) => ({
+      line,
+      name: row.name.trim(),
+      result: "error" as const,
+      note,
+      input: null,
+    })
+    const name = row.name.trim()
+    if (!name) return fail("No name")
+    const email = row.email.trim().toLowerCase()
+    if (email && !z.email().safeParse(email).success)
+      return fail(`${email} isn't an email address`)
+    if (email && (students.has(email) || seenEmails.has(email)))
+      return fail(`${email} already has a student record`)
+    const gender = GENDERS[row.gender.trim().toLowerCase()]
+    if (gender === undefined)
+      return fail(`Gender "${row.gender}" isn't female, male or other`)
+    const birthDate = asDay(row.birthDate)
+    if (birthDate === null)
+      return fail(
+        `Date of birth "${row.birthDate}" isn't a date like 2019-04-02`
+      )
+    let groupId: string | null = null
+    if (row.class.trim()) {
+      const g = groupByPath(ctx, row.class)
+      if (!g) return fail(`No class "${row.class}"`)
+      if (!isLeaf(ctx, g.id))
+        return fail(`"${row.class}" has groups inside it; give a section`)
+      if (!year)
+        return fail("Add a current academic year before placing students")
+      groupId = g.id
+    }
+    if (!coversGroup(ctx, "students.edit", groupId))
+      return fail(
+        groupId
+          ? `You can't add students to ${row.class}`
+          : "You can only add students to your groups"
+      )
+    const roll = row.rollNo.trim()
+    if (roll && !/^\d{1,4}$/.test(roll))
+      return fail(`Roll number "${roll}" isn't a number`)
+    let admissionNo = row.admissionNo.trim()
+    if (admissionNo && usedNos.has(admissionNo.toLowerCase()))
+      return fail(`Admission number ${admissionNo} is already used`)
+    if (!admissionNo) {
+      admissionNo = nextAdmissionNo(prefix, allNos)
+    }
+    allNos.push(admissionNo)
+    usedNos.add(admissionNo.toLowerCase())
+    if (email) seenEmails.add(email)
+    return {
+      line,
+      name,
+      result: "add" as const,
+      note: `${admissionNo}${groupId ? ` · ${pathName(ctx, groupId)}` : " · not placed"}${email ? "" : " · no sign-in"}`,
+      input: {
+        admissionNo,
+        data: {
+          name,
+          email,
+          admissionNo,
+          gender,
+          birthDate,
+          phone: row.phone.trim().slice(0, 30),
+          address: row.address.trim().slice(0, 300),
+          groupId,
+          rollNo: roll ? Number(roll) : null,
+        } satisfies z.infer<typeof studentSchema>,
+      },
+    }
+  })
+  const adds = report.filter((r) => r.result === "add")
+  const summary = { add: adds.length, error: report.length - adds.length }
+  if (!input.commit || adds.length === 0) {
+    return {
+      committed: false,
+      summary,
+      rows: report.map(({ input: _, ...r }) => r),
+    }
+  }
+  await db.transaction(async (tx) => {
+    for (const r of adds)
+      await createInTx(tx, ctx, r.input!.data, r.input!.admissionNo, year)
+  })
+  await writeAudit(ctx, "records.import", `Imported ${adds.length} students`, {
+    skipped: summary.error,
+  })
+  return {
+    committed: true,
+    summary,
+    rows: report.map(({ input: _, ...r }) => r),
+  }
+}
+
+/* ---------- records for people already in classes ---------- */
+
+/** Members sitting in a section, holding no permissions, without a record here. */
+async function unrecorded(ctx: OrgContext) {
+  const leafIds = ctx.groups.filter((g) => isLeaf(ctx, g.id)).map((g) => g.id)
+  if (leafIds.length === 0) return []
+  const db = getDb()
+  const [seats, records, staff] = await Promise.all([
+    db
+      .select({
+        userId: groupMembers.userId,
+        groupId: groupMembers.groupId,
+        name: users.name,
+        email: users.email,
+      })
+      .from(groupMembers)
+      .innerJoin(users, eq(groupMembers.userId, users.id))
+      .innerJoin(
+        orgMembers,
+        and(
+          eq(orgMembers.userId, groupMembers.userId),
+          eq(orgMembers.orgId, ctx.org.id),
+          eq(orgMembers.status, "active")
+        )
+      )
+      .where(inArray(groupMembers.groupId, leafIds)),
+    db
+      .select({ userId: studentRecords.userId })
+      .from(studentRecords)
+      .where(eq(studentRecords.orgId, ctx.org.id)),
+    getDb()
+      .select({
+        userId: roleAssignmentsUser.userId,
+        systemKey: roleOf.systemKey,
+        permissions: roleOf.permissions,
+      })
+      .from(roleAssignmentsUser)
+      .innerJoin(roleOf, eq(roleAssignmentsUser.roleId, roleOf.id))
+      .where(eq(roleAssignmentsUser.orgId, ctx.org.id)),
+  ])
+  const has = new Set(records.map((r) => r.userId))
+  const isStaff = new Set(
+    staff.filter((s) => rolePermissions(s).length > 0).map((s) => s.userId)
+  )
+  const seen = new Set<string>()
+  return seats.filter(
+    (s) =>
+      !has.has(s.userId) &&
+      !isStaff.has(s.userId) &&
+      !seen.has(s.userId) &&
+      (seen.add(s.userId), true)
+  )
+}
+
+/** How many people in classes have no record yet (for the Students page). */
+export async function unrecordedCount(slug: string, user: User) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!canFor(ctx, "students.edit", [])) return { count: 0 }
+  return { count: (await unrecorded(ctx)).length }
+}
+
+/** Gives everyone already in a class a record and an enrolment in the current year. */
+export async function recordEveryone(slug: string, user: User) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!canFor(ctx, "students.edit", []))
+    throw forbidden(
+      "Adding students for the whole organization isn't part of your role."
+    )
+  const db = getDb()
+  const year = await currentYear(db, ctx.org.id)
+  if (!year)
+    throw new ApiError(400, "no_year", "Add the current academic year first.")
+  const people = await unrecorded(ctx)
+  if (people.length === 0) return { added: 0 }
+  const prefix = admissionPrefix(
+    ctx.org.name,
+    Number(year.startsOn.slice(0, 4))
+  )
+  const nos = (
+    await db
+      .select({ no: studentRecords.admissionNo })
+      .from(studentRecords)
+      .where(eq(studentRecords.orgId, ctx.org.id))
+  ).map((r) => r.no)
+  const admitted = await today()
+  await db.transaction(async (tx) => {
+    for (const p of people) {
+      const no = nextAdmissionNo(prefix, nos)
+      nos.push(no)
+      await tx
+        .insert(studentRecords)
+        .values({
+          orgId: ctx.org.id,
+          userId: p.userId,
+          admissionNo: no,
+          admittedOn: admitted,
+        })
+      await tx
+        .insert(enrolments)
+        .values({
+          orgId: ctx.org.id,
+          yearId: year.id,
+          userId: p.userId,
+          groupId: p.groupId,
+        })
+        .onConflictDoNothing()
+    }
+  })
+  await writeAudit(
+    ctx,
+    "records.adopt",
+    `Created records for ${people.length} students already in classes`
+  )
+  return { added: people.length }
 }

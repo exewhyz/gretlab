@@ -11,7 +11,7 @@ import {
   AlertTitle,
 } from "@workspace/ui/components/alert"
 import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 import {
   Card,
   CardAction,
@@ -74,6 +74,7 @@ import {
   type CampusData,
 } from "@/features/campus/components/campus"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
+import { parseCsv } from "@/features/orgs/components/manage"
 import { api } from "@/lib/api/client"
 
 /* ---------- academic years ---------- */
@@ -128,9 +129,19 @@ export function AcademicYears({ slug }: { slug: string }) {
       <PageTitle
         action={
           can && (
-            <Button onClick={() => setEditing("new")}>
-              <PlusIcon /> Add academic year
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {data.years.length > 1 && (
+                <Link
+                  href={`/orgs/${slug}/manage/academic-years/promote`}
+                  className={buttonVariants({ variant: "outline" })}
+                >
+                  Promote students
+                </Link>
+              )}
+              <Button onClick={() => setEditing("new")}>
+                <PlusIcon /> Add academic year
+              </Button>
+            </div>
           )
         }
       >
@@ -382,6 +393,7 @@ export function Students({ slug }: { slug: string }) {
   const [status, setStatus] = useState("")
   const [page, setPage] = useState(1)
   const [adding, setAdding] = useState(false)
+  const [importing, setImporting] = useState(false)
   useEffect(() => {
     const t = setTimeout(() => (setSearch(q), setPage(1)), 300)
     return () => clearTimeout(t)
@@ -402,14 +414,20 @@ export function Students({ slug }: { slug: string }) {
       <PageTitle
         action={
           data.can.edit && (
-            <Button onClick={() => setAdding(true)}>
-              <PlusIcon /> Add student
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setImporting(true)}>
+                Import
+              </Button>
+              <Button onClick={() => setAdding(true)}>
+                <PlusIcon /> Add student
+              </Button>
+            </div>
           )
         }
       >
         Students
       </PageTitle>
+      {data.year && <Unrecorded slug={slug} />}
       {!data.year && (
         <Alert className="mb-4">
           <AlertTitle>No current academic year</AlertTitle>
@@ -560,6 +578,9 @@ export function Students({ slug }: { slug: string }) {
           </Button>
         </div>
       </div>
+      {importing && (
+        <ImportStudents slug={slug} onDone={() => setImporting(false)} />
+      )}
       {adding && (
         <StudentSheet
           slug={slug}
@@ -1033,6 +1054,581 @@ export function StudentProfile({ slug, id }: { slug: string; id: string }) {
           description={`They leave ${cur?.group?.path ?? "their class"} for ${cur?.year}: registers, the timetable and their class page stop including them. Their record and history stay.`}
           confirmLabel={`Mark ${statusTo}`}
           onConfirm={() => status.mutate(statusTo)}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ---------- people in classes without a record ---------- */
+
+function Unrecorded({ slug }: { slug: string }) {
+  const client = useQueryClient()
+  const { data } = useQuery({
+    queryKey: ["org", slug, "students", "unrecorded"],
+    queryFn: () => api<{ count: number }>(`/orgs/${slug}/students/unrecorded`),
+  })
+  const [asking, setAsking] = useState(false)
+  const run = useMutation({
+    mutationFn: () =>
+      api<{ added: number }>(`/orgs/${slug}/students/unrecorded`, {
+        method: "POST",
+      }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["org", slug] }),
+  })
+  if (!data?.count)
+    return run.data ? (
+      <FormMessage
+        message={{ text: `Created ${run.data.added} records.`, kind: "ok" }}
+      />
+    ) : null
+  return (
+    <Alert className="mb-4" data-testid="unrecorded">
+      <AlertTitle>
+        {data.count} {data.count === 1 ? "person is" : "people are"} in a class
+        with no student record
+      </AlertTitle>
+      <AlertDescription className="flex flex-wrap items-center gap-3">
+        <span>
+          Give each a record and an admission number, in their class for this
+          year.
+        </span>
+        <Button
+          size="sm"
+          onClick={() => setAsking(true)}
+          disabled={run.isPending}
+        >
+          Create records
+        </Button>
+        {run.error && (
+          <FormMessage message={{ text: run.error.message, kind: "err" }} />
+        )}
+      </AlertDescription>
+      {asking && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => !open && setAsking(false)}
+          title={`Create ${data.count} student records?`}
+          description="Each gets the next admission number and stays in their class. Staff (anyone with a role) are left out."
+          confirmLabel="Create records"
+          tone="default"
+          onConfirm={() => run.mutate()}
+        />
+      )}
+    </Alert>
+  )
+}
+
+/* ---------- import ---------- */
+
+interface ImportReport {
+  committed: boolean
+  summary: { add: number; error: number }
+  rows: { line: number; name: string; result: "add" | "error"; note: string }[]
+}
+
+const COLUMNS: Record<string, string> = {
+  name: "name",
+  "full name": "name",
+  student: "name",
+  email: "email",
+  "e-mail": "email",
+  "admission number": "admissionNo",
+  "admission no": "admissionNo",
+  "admission no.": "admissionNo",
+  admission: "admissionNo",
+  gender: "gender",
+  sex: "gender",
+  "date of birth": "birthDate",
+  dob: "birthDate",
+  "birth date": "birthDate",
+  birthday: "birthDate",
+  phone: "phone",
+  mobile: "phone",
+  address: "address",
+  class: "class",
+  section: "class",
+  group: "class",
+  roll: "rollNo",
+  "roll number": "rollNo",
+  "roll no": "rollNo",
+  "roll no.": "rollNo",
+}
+
+/** Spreadsheet rows to the import's fields, by their header line. */
+function toRows(text: string) {
+  const [head, ...lines] = parseCsv(text).filter((r) => r.some((c) => c.trim()))
+  if (!head) return { rows: [], unknown: [] as string[] }
+  const keys = head.map((h) => COLUMNS[h.trim().toLowerCase()] ?? null)
+  return {
+    unknown: head
+      .filter((_, i) => !keys[i])
+      .map((h) => h.trim())
+      .filter(Boolean),
+    rows: lines.map((cells) => {
+      const row: Record<string, string> = {}
+      keys.forEach((k, i) => {
+        if (k) row[k] = (cells[i] ?? "").trim()
+      })
+      return row
+    }),
+  }
+}
+
+function ImportStudents({
+  slug,
+  onDone,
+}: {
+  slug: string
+  onDone: () => void
+}) {
+  const client = useQueryClient()
+  const [text, setText] = useState("")
+  const parsed = toRows(text)
+  const check = useMutation({
+    mutationFn: (commit: boolean) =>
+      api<ImportReport>(`/orgs/${slug}/students/import`, {
+        body: { rows: parsed.rows, commit },
+      }),
+    onSuccess: (r) => {
+      if (r.committed)
+        void client.invalidateQueries({ queryKey: ["org", slug] })
+    },
+  })
+  const report = check.data
+  return (
+    <Dialog open onOpenChange={(open) => !open && onDone()}>
+      <DialogContent className="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Import students</DialogTitle>
+          <DialogDescription>
+            A spreadsheet saved as CSV, with a header line. Columns: name, email
+            (leave empty for no sign-in), admission number (empty: the next
+            one), gender, date of birth, phone, address, class (like Grade 3 /
+            A), roll.
+          </DialogDescription>
+        </DialogHeader>
+        {!report?.committed && (
+          <div className="grid gap-2">
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              aria-label="CSV file"
+              className="text-body-sm"
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (file) setText(await file.text())
+              }}
+            />
+            <TextArea
+              aria-label="Or paste the CSV"
+              rows={6}
+              mono
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={
+                "name,email,gender,date of birth,class,roll\nAsha K,,female,02/04/2019,Grade 1 / A,1"
+              }
+            />
+            {parsed.unknown.length > 0 && (
+              <p className="text-caption text-muted-foreground">
+                Ignored columns: {parsed.unknown.join(", ")}
+              </p>
+            )}
+          </div>
+        )}
+        {report && (
+          <div className="grid gap-2" data-testid="import-report">
+            <p className="text-body-sm">
+              {report.committed
+                ? `Added ${report.summary.add} students.`
+                : `${report.summary.add} to add, ${report.summary.error} with problems.`}
+            </p>
+            <div className="max-h-72 overflow-auto rounded-md border border-hairline">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Line</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Result</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {report.rows.map((r) => (
+                    <TableRow key={r.line} data-testid="import-line">
+                      <TableCell className="tabular-nums">{r.line}</TableCell>
+                      <TableCell>{r.name || "—"}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            r.result === "add" ? "secondary" : "destructive"
+                          }
+                        >
+                          {r.result === "add" ? "Add" : "Problem"}
+                        </Badge>{" "}
+                        <span className="text-xs text-muted-foreground">
+                          {r.note}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+        {check.error && (
+          <FormMessage message={{ text: check.error.message, kind: "err" }} />
+        )}
+        <DialogFooter>
+          {report?.committed ? (
+            <Button onClick={onDone}>Done</Button>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={onDone}>
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                disabled={parsed.rows.length === 0 || check.isPending}
+                onClick={() => check.mutate(false)}
+              >
+                Check {parsed.rows.length || ""} lines
+              </Button>
+              <Button
+                disabled={
+                  !report || report.summary.add === 0 || check.isPending
+                }
+                onClick={() => check.mutate(true)}
+              >
+                Add {report?.summary.add ?? ""} students
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* ---------- promotion ---------- */
+
+interface Plan {
+  from: { id: string; name: string; isCurrent: boolean }
+  to: { id: string; name: string; isCurrent: boolean }
+  sections: {
+    groupId: string
+    path: string
+    suggested: string
+    students: {
+      id: string
+      name: string
+      rollNo: number | null
+      already: boolean
+    }[]
+  }[]
+  targets: { id: string; path: string }[]
+}
+
+type Counts = {
+  moved: number
+  repeated: number
+  graduated: number
+  withdrawn: number
+  skipped: number
+}
+
+/** Manage › Academic years › Promote: move a year's students on to the next. */
+export function Promotion({ slug }: { slug: string }) {
+  const client = useQueryClient()
+  const years = useQuery({
+    queryKey: ["org", slug, "academic-years"],
+    queryFn: () =>
+      api<{ can: { years: boolean }; years: Year[] }>(
+        `/orgs/${slug}/academic-years`
+      ),
+  })
+  const list = years.data?.years ?? []
+  const current = list.find((y) => y.isCurrent) ?? list[0]
+  const [fromId, setFromId] = useState("")
+  const [toId, setToId] = useState("")
+  const from = fromId || current?.id || ""
+  const later = list
+    .filter((y) => y.id !== from)
+    .sort((a, b) => a.startsOn.localeCompare(b.startsOn))
+  const to =
+    toId ||
+    later.find(
+      (y) => y.startsOn > (list.find((x) => x.id === from)?.startsOn ?? "")
+    )?.id ||
+    later[0]?.id ||
+    ""
+  const plan = useQuery({
+    queryKey: ["org", slug, "promotion", from, to],
+    queryFn: () =>
+      api<Plan>(`/orgs/${slug}/academic-years/promotion?from=${from}&to=${to}`),
+    enabled: Boolean(from && to && from !== to),
+  })
+  const [sections, setSections] = useState<Record<string, string>>({})
+  const [exceptions, setExceptions] = useState<Record<string, string>>({})
+  const [makeCurrent, setMakeCurrent] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const body = (apply: boolean) => ({
+    fromYearId: from,
+    toYearId: to,
+    sections: Object.fromEntries(
+      (plan.data?.sections ?? []).map((s) => [
+        s.groupId,
+        sections[s.groupId] ?? s.suggested,
+      ])
+    ),
+    exceptions,
+    makeCurrent,
+    apply,
+  })
+  const preview = useMutation({
+    mutationFn: () =>
+      api<{ applied: boolean; counts: Counts }>(
+        `/orgs/${slug}/academic-years/promotion`,
+        { body: body(false) }
+      ),
+  })
+  const apply = useMutation({
+    mutationFn: () =>
+      api<{ applied: boolean; counts: Counts }>(
+        `/orgs/${slug}/academic-years/promotion`,
+        { body: body(true) }
+      ),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["org", slug] }),
+  })
+  if (!years.data) return <Loading error={years.error} />
+  if (list.length < 2) {
+    return (
+      <>
+        <PageTitle>Promote students</PageTitle>
+        <p className="text-body-sm text-muted-foreground">
+          Add next year under Academic years first.
+        </p>
+      </>
+    )
+  }
+  const options = (keepSame: string) => (
+    <>
+      <option value="repeat">{keepSame}</option>
+      <option value="graduate">Graduate</option>
+      <option value="withdraw">Leaves the school</option>
+      {(plan.data?.targets ?? []).map((t) => (
+        <option key={t.id} value={t.id}>
+          {t.path}
+        </option>
+      ))}
+    </>
+  )
+  const describe = (c: Counts) =>
+    `${c.moved} move up, ${c.repeated} stay in their class, ${c.graduated} graduate, ${c.withdrawn} leave${c.skipped ? `; ${c.skipped} already have a class in ${plan.data?.to.name}` : ""}.`
+  return (
+    <div className="grid gap-5" data-testid="promotion">
+      <Link
+        href={`/orgs/${slug}/manage/academic-years`}
+        className="text-body-sm text-muted-foreground hover:text-ink"
+      >
+        ‹ Academic years
+      </Link>
+      <PageTitle>Promote students</PageTitle>
+      <p className="-mt-3 max-w-2xl text-body-sm text-muted-foreground">
+        Each class moves on together; change a class&apos;s destination, or one
+        student&apos;s. Nobody moves until the new year is current, unless you
+        make it current here. Running it again skips anyone already placed.
+      </p>
+      <div className="grid max-w-xl gap-3 sm:grid-cols-2">
+        <Field label="From">
+          <SelectInput
+            value={from}
+            onChange={(e) => (
+              setFromId(e.target.value),
+              setSections({}),
+              setExceptions({}),
+              preview.reset()
+            )}
+          >
+            {list.map((y) => (
+              <option key={y.id} value={y.id}>
+                {y.name}
+                {y.isCurrent ? " (current)" : ""}
+              </option>
+            ))}
+          </SelectInput>
+        </Field>
+        <Field label="To">
+          <SelectInput
+            value={to}
+            onChange={(e) => (setToId(e.target.value), preview.reset())}
+          >
+            {list
+              .filter((y) => y.id !== from)
+              .map((y) => (
+                <option key={y.id} value={y.id}>
+                  {y.name}
+                  {y.isCurrent ? " (current)" : ""}
+                </option>
+              ))}
+          </SelectInput>
+        </Field>
+      </div>
+      {!plan.data ? (
+        <Loading error={plan.error} />
+      ) : plan.data.sections.length === 0 ? (
+        <Empty className="border border-dashed border-hairline">
+          <EmptyHeader>
+            <EmptyTitle>
+              No one is in a class in {plan.data.from.name}
+            </EmptyTitle>
+            <EmptyDescription>
+              Place students in classes for that year first.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <Card className="py-0">
+          <Table data-testid="promotion-sections">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Class in {plan.data.from.name}</TableHead>
+                <TableHead className="text-right">Students</TableHead>
+                <TableHead>Goes to in {plan.data.to.name}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {plan.data.sections.map((s) => (
+                <TableRow
+                  key={s.groupId}
+                  data-testid="promotion-row"
+                  className="align-top"
+                >
+                  <TableCell className="font-medium">
+                    {s.path}
+                    <details className="mt-1 font-normal">
+                      <summary className="cursor-pointer text-xs text-muted-foreground">
+                        One student differently
+                      </summary>
+                      <ul className="mt-2 grid gap-1.5">
+                        {s.students.map((st) => (
+                          <li
+                            key={st.id}
+                            className="grid grid-cols-[minmax(0,1fr)_minmax(0,12rem)] items-center gap-2 text-body-sm"
+                          >
+                            <span className="truncate">
+                              {st.name}
+                              {st.already && (
+                                <span className="text-xs text-muted-foreground">
+                                  {" "}
+                                  · already placed
+                                </span>
+                              )}
+                            </span>
+                            <SelectInput
+                              aria-label={`${st.name} goes to`}
+                              value={exceptions[st.id] ?? ""}
+                              onChange={(e) => {
+                                const next = { ...exceptions }
+                                if (e.target.value) next[st.id] = e.target.value
+                                else delete next[st.id]
+                                setExceptions(next)
+                                preview.reset()
+                              }}
+                            >
+                              <option value="">With the class</option>
+                              {options("Stays in this class")}
+                            </SelectInput>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {s.students.length}
+                  </TableCell>
+                  <TableCell>
+                    <SelectInput
+                      aria-label={`${s.path} goes to`}
+                      value={sections[s.groupId] ?? s.suggested}
+                      onChange={(e) => (
+                        setSections({
+                          ...sections,
+                          [s.groupId]: e.target.value,
+                        }),
+                        preview.reset()
+                      )}
+                    >
+                      {options("Stays in the same class")}
+                    </SelectInput>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+      {plan.data && plan.data.sections.length > 0 && (
+        <div className="grid gap-3">
+          {!plan.data.to.isCurrent && (
+            <label className="flex items-center gap-2 text-body-sm">
+              <Checkbox
+                checked={makeCurrent}
+                onCheckedChange={(on) => setMakeCurrent(on)}
+              />
+              Make {plan.data.to.name} the current year afterwards (everyone
+              moves to their new class now)
+            </label>
+          )}
+          {preview.data && (
+            <Alert data-testid="promotion-preview">
+              <AlertTitle>What will happen</AlertTitle>
+              <AlertDescription>
+                {describe(preview.data.counts)}
+              </AlertDescription>
+            </Alert>
+          )}
+          {apply.data && (
+            <Alert data-testid="promotion-done">
+              <AlertTitle>Done</AlertTitle>
+              <AlertDescription>{describe(apply.data.counts)}</AlertDescription>
+            </Alert>
+          )}
+          {(preview.error ?? apply.error) && (
+            <FormMessage
+              message={{
+                text: (preview.error ?? apply.error)!.message,
+                kind: "err",
+              }}
+            />
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={preview.isPending}
+              onClick={() => preview.mutate()}
+            >
+              Preview
+            </Button>
+            <Button
+              disabled={!preview.data || apply.isPending || Boolean(apply.data)}
+              onClick={() => setConfirming(true)}
+            >
+              Promote
+            </Button>
+          </div>
+        </div>
+      )}
+      {confirming && preview.data && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => !open && setConfirming(false)}
+          title={`Promote ${plan.data?.from.name} to ${plan.data?.to.name}?`}
+          description={describe(preview.data.counts)}
+          confirmLabel="Promote"
+          tone="default"
+          onConfirm={() => apply.mutate()}
         />
       )}
     </div>
