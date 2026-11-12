@@ -88,6 +88,13 @@ export const NOTIFICATION_EVENTS = {
     kinds: ["discussion_reply"],
     emailByDefault: true,
   },
+  "campus.update": {
+    label: "Bus and hostel",
+    description: "Someone is put on a bus route and stop, or given a hostel bed, or it changes.",
+    audience: "students",
+    kinds: ["transport", "hostel"],
+    emailByDefault: true,
+  },
   "parent.updates": {
     label: "Your child's notices and marks",
     description:

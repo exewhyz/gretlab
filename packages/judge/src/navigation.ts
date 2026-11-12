@@ -135,6 +135,14 @@ export const ORG_NAV: NavItem[] = [
     module: "library",
   },
   {
+    key: "transport",
+    label: "Transport",
+    path: "/transport",
+    group: "Campus",
+    anyOf: ["transport.routes", "transport.assign"],
+    module: "transport",
+  },
+  {
     key: "my-timetable",
     label: "My timetable",
     path: "/my-timetable",

@@ -69,7 +69,7 @@ export const MODULES = {
     label: "Transport",
     description: "Routes, stops and which students ride which route.",
     for: ["school", "college"],
-    ready: false,
+    ready: true,
   },
   hostel: {
     label: "Hostel",

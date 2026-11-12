@@ -147,6 +147,7 @@ const COPIED_TO_PARENTS = new Set<string>([
   "assignment.extension",
   "class.notice",
   "class.teacher_note",
+  "campus.update",
 ])
 
 /**

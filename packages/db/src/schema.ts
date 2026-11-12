@@ -838,6 +838,67 @@ export const libraryLoans = pgTable(
   ]
 )
 
+/** A bus (or van) route of an organization (Transport module). */
+export const transportRoutes = pgTable(
+  "transport_routes",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** The vehicle's number or registration. */
+    vehicle: text("vehicle").notNull().default(""),
+    driver: text("driver").notNull().default(""),
+    driverPhone: text("driver_phone").notNull().default(""),
+    /** Seats; null when not limited. */
+    capacity: integer("capacity"),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("transport_routes_name").on(table.orgId, table.name)]
+)
+
+/** A stop on a route, in order, with its morning pick-up and afternoon drop-off times. */
+export const transportStops = pgTable(
+  "transport_stops",
+  {
+    id: id(),
+    routeId: uuid("route_id")
+      .notNull()
+      .references(() => transportRoutes.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    position: integer("position").notNull(),
+    /** "HH:MM", or "" when not set. */
+    pickup: text("pickup").notNull().default(""),
+    drop: text("drop").notNull().default(""),
+  },
+  (table) => [index("transport_stops_route").on(table.routeId, table.position)]
+)
+
+/** Who rides which route, from which stop. One route per person per organization. */
+export const transportRiders = pgTable(
+  "transport_riders",
+  {
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    routeId: uuid("route_id")
+      .notNull()
+      .references(() => transportRoutes.id, { onDelete: "cascade" }),
+    stopId: uuid("stop_id")
+      .notNull()
+      .references(() => transportStops.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.orgId, table.userId] }),
+    index("transport_riders_route").on(table.routeId),
+  ]
+)
+
 /** A link or code that lets people join, optionally into a group and with a role. */
 export const orgInvites = pgTable(
   "org_invites",

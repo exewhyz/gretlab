@@ -109,6 +109,12 @@ export const PERMISSIONS = {
       "The library's catalog, its rules, and lending books to members (Library module). Grant this, or the finer actions under it.",
     module: "Campus",
   },
+  "transport.manage": {
+    label: "Run transport",
+    description:
+      "Routes, their vehicles and stops, and who rides which route (Transport module). Grant this, or the finer actions under it.",
+    module: "Campus",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:
@@ -353,6 +359,18 @@ export const PERMISSIONS = {
     description: "Issue books to members, take them back, renew them and mark them lost.",
     module: "Campus",
     parent: "library.manage",
+  },
+  "transport.routes": {
+    label: "Set routes and stops",
+    description: "Add and change routes, their vehicle, driver, seats and stops.",
+    module: "Campus",
+    parent: "transport.manage",
+  },
+  "transport.assign": {
+    label: "Assign riders",
+    description: "Put the members of the groups this applies to on a route and stop, or take them off.",
+    module: "Campus",
+    parent: "transport.manage",
   },
   "org.members.assign_roles": {
     label: "Assign roles",
