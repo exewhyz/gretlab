@@ -115,6 +115,12 @@ export const PERMISSIONS = {
       "Routes, their vehicles and stops, and who rides which route (Transport module). Grant this, or the finer actions under it.",
     module: "Campus",
   },
+  "hostel.manage": {
+    label: "Run hostels",
+    description:
+      "Hostels, their rooms and beds, and who stays where (Hostel module). Grant this, or the finer actions under it.",
+    module: "Campus",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:
@@ -371,6 +377,18 @@ export const PERMISSIONS = {
     description: "Put the members of the groups this applies to on a route and stop, or take them off.",
     module: "Campus",
     parent: "transport.manage",
+  },
+  "hostel.rooms": {
+    label: "Set hostels, rooms and beds",
+    description: "Add and change hostels, their wardens, rooms and the beds in each.",
+    module: "Campus",
+    parent: "hostel.manage",
+  },
+  "hostel.allot": {
+    label: "Allot beds",
+    description: "Give the members of the groups this applies to a bed, move them, or move them out.",
+    module: "Campus",
+    parent: "hostel.manage",
   },
   "org.members.assign_roles": {
     label: "Assign roles",

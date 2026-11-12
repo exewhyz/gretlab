@@ -75,7 +75,7 @@ export const MODULES = {
     label: "Hostel",
     description: "Hostels, rooms and beds, and who stays where.",
     for: ["school", "college"],
-    ready: false,
+    ready: true,
   },
   finance: {
     label: "Fees and payments",

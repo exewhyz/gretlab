@@ -232,6 +232,19 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Permissions: "Run transport" (`transport.manage`), with "Set routes and stops" (`transport.routes`, organization-wide) and "Assign riders" (`transport.assign`, scoped to the riders' groups through `features/campus/people.ts`, shared with Parent accounts). Changes are audited as `transport.*`. Riders can be added from a pasted list (email, route, stop; names matched ignoring case), with a report per line.
 - A rider is told when they're put on a route or taken off (event `campus.update`, kind `transport`, copied to their parents). Their bus shows on My classes and the parent's child page (`campusOf` → `transport.ride`).
 
+## Hostel (module)
+
+- Off by default; schools and colleges switch it on. The data is `hostels` (who it's for, warden), then `hostel_rooms` (name, floor), then `hostel_beds` (lettered A, B, C… and on past Z), then `hostel_residents`. Unique indexes allow one bed per person per organization and one person per bed, so a race to fill a bed ends in a 409 `taken`. Rules (packages/judge/src/hostel.ts, unit-tested):
+  - Rooms are added in runs (prefix plus a number range, at most 200 at a time), and names already there are skipped.
+  - Fewer beds removes the last letters, never an occupied bed.
+  - Rooms and hostels can be removed only when empty.
+- Permissions:
+  - "Run hostels" (`hostel.manage`) has two parts. "Set hostels, rooms and beds" (`hostel.rooms`) is organization-wide. "Allot beds" (`hostel.allot`) is scoped to the residents' groups.
+  - Someone with only "Allot beds" sees the names of their own groups' residents. Other beds show just as taken.
+  - Beds can be allotted from a pasted list (email, hostel, room, and optionally a bed; with no bed, the first free one is used).
+  - Changes are audited as `hostel.*`.
+- A resident is told when they get a bed, move, or move out (`campus.update`, kind `hostel`, copied to their parents). Their bed shows on My classes and on the parent's child page (`campusOf` → `hostel.stay`).
+
 ## Organizations and permissions
 
 - The platform dashboard is run by platform staff roles (see "Platform staff and roles"; `users.role` is kept in step for older checks). Inside an organization, access comes only from organization roles.
@@ -390,6 +403,12 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/parents.mjs`: on for a school, off for a company; linking a new parent by email, relinking (one row), bad input, self-links; a section-scoped "Parent desk" role and its student search; linking from a list with a report; who sees and removes which links; a parent sees only their child (404 otherwise), isn't a member, gets the linked note, notice copies and one absence note per change; parent events shown only to parents; the child page's attendance, absences, timetable and notices; switching off; unlinking; the audit; both pages and their dialogs, and phone widths.
 - `e2e/books.mjs`: off until switched on, refused for a company; the catalog (add, a list with a report, members search it, outsiders don't), copies can't drop below loans, a book on loan can't be deleted; lending (has it, none free, the per-person limit, the loan period, a past due date, members only), renew, return, a closed loan, lost (a copy fewer); separate catalog and desk roles; overdue on the desk, in the numbers, in the bell, on the member page, on My classes and on the parent's child page; the audit; the desk, catalog and member pages and dialogs, and phone widths; switching off.
 - `e2e/transport.mjs`: off until switched on, refused for a company; routes (backward pick-ups, a stop listed twice, bad times, duplicate names, no seat limit), the office can't assign and bus duty can't add routes; riders (scoped to a section, a stop from another route, a full bus, moving a stop), the rider and their parent told; riders listed per route; My classes and the parent's child page; fewer seats than riders, removing a used stop, growing a route with riders kept; a list with a report; taking off; removing a route; the audit; the page, the route and riders dialogs, My classes, and a phone width.
+- `e2e/hostel.mjs`:
+  - Setup: off until switched on, and refused for a company. Hostels (duplicate names refused). Runs of rooms, with existing names skipped and backward runs refused. Lettered beds.
+  - Allotting: scoped to a section; a taken bed is refused; moving frees the old bed. The resident and their parent are told. My classes and the parent's child page show the bed.
+  - Changing rooms: fewer beds never removes an occupied one, more beds add letters, duplicate room names are refused, and occupied rooms and hostels can't be removed.
+  - A list with first-free and named beds and a report. Who sees whose names. Moving out. The numbers. The audit.
+  - Pages: the page and its hostel, rooms and bed dialogs, My classes, and a phone width.
 - `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.

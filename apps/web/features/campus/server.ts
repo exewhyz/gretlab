@@ -2,6 +2,7 @@ import { getDb, orgMembers, organizations, sql, type User } from "@workspace/db"
 import { enabledModules } from "@workspace/judge"
 
 import { loansOf } from "@/features/books/server"
+import { stayOf } from "@/features/hostel/server"
 import { rideOf } from "@/features/transport/server"
 
 /*
@@ -17,20 +18,23 @@ type Org = Pick<typeof organizations.$inferSelect, "id" | "type" | "modules">
 
 export async function campusOf(org: Org, userId: string) {
   const modules = enabledModules(org.type, org.modules)
-  const [library, transport] = await Promise.all([
+  const [library, transport, hostel] = await Promise.all([
     modules.has("library")
       ? loansOf(org.id, userId).then((loans) => ({ loans }))
       : null,
     modules.has("transport")
       ? rideOf(org.id, userId).then((ride) => ({ ride }))
       : null,
+    modules.has("hostel")
+      ? stayOf(org.id, userId).then((stay) => ({ stay }))
+      : null,
   ])
-  return { library, transport }
+  return { library, transport, hostel }
 }
 
 export type Campus = Awaited<ReturnType<typeof campusOf>>
 
-const CAMPUS_MODULES = ["library", "transport"] as const
+const CAMPUS_MODULES = ["library", "transport", "hostel"] as const
 
 /** Every organization this person is an active member of that has a campus module on. */
 export async function myCampus(user: User) {

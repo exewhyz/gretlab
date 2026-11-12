@@ -899,6 +899,72 @@ export const transportRiders = pgTable(
   ]
 )
 
+/** A hostel of an organization (Hostel module). */
+export const hostels = pgTable(
+  "hostels",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** Who it's for, as the school says it: "Boys", "Girls", "Staff"; may be empty. */
+    forWhom: text("for_whom").notNull().default(""),
+    warden: text("warden").notNull().default(""),
+    wardenPhone: text("warden_phone").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("hostels_name").on(table.orgId, table.name)]
+)
+
+export const hostelRooms = pgTable(
+  "hostel_rooms",
+  {
+    id: id(),
+    hostelId: uuid("hostel_id")
+      .notNull()
+      .references(() => hostels.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    floor: text("floor").notNull().default(""),
+  },
+  (table) => [uniqueIndex("hostel_rooms_name").on(table.hostelId, table.name)]
+)
+
+/** A bed in a room, lettered A, B, C... */
+export const hostelBeds = pgTable(
+  "hostel_beds",
+  {
+    id: id(),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => hostelRooms.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+  },
+  (table) => [uniqueIndex("hostel_beds_label").on(table.roomId, table.label)]
+)
+
+/** Who sleeps in which bed. One bed per person per organization, one person per bed. */
+export const hostelResidents = pgTable(
+  "hostel_residents",
+  {
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bedId: uuid("bed_id")
+      .notNull()
+      .references(() => hostelBeds.id, { onDelete: "cascade" }),
+    since: text("since").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.orgId, table.userId] }),
+    uniqueIndex("hostel_residents_bed").on(table.bedId),
+  ]
+)
+
 /** A link or code that lets people join, optionally into a group and with a role. */
 export const orgInvites = pgTable(
   "org_invites",

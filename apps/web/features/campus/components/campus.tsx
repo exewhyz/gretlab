@@ -25,6 +25,17 @@ export interface CampusRide {
 export interface CampusData {
   library: { loans: CampusLoan[] } | null
   transport?: { ride: CampusRide | null } | null
+  hostel?: { stay: CampusStay | null } | null
+}
+
+export interface CampusStay {
+  hostel: string
+  warden: string
+  wardenPhone: string
+  room: string
+  floor: string
+  bed: string
+  since: string
 }
 
 /** Library books (and later bus and hostel) for one person in one organization. */
@@ -38,8 +49,9 @@ export function CampusSummary({
   /** Their own (links to the library page); a parent sees it without links. */
   own: boolean
 }) {
-  if (!data.library && !data.transport?.ride) return null
   const ride = data.transport?.ride
+  const stay = data.hostel?.stay
+  if (!data.library && !ride && !stay) return null
   return (
     <div className="grid gap-3 sm:grid-cols-2" data-testid="campus">
       {ride && (
@@ -64,6 +76,28 @@ export function CampusSummary({
               {[ride.vehicle, ride.driver, ride.driverPhone]
                 .filter(Boolean)
                 .join(" · ")}
+            </p>
+          )}
+        </div>
+      )}
+      {stay && (
+        <div
+          className="rounded-lg border border-hairline bg-card p-4"
+          data-testid="campus-hostel"
+        >
+          <h3 className="mb-1 text-title-sm text-ink">Hostel</h3>
+          <p className="text-body-sm text-ink">
+            {stay.hostel}, room {stay.room}, bed {stay.bed}
+          </p>
+          <p className="text-xs text-body">
+            {[stay.floor && `Floor ${stay.floor}`, `since ${stay.since}`]
+              .filter(Boolean)
+              .join(", ")}
+          </p>
+          {stay.warden && (
+            <p className="text-xs text-body">
+              Warden{" "}
+              {[stay.warden, stay.wardenPhone].filter(Boolean).join(" · ")}
             </p>
           )}
         </div>

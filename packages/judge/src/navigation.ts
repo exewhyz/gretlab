@@ -143,6 +143,14 @@ export const ORG_NAV: NavItem[] = [
     module: "transport",
   },
   {
+    key: "hostel",
+    label: "Hostel",
+    path: "/hostel",
+    group: "Campus",
+    anyOf: ["hostel.rooms", "hostel.allot"],
+    module: "hostel",
+  },
+  {
     key: "my-timetable",
     label: "My timetable",
     path: "/my-timetable",
