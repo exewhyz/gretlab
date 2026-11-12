@@ -631,6 +631,8 @@ export const organizations = pgTable("organizations", {
     .notNull()
     .default(["Group"]),
   active: boolean("active").notNull().default(true),
+  /** "pending": signed up on the site and waiting for a platform admin's approval. */
+  signupStatus: text("signup_status"),
   /** Languages allowed in its contests and members-only problems; null for all enabled. */
   languages: jsonb("languages").$type<string[] | null>(),
   /** false blocks pasting code in its contests (a deterrent, not a guarantee). */

@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto"
 
 import {
+  academicYears,
+  auditLog,
   getDb,
   groupMembers,
   orgGroups,
@@ -38,6 +40,8 @@ import {
   type SystemRoleKey,
   changesBetween,
   listChanges,
+  yearProblem,
+  type OrgType,
 } from "@workspace/judge"
 import type { z } from "zod"
 
@@ -46,10 +50,12 @@ import { auditCsv, readAudit, writeEntry, type AuditFilters } from "@/features/a
 import { notify } from "@/features/notifications/server"
 import { platformCan } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
+import { getSettings } from "@/features/settings/server"
 
 import { rolePermissions } from "./access"
 
 import type {
+  signupSchema,
   assignRoleSchema,
   importSchema,
   groupSchema,
@@ -337,32 +343,123 @@ export async function createOrganization(
 ) {
   await requirePlatformAdmin(user)
   return getDb().transaction(async (tx) => {
-    const [org] = await tx
-      .insert(organizations)
-      .values({
-        name: input.name,
-        slug: input.slug,
-        type: input.type,
-        groupLevels: ORG_TYPE_CONFIG[input.type].groupLevels,
-      })
-      .returning()
-    await tx.insert(orgRoles).values(
-      Object.entries(SYSTEM_ROLES).map(([key, role]) => ({
-        orgId: org!.id,
-        systemKey: key,
-        name: role.name,
-        description: role.description,
-        permissions: [...role.permissions],
-      }))
-    )
     const owner = await userByEmail(tx, input.ownerEmail)
-    await admitMember(tx, org!, owner.id, "created", false)
-    await giveRole(tx, org!.id, owner.id, "owner", null)
-    await audit(tx, { org: org!, user }, "org.create", `Created ${org!.name}`, {
+    const org = await createOrgInTx(tx, input, owner.id)
+    await audit(tx, { org, user }, "org.create", `Created ${org.name}`, {
       owner: input.ownerEmail,
     })
-    return org!
+    return org
   })
+}
+
+/** A new organization with its system roles and an owner. */
+async function createOrgInTx(
+  tx: Tx,
+  input: { name: string; slug: string; type: OrgType },
+  ownerId: string,
+  extra: { active?: boolean; signupStatus?: string | null; listed?: boolean } = {}
+) {
+  const [org] = await tx
+    .insert(organizations)
+    .values({
+      name: input.name,
+      slug: input.slug,
+      type: input.type,
+      groupLevels: ORG_TYPE_CONFIG[input.type].groupLevels,
+      ...extra,
+    })
+    .returning()
+  await tx.insert(orgRoles).values(
+    Object.entries(SYSTEM_ROLES).map(([key, role]) => ({
+      orgId: org!.id,
+      systemKey: key,
+      name: role.name,
+      description: role.description,
+      permissions: [...role.permissions],
+    }))
+  )
+  await admitMember(tx, org!, ownerId, "created", false)
+  await giveRole(tx, org!.id, ownerId, "owner", null)
+  return org!
+}
+
+/* ---------- signing up a school ---------- */
+
+/** Whether and how people may register their own school (a platform setting). */
+export async function signupMode() {
+  return (await getSettings())["orgs.self_signup"]
+}
+
+/**
+ * Registers a school (or college, cohort…) with the person signing up as its owner. When
+ * sign-ups are reviewed it waits, inactive, for a platform admin; when open it's ready at
+ * once. The optional set-up adds the current academic year and grades with sections.
+ */
+export async function signUpOrganization(user: User, input: z.infer<typeof signupSchema>) {
+  const mode = await signupMode()
+  if (mode === "off")
+    throw new ApiError(403, "signup_off", "Registering a school here is switched off. Ask the site's admins.")
+  const db = getDb()
+  // A few a day per person, so the directory can't be flooded.
+  const [recent] = await db
+    .select({ n: count() })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.actorId, user.id),
+        eq(auditLog.action, "org.signup"),
+        sql.gt(auditLog.createdAt, new Date(Date.now() - 86_400_000))
+      )
+    )
+  if (Number(recent?.n ?? 0) >= 3)
+    throw new ApiError(429, "too_many", "You've registered 3 today. Try again tomorrow.")
+  if (input.year) {
+    const problem = yearProblem(input.year)
+    if (problem) throw new ApiError(400, "bad_year", problem)
+  }
+  if (input.grades && input.grades.to < input.grades.from)
+    throw new ApiError(400, "bad_grades", "The last grade can't come before the first.")
+  if (input.grades && new Set(input.grades.sections.map((s) => s.toLowerCase())).size !== input.grades.sections.length)
+    throw new ApiError(400, "bad_grades", "Each section once.")
+  const [taken] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.slug, input.slug))
+  if (taken) throw new ApiError(409, "slug_taken", "That web address is taken. Try another.")
+  const pending = mode === "review"
+  const org = await db.transaction(async (tx) => {
+    const org = await createOrgInTx(tx, input, user.id, pending ? { active: false, signupStatus: "pending" } : {})
+    if (input.year)
+      await tx.insert(academicYears).values({ orgId: org.id, ...input.year, isCurrent: true })
+    if (input.grades) {
+      const levels = ORG_TYPE_CONFIG[input.type].groupLevels
+      for (let n = input.grades.from; n <= input.grades.to; n++) {
+        const [grade] = await tx
+          .insert(orgGroups)
+          .values({ orgId: org.id, name: `${levels[0] ?? "Grade"} ${n}` })
+          .returning()
+        if (levels.length > 1)
+          await tx.insert(orgGroups).values(
+            input.grades.sections.map((name) => ({ orgId: org.id, parentId: grade!.id, name }))
+          )
+      }
+    }
+    await audit(tx, { org, user }, "org.signup", `Registered ${org.name}${pending ? ", waiting for approval" : ""}`, {
+      year: input.year?.name ?? null,
+      grades: input.grades ? `${input.grades.from}-${input.grades.to} × ${input.grades.sections.length}` : null,
+    })
+    return org
+  })
+  if (pending) {
+    const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"))
+    await notify(
+      admins.map((a) => a.id),
+      {
+        kind: "school_signup",
+        title: `${org.name} asks to join the platform`,
+        body: `Registered by ${user.name ?? user.email}. Approve it in Organizations.`,
+        href: "/admin/organizations",
+      }
+    )
+  }
+  return { slug: org.slug, name: org.name, pending }
 }
 
 export async function setOrganizationActive(
@@ -371,18 +468,40 @@ export async function setOrganizationActive(
   active: boolean
 ) {
   await requirePlatformAdmin(user)
+  const [before] = await getDb()
+    .select({ signupStatus: organizations.signupStatus })
+    .from(organizations)
+    .where(eq(organizations.id, id))
+  const approving = active && before?.signupStatus === "pending"
   const [org] = await getDb()
     .update(organizations)
-    .set({ active })
+    .set(approving ? { active, signupStatus: null } : { active })
     .where(eq(organizations.id, id))
     .returning()
   if (!org) throw notFound("Organization not found")
   await audit(
     getDb(),
     { org, user },
-    "org.active",
-    active ? "Reactivated" : "Suspended"
+    approving ? "org.approve" : "org.active",
+    approving ? "Approved the sign-up" : active ? "Reactivated" : "Suspended"
   )
+  if (approving) {
+    const owners = await getDb()
+      .select({ id: roleAssignments.userId })
+      .from(roleAssignments)
+      .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
+      .where(and(eq(roleAssignments.orgId, org.id), eq(orgRoles.systemKey, "owner")))
+    await notify(
+      owners.map((o) => o.id),
+      {
+        kind: "school_approved",
+        title: `${org.name} is approved`,
+        body: "It's ready to use: add your staff, classes and students.",
+        href: `/orgs/${org.slug}`,
+        orgId: org.id,
+      }
+    )
+  }
   return org
 }
 
@@ -470,6 +589,8 @@ export async function getOrganization(slug: string, viewer: User | null) {
     /** Management permissions this viewer has anywhere in the organization. */
     permissions,
     canManage: permissions.length > 0,
+    /** Signed up on the site and waiting for a platform admin (shown to its members). */
+    pendingApproval: isMember && org.signupStatus === "pending",
     /** Taking applications now (Admissions module): the page offers to apply. */
     admissionsOpen: (() => {
       const modules = enabledModules(org.type, org.modules)
@@ -1691,6 +1812,12 @@ export type { OrgContext }
 export async function orgContext(slug: string, user: User) {
   const ctx = await context(slug, user)
   if (!ctx.org.active && !ctx.platformAdmin) {
+    if (ctx.org.signupStatus === "pending")
+      throw new ApiError(
+        403,
+        "pending_approval",
+        `${ctx.org.name} is waiting for the platform's approval. You'll be told when it's ready.`
+      )
     throw forbidden("This organization is suspended.")
   }
   return ctx

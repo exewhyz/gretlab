@@ -705,7 +705,7 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
             .map((s) => (
               <Link
                 key={s.title}
-                href={`${manage}${s.href}`}
+                href={s.href.startsWith("/orgs/") ? s.href : `${manage}${s.href}`}
                 className="group/short"
               >
                 <Card

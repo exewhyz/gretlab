@@ -23,6 +23,29 @@ export const orgCreateSchema = z.object({
   ownerEmail: z.email("Enter the owner's email").toLowerCase(),
 })
 
+export const signupSchema = z.object({
+  name: z.string().trim().min(2, "Give it a name").max(120),
+  slug,
+  type: z.enum(ORG_TYPES),
+  /** Optional set-up so the school is ready to use. */
+  year: z
+    .object({
+      name: z.string().trim().min(2).max(40),
+      startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    })
+    .nullable()
+    .default(null),
+  grades: z
+    .object({
+      from: z.number().int().min(1).max(12),
+      to: z.number().int().min(1).max(12),
+      sections: z.array(z.string().trim().min(1).max(10)).min(1).max(10),
+    })
+    .nullable()
+    .default(null),
+})
+
 export const orgSettingsSchema = z
   .object({
     name: z.string().trim().min(2).max(120),

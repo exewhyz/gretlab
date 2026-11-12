@@ -98,6 +98,7 @@ check("search finds by name", (await list("?q=ravi")).json?.total === 1)
 check("filters by class and status", (await list(`?gradeId=${G1.id}&status=submitted`)).json?.total === 2 && (await list("?status=admitted")).json?.total === 0)
 check("a teacher can't see them", (await teacher(`${O}/admissions`)).status === 403)
 check("the sidebar counts new ones", (await office(`${O}/shell`)).json?.admissionsNew === 2)
+check("the owner's home flags new applications", (await owner(`${O}/home`)).json?.admin?.attention.some((x) => x.kind === "Admissions" && x.text === "2 new applications"))
 const detail = (await office(`${O}/admissions/${a1.json.id}`)).json
 check("the office sees the details unsealed", detail?.birthDate === "2020-06-15" && detail.phone === "+91 98450 12345" && detail.notes === "Allergic to peanuts" && detail.applicant.email === "adm-p1@example.com", JSON.stringify(detail)?.slice(0, 300))
 check("...and what admitting needs", detail?.admit?.sections.map((s) => s.name).join() === "Grade 1 › A,Grade 1 › B" && detail.admit.linksParent === true && /^[A-Z]+-2026-\d{4}$/.test(detail.admit.admissionNo), JSON.stringify(detail?.admit))

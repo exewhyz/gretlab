@@ -1,5 +1,7 @@
 import {
   academicYears,
+  classTeachers,
+  termExams,
   attendance,
   getDb,
   groupMembers,
@@ -25,6 +27,7 @@ import {
   enabledModules,
   ORG_NAV,
   PERMISSIONS,
+  readAdmissionSettings,
   visibleOrgNav,
   type Permission,
 } from "@workspace/judge"
@@ -503,6 +506,28 @@ async function adminHome(ctx: OrgContext) {
       ).length > 0
     : false
 
+  // The newer processes: class teachers, exams and admissions.
+  const year = hasCurrentYear
+    ? (
+        await db
+          .select({ id: academicYears.id })
+          .from(academicYears)
+          .where(and(eq(academicYears.orgId, ctx.org.id), eq(academicYears.isCurrent, true)))
+          .limit(1)
+      )[0]
+    : undefined
+  const [[leadCount], [examCount], newApps, leaveWaiting] = await Promise.all([
+    year
+      ? db.select({ n: count() }).from(classTeachers).where(eq(classTeachers.yearId, year.id))
+      : [{ n: 0 }],
+    modules.has("exams") && year
+      ? db.select({ n: count() }).from(termExams).where(eq(termExams.yearId, year.id))
+      : [{ n: 0 }],
+    newApplications(ctx),
+    pendingLeaveCount(ctx),
+  ])
+  const admissionsSetUp = readAdmissionSettings(ctx.org.moduleSettings).yearId != null
+
   const steps = [
     {
       key: "profile",
@@ -526,6 +551,16 @@ async function adminHome(ctx: OrgContext) {
       done: classes.length > 0,
       href: "/groups",
     },
+    ...(modules.has("records")
+      ? [
+          {
+            key: "class-teachers",
+            label: "Class teachers",
+            done: Number(leadCount?.n ?? 0) > 0,
+            href: "/academic-years",
+          },
+        ]
+      : []),
     {
       key: "teachers",
       label: "Add teachers",
@@ -578,10 +613,52 @@ async function adminHome(ctx: OrgContext) {
           },
         ]
       : []),
+    ...(modules.has("exams")
+      ? [
+          {
+            key: "exams",
+            label: "This year's exams",
+            done: Number(examCount?.n ?? 0) > 0,
+            href: "/exams",
+          },
+        ]
+      : []),
+    ...(modules.has("admissions")
+      ? [
+          {
+            key: "admissions",
+            label: "Admissions",
+            done: admissionsSetUp,
+            href: "/admissions",
+          },
+        ]
+      : []),
   ]
 
   const notTaken = rows.filter((r) => !r.taken)
   const attention = [
+    ...(newApps > 0
+      ? [
+          {
+            kind: "Admissions",
+            tone: "plain",
+            text: `${newApps} new application${newApps === 1 ? "" : "s"}`,
+            action: "Review",
+            href: "/admissions",
+          },
+        ]
+      : []),
+    ...(leaveWaiting > 0
+      ? [
+          {
+            kind: "Leave",
+            tone: "plain",
+            text: `${leaveWaiting} leave request${leaveWaiting === 1 ? "" : "s"} to decide`,
+            action: "Decide",
+            href: `/orgs/${ctx.org.slug}/leave`,
+          },
+        ]
+      : []),
     ...(modules.has("attendance") && notTaken.length
       ? [
           {

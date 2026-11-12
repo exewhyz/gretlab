@@ -21,6 +21,7 @@ interface OrgRow {
   name: string
   type: OrgType
   active: boolean
+  signupStatus: string | null
   listed: boolean
   joinPolicy: string
   members: number
@@ -142,7 +143,13 @@ export function AdminOrganizations() {
               >
                 {org.name}
               </Link>
-              {!org.active && <span className="ml-2 text-xs">Suspended</span>}
+              {org.signupStatus === "pending" ? (
+                <span className="ml-2 text-xs font-semibold text-primary-active" data-testid="awaiting-approval">
+                  Waiting for approval
+                </span>
+              ) : (
+                !org.active && <span className="ml-2 text-xs">Suspended</span>
+              )}
               {!org.listed && <span className="ml-2 text-xs">Unlisted</span>}
             </td>
             <td>{ORG_TYPE[org.type]}</td>
@@ -165,11 +172,11 @@ export function AdminOrganizations() {
               ) : (
                 <Button
                   size="xs"
-                  variant="ghost"
+                  variant={org.signupStatus === "pending" ? "default" : "ghost"}
                   disabled={toggle.isPending}
                   onClick={() => toggle.mutate(org)}
                 >
-                  Reactivate
+                  {org.signupStatus === "pending" ? "Approve" : "Reactivate"}
                 </Button>
               )}
             </td>

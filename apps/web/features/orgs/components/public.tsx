@@ -16,6 +16,7 @@ import { ORG_TYPE_CONFIG, ORG_TYPES, type OrgType } from "@workspace/judge"
 
 import { Loading } from "@/features/admin/components/shell"
 import { ApplyButton } from "@/features/admissions/components/admissions"
+import { SignupLink } from "@/features/orgs/components/signup"
 import { api } from "@/lib/api/client"
 import { formatDate, formatDateTime } from "@/lib/format"
 
@@ -60,6 +61,7 @@ interface OrgProfile {
   } | null
   canManage: boolean
   admissionsOpen?: boolean
+  pendingApproval?: boolean
 }
 
 function TypeBadge({ type }: { type: OrgType }) {
@@ -95,7 +97,10 @@ export function MyOrganizations() {
 
   return (
     <>
-      <h1 className="mb-1 text-display-lg text-ink">Organizations</h1>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-display-lg text-ink">Organizations</h1>
+        <SignupLink />
+      </div>
       <p className="mb-5 text-body-sm text-body">
         Your account is yours. Join colleges, companies and communities to get
         their assignments, contests and classes; you can belong to several.
@@ -413,6 +418,16 @@ export function OrgProfileView({ slug }: { slug: string }) {
         )}
         <FormMessage message={message} />
       </div>
+      {data.pendingApproval && (
+        <p
+          role="status"
+          className="mt-4 rounded-xl border border-hairline bg-card p-4 text-body-sm text-ink"
+          data-testid="pending-approval"
+        >
+          {data.name} is waiting for the platform&apos;s approval. You&apos;ll get a
+          notification when it&apos;s ready to use.
+        </p>
+      )}
       {data.admissionsOpen && member?.status !== "active" && (
         <div
           className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-card p-4"

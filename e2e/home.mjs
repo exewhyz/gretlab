@@ -54,6 +54,10 @@ for (let n = 6; n >= 0; n--) for (const [g, hs] of Object.entries(kids)) {
 }
 for (let n = 1; n <= 5; n++) await owner(`${O}/attendance/register`, { method: "PUT", body: { groupId: a5.id, day: back(n + 6), period: "", marks: [{ userId: uid("gf-14"), status: "absent" }] } })
 await owner(`${O}/parents`, { body: { studentId: uid("gf-2"), email: "gf-parent@example.com" } })
+const yr = (await owner(`${O}/academic-years`)).years.find((y) => y.isCurrent)
+await owner(`${O}/academic-years/${yr.id}/class-teachers`, { method: "PUT", body: { assignments: [{ groupId: a3.id, teacherId: uid("gf-1") }] } })
+await owner(`${O}/exams`, { body: { yearId: yr.id, name: "Unit test 1" } })
+await owner(`${O}/admissions/settings`, { method: "PUT", body: { open: false, yearId: yr.id, gradeIds: [], instructions: "" } })
 
 mkdirSync(SHOTS, { recursive: true })
 let failures = 0
@@ -79,6 +83,7 @@ check("students, teachers and classes are counted", a.tiles.students === 18 && a
 check("present today counts taken registers only", a.tiles.present.present === 5 && a.tiles.present.of === 6 && a.tiles.present.open === 2, JSON.stringify(a.tiles.present))
 check("class by class: taken, and not taken", a.classes.find((c) => c.name === "Grade 3 · A")?.taken && a.classes.filter((c) => !c.taken).length === 2)
 check("recent days come from registers", a.trend.length === 10 && a.trend.at(-1).percent === 83, JSON.stringify(a.trend.at(-1)))
+check("the checklist covers class teachers, exams and admissions", ["class-teachers", "exams", "admissions"].every((k) => a.steps.find((s) => s.key === k)?.done === true), JSON.stringify(a.steps.filter((s) => !s.done)))
 check("the checklist knows what's done", a.steps.find((s) => s.key === "timetable")?.done && a.steps.find((s) => s.key === "parents")?.done && a.steps.every((s) => typeof s.done === "boolean"))
 check("needs attention lists open registers, low attendance and unlinked parents", ["Register", "Attendance", "Parents"].every((k) => a.attention.some((x) => x.kind === k)), JSON.stringify(a.attention.map((x) => x.kind)))
 check("coverage counts parents linked and teachers on the timetable", a.coverage.find((c) => c.label.startsWith("Students with a parent"))?.value === 1 && a.coverage.find((c) => c.label.startsWith("Teachers on"))?.value === 1)

@@ -83,6 +83,19 @@ export const SETTINGS = {
     schema: z.boolean(),
     default: true,
   },
+  "orgs.self_signup": {
+    label: "School sign-up",
+    description:
+      "Whether people can register their own school, college or cohort from the site. Reviewed: it waits for a platform admin to approve it before anyone can use it. Open: it's ready at once.",
+    group: "Accounts",
+    schema: z.enum(["off", "review", "open"]),
+    choices: {
+      off: "Off: platform admins create them",
+      review: "Reviewed: an admin approves each",
+      open: "Open: ready at once",
+    },
+    default: "off" as "off" | "review" | "open",
+  },
   "registration.allowed_email_domains": {
     label: "Allowed email domains",
     description:

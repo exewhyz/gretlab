@@ -105,6 +105,7 @@ check("the register shows who's on leave that day", (await reg(t, a6.id, tue)).j
 const r2 = await ask(k2, { type: "family", startsOn: mon, endsOn: mon })
 check("a student asks for their own leave", r2.status === 200 && r2.json?.name === "Lv Kid Two", JSON.stringify(r2))
 check("with no class teacher, it waits for the school-wide approvers", (await owner(`${O}/leave`)).json?.waiting.some((r) => r.id === r2.json.id) && !(await t(`${O}/leave`)).json?.waiting.some((r) => r.id === r2.json.id))
+check("the owner's home flags leave to decide", (await owner(`${O}/home`)).json?.admin?.attention.some((x) => x.kind === "Leave" && x.href === "/orgs/lv-school/leave"))
 check("the student takes it back", (await k2(`${O}/leave/${r2.json.id}/cancel`, { body: {} })).status === 200 && psql(`select status from leave_requests where id='${r2.json.id}'`) === "cancelled")
 
 // ---------- staff leave and balances

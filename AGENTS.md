@@ -359,6 +359,31 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - Manage › Staff attendance: a Day tab with buttons per person, the time in and a note; a Month tab with a grid, totals and %.
   - My attendance (`/orgs/[slug]/my-attendance`) for every staff member: today's check-in and their month. Audited as `staff_attendance.*`.
 
+## Admissions (module)
+
+- On by default for schools and colleges; needs Student records. Code in `features/admissions`; rules in `packages/judge/src/admissions.ts`, unit-tested: statuses and the moves the office may make, settings, what an application must say, and `APP-YYYY-NNNN` numbers (per year applied for, taken under a row lock on the organization).
+- **Settings** (`module_settings.admissions`): open or closed, the academic year applications are for, the classes (top-level groups, none chosen: all) and instructions. When open, the public page shows "Apply for admission" (`getOrganization().admissionsOpen`).
+- **Applying:**
+  - Applicants sign in (Google), which keeps out anonymous spam and gives the account that becomes the parent. They apply at `/orgs/[slug]/apply`, even if they aren't members.
+  - Limits: one open application per child (same name and birth date) and five open at once. Applicants see their applications and can withdraw them while undecided.
+  - `admission_applications` seals birth date, phone and address (`lib/sealed.ts`, purpose "admission").
+- **The office** ("Manage admissions", `admissions.manage`, organization-wide):
+  - Manage › Admissions: open or closed, status counts, a class filter, search, pages of 50, and a sidebar count of new applications (`orgShell().admissionsNew`). The admin home flags them in "needs attention".
+  - An application's page moves it to reviewing, waitlisted or not admitted, with a message the applicant is told (`admission_update`). The office is told of new applications (`admission_new`).
+- **Admitting** reuses Student records' `createInTx`, so it makes the same account, record, admission number and enrolment as adding a student by hand:
+  - It enrols the student in the chosen section of the class applied for, in the application's year. They're placed in the class now only if that year is current; otherwise they join when it becomes current.
+  - It links the applicant as parent (Parent accounts), and a student who applied for themselves (relation `self`) becomes their own record.
+  - It runs in one transaction with the application locked. The link to the record shows only to people who can see student records. Audited as `admission.*`.
+- `createInTx` now places a student (`group_members`) only for the current year; admitting into next year leaves today's classes alone.
+
+## Registering a school
+
+- The platform setting "School sign-up" (`orgs.self_signup`) is off (default), review or open.
+- At `/schools/new` (linked from Organizations when allowed), a signed-in person registers a school, college or cohort and becomes its owner (`createOrgInTx`, shared with the admin's create).
+- **Optional set-up** in the same step: the current academic year, and grades `from`–`to` with the same sections in each (for kinds with two group levels).
+- **Review mode:** the organization starts inactive with `signup_status = 'pending'`. Platform admins are told (`school_signup`). Its pages answer 403 `pending_approval`, and the owner's profile says it's waiting. Approving in Admin › Organizations (activating a pending one) clears it, tells the owners (`school_approved`) and logs `org.approve`.
+- Limited to three registrations a day per person (from the audit log), and taken addresses are refused.
+
 ## The school home and frame
 
 - **The frame.** Every school page (the home at `/orgs/:slug` and all of `/orgs/:slug/manage/*`) sits in `OrgShell` (`features/home/components/org-shell.tsx`), built on shadcn's Sidebar (`packages/ui`):
@@ -383,6 +408,8 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Built only from shadcn components (Card, Badge, Progress, Chart, Empty, Skeleton, Tabs, Sidebar) and Gretlab's theme tokens. The sidebar and chart tokens are in `packages/ui/src/styles/globals.css`. Add components with the shadcn CLI from `packages/ui` and never overwrite existing ones.
 
 - A fifth view, `staff`, is for active members whose roles grant something but who neither oversee the school (admin) nor teach a class (teacher): an office clerk who takes staff attendance or approves leave. Their home has today's check-in (Staff attendance module) and a card for each page their roles open (`visibleOrgNav`).
+
+- The admin checklist also has class teachers (this year), this year's exams and admissions (a year chosen), each when its module is on. "Needs attention" also lists new applications and leave waiting for this person; an attention link may be a full `/orgs/...` path (leave lives outside Manage).
 
 ## Organizations and permissions
 
@@ -574,6 +601,11 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
   - The pages and the add sheet, at laptop and phone width.
 - `e2e/promotion.mjs`: import (bad rows refused, nothing half-written, scoped to the importer's grade), creating records for existing members, the promotion plan's suggestions, a preview, applying with exceptions, running twice, making the new year current, who may promote, and the wizard at laptop and phone width.
+- `e2e/admissions.mjs`:
+  - Closed by default; opening (who may, a year, grades only); applying (checks, duplicates, five at most, numbers per year, sealed details); the office told, the list, filters, search, the sidebar and home counts.
+  - Reviewing, waitlisting, turning down with a message; admitting into the current year (record, enrolment, place, parent linked, parent's home) and into next year (enrolled, not placed); a student applying for themselves; withdrawing; closing; the log.
+  - The pages: applying from the public page on a phone, admitting from the office, the record link for those who may see records.
+- `e2e/signup.mjs`: off by default; reviewed (inactive, admins told, pages waiting, approving opens it and tells the owner); open; the set-up (year, grades with sections); taken addresses, bad years and grades, three a day; the pages (the link, the form on a phone, approving in admin).
 - `e2e/staff-attendance.mjs`:
   - Who counts as staff; marking a day (times, notes, corrections, no future days, staff only); who may mark or see.
   - Self check-in (late after the late time, once a day, switched off); approved leave on the register and in the month; the month report; your own attendance; the staff home; the log.
