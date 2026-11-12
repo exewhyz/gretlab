@@ -1517,6 +1517,40 @@ export const admissionApplications = pgTable(
   ]
 )
 
+/**
+ * A transfer certificate issued to a student leaving (Student records). What it says is
+ * kept as issued (`details`, sealed JSON: name, birth date, parents, class…), so a reprint
+ * matches the original even after the record changes.
+ */
+export const transferCertificates = pgTable(
+  "transfer_certificates",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** "TC-2026-0001", unique per organization. */
+    number: text("number").notNull(),
+    issuedOn: text("issued_on").notNull(),
+    leavingDate: text("leaving_date").notNull(),
+    reason: text("reason").notNull().default(""),
+    conduct: text("conduct").notNull().default(""),
+    remarks: text("remarks").notNull().default(""),
+    details: text("details").notNull(),
+    issuedBy: uuid("issued_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("transfer_certificates_number").on(table.orgId, table.number),
+    index("transfer_certificates_user").on(table.userId),
+  ]
+)
+
 /** The organization's daily periods, in order (Timetable module). */
 export const timetablePeriods = pgTable(
   "timetable_periods",

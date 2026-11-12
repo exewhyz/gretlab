@@ -62,6 +62,7 @@ import {
 
 import { ConfirmDialog } from "@/components/confirm"
 import {
+  Check,
   Field,
   FormMessage,
   SelectInput,
@@ -328,7 +329,10 @@ function ClassTeachersDialog({
         ) : data.sections.length === 0 ? (
           <p className="text-body-sm text-muted-foreground">No sections yet.</p>
         ) : (
-          <div className="grid max-h-[55vh] gap-3 overflow-y-auto pr-1" data-testid="class-teachers">
+          <div
+            className="grid max-h-[55vh] gap-3 overflow-y-auto pr-1"
+            data-testid="class-teachers"
+          >
             {data.sections.map((sec) => (
               <Field key={sec.groupId} label={sec.name}>
                 <SelectInput
@@ -338,7 +342,9 @@ function ClassTeachersDialog({
                   }
                 >
                   <option value="">
-                    {sec.options.length ? "No class teacher" : "Nobody teaches it yet"}
+                    {sec.options.length
+                      ? "No class teacher"
+                      : "Nobody teaches it yet"}
                   </option>
                   {sec.options.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -513,16 +519,31 @@ export function Students({ slug }: { slug: string }) {
     <>
       <PageTitle
         action={
-          data.can.edit && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => setImporting(true)}>
-                Import
-              </Button>
-              <Button onClick={() => setAdding(true)}>
-                <PlusIcon /> Add student
-              </Button>
-            </div>
-          )
+          <div className="flex flex-wrap gap-2">
+            {groupId &&
+              !data.groups.some((g) => g.parentId === groupId) &&
+              data.year && (
+                <a
+                  href={`/api/v1/orgs/${slug}/students/id-cards/pdf?groupId=${groupId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonVariants({ variant: "outline" })}
+                  data-testid="id-cards"
+                >
+                  ID cards (PDF)
+                </a>
+              )}
+            {data.can.edit && (
+              <>
+                <Button variant="outline" onClick={() => setImporting(true)}>
+                  Import
+                </Button>
+                <Button onClick={() => setAdding(true)}>
+                  <PlusIcon /> Add student
+                </Button>
+              </>
+            )}
+          </div>
         }
       >
         Students
@@ -1145,6 +1166,13 @@ export function StudentProfile({ slug, id }: { slug: string; id: string }) {
         <div className="[&_[data-testid=campus]]:grid-cols-1">
           <CampusSummary data={data.campus} slug={slug} own={false} />
         </div>
+        <TransferCertificates
+          slug={slug}
+          id={id}
+          name={data.name}
+          canIssue={data.can.edit}
+          active={cur?.status === "active"}
+        />
       </div>
       {editing && list.data && (
         <StudentSheet
@@ -1740,5 +1768,160 @@ export function Promotion({ slug }: { slug: string }) {
         />
       )}
     </div>
+  )
+}
+
+/* ---------- transfer certificates ---------- */
+
+function TransferCertificates({
+  slug,
+  id,
+  name,
+  canIssue,
+  active,
+}: {
+  slug: string
+  id: string
+  name: string
+  canIssue: boolean
+  active: boolean
+}) {
+  const client = useQueryClient()
+  const url = `/orgs/${slug}/students/${id}/transfer-certificates`
+  const { data } = useQuery({
+    queryKey: ["org", slug, "tcs", id],
+    queryFn: () =>
+      api<{
+        certificates: {
+          id: string
+          number: string
+          issuedOn: string
+          leavingDate: string
+        }[]
+      }>(url),
+  })
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({
+    leavingDate: new Date().toISOString().slice(0, 10),
+    reason: "",
+    conduct: "Good",
+    remarks: "",
+    markTransferred: true,
+  })
+  const issue = useMutation({
+    mutationFn: () => api<{ id: string; number: string }>(url, { body: form }),
+    onSuccess: (tc) => {
+      setOpen(false)
+      void client.invalidateQueries({ queryKey: ["org", slug] })
+      window.open(
+        `/api/v1/orgs/${slug}/transfer-certificates/${tc.id}/pdf`,
+        "_blank",
+        "noopener"
+      )
+    },
+  })
+  const list = data?.certificates ?? []
+  if (!canIssue && list.length === 0) return null
+  return (
+    <Card size="sm" data-testid="transfer-certificates">
+      <CardHeader>
+        <CardTitle>Transfer certificates</CardTitle>
+        <CardDescription>
+          {list.length ? `${list.length} issued` : "None issued."}
+        </CardDescription>
+        {canIssue && (
+          <CardAction>
+            <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+              Issue
+            </Button>
+          </CardAction>
+        )}
+      </CardHeader>
+      {list.length > 0 && (
+        <CardContent className="grid gap-1 text-body-sm">
+          {list.map((t) => (
+            <a
+              key={t.id}
+              className="flex justify-between gap-2 hover:underline"
+              href={`/api/v1/orgs/${slug}/transfer-certificates/${t.id}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="tc-link"
+            >
+              <span className="font-medium">{t.number}</span>
+              <span className="text-muted-foreground">
+                left {longDate(t.leavingDate)}
+              </span>
+            </a>
+          ))}
+        </CardContent>
+      )}
+      {open && (
+        <Dialog open onOpenChange={setOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Transfer certificate for {name}</DialogTitle>
+              <DialogDescription>
+                It&apos;s numbered and kept as issued; reprints match it.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3">
+              <Field label="Date of leaving">
+                <TextInput
+                  type="date"
+                  value={form.leavingDate}
+                  onChange={(e) =>
+                    setForm({ ...form, leavingDate: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Reason for leaving">
+                <TextInput
+                  value={form.reason}
+                  placeholder="Family moving to Pune"
+                  onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                />
+              </Field>
+              <Field label="Conduct">
+                <TextInput
+                  value={form.conduct}
+                  onChange={(e) =>
+                    setForm({ ...form, conduct: e.target.value })
+                  }
+                />
+              </Field>
+              <Field label="Remarks">
+                <TextArea
+                  value={form.remarks}
+                  maxLength={500}
+                  onChange={(e) =>
+                    setForm({ ...form, remarks: e.target.value })
+                  }
+                />
+              </Field>
+              {active && (
+                <Check
+                  label="Also mark them transferred"
+                  checked={form.markTransferred}
+                  onCheckedChange={(v) =>
+                    setForm({ ...form, markTransferred: v })
+                  }
+                />
+              )}
+            </div>
+            {issue.error && (
+              <FormMessage
+                message={{ text: issue.error.message, kind: "err" }}
+              />
+            )}
+            <DialogFooter>
+              <Button onClick={() => issue.mutate()} disabled={issue.isPending}>
+                Issue and print
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </Card>
   )
 }

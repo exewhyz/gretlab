@@ -384,6 +384,18 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - **Review mode:** the organization starts inactive with `signup_status = 'pending'`. Platform admins are told (`school_signup`). Its pages answer 403 `pending_approval`, and the owner's profile says it's waiting. Approving in Admin › Organizations (activating a pending one) clears it, tells the owners (`school_approved`) and logs `org.approve`.
 - Limited to three registrations a day per person (from the audit log), and taken addresses are refused.
 
+## PDFs (report cards, transfer certificates, ID cards)
+
+- Made on the server with `pdf-lib` (pure JavaScript, works on Vercel) through a small layout layer, `lib/pdf/document.ts`: A4 pages, wrapped text, label–value facts, tables whose header repeats on each page, the letterhead, lines to sign, and footers.
+- **Fonts:** Noto Sans regular and bold are cut down to Latin, Latin Extended, punctuation and ₹, and embedded as base64 in `lib/pdf/fonts.ts` (in `.prettierignore`). Only the glyphs used are put in each PDF. A character the fonts lack prints as "?" (`printable`), so no name breaks a document.
+  - Indic scripts aren't supported: pdf-lib doesn't shape text, so Devanagari would come out wrong even with the font.
+- **Routes** answer `application/pdf` inline with `cache-control: private, no-store`, and are guarded exactly like the pages they print:
+  - `report-cards/[studentId]/pdf` (`me` too): the report card, through `reportCard()`, so the family sees published exams only.
+  - `report-cards/class/[groupId]/pdf?yearId&published=1`: every student of a section, through `classReportCards()`, for staff who may see the class; audited `exam.print`. `composeCards()` builds many cards from one pass over the class's results, so a class costs about what one student does.
+  - `students/[id]/transfer-certificates` (GET list, POST issue) and `transfer-certificates/[id]/pdf`. Issuing needs "Add and edit students" for the student and is numbered `TC-YYYY-NNNN` under a row lock. What it says is kept sealed as issued (`transfer_certificates.details`), so reprints match. By default it marks the student transferred. Audited `records.tc` and `records.tc_print`.
+  - `students/id-cards/pdf?groupId`: a section's current-year students, ten 85.6 × 54 mm cards to an A4 sheet; audited `records.id_cards`.
+- **Buttons:** Download PDF on the report card page, "All report cards (PDF)" on an exam's Results tab, Transfer certificates on a student's profile (issue and print, and the list), and "ID cards (PDF)" on Students once a section is chosen.
+
 ## The school home and frame
 
 - **The frame.** Every school page (the home at `/orgs/:slug` and all of `/orgs/:slug/manage/*`) sits in `OrgShell` (`features/home/components/org-shell.tsx`), built on shadcn's Sidebar (`packages/ui`):
@@ -601,6 +613,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
   - The pages and the add sheet, at laptop and phone width.
 - `e2e/promotion.mjs`: import (bad rows refused, nothing half-written, scoped to the importer's grade), creating records for existing members, the promotion plan's suggestions, a preview, applying with exceptions, running twice, making the new year current, who may promote, and the wizard at laptop and phone width.
+- `e2e/pdfs.mjs`: report cards for the student, parent and staff (nobody else); a class's report cards; names outside the fonts; transfer certificates (who may issue and print, dates, numbering, marking transferred, sealed as issued, the log); ID cards; the buttons. Each PDF is opened with pdf-lib to check it's valid, with the right page count and title.
 - `e2e/admissions.mjs`:
   - Closed by default; opening (who may, a year, grades only); applying (checks, duplicates, five at most, numbers per year, sealed details); the office told, the list, filters, search, the sidebar and home counts.
   - Reviewing, waitlisting, turning down with a message; admitting into the current year (record, enrolment, place, parent linked, parent's home) and into next year (enrolled, not placed); a student applying for themselves; withdrawing; closing; the log.

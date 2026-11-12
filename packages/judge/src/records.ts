@@ -4,17 +4,29 @@
  * Pure, so they're unit-tested here.
  */
 
-export const ENROLMENT_STATUSES = ["active", "transferred", "graduated", "withdrawn"] as const
+export const ENROLMENT_STATUSES = [
+  "active",
+  "transferred",
+  "graduated",
+  "withdrawn",
+] as const
 export type EnrolmentStatus = (typeof ENROLMENT_STATUSES)[number]
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 
 /** Why an academic year can't be saved, or null. */
-export function yearProblem(input: { name: string; startsOn: string; endsOn: string }) {
+export function yearProblem(input: {
+  name: string
+  startsOn: string
+  endsOn: string
+}) {
   const name = input.name.trim()
-  if (name.length < 2 || name.length > 40) return "Give the year a name of 2 to 40 characters, like 2026-2027."
-  if (!DAY.test(input.startsOn) || !DAY.test(input.endsOn)) return "Give a start and end date."
-  if (input.endsOn <= input.startsOn) return "The year must end after it starts."
+  if (name.length < 2 || name.length > 40)
+    return "Give the year a name of 2 to 40 characters, like 2026-2027."
+  if (!DAY.test(input.startsOn) || !DAY.test(input.endsOn))
+    return "Give a start and end date."
+  if (input.endsOn <= input.startsOn)
+    return "The year must end after it starts."
   return null
 }
 
@@ -58,7 +70,8 @@ export const NO_LOGIN_DOMAIN = "students.gretlab.invalid"
 
 export const noLoginEmail = (id: string) => `no-login+${id}@${NO_LOGIN_DOMAIN}`
 
-export const isNoLoginEmail = (email: string) => email.toLowerCase().endsWith(".invalid")
+export const isNoLoginEmail = (email: string) =>
+  email.toLowerCase().endsWith(".invalid")
 
 /* ---------- promotion ---------- */
 
@@ -68,7 +81,8 @@ export interface TreeGroup {
   parentId: string | null
 }
 
-const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+const natural = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
 
 /**
  * Where each section's students go next year: the same-named section of the next group
@@ -77,10 +91,15 @@ const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeri
  * section of that name goes to that grade's first section. A section without a parent
  * (no grades) stays where it is.
  */
-export function suggestPromotion(groups: readonly TreeGroup[], sectionIds: readonly string[]) {
+export function suggestPromotion(
+  groups: readonly TreeGroup[],
+  sectionIds: readonly string[]
+) {
   const byId = new Map(groups.map((g) => [g.id, g]))
   const childrenOf = (id: string | null) =>
-    groups.filter((g) => g.parentId === id).sort((a, b) => natural(a.name, b.name))
+    groups
+      .filter((g) => g.parentId === id)
+      .sort((a, b) => natural(a.name, b.name))
   const out: Record<string, string> = {}
   for (const id of sectionIds) {
     const section = byId.get(id)
@@ -97,8 +116,20 @@ export function suggestPromotion(groups: readonly TreeGroup[], sectionIds: reado
       continue
     }
     const sections = childrenOf(next.id)
-    const same = sections.find((s) => s.name.toLowerCase() === section.name.toLowerCase())
+    const same = sections.find(
+      (s) => s.name.toLowerCase() === section.name.toLowerCase()
+    )
     out[id] = (same ?? sections[0] ?? next).id
   }
   return out
+}
+
+/** The next of a numbered series: "TC-2026-" and the highest used plus one, four digits at least. */
+export function nextSerial(prefix: string, used: string[]) {
+  const top = used
+    .filter((u) => u.startsWith(prefix))
+    .map((u) => Number(u.slice(prefix.length)))
+    .filter(Number.isFinite)
+    .reduce((a, b) => Math.max(a, b), 0)
+  return `${prefix}${String(top + 1).padStart(4, "0")}`
 }

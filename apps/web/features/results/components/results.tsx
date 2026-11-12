@@ -126,9 +126,7 @@ export function Exams({ slug }: { slug: string }) {
   const { data, error } = useQuery({
     queryKey: key,
     queryFn: () =>
-      api<ExamList>(
-        `/orgs/${slug}/exams${yearId ? `?yearId=${yearId}` : ""}`
-      ),
+      api<ExamList>(`/orgs/${slug}/exams${yearId ? `?yearId=${yearId}` : ""}`),
   })
   const [editing, setEditing] = useState<ExamItem | "new" | null>(null)
   const [scaleOpen, setScaleOpen] = useState(false)
@@ -216,7 +214,10 @@ export function Exams({ slug }: { slug: string }) {
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="exams">
+        <div
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          data-testid="exams"
+        >
           {data.exams.map((e) => (
             <Card key={e.id} data-testid="exam-card">
               <CardHeader>
@@ -259,7 +260,10 @@ export function Exams({ slug }: { slug: string }) {
                   )}
                   <Link
                     href={`/orgs/${slug}/manage/exams/${e.id}`}
-                    className={buttonVariants({ size: "sm", variant: "outline" })}
+                    className={buttonVariants({
+                      size: "sm",
+                      variant: "outline",
+                    })}
                   >
                     Open
                   </Link>
@@ -422,7 +426,10 @@ function BankDialog({ slug, onDone }: { slug: string; onDone: () => void }) {
           <FormMessage message={{ text: save.error.message, kind: "err" }} />
         )}
         <DialogFooter>
-          <Button onClick={() => save.mutate()} disabled={text === null || save.isPending}>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={text === null || save.isPending}
+          >
             Save
           </Button>
         </DialogFooter>
@@ -472,7 +479,10 @@ function ScaleDialog({
             A grade starts at its percentage. The lowest starts at 0%.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid max-h-[55vh] gap-2 overflow-y-auto" data-testid="scale">
+        <div
+          className="grid max-h-[55vh] gap-2 overflow-y-auto"
+          data-testid="scale"
+        >
           <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-caption font-semibold">
             <span>Grade</span>
             <span>From %</span>
@@ -604,7 +614,8 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
     },
   })
   const remove = useMutation({
-    mutationFn: () => api(`/orgs/${slug}/exams/${examId}`, { method: "DELETE" }),
+    mutationFn: () =>
+      api(`/orgs/${slug}/exams/${examId}`, { method: "DELETE" }),
     onSuccess: () => router.push(`/orgs/${slug}/manage/exams`),
   })
   if (!data) return <Loading error={error} />
@@ -628,7 +639,10 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
           data.canSetup && (
             <div className="flex flex-wrap gap-2">
               {exam.published ? (
-                <Button variant="outline" onClick={() => setConfirm("unpublish")}>
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirm("unpublish")}
+                >
                   Unpublish
                 </Button>
               ) : (
@@ -647,7 +661,11 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
-                    <Button variant="ghost" size="icon" aria-label="More actions" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="More actions"
+                    />
                   }
                 >
                   <DotsThreeIcon />
@@ -707,7 +725,7 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
       {expected > 0 && (
         <div className="mb-4 flex max-w-md items-center gap-3 text-body-sm">
           <Progress value={(100 * entered) / expected} className="flex-1" />
-          <span className="tabular-nums text-muted-foreground">
+          <span className="text-muted-foreground tabular-nums">
             {entered} of {expected} marks in
           </span>
         </div>
@@ -746,7 +764,10 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                         <Link
                           aria-label={`Remarks for ${c.name}`}
                           href={`/orgs/${slug}/manage/exams/${examId}/remarks/${c.groupId}`}
-                          className={buttonVariants({ size: "sm", variant: "outline" })}
+                          className={buttonVariants({
+                            size: "sm",
+                            variant: "outline",
+                          })}
                         >
                           Remarks {Math.min(c.remarks, c.students)}/{c.students}
                         </Link>
@@ -757,7 +778,9 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Subject</TableHead>
-                        <TableHead className="hidden sm:table-cell">Teacher</TableHead>
+                        <TableHead className="hidden sm:table-cell">
+                          Teacher
+                        </TableHead>
                         <TableHead className="text-right">Marks</TableHead>
                         <TableHead className="text-right">In</TableHead>
                         <TableHead className="w-10">
@@ -785,7 +808,10 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
                             {p.maxMarks}
-                            <span className="text-muted-foreground"> / pass {fmt(p.passMarks)}</span>
+                            <span className="text-muted-foreground">
+                              {" "}
+                              / pass {fmt(p.passMarks)}
+                            </span>
                           </TableCell>
                           <TableCell
                             className={cn(
@@ -802,7 +828,10 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                               <Link
                                 aria-label={`Enter marks for ${p.subject}, ${c.name}`}
                                 href={`/orgs/${slug}/manage/exams/${examId}/papers/${p.id}`}
-                                className={buttonVariants({ size: "sm", variant: "ghost" })}
+                                className={buttonVariants({
+                                  size: "sm",
+                                  variant: "ghost",
+                                })}
                               >
                                 Enter
                               </Link>
@@ -829,7 +858,12 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
         </TabsContent>
         {resultClasses.length > 0 && (
           <TabsContent value="results" className="mt-3">
-            <ClassResults slug={slug} examId={examId} classes={resultClasses} />
+            <ClassResults
+              slug={slug}
+              examId={examId}
+              yearId={data.year?.id ?? ""}
+              classes={resultClasses}
+            />
           </TabsContent>
         )}
       </Tabs>
@@ -865,7 +899,10 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
           description="Students and their parents are told and can see their report cards. Marks are locked until you unpublish."
           confirmLabel="Publish"
           tone="default"
-          onConfirm={() => (setMissing(""), publish.mutate({ published: true }))}
+          onConfirm={() => (
+            setMissing(""),
+            publish.mutate({ published: true })
+          )}
         />
       )}
       {confirm === "force" && (
@@ -961,7 +998,10 @@ function PapersDialog({
           <>
             <p className="text-body-sm" data-testid="papers-added">
               Added {save.data.added} papers
-              {save.data.skipped ? `; ${save.data.skipped} were already there` : ""}.
+              {save.data.skipped
+                ? `; ${save.data.skipped} were already there`
+                : ""}
+              .
             </p>
             <DialogFooter>
               <Button onClick={() => onDone(true)}>Done</Button>
@@ -978,7 +1018,10 @@ function PapersDialog({
                     onCheckedChange={(v) => toggle(g.id, v)}
                   >
                     <span className="font-medium">{g.name}</span>
-                    <span className="text-muted-foreground"> (all sections)</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      (all sections)
+                    </span>
                   </Check>
                   {under(g).map((s) => (
                     <Check
@@ -1007,7 +1050,9 @@ function PapersDialog({
                   type="number"
                   min={1}
                   value={form.maxMarks}
-                  onChange={(e) => setForm({ ...form, maxMarks: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, maxMarks: e.target.value })
+                  }
                 />
               </Field>
               <Field label="Pass marks">
@@ -1016,12 +1061,16 @@ function PapersDialog({
                   min={0}
                   step="0.5"
                   value={form.passMarks}
-                  onChange={(e) => setForm({ ...form, passMarks: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, passMarks: e.target.value })
+                  }
                 />
               </Field>
             </div>
             {save.error && (
-              <FormMessage message={{ text: save.error.message, kind: "err" }} />
+              <FormMessage
+                message={{ text: save.error.message, kind: "err" }}
+              />
             )}
             <DialogFooter>
               <Button
@@ -1075,7 +1124,9 @@ function PaperDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{paper.subject}</DialogTitle>
-          <DialogDescription>Full and pass marks, and the day.</DialogDescription>
+          <DialogDescription>
+            Full and pass marks, and the day.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Full marks">
@@ -1103,11 +1154,18 @@ function PaperDialog({
         </div>
         {(save.error || remove.error) && (
           <FormMessage
-            message={{ text: (save.error ?? remove.error)!.message, kind: "err" }}
+            message={{
+              text: (save.error ?? remove.error)!.message,
+              kind: "err",
+            }}
           />
         )}
         <DialogFooter className="sm:justify-between">
-          <Button variant="ghost" className="text-destructive" onClick={() => setRemoving(true)}>
+          <Button
+            variant="ghost"
+            className="text-destructive"
+            onClick={() => setRemoving(true)}
+          >
             Remove paper
           </Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending}>
@@ -1139,7 +1197,13 @@ interface ResultsData {
     id: string
     name: string
     rollNo: number | null
-    cells: { paperId: string; marks: number | null; absent: boolean; outcome: string; grade: string | null }[]
+    cells: {
+      paperId: string
+      marks: number | null
+      absent: boolean
+      outcome: string
+      grade: string | null
+    }[]
     obtained: number
     maxMarks: number
     percent: number | null
@@ -1160,45 +1224,88 @@ interface ResultsData {
 function ClassResults({
   slug,
   examId,
+  yearId,
   classes,
 }: {
   slug: string
   examId: string
+  yearId: string
   classes: { groupId: string; name: string }[]
 }) {
   const [groupId, setGroupId] = useState(classes[0]!.groupId)
   const { data, error } = useQuery({
     queryKey: ["org", slug, "exam", examId, "results", groupId],
     queryFn: () =>
-      api<ResultsData>(`/orgs/${slug}/exams/${examId}/results?groupId=${groupId}`),
+      api<ResultsData>(
+        `/orgs/${slug}/exams/${examId}/results?groupId=${groupId}`
+      ),
   })
   return (
     <div className="grid gap-3">
-      <div className="w-64">
-        <Field label="Class">
-          <SelectInput value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-            {classes.map((c) => (
-              <option key={c.groupId} value={c.groupId}>
-                {c.name}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="w-64">
+          <Field label="Class">
+            <SelectInput
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+            >
+              {classes.map((c) => (
+                <option key={c.groupId} value={c.groupId}>
+                  {c.name}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+        </div>
+        <a
+          href={`/api/v1/orgs/${slug}/report-cards/class/${groupId}/pdf?yearId=${yearId}`}
+          target="_blank"
+          rel="noreferrer"
+          className={buttonVariants({ variant: "outline" })}
+          data-testid="class-report-pdf"
+        >
+          All report cards (PDF)
+        </a>
       </div>
       {!data ? (
         <Loading error={error} />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="result-stats">
+          <div
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+            data-testid="result-stats"
+          >
             {[
               ["Students", String(data.stats.students)],
-              ["Passed", data.stats.complete ? `${data.stats.passed} of ${data.stats.complete}` : "–"],
-              ["Class average", data.stats.average == null ? "–" : `${fmt(data.stats.average)}%`],
-              ["Highest", data.stats.highest == null ? "–" : `${fmt(data.stats.highest)}%`],
+              [
+                "Passed",
+                data.stats.complete
+                  ? `${data.stats.passed} of ${data.stats.complete}`
+                  : "–",
+              ],
+              [
+                "Class average",
+                data.stats.average == null
+                  ? "–"
+                  : `${fmt(data.stats.average)}%`,
+              ],
+              [
+                "Highest",
+                data.stats.highest == null
+                  ? "–"
+                  : `${fmt(data.stats.highest)}%`,
+              ],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-hairline bg-card p-3">
-                <div className="text-caption text-muted-foreground">{label}</div>
-                <div className="text-title-md tabular-nums text-ink">{value}</div>
+              <div
+                key={label}
+                className="rounded-lg border border-hairline bg-card p-3"
+              >
+                <div className="text-caption text-muted-foreground">
+                  {label}
+                </div>
+                <div className="text-title-md text-ink tabular-nums">
+                  {value}
+                </div>
               </div>
             ))}
           </div>
@@ -1211,7 +1318,9 @@ function ClassResults({
                   {data.papers.map((p) => (
                     <TableHead key={p.id} className="text-right">
                       {p.subject}
-                      <div className="font-normal text-muted-foreground">/{p.maxMarks}</div>
+                      <div className="font-normal text-muted-foreground">
+                        /{p.maxMarks}
+                      </div>
                     </TableHead>
                   ))}
                   <TableHead className="text-right">Total</TableHead>
@@ -1224,9 +1333,14 @@ function ClassResults({
               <TableBody>
                 {data.rows.map((r) => (
                   <TableRow key={r.id} data-testid="result-row">
-                    <TableCell className="tabular-nums text-muted-foreground">{r.rollNo ?? "–"}</TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">
+                      {r.rollNo ?? "–"}
+                    </TableCell>
                     <TableCell className="font-medium">
-                      <Link className="hover:underline" href={`/orgs/${slug}/results/${r.id}`}>
+                      <Link
+                        className="hover:underline"
+                        href={`/orgs/${slug}/results/${r.id}`}
+                      >
                         {r.name}
                       </Link>
                     </TableCell>
@@ -1235,24 +1349,38 @@ function ClassResults({
                         key={c.paperId}
                         className={cn(
                           "text-right tabular-nums",
-                          (c.outcome === "fail" || c.outcome === "absent") && "text-destructive"
+                          (c.outcome === "fail" || c.outcome === "absent") &&
+                            "text-destructive"
                         )}
                       >
                         {c.absent ? "AB" : fmt(c.marks)}
                       </TableCell>
                     ))}
-                    <TableCell className="text-right tabular-nums">{fmt(r.obtained)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.percent)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {fmt(r.obtained)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {fmt(r.percent)}
+                    </TableCell>
                     <TableCell>{r.grade ?? "–"}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.rank ?? "–"}</TableCell>
-                    <TableCell className={RESULT[r.result]?.tone}>{RESULT[r.result]?.label}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {r.rank ?? "–"}
+                    </TableCell>
+                    <TableCell className={RESULT[r.result]?.tone}>
+                      {RESULT[r.result]?.label}
+                    </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/40">
                   <TableCell />
-                  <TableCell className="text-muted-foreground">Average</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    Average
+                  </TableCell>
                   {data.stats.subjects.map((s) => (
-                    <TableCell key={s.paperId} className="text-right tabular-nums text-muted-foreground">
+                    <TableCell
+                      key={s.paperId}
+                      className="text-right text-muted-foreground tabular-nums"
+                    >
                       {fmt(s.average)}
                     </TableCell>
                   ))}
@@ -1270,7 +1398,14 @@ function ClassResults({
 /* ---------- entering marks ---------- */
 
 interface Sheet {
-  paper: { id: string; subject: string; class: string; maxMarks: number; passMarks: number; heldOn: string | null }
+  paper: {
+    id: string
+    subject: string
+    class: string
+    maxMarks: number
+    passMarks: number
+    heldOn: string | null
+  }
   exam: { id: string; name: string; published: boolean }
   canMark: boolean
   students: {
@@ -1372,8 +1507,11 @@ export function MarksSheet({
   }, [dirty.length])
   if (!data) return <Loading error={error} />
   const { paper } = data
-  const errors = data.students
-    .map((s) => (draft[s.id] && !draft[s.id]!.absent ? markError(draft[s.id]!.text, paper.maxMarks) : null))
+  const errors = data.students.map((s) =>
+    draft[s.id] && !draft[s.id]!.absent
+      ? markError(draft[s.id]!.text, paper.maxMarks)
+      : null
+  )
   const bad = errors.some(Boolean)
   const entered = data.students.filter((s) => {
     const d = draft[s.id]
@@ -1386,7 +1524,10 @@ export function MarksSheet({
           Exams
         </Link>{" "}
         ·{" "}
-        <Link href={`/orgs/${slug}/manage/exams/${examId}`} className="hover:underline">
+        <Link
+          href={`/orgs/${slug}/manage/exams/${examId}`}
+          className="hover:underline"
+        >
           {data.exam.name}
         </Link>
       </div>
@@ -1413,7 +1554,9 @@ export function MarksSheet({
             ? "Only the subject teacher can enter these."
             : "Press Enter to go to the next student. Halves are allowed."}
       </p>
-      {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+      {save.error && (
+        <FormMessage message={{ text: save.error.message, kind: "err" }} />
+      )}
       {save.isSuccess && dirty.length === 0 && (
         <FormMessage message={{ text: "Marks saved.", kind: "ok" }} />
       )}
@@ -1421,7 +1564,9 @@ export function MarksSheet({
         <Empty className="border border-dashed border-hairline">
           <EmptyHeader>
             <EmptyTitle>No students in this class that year</EmptyTitle>
-            <EmptyDescription>Students are placed in Manage › Students.</EmptyDescription>
+            <EmptyDescription>
+              Students are placed in Manage › Students.
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
@@ -1441,10 +1586,16 @@ export function MarksSheet({
                 const d = draft[s.id] ?? { text: "", absent: false, remark: "" }
                 const err = errors[i]
                 const n = Number(d.text)
-                const fails = !d.absent && d.text.trim() !== "" && !err && n < paper.passMarks
+                const fails =
+                  !d.absent &&
+                  d.text.trim() !== "" &&
+                  !err &&
+                  n < paper.passMarks
                 return (
                   <TableRow key={s.id} data-testid="mark-row">
-                    <TableCell className="tabular-nums text-muted-foreground">{s.rollNo ?? "–"}</TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">
+                      {s.rollNo ?? "–"}
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium">{s.name}</div>
                       <div className="text-caption text-muted-foreground">
@@ -1463,18 +1614,31 @@ export function MarksSheet({
                         disabled={!data.canMark || d.absent}
                         value={d.absent ? "" : d.text}
                         placeholder={d.absent ? "AB" : ""}
-                        className={cn("w-24 tabular-nums", fails && "text-destructive")}
+                        className={cn(
+                          "w-24 tabular-nums",
+                          fails && "text-destructive"
+                        )}
                         onChange={(e) =>
-                          setDraft({ ...draft, [s.id]: { ...d, text: e.target.value } })
+                          setDraft({
+                            ...draft,
+                            [s.id]: { ...d, text: e.target.value },
+                          })
                         }
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault()
-                            inputs.current.slice(i + 1).find((x) => x && !x.disabled)?.focus()
+                            inputs.current
+                              .slice(i + 1)
+                              .find((x) => x && !x.disabled)
+                              ?.focus()
                           }
                         }}
                       />
-                      {err && <div className="mt-1 text-caption text-destructive">{err}</div>}
+                      {err && (
+                        <div className="mt-1 text-caption text-destructive">
+                          {err}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Checkbox
@@ -1482,7 +1646,10 @@ export function MarksSheet({
                         disabled={!data.canMark}
                         checked={d.absent}
                         onCheckedChange={(v) =>
-                          setDraft({ ...draft, [s.id]: { ...d, absent: v === true } })
+                          setDraft({
+                            ...draft,
+                            [s.id]: { ...d, absent: v === true },
+                          })
                         }
                       />
                     </TableCell>
@@ -1494,7 +1661,10 @@ export function MarksSheet({
                         value={d.remark}
                         placeholder="Optional"
                         onChange={(e) =>
-                          setDraft({ ...draft, [s.id]: { ...d, remark: e.target.value } })
+                          setDraft({
+                            ...draft,
+                            [s.id]: { ...d, remark: e.target.value },
+                          })
                         }
                       />
                     </TableCell>
@@ -1524,7 +1694,12 @@ interface ReportCardData {
     classTeacher: string | null
   }
   scale: Band[]
-  subjects: { subjectId: string; name: string; final: number | null; grade: string | null }[]
+  subjects: {
+    subjectId: string
+    name: string
+    final: number | null
+    grade: string | null
+  }[]
   exams: {
     id: string
     name: string
@@ -1552,7 +1727,13 @@ interface ReportCardData {
   viewer: "student" | "parent" | "staff"
 }
 
-export function ReportCard({ slug, studentId }: { slug: string; studentId: string }) {
+export function ReportCard({
+  slug,
+  studentId,
+}: {
+  slug: string
+  studentId: string
+}) {
   const [yearId, setYearId] = useState("")
   const { data, error } = useQuery({
     queryKey: ["org", slug, "report-card", studentId, yearId],
@@ -1575,7 +1756,10 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
         {data.years.length > 1 ? (
           <div className="w-48">
             <Field label="Academic year">
-              <SelectInput value={data.year.id} onChange={(e) => setYearId(e.target.value)}>
+              <SelectInput
+                value={data.year.id}
+                onChange={(e) => setYearId(e.target.value)}
+              >
                 {data.years.map((y) => (
                   <option key={y.id} value={y.id}>
                     {y.name}
@@ -1587,9 +1771,20 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
         ) : (
           <span />
         )}
-        <Button variant="outline" onClick={() => window.print()}>
-          <PrinterIcon /> Print
-        </Button>
+        <div className="flex gap-2">
+          <a
+            href={`/api/v1/orgs/${slug}/report-cards/${studentId}/pdf?yearId=${data.year.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonVariants({ variant: "outline" })}
+            data-testid="report-pdf"
+          >
+            Download PDF
+          </a>
+          <Button variant="outline" onClick={() => window.print()}>
+            <PrinterIcon /> Print
+          </Button>
+        </div>
       </div>
       <article
         id="report-card"
@@ -1598,7 +1793,7 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
       >
         <header className="grid gap-1 border-b border-hairline pb-4 text-center">
           <div className="text-title-lg text-ink">{data.org.name}</div>
-          <div className="text-body-sm uppercase tracking-wide text-muted-foreground">
+          <div className="text-body-sm tracking-wide text-muted-foreground uppercase">
             Report card · {data.year.name}
           </div>
         </header>
@@ -1607,8 +1802,13 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
             ["Student", data.student.name],
             ["Admission no.", data.student.admissionNo ?? "–"],
             ["Class", data.year.class ?? "–"],
-            ["Roll no.", data.year.rollNo == null ? "–" : String(data.year.rollNo)],
-            ...(data.year.classTeacher ? [["Class teacher", data.year.classTeacher]] : []),
+            [
+              "Roll no.",
+              data.year.rollNo == null ? "–" : String(data.year.rollNo),
+            ],
+            ...(data.year.classTeacher
+              ? [["Class teacher", data.year.classTeacher]]
+              : []),
           ].map(([k, v]) => (
             <div key={k}>
               <dt className="text-caption text-muted-foreground">{k}</dt>
@@ -1622,48 +1822,86 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-body-sm" data-testid="report-table">
+            <table
+              className="w-full border-collapse text-body-sm"
+              data-testid="report-table"
+            >
               <thead>
                 <tr className="border-b border-hairline text-left">
                   <th className="py-2 pr-3 font-semibold">Subject</th>
                   {data.exams.map((e) => (
-                    <th key={e.id} className="px-2 py-2 text-right font-semibold" colSpan={2}>
+                    <th
+                      key={e.id}
+                      className="px-2 py-2 text-right font-semibold"
+                      colSpan={2}
+                    >
                       {e.name}
                       {!e.published && (
-                        <span className="ml-1 font-normal text-muted-foreground">(draft)</span>
+                        <span className="ml-1 font-normal text-muted-foreground">
+                          (draft)
+                        </span>
                       )}
                       {e.weight > 0 && (
-                        <div className="font-normal text-muted-foreground">weight {e.weight}</div>
+                        <div className="font-normal text-muted-foreground">
+                          weight {e.weight}
+                        </div>
                       )}
                     </th>
                   ))}
-                  {weighted && <th className="px-2 py-2 text-right font-semibold" colSpan={2}>Year</th>}
+                  {weighted && (
+                    <th
+                      className="px-2 py-2 text-right font-semibold"
+                      colSpan={2}
+                    >
+                      Year
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {data.subjects.map((s) => (
-                  <tr key={s.subjectId} className="border-b border-hairline/60" data-testid="report-subject">
+                  <tr
+                    key={s.subjectId}
+                    className="border-b border-hairline/60"
+                    data-testid="report-subject"
+                  >
                     <td className="py-2 pr-3 font-medium text-ink">{s.name}</td>
                     {data.exams.map((e) => {
-                      const p = e.papers.find((x) => x.subjectId === s.subjectId)
+                      const p = e.papers.find(
+                        (x) => x.subjectId === s.subjectId
+                      )
                       return (
                         <Fragment key={e.id}>
                           <td
                             className={cn(
                               "px-2 py-2 text-right tabular-nums",
-                              (p?.outcome === "fail" || p?.outcome === "absent") && "text-destructive"
+                              (p?.outcome === "fail" ||
+                                p?.outcome === "absent") &&
+                                "text-destructive"
                             )}
                           >
-                            {!p ? "" : p.absent ? "AB" : p.marks == null ? "–" : `${fmt(p.marks)}/${p.maxMarks}`}
+                            {!p
+                              ? ""
+                              : p.absent
+                                ? "AB"
+                                : p.marks == null
+                                  ? "–"
+                                  : `${fmt(p.marks)}/${p.maxMarks}`}
                           </td>
-                          <td className="px-2 py-2 text-right text-muted-foreground">{p?.grade ?? ""}</td>
+                          <td className="px-2 py-2 text-right text-muted-foreground">
+                            {p?.grade ?? ""}
+                          </td>
                         </Fragment>
                       )
                     })}
                     {weighted && (
                       <>
-                        <td className="px-2 py-2 text-right tabular-nums">{s.final == null ? "–" : `${fmt(s.final)}%`}</td>
-                        <td className="px-2 py-2 text-right font-medium">{s.grade ?? ""}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">
+                          {s.final == null ? "–" : `${fmt(s.final)}%`}
+                        </td>
+                        <td className="px-2 py-2 text-right font-medium">
+                          {s.grade ?? ""}
+                        </td>
                       </>
                     )}
                   </tr>
@@ -1682,17 +1920,26 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
                   ))}
                   {weighted && (
                     <>
-                      <td className="px-2 py-2 text-right tabular-nums" data-testid="report-final">
+                      <td
+                        className="px-2 py-2 text-right tabular-nums"
+                        data-testid="report-final"
+                      >
                         {data.final ? `${fmt(data.final.percent)}%` : "–"}
                       </td>
-                      <td className="px-2 py-2 text-right">{data.final?.grade ?? ""}</td>
+                      <td className="px-2 py-2 text-right">
+                        {data.final?.grade ?? ""}
+                      </td>
                     </>
                   )}
                 </tr>
                 <tr className="text-muted-foreground">
                   <td className="py-1 pr-3">Percentage</td>
                   {data.exams.map((e) => (
-                    <td key={e.id} className="px-2 py-1 text-right tabular-nums" colSpan={2}>
+                    <td
+                      key={e.id}
+                      className="px-2 py-1 text-right tabular-nums"
+                      colSpan={2}
+                    >
                       {e.percent == null ? "–" : `${fmt(e.percent)}%`}
                     </td>
                   ))}
@@ -1701,7 +1948,11 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
                 <tr className="text-muted-foreground">
                   <td className="py-1 pr-3">Rank in class</td>
                   {data.exams.map((e) => (
-                    <td key={e.id} className="px-2 py-1 text-right tabular-nums" colSpan={2}>
+                    <td
+                      key={e.id}
+                      className="px-2 py-1 text-right tabular-nums"
+                      colSpan={2}
+                    >
                       {e.rank == null ? "–" : `${e.rank} of ${e.of}`}
                     </td>
                   ))}
@@ -1712,7 +1963,10 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
                   {data.exams.map((e) => (
                     <td
                       key={e.id}
-                      className={cn("px-2 py-1 text-right", RESULT[e.result]?.tone)}
+                      className={cn(
+                        "px-2 py-1 text-right",
+                        RESULT[e.result]?.tone
+                      )}
                       colSpan={2}
                       data-testid="report-result"
                     >
@@ -1738,7 +1992,10 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
                     <ul className="grid gap-0.5 text-muted-foreground">
                       {e.subjectRemarks.map((r) => (
                         <li key={r.subject}>
-                          <span className="font-medium text-ink">{r.subject}:</span> {r.text}
+                          <span className="font-medium text-ink">
+                            {r.subject}:
+                          </span>{" "}
+                          {r.text}
                         </li>
                       ))}
                     </ul>
@@ -1749,10 +2006,7 @@ export function ReportCard({ slug, studentId }: { slug: string; studentId: strin
         )}
         <footer className="grid gap-1 border-t border-hairline pt-3 text-caption text-muted-foreground">
           <div>
-            Grades:{" "}
-            {data.scale
-              .map((b) => `${b.grade} ${b.min}%+`)
-              .join(" · ")}
+            Grades: {data.scale.map((b) => `${b.grade} ${b.min}%+`).join(" · ")}
             . AB: absent.
           </div>
         </footer>
@@ -1797,20 +2051,32 @@ export function RemarksSheet({
   const client = useQueryClient()
   const key = ["org", slug, "remarks", examId, groupId]
   const url = `/orgs/${slug}/exams/${examId}/remarks/${groupId}`
-  const { data, error } = useQuery({ queryKey: key, queryFn: () => api<RemarksData>(url) })
+  const { data, error } = useQuery({
+    queryKey: key,
+    queryFn: () => api<RemarksData>(url),
+  })
   const [draft, setDraft] = useState<Record<string, string>>({})
   useEffect(() => {
-    if (data) setDraft(Object.fromEntries(data.students.map((s) => [s.id, s.remark])))
+    if (data)
+      setDraft(Object.fromEntries(data.students.map((s) => [s.id, s.remark])))
   }, [data])
   const dirty = useMemo(
-    () => data?.students.filter((s) => (draft[s.id] ?? s.remark).trim() !== s.remark) ?? [],
+    () =>
+      data?.students.filter(
+        (s) => (draft[s.id] ?? s.remark).trim() !== s.remark
+      ) ?? [],
     [data, draft]
   )
   const save = useMutation({
     mutationFn: () =>
       api<RemarksData>(url, {
         method: "PUT",
-        body: { remarks: dirty.map((s) => ({ userId: s.id, text: (draft[s.id] ?? "").trim() })) },
+        body: {
+          remarks: dirty.map((s) => ({
+            userId: s.id,
+            text: (draft[s.id] ?? "").trim(),
+          })),
+        },
       }),
     onSuccess: (next) => {
       client.setQueryData(key, next)
@@ -1832,14 +2098,20 @@ export function RemarksSheet({
           Exams
         </Link>{" "}
         ·{" "}
-        <Link href={`/orgs/${slug}/manage/exams/${examId}`} className="hover:underline">
+        <Link
+          href={`/orgs/${slug}/manage/exams/${examId}`}
+          className="hover:underline"
+        >
           {data.exam.name}
         </Link>
       </div>
       <PageTitle
         action={
           data.canWrite && (
-            <Button onClick={() => save.mutate()} disabled={dirty.length === 0 || save.isPending}>
+            <Button
+              onClick={() => save.mutate()}
+              disabled={dirty.length === 0 || save.isPending}
+            >
               {dirty.length ? `Save ${dirty.length} remarks` : "Saved"}
             </Button>
           )
@@ -1855,7 +2127,9 @@ export function RemarksSheet({
             ? "Only the class teacher can write these."
             : `${data.students.length - empty} of ${data.students.length} written. Pick from the comment bank or write your own; they show on the report card.`}
       </p>
-      {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+      {save.error && (
+        <FormMessage message={{ text: save.error.message, kind: "err" }} />
+      )}
       {save.isSuccess && dirty.length === 0 && (
         <FormMessage message={{ text: "Remarks saved.", kind: "ok" }} />
       )}
@@ -1874,12 +2148,16 @@ export function RemarksSheet({
                 <CardHeader>
                   <CardTitle>
                     {s.rollNo != null && (
-                      <span className="mr-2 text-muted-foreground tabular-nums">{s.rollNo}</span>
+                      <span className="mr-2 text-muted-foreground tabular-nums">
+                        {s.rollNo}
+                      </span>
                     )}
                     {s.name}
                   </CardTitle>
                   <CardDescription>
-                    {s.percent == null ? "No marks yet" : `${fmt(s.percent)}% · ${s.grade}`}
+                    {s.percent == null
+                      ? "No marks yet"
+                      : `${fmt(s.percent)}% · ${s.grade}`}
                     {s.rank != null && ` · rank ${s.rank}`}
                     {s.result !== "none" && (
                       <span className={cn("ml-1", RESULT[s.result]?.tone)}>
@@ -1908,7 +2186,9 @@ export function RemarksSheet({
                               onClick={() =>
                                 setDraft({
                                   ...draft,
-                                  [s.id]: [value.trim(), fill(b, s.name)].filter(Boolean).join(" "),
+                                  [s.id]: [value.trim(), fill(b, s.name)]
+                                    .filter(Boolean)
+                                    .join(" "),
                                 })
                               }
                             >
@@ -1927,13 +2207,16 @@ export function RemarksSheet({
                     disabled={!data.canWrite}
                     value={value}
                     placeholder={data.canWrite ? "Write a remark" : "No remark"}
-                    onChange={(e) => setDraft({ ...draft, [s.id]: e.target.value })}
+                    onChange={(e) =>
+                      setDraft({ ...draft, [s.id]: e.target.value })
+                    }
                   />
                   {s.subjects.length > 0 && (
                     <ul className="grid gap-0.5 text-caption text-muted-foreground">
                       {s.subjects.map((r) => (
                         <li key={r.subject}>
-                          <span className="font-medium">{r.subject}:</span> {r.text}
+                          <span className="font-medium">{r.subject}:</span>{" "}
+                          {r.text}
                         </li>
                       ))}
                     </ul>

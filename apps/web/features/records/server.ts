@@ -4,6 +4,7 @@ import {
   academicYears,
   attendance,
   classTeachers,
+  transferCertificates,
   enrolments,
   getDb,
   groupMembers,
@@ -24,6 +25,7 @@ import {
   ENROLMENT_STATUSES,
   isNoLoginEmail,
   nextAdmissionNo,
+  nextSerial,
   noLoginEmail,
   suggestPromotion,
   yearProblem,
@@ -502,7 +504,11 @@ export async function nextNumber(slug: string, user: User) {
   return { admissionNo: await suggestAdmissionNo(ctx) }
 }
 
-export async function admissionFree(ctx: OrgContext, no: string, except?: string) {
+export async function admissionFree(
+  ctx: OrgContext,
+  no: string,
+  except?: string
+) {
   const [clash] = await getDb()
     .select({ userId: studentRecords.userId })
     .from(studentRecords)
@@ -1097,15 +1103,13 @@ export async function promote(
           .where(eq(enrolments.id, p.id))
         continue
       }
-      await tx
-        .insert(enrolments)
-        .values({
-          orgId: ctx.org.id,
-          yearId: to.id,
-          userId: p.userId,
-          groupId: p.to,
-          rollNo: p.kind === "repeated" ? p.rollNo : null,
-        })
+      await tx.insert(enrolments).values({
+        orgId: ctx.org.id,
+        yearId: to.id,
+        userId: p.userId,
+        groupId: p.to,
+        rollNo: p.kind === "repeated" ? p.rollNo : null,
+      })
     }
     if (input.makeCurrent) await makeCurrent(tx, ctx, to.id)
     // Graduates and leavers of the current year leave their classes now.
@@ -1401,14 +1405,12 @@ export async function recordEveryone(slug: string, user: User) {
     for (const p of people) {
       const no = nextAdmissionNo(prefix, nos)
       nos.push(no)
-      await tx
-        .insert(studentRecords)
-        .values({
-          orgId: ctx.org.id,
-          userId: p.userId,
-          admissionNo: no,
-          admittedOn: admitted,
-        })
+      await tx.insert(studentRecords).values({
+        orgId: ctx.org.id,
+        userId: p.userId,
+        admissionNo: no,
+        admittedOn: admitted,
+      })
       await tx
         .insert(enrolments)
         .values({
@@ -1441,22 +1443,34 @@ async function ownYear(ctx: OrgContext, yearId: string) {
   const [year] = await getDb()
     .select()
     .from(academicYears)
-    .where(and(eq(academicYears.id, yearId), eq(academicYears.orgId, ctx.org.id)))
+    .where(
+      and(eq(academicYears.id, yearId), eq(academicYears.orgId, ctx.org.id))
+    )
   if (!year) throw notFound("Year not found")
   return year
 }
 
 /** Each section's class teacher for a year, and who could be (those teaching it). */
-export async function classTeachersOf(slug: string, user: User, yearId: string) {
+export async function classTeachersOf(
+  slug: string,
+  user: User,
+  yearId: string
+) {
   const ctx = await orgContext(slug, user)
   needModule(ctx)
   if (!canFor(ctx, "students.years", []))
-    throw forbidden("Choosing class teachers needs \"Academic years\".")
+    throw forbidden('Choosing class teachers needs "Academic years".')
   const year = await ownYear(ctx, yearId)
   const sections = ctx.groups.filter((g) => isLeaf(ctx, g.id))
   const [rows, options] = await Promise.all([
-    getDb().select().from(classTeachers).where(eq(classTeachers.yearId, year.id)),
-    teachersOfGroups(ctx, sections.map((g) => g.id)),
+    getDb()
+      .select()
+      .from(classTeachers)
+      .where(eq(classTeachers.yearId, year.id)),
+    teachersOfGroups(
+      ctx,
+      sections.map((g) => g.id)
+    ),
   ])
   return {
     year: { id: year.id, name: year.name },
@@ -1465,9 +1479,14 @@ export async function classTeachersOf(slug: string, user: User, yearId: string) 
         groupId: g.id,
         name: pathName(ctx, g.id),
         teacherId: rows.find((r) => r.groupId === g.id)?.teacherId ?? null,
-        options: (options.get(g.id) ?? []).map((t) => ({ id: t.id, name: t.name })),
+        options: (options.get(g.id) ?? []).map((t) => ({
+          id: t.id,
+          name: t.name,
+        })),
       }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { numeric: true })
+      ),
   }
 }
 
@@ -1480,17 +1499,24 @@ export async function setClassTeachers(
   const ctx = await orgContext(slug, user)
   needModule(ctx)
   if (!canFor(ctx, "students.years", []))
-    throw forbidden("Choosing class teachers needs \"Academic years\".")
+    throw forbidden('Choosing class teachers needs "Academic years".')
   const year = await ownYear(ctx, yearId)
   for (const a of input.assignments)
     if (!isLeaf(ctx, a.groupId))
-      throw new ApiError(400, "not_a_section", "Class teachers are for sections.")
+      throw new ApiError(
+        400,
+        "not_a_section",
+        "Class teachers are for sections."
+      )
   const options = await teachersOfGroups(
     ctx,
     input.assignments.map((a) => a.groupId)
   )
   for (const a of input.assignments) {
-    if (a.teacherId && !(options.get(a.groupId) ?? []).some((t) => t.id === a.teacherId))
+    if (
+      a.teacherId &&
+      !(options.get(a.groupId) ?? []).some((t) => t.id === a.teacherId)
+    )
       throw new ApiError(
         400,
         "not_a_teacher",
@@ -1502,7 +1528,9 @@ export async function setClassTeachers(
     .from(classTeachers)
     .where(eq(classTeachers.yearId, year.id))
   const changed = input.assignments.filter(
-    (a) => (before.find((b) => b.groupId === a.groupId)?.teacherId ?? null) !== a.teacherId
+    (a) =>
+      (before.find((b) => b.groupId === a.groupId)?.teacherId ?? null) !==
+      a.teacherId
   )
   if (changed.length === 0) return classTeachersOf(slug, user, yearId)
   await getDb().transaction(async (tx) => {
@@ -1510,7 +1538,12 @@ export async function setClassTeachers(
     if (cleared.length)
       await tx
         .delete(classTeachers)
-        .where(and(eq(classTeachers.yearId, year.id), inArray(classTeachers.groupId, cleared)))
+        .where(
+          and(
+            eq(classTeachers.yearId, year.id),
+            inArray(classTeachers.groupId, cleared)
+          )
+        )
     const set = changed.filter((a) => a.teacherId)
     if (set.length)
       await tx
@@ -1535,4 +1568,280 @@ export async function setClassTeachers(
     { yearId: year.id }
   )
   return classTeachersOf(slug, user, yearId)
+}
+
+/* ---------- transfer certificates ---------- */
+
+export const tcSchema = z.object({
+  leavingDate: day,
+  reason: z.string().trim().max(200).default(""),
+  conduct: z.string().trim().max(100).default("Good"),
+  remarks: z.string().trim().max(500).default(""),
+  /** Also mark them transferred in their current class. */
+  markTransferred: z.boolean().default(true),
+})
+
+/** What a certificate says, kept as issued (sealed). */
+export interface TcDetails {
+  name: string
+  admissionNo: string
+  gender: string
+  birthDate: string
+  admittedOn: string
+  parents: { name: string; relation: string }[]
+  lastClass: string | null
+  lastYear: string | null
+  rollNo: number | null
+}
+
+const TC_SEAL = "transfer certificate"
+
+/** Issues a certificate (and, by default, marks the student transferred). */
+export async function issueTransferCertificate(
+  slug: string,
+  user: User,
+  studentId: string,
+  input: z.infer<typeof tcSchema>
+) {
+  const student = await getStudent(slug, user, studentId)
+  if (!student.can.edit)
+    throw forbidden(
+      'Issuing a transfer certificate needs "Add and edit students" for their class.'
+    )
+  const ctx = await orgContext(slug, user)
+  if (input.leavingDate < student.admittedOn)
+    throw new ApiError(
+      400,
+      "bad_date",
+      "They can't leave before they were admitted."
+    )
+  const issuedOn = await today()
+  if (input.leavingDate > issuedOn)
+    throw new ApiError(
+      400,
+      "bad_date",
+      "The leaving date can't be after today."
+    )
+  const last = student.history[0] ?? null
+  const details: TcDetails = {
+    name: student.name,
+    admissionNo: student.admissionNo,
+    gender: student.gender,
+    birthDate: student.birthDate,
+    admittedOn: student.admittedOn,
+    parents: student.parents.map((p) => ({
+      name: p.name,
+      relation: p.relation,
+    })),
+    lastClass: last?.group ?? null,
+    lastYear: last?.year ?? null,
+    rollNo: last?.rollNo ?? null,
+  }
+  const row = await getDb().transaction(async (tx) => {
+    await tx.execute(
+      sql.sql`select 1 from organizations where id = ${ctx.org.id} for update`
+    )
+    const prefix = `TC-${issuedOn.slice(0, 4)}-`
+    const used = await tx
+      .select({ n: transferCertificates.number })
+      .from(transferCertificates)
+      .where(
+        and(
+          eq(transferCertificates.orgId, ctx.org.id),
+          ilike(transferCertificates.number, `${prefix}%`)
+        )
+      )
+    const [created] = await tx
+      .insert(transferCertificates)
+      .values({
+        orgId: ctx.org.id,
+        userId: studentId,
+        number: nextSerial(
+          prefix,
+          used.map((u) => u.n)
+        ),
+        issuedOn,
+        leavingDate: input.leavingDate,
+        reason: input.reason,
+        conduct: input.conduct,
+        remarks: input.remarks,
+        details: seal(TC_SEAL, JSON.stringify(details)),
+        issuedBy: user.id,
+      })
+      .returning()
+    return created!
+  })
+  await writeAudit(
+    ctx,
+    "records.tc",
+    `Issued transfer certificate ${row.number} to ${student.name} (${student.admissionNo})`,
+    { studentId, number: row.number }
+  )
+  if (input.markTransferred && student.current?.status === "active")
+    await setStatus(slug, user, studentId, "transferred")
+  return { id: row.id, number: row.number }
+}
+
+/** A student's certificates, newest first. */
+export async function transferCertificatesOf(
+  slug: string,
+  user: User,
+  studentId: string
+) {
+  await getStudent(slug, user, studentId)
+  const ctx = await orgContext(slug, user)
+  const rows = await getDb()
+    .select({
+      id: transferCertificates.id,
+      number: transferCertificates.number,
+      issuedOn: transferCertificates.issuedOn,
+      leavingDate: transferCertificates.leavingDate,
+    })
+    .from(transferCertificates)
+    .where(
+      and(
+        eq(transferCertificates.orgId, ctx.org.id),
+        eq(transferCertificates.userId, studentId)
+      )
+    )
+    .orderBy(desc(transferCertificates.createdAt))
+  return { certificates: rows }
+}
+
+/** One certificate, as issued, for printing. Those who may see the student only. */
+export async function transferCertificate(
+  slug: string,
+  user: User,
+  id: string
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!z.uuid().safeParse(id).success) throw notFound("Certificate not found")
+  const [row] = await getDb()
+    .select()
+    .from(transferCertificates)
+    .where(
+      and(
+        eq(transferCertificates.id, id),
+        eq(transferCertificates.orgId, ctx.org.id)
+      )
+    )
+  if (!row) throw notFound("Certificate not found")
+  // The same check as opening the student's record.
+  await getStudent(slug, user, row.userId).catch(() => {
+    throw notFound("Certificate not found")
+  })
+  const [issuer] = row.issuedBy
+    ? await getDb()
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, row.issuedBy))
+    : []
+  await writeAudit(
+    ctx,
+    "records.tc_print",
+    `Printed transfer certificate ${row.number}`,
+    { id }
+  )
+  return {
+    org: { name: ctx.org.name },
+    number: row.number,
+    issuedOn: row.issuedOn,
+    leavingDate: row.leavingDate,
+    reason: row.reason,
+    conduct: row.conduct,
+    remarks: row.remarks,
+    issuedBy: issuer ? (issuer.name ?? issuer.email) : null,
+    details: JSON.parse(unseal(TC_SEAL, row.details) ?? "{}") as TcDetails,
+  }
+}
+
+/* ---------- ID cards ---------- */
+
+/** A section's students this year, with what an ID card shows. Those who may see them only. */
+export async function idCardData(slug: string, user: User, groupId: string) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!isLeaf(ctx, groupId)) throw notFound("Class not found")
+  if (
+    !coversGroup(ctx, "students.view", groupId) &&
+    !coversGroup(ctx, "students.edit", groupId)
+  )
+    throw forbidden("Seeing these students isn't part of your role.")
+  const db = getDb()
+  const year = await currentYear(db, ctx.org.id)
+  if (!year)
+    throw new ApiError(400, "no_year", "Add the current academic year first.")
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      rollNo: enrolments.rollNo,
+      admissionNo: studentRecords.admissionNo,
+      birthDate: studentRecords.birthDate,
+      phone: studentRecords.phone,
+    })
+    .from(enrolments)
+    .innerJoin(users, eq(enrolments.userId, users.id))
+    .innerJoin(
+      studentRecords,
+      and(
+        eq(studentRecords.orgId, enrolments.orgId),
+        eq(studentRecords.userId, enrolments.userId)
+      )
+    )
+    .where(
+      and(
+        eq(enrolments.yearId, year.id),
+        eq(enrolments.groupId, groupId),
+        eq(enrolments.status, "active")
+      )
+    )
+  const parents = rows.length
+    ? await db
+        .select({
+          studentId: guardians.studentId,
+          name: users.name,
+          email: users.email,
+        })
+        .from(guardians)
+        .innerJoin(users, eq(guardians.parentId, users.id))
+        .where(
+          and(
+            eq(guardians.orgId, ctx.org.id),
+            inArray(
+              guardians.studentId,
+              rows.map((r) => r.id)
+            )
+          )
+        )
+    : []
+  await writeAudit(
+    ctx,
+    "records.id_cards",
+    `Printed ID cards for ${pathName(ctx, groupId)}`,
+    { groupId }
+  )
+  return {
+    org: { name: ctx.org.name },
+    year: year.name,
+    class: pathName(ctx, groupId),
+    students: rows
+      .map((r) => ({
+        name: r.name ?? r.email,
+        rollNo: r.rollNo,
+        admissionNo: r.admissionNo,
+        birthDate: unseal(SEAL, r.birthDate) ?? "",
+        phone: unseal(SEAL, r.phone) ?? "",
+        parent: (() => {
+          const p = parents.find((x) => x.studentId === r.id)
+          return p ? (p.name ?? p.email) : ""
+        })(),
+      }))
+      .sort(
+        (a, b) =>
+          (a.rollNo ?? 1e9) - (b.rollNo ?? 1e9) || a.name.localeCompare(b.name)
+      ),
+  }
 }
