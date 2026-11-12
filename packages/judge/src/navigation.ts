@@ -97,6 +97,19 @@ export const ORG_NAV: NavItem[] = [
     anyOf: ["assignments.manage", "gradebook.view"],
   },
   {
+    key: "subjects",
+    label: "Subjects",
+    path: "/subjects",
+    group: "Teaching",
+    anyOf: [
+      "subjects.create",
+      "subjects.edit",
+      "subjects.delete",
+      "subjects.assign",
+    ],
+    module: "subjects",
+  },
+  {
     key: "attendance",
     label: "Attendance",
     path: "/attendance",

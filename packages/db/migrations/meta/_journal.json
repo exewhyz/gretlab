@@ -302,6 +302,13 @@
       "when": 1794427442693,
       "tag": "0042_attendance_registers",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794460274157,
+      "tag": "0043_subjects",
+      "breakpoints": true
     }
   ]
 }

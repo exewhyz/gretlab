@@ -201,6 +201,11 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Marks have a `status`: present, absent, late, excused; `present` is kept in step (present or late). Excused is left out of every percentage (`summarizeAttendance` in `packages/judge/src/attendance.ts`, unit-tested).
 - Permissions: "Take attendance" (`attendance.mark`) and "See attendance" (`attendance.view`), scoped to groups; the Teacher role has both. Students see only their own figures on the class page. A register can't be taken for a day that hasn't come (site timezone) or for anyone who isn't a student of the group; saving replaces the marks and is audited (`attendance.take` / `attendance.correct`).
 
+## Subjects (module)
+
+- On by default for schools and colleges. Manage › Subjects lists the organization's subjects (`subjects`: name, optional code unique per org, case-insensitive) and, for each, the classes that take it and who teaches it there (`class_subjects`, one per group and subject). Adding to a class and choosing its teacher happens in a dialog; the teacher must be someone given teaching for that class (`teachersOfGroup`). Deleting a subject takes it off every class.
+- Permissions: "Manage subjects" (`subjects.manage`) with Add, Edit, Delete (organization-wide) and "Assign subjects to classes" (`subjects.assign`, scoped to groups) under it. Changes are audited (`subject.create/update/delete/assign/unassign`). `subjectsOfGroups()` feeds the class page and the timetable.
+
 ## Organizations and permissions
 
 - The platform dashboard is run by platform staff roles (see "Platform staff and roles"; `users.role` is kept in step for older checks). Inside an organization, access comes only from organization roles.
@@ -354,6 +359,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/permissions.mjs`: fine-grained roles end to end — a custom role with only `assignments.grade` grades but can't create, publish or delete; `assignments.create` drafts but can't publish; the coarse `assignments.manage` still does all; a parent-holder may hand out a child while a child-holder can't grant a sibling; members' change-groups, remove and assign-roles are separate (remove is org-wide).
 - `e2e/org-types.mjs`: kinds of organization (school, cohort, company: their default group levels; an unknown kind refused), modules (not switchable before ready or for a kind that can't use them; choices remembered; unknown refused), the sidebar naming groups per kind, and the Modules card shown only where it applies.
 - `e2e/attendance.mjs`: the module on for a school, off for a company and when switched off (404, gone from the sidebar); a teacher sees only their section; students and other sections' teachers refused; future days, non-students, bad statuses and bad queries refused; taking, correcting (one row), a second period, the audit, registers kept out of the teaching log; the month (late counts, excused left out); the pages, and a phone width.
+- `e2e/subjects.mjs`: the module on for a school, off for a company; adding, duplicates (name any case, code), bad codes, renaming; putting a subject on a class with a teacher who teaches there (a student or another section's teacher refused), changing the teacher (one row); an assign-only role limited to its section; deleting; the audit; the page and its dialogs, and a phone width.
 - `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.

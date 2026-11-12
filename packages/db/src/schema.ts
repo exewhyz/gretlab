@@ -854,6 +854,53 @@ export const teachingSessions = pgTable(
   ]
 )
 
+/** The subjects an organization teaches (Subjects module): Mathematics, Physics, English. */
+export const subjects = pgTable(
+  "subjects",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** A short code ("MATH"); "" for none. */
+    code: text("code").notNull().default(""),
+    description: text("description").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("subjects_name").on(table.orgId, sql`lower(${table.name})`),
+    uniqueIndex("subjects_code")
+      .on(table.orgId, sql`lower(${table.code})`)
+      .where(sql`${table.code} <> ''`),
+  ]
+)
+
+/** A subject taught in a class (a group), and by whom. */
+export const classSubjects = pgTable(
+  "class_subjects",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id")
+      .notNull()
+      .references(() => subjects.id, { onDelete: "cascade" }),
+    teacherId: uuid("teacher_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("class_subjects_unique").on(table.groupId, table.subjectId),
+    index("class_subjects_org").on(table.orgId),
+  ]
+)
+
 /** A student's rating of a class they were in. Teachers see averages and comments, not names. */
 export const sessionFeedback = pgTable(
   "session_feedback",

@@ -50,7 +50,7 @@ export const MODULES = {
     label: "Subjects",
     description: "Subjects taught in each class, beyond the coding lab.",
     for: ["school", "college"],
-    ready: false,
+    ready: true,
   },
   parents: {
     label: "Parent accounts",

@@ -86,6 +86,12 @@ export const PERMISSIONS = {
       "Keep the syllabus of the groups this applies to and log the classes taught.",
     module: "Teaching",
   },
+  "subjects.manage": {
+    label: "Manage subjects",
+    description:
+      "The subjects the organization teaches, and which classes take them and who teaches them. Grant this, or the finer actions under it.",
+    module: "Teaching",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:
@@ -269,6 +275,31 @@ export const PERMISSIONS = {
       "Choose which notifications the organization sends its members, within what the platform allows.",
     module: "Structure",
     parent: "org.settings.manage",
+  },
+  "subjects.create": {
+    label: "Add subjects",
+    description: "Add subjects to the organization's list.",
+    module: "Teaching",
+    parent: "subjects.manage",
+  },
+  "subjects.edit": {
+    label: "Edit subjects",
+    description: "Rename subjects and change their code or description.",
+    module: "Teaching",
+    parent: "subjects.manage",
+  },
+  "subjects.delete": {
+    label: "Delete subjects",
+    description: "Remove subjects, and every class's use of them.",
+    module: "Teaching",
+    parent: "subjects.manage",
+  },
+  "subjects.assign": {
+    label: "Assign subjects to classes",
+    description:
+      "Choose which classes take a subject and who teaches it there, for the groups this applies to.",
+    module: "Teaching",
+    parent: "subjects.manage",
   },
   "org.members.assign_roles": {
     label: "Assign roles",

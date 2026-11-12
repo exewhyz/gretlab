@@ -200,6 +200,12 @@ export async function runsClass(cc: ClassContext, userIds: string[]) {
 }
 
 export async function teachersOf(cc: ClassContext) {
+  return teachersOfGroup(cc.ctx, cc.groupId)
+}
+
+/** The people given teaching for a group (or a group above it), with their roles. */
+export async function teachersOfGroup(ctx: OrgContext, groupId: string) {
+  const cc = { ctx, groupId }
   const rows = await getDb()
     .select({
       id: users.id,
