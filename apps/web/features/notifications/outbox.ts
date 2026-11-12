@@ -25,6 +25,11 @@ import {
  * was cut off anyway is reclaimed after OUTBOX_STUCK_SECONDS. Delivery is at least once,
  * and providers get a stable id per email to drop duplicates. Sent rows are deleted after
  * a week, failed ones after a month.
+ *
+ * Urgent email (sign-in codes, security notices) is claimed ahead of the rest, so a
+ * backlog of notices never delays a code, and sendUrgent() sends only urgent email, at
+ * once, for a request that's waiting on it. Email with `expiresAt` (a code) is dropped
+ * rather than sent late.
  */
 
 const { eq, inArray } = sql
@@ -37,14 +42,30 @@ export interface QueuedEmail {
   text: string
 }
 
+export interface QueueOptions {
+  /** Ahead of everything else (sign-in codes, security notices). */
+  urgent?: boolean
+  /** Don't send it after this long (a code that will have expired). */
+  expiresInMs?: number
+}
+
 /** Queues emails inside the caller's transaction. Without a provider, nothing is queued. */
-export async function queueEmails(tx: Executor, emails: QueuedEmail[]) {
+export async function queueEmails(
+  tx: Executor,
+  emails: QueuedEmail[],
+  options: QueueOptions = {}
+) {
   if (!mailEnabled() || emails.length === 0) return
+  const expiresAt = options.expiresInMs
+    ? new Date(Date.now() + options.expiresInMs)
+    : null
   await tx.insert(emailOutbox).values(
     emails.map((e) => ({
       to: e.to,
       subject: e.subject.slice(0, 300),
       text: e.text.slice(0, 10_000),
+      urgent: options.urgent ?? false,
+      expiresAt,
     }))
   )
 }
@@ -57,19 +78,30 @@ type Claimed = {
   attempts: number
 } & Record<string, unknown>
 
-function claim(limit: number) {
+/** Takes a batch to send: urgent first, then oldest; only urgent when asked. */
+function claim(limit: number, onlyUrgent = false) {
   return getDb().execute<Claimed>(sql.sql`
     UPDATE email_outbox
     SET status = 'sending', claimed_at = now(), attempts = attempts + 1
     WHERE id IN (
       SELECT id FROM email_outbox
-      WHERE (status = 'queued' AND next_attempt_at <= now())
-         OR (status = 'sending' AND claimed_at < now() - make_interval(secs => ${OUTBOX_STUCK_SECONDS}))
-      ORDER BY next_attempt_at, id
+      WHERE ((status = 'queued' AND next_attempt_at <= now())
+         OR (status = 'sending' AND claimed_at < now() - make_interval(secs => ${OUTBOX_STUCK_SECONDS})))
+        AND (expires_at IS NULL OR expires_at > now())
+        AND (${onlyUrgent} = false OR urgent)
+      ORDER BY urgent DESC, next_attempt_at, id
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
     )
     RETURNING id, to_address, subject, body, attempts
+  `)
+}
+
+/** Email past its use (a code that expired while waiting) is dropped, not sent late. */
+function dropExpired() {
+  return getDb().execute(sql.sql`
+    UPDATE email_outbox SET status = 'failed', last_error = 'expired before it could be sent'
+    WHERE status IN ('queued', 'sending') AND expires_at <= now()
   `)
 }
 
@@ -128,19 +160,46 @@ export async function drainOutbox(budgetMs = 25_000): Promise<DrainResult> {
   const provider = mailer()
   if (!provider) return done
   const stopAt = Date.now() + budgetMs
+  await dropExpired()
   // Leave room for the last batch: a provider call can take up to ~15 s.
   while (Date.now() < stopAt - 15_000) {
-    const rows = await claim(provider.batchSize)
-    if (rows.length === 0) break
-    const mails: Mail[] = rows.map((row) => ({
-      id: row.id,
-      to: row.to_address,
-      subject: row.subject,
-      text: row.body,
-    }))
-    await record(rows, await provider.send(mailFrom(), mails), done)
+    if (!(await sendBatch(provider, false, done))) break
   }
   await tidy()
+  return done
+}
+
+/** Claims and sends one batch; false when there was nothing to send. */
+async function sendBatch(
+  provider: NonNullable<ReturnType<typeof mailer>>,
+  onlyUrgent: boolean,
+  done: DrainResult
+) {
+  const rows = await claim(provider.batchSize, onlyUrgent)
+  if (rows.length === 0) return false
+  const mails: Mail[] = rows.map((row) => ({
+    id: row.id,
+    to: row.to_address,
+    subject: row.subject,
+    text: row.body,
+  }))
+  await record(rows, await provider.send(mailFrom(), mails), done)
+  return true
+}
+
+/**
+ * Sends the urgent email waiting (a sign-in code just queued), now, for a request that
+ * waits on it. Ordinary email is left to drainOutbox, so a backlog never slows this.
+ */
+export async function sendUrgent(): Promise<DrainResult> {
+  const done: DrainResult = { sent: 0, retrying: 0, failed: 0 }
+  const provider = mailer()
+  if (!provider) return done
+  await dropExpired()
+  // A few batches at most: urgent email is a code or two, not a mailing.
+  for (let i = 0; i < 3; i++) {
+    if (!(await sendBatch(provider, true, done))) break
+  }
   return done
 }
 

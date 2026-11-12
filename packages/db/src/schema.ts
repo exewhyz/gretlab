@@ -1540,9 +1540,16 @@ export const emailOutbox = pgTable(
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
     lastError: text("last_error"),
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    /** Sign-in codes and security notices: sent ahead of everything else. */
+    urgent: boolean("urgent").notNull().default(false),
+    /** Not worth sending after this (a code that has expired); dropped instead. */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (table) => [index("email_outbox_due").on(table.status, table.nextAttemptAt)]
+  (table) => [
+    index("email_outbox_due").on(table.status, table.nextAttemptAt),
+    index("email_outbox_urgent").on(table.status, table.urgent, table.nextAttemptAt),
+  ]
 )
 
 /** What a program's graduates should be able to do (PO1..PO12, PSOs): one list per organization. */

@@ -33,7 +33,7 @@ import QRCode from "qrcode"
 
 import { writeEntry } from "@/features/audit/server"
 import { mailEnabled } from "@/features/notifications/mailer"
-import { drainOutbox, queueEmails } from "@/features/notifications/outbox"
+import { queueEmails, sendUrgent } from "@/features/notifications/outbox"
 import { rolePermissions } from "@/features/orgs/access"
 import { platformAccess } from "@/features/platform/access"
 import { getSettings } from "@/features/settings/server"
@@ -139,11 +139,14 @@ const methodsOf = (row: Row | null) => ({
 const log = (actor: User, action: string, summary: string) =>
   writeEntry(getDb(), { orgId: null, actor, action, summary })
 
-/** Queued in the outbox and sent straight after the response (a code can't wait for cron). */
-async function mail(to: string, subject: string, text: string) {
-  await queueEmails(getDb(), [{ to, subject, text }])
+/**
+ * A security notice: urgent in the outbox (ahead of any backlog), sent right after the
+ * response, and retried by the outbox if the provider is down.
+ */
+async function notice(to: string, subject: string, text: string) {
+  await queueEmails(getDb(), [{ to, subject, text }], { urgent: true })
   const send = () =>
-    drainOutbox().catch((error) => console.error("[two-factor] mail:", error))
+    sendUrgent().catch((error) => console.error("[two-factor] notice:", error))
   try {
     after(send)
   } catch {
@@ -154,7 +157,7 @@ async function mail(to: string, subject: string, text: string) {
 /** A notice for the account's owner whenever its sign-in changes. */
 function securityNotice(user: User, what: string) {
   const site = process.env.NEXTAUTH_URL ?? ""
-  return mail(
+  return notice(
     user.email,
     `Security: ${what}`,
     `${what} for your account (${user.email}) on ${new Date().toUTCString()}.\n\n` +
@@ -293,12 +296,30 @@ async function emailCode(
       emailWindowStart: fresh ? now : row.emailWindowStart,
     })
     .where(eq(twoFactor.userId, user.id))
-  await mail(
-    user.email,
-    `Your ${ISSUER} code: ${code}`,
-    `Your code to ${why} is ${code}. It works once, for 10 minutes.\n\n` +
-      `If you didn't ask for it, someone may know your Google password: change it, and ignore this email.`
+  // Urgent, and sent now while the person waits: a backlog of notices can't hold it up,
+  // and a code that couldn't go out within its 10 minutes is dropped, not sent late.
+  await queueEmails(
+    db,
+    [
+      {
+        to: user.email,
+        subject: `Your ${ISSUER} code: ${code}`,
+        text:
+          `Your code to ${why} is ${code}. It works once, for 10 minutes.\n\n` +
+          `If you didn't ask for it, someone may know your Google password: change it, and ignore this email.`,
+      },
+    ],
+    { urgent: true, expiresInMs: EMAIL_CODE.ttlMs }
   )
+  const sent = await sendUrgent()
+  if (sent.sent === 0 && sent.retrying + sent.failed > 0) {
+    // Still queued: the outbox retries it while the code is good.
+    throw new ApiError(
+      502,
+      "mail_delayed",
+      "The email service didn't take the code just now. It will keep trying, or ask again in a minute."
+    )
+  }
   return { sentTo: maskEmail(user.email), resendIn: EMAIL_CODE.resendMs / 1000 }
 }
 

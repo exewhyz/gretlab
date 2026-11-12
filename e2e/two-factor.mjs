@@ -11,6 +11,7 @@
  */
 import { execFileSync } from "node:child_process"
 import { createHmac } from "node:crypto"
+import { createServer } from "node:http"
 import { mkdirSync } from "node:fs"
 import { createRequire } from "node:module"
 
@@ -29,6 +30,20 @@ const check = (name, ok, detail = "") => {
 }
 const psql = (q) => execFileSync("docker", ["compose", "-f", ROOT + "docker-compose.yml", "exec", "-T", "postgres", "psql", "-U", "gretlab", "-d", DB, "-Atqc", q]).toString().trim()
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+// A fake email provider (Resend's API shape), so codes really go out.
+const delivered = []
+const provider = createServer((req, res) => {
+  let raw = ""
+  req.on("data", (c) => (raw += c))
+  req.on("end", () => {
+    const body = JSON.parse(raw)
+    for (const m of Array.isArray(body) ? body : [body]) delivered.push({ to: m.to[0], subject: m.subject })
+    res.writeHead(200, { "content-type": "application/json" })
+    res.end(JSON.stringify({ data: [] }))
+  })
+})
+await new Promise((r) => provider.listen(3198, "127.0.0.1", r))
+
 /** The latest code emailed to someone (the outbox keeps the subject: "Your Gretlab code: 123456"). */
 const mailedCode = (h) => psql(`select subject from email_outbox where to_address='${h}@example.com' and subject like 'Your Gretlab code:%' order by created_at desc limit 1`).split(": ")[1] ?? ""
 const notices = (h) => psql(`select subject from email_outbox where to_address='${h}@example.com' and subject like 'Security:%' order by created_at`).split("\n").filter(Boolean)
@@ -128,6 +143,7 @@ check("using a backup code is emailed", notices("tfa-u").some((n) => n.includes(
 const emailSetup = (await u.api("/me/security/email", { method: "POST" })).json
 check("adding email sends a code, and no new backup codes", emailSetup?.sentTo === "t•••u@example.com" && emailSetup.backupCodes === null && /^\d{6}$/.test(mailedCode("tfa-u")), JSON.stringify(emailSetup))
 check("asking again within a minute waits", (await u.api("/me/security/email", { method: "POST" })).json?.error?.code === "wait")
+check("the code was really handed to the email service, not just queued", delivered.some((m) => m.to === "tfa-u@example.com" && m.subject.startsWith("Your Gretlab code:")))
 check("the emailed code turns email on", (await u.step({ confirmEmail: mailedCode("tfa-u") })) === null && (await u.api("/me/security")).json?.methods.email === true)
 psql(`update two_factor set email_sent_at = now() - interval '2 minutes' where user_id='${uid("tfa-u")}'`)
 const viaMail = await session("tfa-u@example.com")
@@ -135,6 +151,21 @@ check("someone owing the step can have a code emailed", (await viaMail.api("/aut
 const mailed = mailedCode("tfa-u")
 check("...which passes it", (await viaMail.step({ secondStep: mailed })) === null && (await viaMail.api("/me")).json?.user !== null)
 check("...once", (await (await session("tfa-u@example.com")).step({ secondStep: mailed })) === "wrong_code")
+// A backlog: 300 ordinary emails queued ahead. The code must not wait behind them.
+psql(`insert into email_outbox(to_address, subject, body) select 'tfa-bulk-' || g || '@example.com', 'Notice', 'x' from generate_series(1, 300) g`)
+psql(`update two_factor set email_sent_at = now() - interval '2 minutes' where user_id='${uid("tfa-u")}'`)
+const behind = await session("tfa-u@example.com")
+const t0 = Date.now()
+const fast = await behind.api("/auth/two-factor/email", { method: "POST" })
+const latest = psql(`select status from email_outbox where to_address='tfa-u@example.com' and subject like 'Your Gretlab code:%' order by created_at desc limit 1`)
+check("a code goes ahead of a backlog of notices, at once", fast.status === 200 && latest === "sent" && Date.now() - t0 < 5000, JSON.stringify([fast.status, latest, Date.now() - t0]))
+check("...and the backlog is left to the queue", Number(psql(`select count(*) from email_outbox where to_address like 'tfa-bulk-%' and status = 'queued'`)) >= 290)
+psql(`delete from email_outbox where to_address like 'tfa-bulk-%'`)
+psql(`insert into email_outbox(to_address, subject, body, urgent, expires_at) values ('tfa-u@example.com', 'Your Gretlab code: 999999', 'x', true, now() - interval '1 minute')`)
+psql(`update two_factor set email_sent_at = now() - interval '2 minutes' where user_id='${uid("tfa-u")}'`)
+await behind.api("/auth/two-factor/email", { method: "POST" })
+check("a code that expired while waiting is dropped, not sent late", psql(`select status || ':' || last_error from email_outbox where subject = 'Your Gretlab code: 999999'`).startsWith("failed:expired") && !delivered.some((m) => m.subject === "Your Gretlab code: 999999"))
+psql(`delete from email_outbox where subject = 'Your Gretlab code: 999999'`)
 check("someone not signed in can't ask for one", (await fetch(BASE + "/api/v1/auth/two-factor/email", { method: "POST" })).status === 401)
 psql(`update two_factor set email_sent_at = now() - interval '2 minutes' where user_id='${uid("tfa-u")}'`)
 const late = await session("tfa-u@example.com")
@@ -263,6 +294,7 @@ await phone.getByRole("heading", { name: "One more step" }).waitFor({ timeout: 1
 check("no sideways scrolling on a phone", await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
 await browser.close()
 
+provider.close()
 cleanup()
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED")
 process.exit(failures ? 1 : 0)
