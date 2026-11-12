@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm"
 import {
   boolean,
   customType,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -1239,6 +1240,89 @@ export const classSubjects = pgTable(
   (table) => [
     uniqueIndex("class_subjects_unique").on(table.groupId, table.subjectId),
     index("class_subjects_org").on(table.orgId),
+  ]
+)
+
+/**
+ * An exam in an academic year (Exams module): "Unit test 1", "Half-yearly". `weight`
+ * says how much it counts toward the year's result (0: it doesn't). Results are seen by
+ * students and parents only once published, and marks are locked while they are.
+ */
+export const termExams = pgTable(
+  "term_exams",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    yearId: uuid("year_id")
+      .notNull()
+      .references(() => academicYears.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** "YYYY-MM-DD", optional. */
+    startsOn: text("starts_on"),
+    endsOn: text("ends_on"),
+    weight: integer("weight").notNull().default(0),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("term_exams_name").on(table.yearId, sql`lower(${table.name})`),
+    index("term_exams_org").on(table.orgId),
+  ]
+)
+
+/** One subject of one exam in one class (a section): its full and pass marks. */
+export const examPapers = pgTable(
+  "exam_papers",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    examId: uuid("exam_id")
+      .notNull()
+      .references(() => termExams.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id")
+      .notNull()
+      .references(() => subjects.id, { onDelete: "cascade" }),
+    maxMarks: integer("max_marks").notNull(),
+    passMarks: doublePrecision("pass_marks").notNull(),
+    /** "YYYY-MM-DD", optional. */
+    heldOn: text("held_on"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("exam_papers_unique").on(table.examId, table.groupId, table.subjectId),
+    index("exam_papers_group").on(table.groupId),
+  ]
+)
+
+/** A student's marks in a paper (halves allowed), or that they missed it. */
+export const examMarks = pgTable(
+  "exam_marks",
+  {
+    paperId: uuid("paper_id")
+      .notNull()
+      .references(() => examPapers.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    marks: doublePrecision("marks"),
+    absent: boolean("absent").notNull().default(false),
+    enteredBy: uuid("entered_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.paperId, table.userId] }),
+    index("exam_marks_user").on(table.userId),
   ]
 )
 

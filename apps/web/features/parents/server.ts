@@ -416,6 +416,7 @@ export async function childOverview(
       classes: [],
       absences: [],
       work: [],
+      results: false,
     }
   }
   const modules = enabledModules(ctx.org.type, ctx.org.modules)
@@ -494,5 +495,6 @@ export async function childOverview(
     absences: absences.map((a) => ({ ...a, group: pathName(ctx, a.groupId) })),
     work,
     campus: await campusOf(ctx.org, studentId),
+    results: modules.has("exams"),
   }
 }

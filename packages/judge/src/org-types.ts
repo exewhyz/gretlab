@@ -40,6 +40,13 @@ export const MODULES = {
     for: ["school", "college"],
     ready: true,
   },
+  exams: {
+    label: "Exams and report cards",
+    description:
+      "Term exams with marks for every subject, grades, results by class and printable report cards. Needs Student records and Subjects.",
+    for: ["school", "college"],
+    ready: true,
+  },
   attendance: {
     label: "Attendance",
     description:
@@ -110,13 +117,13 @@ export const ORG_TYPE_CONFIG: Record<OrgType, OrgTypeConfig> = {
     label: "School",
     groupLevels: ["Grade", "Section"],
     groupsLabel: "Classes",
-    modules: ["records", "attendance", "timetable", "subjects", "parents"],
+    modules: ["records", "exams", "attendance", "timetable", "subjects", "parents"],
   },
   college: {
     label: "College",
     groupLevels: ["Branch", "Batch"],
     groupsLabel: "Batches",
-    modules: ["records", "attendance", "timetable", "subjects"],
+    modules: ["records", "exams", "attendance", "timetable", "subjects"],
   },
   cohort: {
     label: "Cohort program",

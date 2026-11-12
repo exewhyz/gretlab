@@ -121,6 +121,14 @@ export const ORG_NAV: NavItem[] = [
     module: "records",
   },
   {
+    key: "exams",
+    label: "Exams",
+    path: "/exams",
+    group: "Academics",
+    anyOf: ["exams.setup", "exams.marks", "exams.view"],
+    module: "exams",
+  },
+  {
     key: "subjects",
     label: "Subjects",
     path: "/subjects",

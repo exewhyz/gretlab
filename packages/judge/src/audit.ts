@@ -32,6 +32,8 @@ export const AUDIT_CATEGORIES: Record<string, string> = {
   attendance: "Attendance",
   subject: "Subjects",
   timetable: "Timetable",
+  records: "Student records",
+  exam: "Exams",
   parent: "Parents",
   library: "Library",
   transport: "Transport",

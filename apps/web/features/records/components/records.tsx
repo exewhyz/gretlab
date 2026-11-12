@@ -618,7 +618,7 @@ interface Profile {
   parents: { name: string; email: string; relation: string }[]
   attendance: { marked: number; percent: number } | null
   campus: CampusData
-  can: { edit: boolean }
+  can: { edit: boolean; results?: boolean }
 }
 
 /** Add or edit a student, in a sheet from the side. */
@@ -869,6 +869,14 @@ export function StudentProfile({ slug, id }: { slug: string; id: string }) {
             · {data.admissionNo}
           </p>
         </div>
+        {data.can.results && (
+          <Link
+            href={`/orgs/${slug}/results/${id}`}
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Report card
+          </Link>
+        )}
         {data.can.edit && (
           <div className="flex gap-2">
             <Button

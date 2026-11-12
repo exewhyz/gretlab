@@ -27,6 +27,7 @@ import {
   SquaresFourIcon,
   StackIcon,
   StudentIcon,
+  ExamIcon,
   TargetIcon,
   TrophyIcon,
   UploadSimpleIcon,
@@ -93,6 +94,8 @@ const ICONS: Record<string, Icon> = {
   parents: HeartIcon,
   students: StudentIcon,
   "academic-years": CalendarCheckIcon,
+  exams: ExamIcon,
+  results: ExamIcon,
   subjects: BookOpenIcon,
   timetable: CalendarDotsIcon,
   "my-timetable": CalendarDotsIcon,
@@ -162,6 +165,9 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
         { key: "classes", label: "My classes", href: "/classes" },
         ...(shell.modules.includes("library")
           ? [{ key: "books", label: "Library", href: `${base}/books` }]
+          : []),
+        ...(shell.modules.includes("exams")
+          ? [{ key: "results", label: "Results", href: `${base}/results/me` }]
           : []),
       ],
     })

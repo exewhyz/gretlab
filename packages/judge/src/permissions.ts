@@ -127,6 +127,12 @@ export const PERMISSIONS = {
       "Students' records (admission number, personal details) and their class for each academic year (Student records module). Grant this, or the finer actions under it.",
     module: "Members",
   },
+  "exams.manage": {
+    label: "Manage exams and results",
+    description:
+      "Exams, their papers, marks, the grading scale and publishing results (Exams module). Grant this, or the finer actions under it.",
+    module: "Teaching",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:
@@ -414,6 +420,26 @@ export const PERMISSIONS = {
     module: "Members",
     parent: "students.manage",
   },
+  "exams.setup": {
+    label: "Set up exams",
+    description:
+      "Add and edit exams and their papers, set the grading scale, and publish results to students and parents.",
+    module: "Teaching",
+    parent: "exams.manage",
+  },
+  "exams.marks": {
+    label: "Enter marks",
+    description:
+      "Enter and correct marks in every subject of the groups this applies to (for an exam cell or a class teacher). Subject teachers can always enter marks for their own subjects.",
+    module: "Teaching",
+    parent: "exams.manage",
+  },
+  "exams.view": {
+    label: "See results",
+    description: "See marks, results and report cards of the students of the groups this applies to.",
+    module: "Teaching",
+    parent: "exams.manage",
+  },
   "org.members.assign_roles": {
     label: "Assign roles",
     description:
@@ -497,6 +523,7 @@ export const SYSTEM_ROLES = {
       "attendance.view",
       "parents.view",
       "students.view",
+      "exams.view",
     ] as Permission[],
   },
   member: {

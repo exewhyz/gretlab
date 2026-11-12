@@ -41,7 +41,7 @@ export const NOTIFICATION_EVENTS = {
     description:
       "A teacher marks answers or a project, comments on code, or releases results.",
     audience: "students",
-    kinds: ["marks", "comment", "feedback", "project_marked"],
+    kinds: ["marks", "comment", "feedback", "project_marked", "results"],
     emailByDefault: true,
   },
   "assignment.extension": {

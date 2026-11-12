@@ -62,6 +62,7 @@ interface Period {
 }
 
 interface Overview {
+  results?: boolean
   child: { name: string }
   org: { name: string }
   active: boolean
@@ -128,6 +129,14 @@ export function ChildPage({
           {data.classes.length > 0 &&
             ` · ${data.classes.map((c) => c.name).join(", ")}`}
         </p>
+        {data.results && (
+          <Link
+            href={`/orgs/${slug}/results/${studentId}`}
+            className="mt-2 inline-block text-body-sm font-medium text-primary hover:underline"
+          >
+            Report card ›
+          </Link>
+        )}
       </header>
       {!data.active && (
         <p className="text-body-sm text-body">

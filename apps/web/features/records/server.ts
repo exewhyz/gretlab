@@ -893,7 +893,14 @@ export async function getStudent(slug: string, user: User, id: string) {
         }
       : null,
     campus,
-    can: { edit: coversGroup(ctx, "students.edit", groupId) },
+    can: {
+      edit: coversGroup(ctx, "students.edit", groupId),
+      results:
+        enabledModules(ctx.org.type, ctx.org.modules).has("exams") &&
+        (canFor(ctx, "exams.setup", []) ||
+          coversGroup(ctx, "exams.view", groupId) ||
+          coversGroup(ctx, "exams.marks", groupId)),
+    },
   }
 }
 

@@ -296,6 +296,27 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - **People already in classes without a record** (from before the module) show as a banner on Manage › Students; "Create records" gives each an admission number and a current-year enrolment (`records.adopt`).
 - **Pages:** Manage › Students (search by name, email or admission number; filter by class (a grade includes its sections) and status; pages of 50; a sheet to add or edit), Manage › Students › one student (details, parents, attendance, campus, class by year; mark transferred, graduated or withdrawn, or back), and Manage › Academic years. The admin home's checklist gains "Current academic year".
 
+## Exams and report cards (module)
+
+- On by default for schools and colleges; needs Student records and Subjects on (otherwise the API answers 409 `needs_modules`). Code in `features/results` (the lab's timed exams are `features/exams`, a different thing). Rules in `packages/judge/src/results.ts`, unit-tested: the grading scale (CBSE's A1–E by default, kept in `organizations.module_settings.exams.scale`), marks (whole or half, up to full marks), a paper's outcome, an exam's total, percentage, grade and result (an absence is 0 and a fail; any unmarked paper makes it "incomplete"), the year's weighted result, and competition ranks.
+- Tables: `term_exams` (an exam in an academic year, with an optional weight toward the year's result and `published_at`), `exam_papers` (one per exam, section and subject: full and pass marks, the day), `exam_marks` (per paper and student: marks or absent).
+- **Who sits a paper comes from the exam year's enrolments**, not today's classes, so last year's results stay right after promotion. Anyone who already has marks stays on the sheet even if they left.
+- Adding papers: choose sections or grades (a grade means each section). Each gets a paper for every subject it takes, including subjects given to its grade. Existing papers are left alone, so it's safe to run again.
+- **Permissions:**
+  - "Manage exams and results" (`exams.manage`) has three finer actions under it:
+    - "Set up exams" (`exams.setup`, organization-wide): exams, papers, the scale, publishing;
+    - "Enter marks" (`exams.marks`, scoped to groups): for an exam cell or a class teacher;
+    - "See results" (`exams.view`, scoped; the Teacher role has it).
+  - A paper's subject teacher (Subjects module) can always enter its marks, and no other subject's.
+  - Students and their parents see only their own report card, and only published exams. Staff see drafts, marked as drafts. Anyone else gets 404, so they can't tell a student exists.
+- **Publishing** refuses while marks are missing (409 `incomplete`) unless forced. It tells each student (kind `results`, under "Marks and feedback"), and their parents get a copy. While an exam is published its marks, papers and the exam itself are locked; unpublishing unlocks them.
+- Audited as `exam.*`. A change to a mark already entered is logged as `exam.marks_correct`, separately from first entry.
+- **Pages:**
+  - Manage › Exams: the year's exams, the grading scale, adding an exam.
+  - An exam: papers by class with marking progress, adding papers, publishing; a Results tab with each class's table, stats and ranks.
+  - Marks entry (`/manage/exams/[id]/papers/[paperId]`): Enter moves to the next student, bad marks are flagged before saving, and leaving with unsaved marks warns.
+  - The report card at `/orgs/[slug]/results/[studentId]` (`me` for your own): printable. Linked from the student's sidebar (Results), the parent's child page and the staff student profile.
+
 ## The school home and frame
 
 - **The frame.** Every school page (the home at `/orgs/:slug` and all of `/orgs/:slug/manage/*`) sits in `OrgShell` (`features/home/components/org-shell.tsx`), built on shadcn's Sidebar (`packages/ui`):
@@ -509,6 +530,11 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
   - The pages and the add sheet, at laptop and phone width.
 - `e2e/promotion.mjs`: import (bad rows refused, nothing half-written, scoped to the importer's grade), creating records for existing members, the promotion plan's suggestions, a preview, applying with exceptions, running twice, making the new year current, who may promote, and the wizard at laptop and phone width.
+- `e2e/exams.mjs`:
+  - The scale; exams (duplicates, dates, who may); papers per subject per section (including the grade's subjects; adding twice adds nothing).
+  - Marks by the subject teacher, an exam-cell role and nobody else; halves, limits, absences, students of another class; corrections logged separately.
+  - Results and ranks; publishing (asks with marks missing, tells students and parents, locks marks); report cards for the student, their parent and staff (drafts hidden from the family); unpublishing; the log.
+  - The pages: adding an exam and papers, the results tab, entering marks with the keyboard, the report card on a phone and from the parent's child page.
 - `e2e/projects.mjs`: projects in assignments, repository links (spellings, refusals, pinning), the time rules and extensions, marking, totals and held results, edits keeping work, and the pages.
 - `e2e/peer.mjs`: peer review settings, handing out, anonymity, writing and handing in reviews, authors reading them, teachers' overview and hiding, closing, and the pages.
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.
