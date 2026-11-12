@@ -787,6 +787,57 @@ export const guardians = pgTable(
   ]
 )
 
+/** A title in an organization's library (Library module), with how many copies it owns. */
+export const libraryBooks = pgTable(
+  "library_books",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    author: text("author").notNull().default(""),
+    isbn: text("isbn").notNull().default(""),
+    category: text("category").notNull().default(""),
+    /** Where it's kept, e.g. "Shelf B3". */
+    shelf: text("shelf").notNull().default(""),
+    copies: integer("copies").notNull().default(1),
+    createdAt: createdAt(),
+  },
+  (table) => [index("library_books_org").on(table.orgId, table.title)]
+)
+
+/** A book lent to a member. Days are "YYYY-MM-DD" in the site's time zone. */
+export const libraryLoans = pgTable(
+  "library_loans",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    bookId: uuid("book_id")
+      .notNull()
+      .references(() => libraryBooks.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    issuedOn: text("issued_on").notNull(),
+    dueOn: text("due_on").notNull(),
+    returnedOn: text("returned_on"),
+    /** out, returned or lost. */
+    status: text("status").notNull().default("out"),
+    issuedBy: uuid("issued_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("library_loans_org").on(table.orgId, table.status),
+    index("library_loans_user").on(table.userId),
+    index("library_loans_book").on(table.bookId, table.status),
+  ]
+)
+
 /** A link or code that lets people join, optionally into a group and with a role. */
 export const orgInvites = pgTable(
   "org_invites",

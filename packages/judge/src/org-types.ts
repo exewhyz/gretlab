@@ -63,7 +63,7 @@ export const MODULES = {
     label: "Library",
     description: "The catalog of books and who has borrowed what.",
     for: ["school", "college"],
-    ready: false,
+    ready: true,
   },
   transport: {
     label: "Transport",

@@ -14,6 +14,7 @@ import { enabledModules, type Permission } from "@workspace/judge"
 import { z } from "zod"
 
 import { listAssignments } from "@/features/assignments/server"
+import { campusOf } from "@/features/campus/server"
 import { classAttendance, classStream } from "@/features/classes/server"
 import { notify } from "@/features/notifications/server"
 import {
@@ -542,5 +543,6 @@ export async function childOverview(
     classes,
     absences: absences.map((a) => ({ ...a, group: pathName(ctx, a.groupId) })),
     work,
+    campus: await campusOf(ctx.org, studentId),
   }
 }

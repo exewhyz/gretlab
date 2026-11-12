@@ -103,6 +103,12 @@ export const PERMISSIONS = {
       "Link parents to the students of the groups this applies to, and see who they are (Parent accounts module). Grant this, or the finer actions under it.",
     module: "Members",
   },
+  "library.manage": {
+    label: "Run the library",
+    description:
+      "The library's catalog, its rules, and lending books to members (Library module). Grant this, or the finer actions under it.",
+    module: "Campus",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:
@@ -335,6 +341,18 @@ export const PERMISSIONS = {
     description: "Link parents to students of the groups this applies to, one at a time or from a list, and remove links.",
     module: "Members",
     parent: "parents.manage",
+  },
+  "library.catalog": {
+    label: "Keep the catalog",
+    description: "Add, edit and remove books and their copies, and set loan rules.",
+    module: "Campus",
+    parent: "library.manage",
+  },
+  "library.lend": {
+    label: "Lend and take back books",
+    description: "Issue books to members, take them back, renew them and mark them lost.",
+    module: "Campus",
+    parent: "library.manage",
   },
   "org.members.assign_roles": {
     label: "Assign roles",

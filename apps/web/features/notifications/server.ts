@@ -20,6 +20,7 @@ import {
 import { after } from "next/server"
 
 import { listAssignments } from "@/features/assignments/server"
+import { dueLoans } from "@/features/books/server"
 import { listContests } from "@/features/contests/server"
 import { getSettings } from "@/features/settings/server"
 
@@ -190,7 +191,7 @@ export async function tellParents(
 
 export interface Reminder {
   id: string
-  kind: "due_soon" | "contest_soon" | "attendance_low"
+  kind: "due_soon" | "contest_soon" | "attendance_low" | "library_due"
   title: string
   body: string
   href: string
@@ -269,6 +270,19 @@ async function remindersFor(user: User): Promise<Reminder[]> {
       body: "Below 75%. Talk to your teacher if something is getting in the way.",
       href: `/orgs/${r.orgSlug}/classes/${r.groupId}`,
       at: new Date().toISOString(),
+    })
+  }
+  // Library books due within a day, or overdue.
+  for (const loan of await dueLoans(user.id).catch(() => [])) {
+    out.push({
+      id: `library:${loan.id}`,
+      kind: "library_due",
+      title: loan.overdue
+        ? `"${loan.title}" was due back on ${loan.dueOn}`
+        : `"${loan.title}" is due back by ${loan.dueOn}`,
+      body: "Return or renew it at the library.",
+      href: `/orgs/${loan.slug}/books`,
+      at: `${loan.dueOn}T00:00:00.000Z`,
     })
   }
   return out.sort((a, b) => a.at.localeCompare(b.at))

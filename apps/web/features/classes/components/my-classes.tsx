@@ -8,6 +8,7 @@ import { buttonVariants } from "@workspace/ui/components/button"
 import { useContentScope } from "@/features/account/scope"
 import { ScopeNote } from "@/features/account/scope-switcher"
 import { Loading } from "@/features/admin/components/shell"
+import { CampusSummary, type CampusData } from "@/features/campus/components/campus"
 import { api } from "@/lib/api/client"
 
 interface MyOrgClasses {
@@ -21,6 +22,10 @@ export function MyClasses() {
   const { data, error } = useQuery({
     queryKey: ["me", "classes"],
     queryFn: () => api<MyOrgClasses[]>("/me/classes"),
+  })
+  const campus = useQuery({
+    queryKey: ["me", "campus"],
+    queryFn: () => api<(CampusData & { slug: string; name: string })[]>("/me/campus"),
   })
   const { shows } = useContentScope()
   if (!data) return <Loading error={error} />
@@ -79,6 +84,11 @@ export function MyClasses() {
               </Link>
             ))}
           </div>
+          {campus.data
+            ?.filter((c) => c.slug === org.slug)
+            .map((c) => (
+              <CampusSummary key={c.slug} data={c} slug={c.slug} own />
+            ))}
         </section>
       ))}
     </>

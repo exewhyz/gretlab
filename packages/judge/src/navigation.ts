@@ -18,6 +18,7 @@ export const NAV_GROUPS = [
   "People",
   "Teaching",
   "Content",
+  "Campus",
   "Reports",
   "Communication",
   "Settings",
@@ -124,6 +125,14 @@ export const ORG_NAV: NavItem[] = [
     group: "Teaching",
     anyOf: ["timetable.periods", "timetable.edit"],
     module: "timetable",
+  },
+  {
+    key: "books",
+    label: "Books",
+    path: "/books",
+    group: "Campus",
+    anyOf: ["library.catalog", "library.lend"],
+    module: "library",
   },
   {
     key: "my-timetable",

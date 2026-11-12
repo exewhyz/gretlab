@@ -7,6 +7,7 @@ import {
   visibleOrgNav,
   type NavItem,
 } from "./navigation.ts"
+import { MODULE_KEYS } from "./org-types.ts"
 
 test("every nav item sits in a known group", () => {
   for (const item of ORG_NAV) {
@@ -14,8 +15,12 @@ test("every nav item sits in a known group", () => {
   }
 })
 
-test("an owner (holds everything) sees every group, Overview first", () => {
-  const nav = visibleOrgNav(ORG_NAV, { orgType: "college", can: () => true })
+test("an owner (holds everything, every module on) sees every group, Overview first", () => {
+  const nav = visibleOrgNav(ORG_NAV, {
+    orgType: "college",
+    can: () => true,
+    enabledModules: new Set(MODULE_KEYS),
+  })
   assert.equal(nav[0]?.group, "Overview")
   assert.deepEqual(
     nav.map((g) => g.group),

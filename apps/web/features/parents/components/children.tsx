@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 
 import { Card, Loading } from "@/features/admin/components/shell"
+import { CampusSummary, type CampusData } from "@/features/campus/components/campus"
 import { WeekGrid } from "@/features/timetable/components/timetable"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
@@ -84,6 +85,7 @@ interface Overview {
     notices: { id: string; at: string; text: string; by: string | null }[]
   }[]
   absences: { day: string; period: string; group: string; status: string }[]
+  campus?: CampusData
   work: {
     slug: string
     title: string
@@ -186,6 +188,8 @@ export function ChildPage({
             </section>
           )
       )}
+
+      {data.campus?.library && <CampusSummary data={data.campus} slug={slug} own={false} />}
 
       <section aria-labelledby="work">
         <h2 id="work" className="mb-2 text-title-sm text-ink">

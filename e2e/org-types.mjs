@@ -54,7 +54,7 @@ check("a school starts with its ready default modules on", school?.org.modules.j
 
 // ---------- switching modules
 const patch = (slug, modules) => owner(`/orgs/${slug}`, { method: "PATCH", body: { modules } })
-const early = await patch("typ-school", { library: true })
+const early = await patch("typ-school", { finance: true })
 check("a module that isn't ready can't be switched on", early.status === 400 && early.json?.error?.code === "module_unavailable", JSON.stringify(early.json))
 check("a company can't switch on a school module", (await patch("typ-company", { hostel: true })).json?.error?.code === "module_unavailable")
 check("switching one off is fine", (await patch("typ-school", { attendance: false })).status === 200)
@@ -75,7 +75,7 @@ check("a school's sidebar calls groups Classes", (await navOf("typ-school")).inc
 check("a company's sidebar calls groups Teams", (await navOf("typ-company")).includes("Teams"))
 await page.goto(`${BASE}/orgs/typ-school/manage/settings`)
 await page.getByTestId("org-modules").waitFor({ timeout: 30000 })
-check("a school's settings list its modules", (await page.getByTestId("module-hostel").count()) === 1 && (await page.getByTestId("module-library").innerText()).includes("Coming soon") && !(await page.getByTestId("module-attendance").innerText()).includes("Coming soon"))
+check("a school's settings list its modules", (await page.getByTestId("module-hostel").count()) === 1 && (await page.getByTestId("module-finance").innerText()).includes("Coming soon") && !(await page.getByTestId("module-attendance").innerText()).includes("Coming soon"))
 await page.screenshot({ path: SHOTS + "org-modules.png", fullPage: true })
 await page.goto(`${BASE}/orgs/typ-company/manage/settings`)
 await page.getByRole("button", { name: "Save settings" }).waitFor({ timeout: 30000 })
