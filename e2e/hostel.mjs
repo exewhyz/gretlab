@@ -122,7 +122,7 @@ check("warden duty moves a resident out", (await duty(`${O}/hostel/residents/${u
 check("...not another section's", (await duty(`${O}/hostel/residents/${uid("hst-s3")}`, { method: "DELETE" })).status === 403)
 const setup = (await owner(`${O}/hostel`)).json.hostels[0]
 check("the numbers add up", setup.rooms === 3 && setup.beds === 6 && setup.taken === 3, JSON.stringify(setup))
-const log = (await owner(`${O}/audit`)).json
+const log = (await owner(`${O}/audit?limit=200`)).json.entries
 check("hostels are in the activity log", ["hostel.add", "hostel.rooms_add", "hostel.room_edit", "hostel.room_delete", "hostel.allot", "hostel.vacate", "hostel.import"].every((a) => log.some((e) => e.action === a)))
 
 // ---------- the pages

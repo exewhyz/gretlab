@@ -82,7 +82,7 @@ const staffList = (await owner("/admin/staff")).json
 check("the staff list says how each got access", staffList.find((s) => s.email === "admin@example.com")?.source === "admin_emails" && staffList.find((s) => s.email === "plat-b@example.com")?.source === "role")
 
 // ---------- the activity log
-const log = (await owner("/admin/activity")).json
+const log = (await owner("/admin/activity?limit=200")).json.entries
 check("every change is in the activity log", log.some((e) => e.summary === "Gave plat-new@example.com the Reviewer role") && log.some((e) => e.summary === "Removed plat-new@example.com from platform staff") && log.some((e) => e.summary.startsWith("Created the plat Library helper")))
 check("only for those allowed to see it", (await b("/admin/activity")).status === 403 && (await a("/admin/activity")).status === 200)
 

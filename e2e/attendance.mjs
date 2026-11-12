@@ -91,7 +91,7 @@ check("it's saved with each status", r1.taken && st(r1, "att-s1") === "present" 
 check("taken once per day: correcting replaces it", (await put(t1, secA.id, [...marks.slice(0, 1), { userId: uid("att-s2"), status: "late" }, marks[2]])).status === 200 && st((await reg(t1, secA.id)).json, "att-s2") === "late")
 check("one register row, not two", psql(`select count(*) from teaching_sessions where group_id='${secA.id}' and kind='register' and period=''`) === "1")
 check("a second period the same day is its own register", (await put(t1, secA.id, [{ userId: uid("att-s1"), status: "absent" }], day, "Period 2")).status === 200)
-const log = (await owner(`${O}/audit`)).json
+const log = (await owner(`${O}/audit?limit=200`)).json.entries
 check("taking and correcting are in the activity log", ["attendance.take", "attendance.correct"].every((a) => log.some((e) => e.action === a)))
 check("registers stay out of the teaching log", psql(`select count(*) from teaching_sessions where group_id='${secA.id}' and kind='class'`) === "0")
 

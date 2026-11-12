@@ -119,7 +119,7 @@ check("...and on My classes", campus?.find((c) => c.slug === "lib-school")?.libr
 await owner(`${O}/parents`, { body: { studentId: uid("lib-s3"), email: "lib-parent@example.com" } })
 const child = (await (await client("lib-parent@example.com"))(`${O}/children/${uid("lib-s3")}`)).json
 check("a parent sees their child's books", child?.campus?.library?.loans[0]?.title === "Godaan", JSON.stringify(child?.campus))
-const log = (await owner(`${O}/audit`)).json
+const log = (await owner(`${O}/audit?limit=200`)).json.entries
 check("the library is in the activity log", ["library.book_add", "library.import", "library.settings", "library.issue", "library.renew", "library.return", "library.lost"].every((a) => log.some((e) => e.action === a)))
 
 // ---------- the pages

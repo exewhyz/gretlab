@@ -117,7 +117,7 @@ check("a list places what it can and reports the rest", imp?.placed === 1 && imp
 check("bus duty takes a rider off", (await duty(`${O}/transport/riders/${uid("trn-s2")}`, { method: "DELETE" })).status === 200)
 check("...not a Section B one", (await duty(`${O}/transport/riders/${uid("trn-s3")}`, { method: "DELETE" })).status === 403)
 check("removing a route takes its riders off", (await office(`${O}/transport/routes/${r2.id}`, { method: "DELETE" })).status === 200 && psql(`select count(*) from transport_riders where user_id='${uid("trn-s3")}'`) === "0")
-const log = (await owner(`${O}/audit`)).json
+const log = (await owner(`${O}/audit?limit=200`)).json.entries
 check("transport is in the activity log", ["transport.route_add", "transport.route_edit", "transport.route_delete", "transport.assign", "transport.unassign", "transport.import"].every((a) => log.some((e) => e.action === a)))
 
 // ---------- the pages

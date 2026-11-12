@@ -145,7 +145,7 @@ check("...and gets no copies", !(await p1("/me/notifications")).json.notificatio
 await owner(O, { method: "PATCH", body: { modules: { parents: true } } })
 check("the owner unlinks", (await owner(`${O}/parents/${s3link.id}`, { method: "DELETE" })).status === 200)
 check("the unlinked parent loses the child", (await (await client("par-p3@example.com"))(`${O}/children/${uid("par-s3")}`)).status === 404)
-const log = (await owner(`${O}/audit`)).json
+const log = (await owner(`${O}/audit?limit=200`)).json.entries
 check("changes are in the activity log", ["parent.link", "parent.import", "parent.unlink"].every((a) => log.some((e) => e.action === a)))
 
 // ---------- the pages

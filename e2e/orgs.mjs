@@ -147,7 +147,7 @@ const memberRole = (await api.owner(`${O}/members`)).json.find((m) => m.email ==
 check("everyone keeps the Member role", (await api.owner(`${O}/role-assignments/${memberRole.assignmentId}`, { method: "DELETE" })).status === 400)
 
 // ---------- activity log
-const log = (await api.owner(`${O}/audit`)).json
+const log = (await api.owner(`${O}/audit?limit=200`)).json.entries
 check("changes are in the activity log", ["org.create", "member.approve", "role.create", "role.assign", "invite.revoke", "group.create", "member.groups"].every((a) => log.some((e) => e.action === a)), log.map((e) => e.action).join(","))
 check("the log needs its permission", (await api.campus(`${O}/audit`)).status === 403)
 
@@ -201,7 +201,7 @@ const groupsAfter = (await api.owner(`${C}/groups`)).json.groups
 const gname = (id) => groupsAfter.find((g) => g.id === id)?.name
 check("new people land in a new 2026-B under CSE", afterImport.find((m) => m.email === "org-new1@example.com")?.groupIds.map(gname).includes("2026-B") && groupsAfter.find((g) => g.name === "2026-B").parentId === gid("CSE"))
 check("an imported teacher gets the role", afterImport.find((m) => m.email === "org-new2@example.com")?.roles.some((r) => r.systemKey === "teacher"))
-check("imports are logged", (await api.owner(`${C}/audit`)).json.some((e) => e.action === "member.import"))
+check("imports are logged", (await api.owner(`${C}/audit?limit=200`)).json.entries.some((e) => e.action === "member.import"))
 
 // ---------- the organization's own problems
 const template = (await api.admin(`/admin/problems/${P1}`)).json

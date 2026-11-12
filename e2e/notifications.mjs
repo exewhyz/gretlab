@@ -196,7 +196,7 @@ await setOrg({})
 check("the scheduler's address needs its secret", (await fetch(`${BASE}/api/cron/outbox`, { method: "POST" })).status === 401)
 
 // ---------- the record
-const log = (await owner(`${O}/audit`)).json
+const log = (await owner(`${O}/audit?limit=200`)).json.entries
 check("changes are in the organization's activity log", log.some((e) => e.action === "notifications.update"))
 check("...and the platform's", Number(psql(`select count(*) from audit_log where org_id is null and action = 'notifications.update'`)) >= 1)
 

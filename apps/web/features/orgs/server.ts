@@ -1,7 +1,6 @@
 import { randomBytes } from "node:crypto"
 
 import {
-  auditLog,
   getDb,
   groupMembers,
   orgGroups,
@@ -36,10 +35,13 @@ import {
   type Grant,
   type Permission,
   type SystemRoleKey,
+  changesBetween,
+  listChanges,
 } from "@workspace/judge"
 import type { z } from "zod"
 
 import { ApiError, notFound } from "@/lib/api/route"
+import { auditCsv, readAudit, writeEntry, type AuditFilters } from "@/features/audit/server"
 import { notify } from "@/features/notifications/server"
 import { platformCan } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
@@ -203,17 +205,24 @@ function scopeOf(ctx: OrgContext, permission: Permission): "all" | Set<string> {
 
 async function audit(
   tx: Tx | Db,
-  ctx: { org: Organization; user: User },
+  ctx: {
+    org: Organization
+    user: User
+    platformAdmin?: boolean
+    membership?: { status: string } | null
+  },
   action: string,
   summary: string,
   detail?: Record<string, unknown>
 ) {
-  await tx.insert(auditLog).values({
+  await writeEntry(tx, {
     orgId: ctx.org.id,
-    actorId: ctx.user.id,
+    actor: ctx.user,
     action,
     summary,
-    detail: detail ?? null,
+    detail,
+    // Platform staff stepping in for support, not as a member.
+    support: Boolean(ctx.platformAdmin) && ctx.membership?.status !== "active",
   })
 }
 
@@ -1057,12 +1066,22 @@ export async function updateSettings(
       .set({ ...input, website: input.website === "" ? null : input.website })
       .where(eq(organizations.id, ctx.org.id))
       .returning()
+    const changes = changesBetween(ctx.org, org!, SETTING_LABELS)
+    const moduleLabel = (key: string) => MODULES[key as keyof typeof MODULES]?.label ?? key
+    const lists = [
+      listChanges(
+        "Modules",
+        [...enabledModules(ctx.org.type, ctx.org.modules)].map(moduleLabel),
+        [...enabledModules(org!.type, org!.modules)].map(moduleLabel)
+      ),
+    ].filter(Boolean)
+    const what = [...changes.map((c) => c.field), ...lists.map((l) => l!.label)]
     await audit(
       tx,
       ctx,
       "org.settings",
-      `Changed ${Object.keys(input).join(", ")}`,
-      input
+      what.length ? `Changed ${what.join(", ").toLowerCase()}` : "Saved the settings unchanged",
+      { changes, lists }
     )
     return org!
   })
@@ -1603,13 +1622,12 @@ export async function updateRole(
   needSubset(ctx, [...role.permissions, ...input.permissions], null)
   await getDb().transaction(async (tx) => {
     await tx.update(orgRoles).set(input).where(eq(orgRoles.id, id))
-    const added = input.permissions.filter((p) => !role.permissions.includes(p))
-    const removed = role.permissions.filter(
-      (p) => !input.permissions.includes(p)
-    )
+    const label = (p: string) => PERMISSIONS[p as Permission]?.label ?? p
     await audit(tx, ctx, "role.update", `Changed role ${input.name}`, {
-      added,
-      removed,
+      changes: changesBetween(role, input, { name: "Name", description: "Description" }),
+      lists: [
+        listChanges("Permissions", role.permissions.map(label), input.permissions.map(label)),
+      ].filter(Boolean),
     })
   })
 }
@@ -1629,23 +1647,33 @@ export async function deleteRole(slug: string, user: User, id: string) {
 
 /* ---------- activity ---------- */
 
-export async function listAudit(slug: string, user: User) {
+/** How organization settings are named in the activity log. */
+const SETTING_LABELS = {
+  name: "Name",
+  description: "Description",
+  website: "Website",
+  type: "Kind",
+  listed: "Listed in the directory",
+  joinPolicy: "Who can join",
+  emailDomains: "Email domains",
+  groupLevels: "Group levels",
+  languages: "Languages",
+  allowPaste: "Pasting in the editor",
+}
+
+/** Manage › Activity: a page of the organization's log, filtered. */
+export async function listAudit(slug: string, user: User, filters: AuditFilters) {
   const ctx = await context(slug, user)
   need(ctx, "org.audit.view")
-  const rows = await getDb()
-    .select({ entry: auditLog, actor: users })
-    .from(auditLog)
-    .leftJoin(users, eq(auditLog.actorId, users.id))
-    .where(eq(auditLog.orgId, ctx.org.id))
-    .orderBy(desc(auditLog.createdAt))
-    .limit(300)
-  return rows.map(({ entry, actor }) => ({
-    id: entry.id,
-    action: entry.action,
-    summary: entry.summary,
-    actor: actor ? (actor.name ?? actor.email) : "Someone removed",
-    createdAt: entry.createdAt,
-  }))
+  return readAudit(ctx.org.id, filters)
+}
+
+/** The organization's log, filtered, as CSV. */
+export async function exportAudit(slug: string, user: User, filters: AuditFilters) {
+  const ctx = await context(slug, user)
+  need(ctx, "org.audit.view")
+  await audit(getDb(), ctx, "org.audit_export", "Downloaded the activity log")
+  return auditCsv(ctx.org.id, filters, `${ctx.org.slug}-activity.csv`)
 }
 
 /* ---------- for organization content (contests, assignments, problems, notices) ---------- */

@@ -1007,11 +1007,24 @@ export const auditLog = pgTable(
       onDelete: "set null",
     }),
     action: text("action").notNull(),
+    /** The action's area ("role" for role.update), for filtering. */
+    category: text("category").notNull().default(""),
     summary: text("summary").notNull(),
     detail: jsonb("detail").$type<Record<string, unknown>>(),
+    /** Who it was, as they were then ("Name <email>"), kept if the account goes. */
+    actorLabel: text("actor_label").notNull().default(""),
+    /** Where the request came from, when it came through the API. */
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    /** Platform staff acting inside an organization they aren't a member of. */
+    support: boolean("support").notNull().default(false),
     createdAt: createdAt(),
   },
-  (table) => [index("audit_log_org").on(table.orgId, table.createdAt)]
+  (table) => [
+    index("audit_log_org").on(table.orgId, table.createdAt),
+    index("audit_log_org_category").on(table.orgId, table.category, table.createdAt),
+    index("audit_log_org_actor").on(table.orgId, table.actorId, table.createdAt),
+  ]
 )
 
 /** The topics a group is taught, in order, with an optional date each should be done by. */

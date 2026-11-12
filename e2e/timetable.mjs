@@ -120,7 +120,7 @@ await put(owner, secA.id, 3, p2.id, mathsA)
 await setPeriods(owner, { days: [1, 2, 3, 4, 5], periods: [{ ...p1, ...P[0] }, recess] })
 check("removing a period removes its cells", psql(`select count(*) from timetable_slots where org_id='${orgId}'`) === "0")
 await setPeriods(owner, { days: [1, 2, 3, 4, 5], periods: [{ ...p1, ...P[0] }, recess, P[2]] })
-const log = (await owner(`${O}/audit`)).json
+const log = (await owner(`${O}/audit?limit=200`)).json.entries
 check("changes are in the activity log", ["timetable.periods", "timetable.slot"].every((a) => log.some((e) => e.action === a)))
 
 // ---------- the pages

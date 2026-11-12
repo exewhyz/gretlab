@@ -1,5 +1,4 @@
 import {
-  auditLog,
   getDb,
   platformRoles,
   platformStaff,
@@ -11,10 +10,15 @@ import {
   grantsPlatformPermission,
   isPlatformPermission,
   isPlatformRoleKey,
+  changesBetween,
+  listChanges,
+  PLATFORM_PERMISSIONS,
   mayGrantPlatformRole,
   PLATFORM_ROLES,
   type PlatformPermission,
 } from "@workspace/judge"
+
+import { auditCsv, readAudit, writeEntry, type AuditFilters } from "@/features/audit/server"
 
 import { isAdminEmail } from "@/lib/admin-emails"
 import { ApiError, notFound } from "@/lib/api/route"
@@ -26,7 +30,7 @@ import { platformAccess } from "./access"
  * hold, only owners make owners, the last owner stays, and every change is logged.
  */
 
-const { and, asc, count, desc, eq, inArray, isNull } = sql
+const { and, asc, count, eq, inArray, isNull } = sql
 
 const forbidden = (message: string) => new ApiError(403, "forbidden", message)
 
@@ -64,15 +68,7 @@ export async function writePlatformAudit(
   summary: string,
   detail?: Record<string, unknown>
 ) {
-  await getDb()
-    .insert(auditLog)
-    .values({
-      orgId: null,
-      actorId: actor.id,
-      action,
-      summary,
-      detail: detail ?? null,
-    })
+  await writeEntry(getDb(), { orgId: null, actor, action, summary, detail })
 }
 
 async function needRoles(
@@ -321,6 +317,9 @@ export async function saveRole(
   }
   if (id && isPlatformRoleKey(id))
     throw forbidden("Built-in roles can't be changed.")
+  const [before] = id
+    ? await getDb().select().from(platformRoles).where(eq(platformRoles.id, id))
+    : []
   const values = {
     name: input.name.trim(),
     description: input.description.trim(),
@@ -339,7 +338,16 @@ export async function saveRole(
     id ? "role.update" : "role.create",
     `${id ? "Changed" : "Created"} the ${row.name} role`,
     {
-      permissions,
+      changes: before
+        ? changesBetween(before, values, { name: "Name", description: "Description" })
+        : [],
+      lists: [
+        listChanges(
+          "Permissions",
+          (before?.permissions ?? []).map(permissionLabel),
+          permissions.map(permissionLabel)
+        ),
+      ].filter(Boolean),
     }
   )
   return row
@@ -367,25 +375,26 @@ export async function deleteRole(actor: User, id: string) {
   await writePlatformAudit(actor, "role.delete", `Deleted the ${row.name} role`)
 }
 
-/** The platform's activity log, newest first. */
-export async function platformActivity(actor: User, limit = 200) {
+const permissionLabel = (p: string) =>
+  PLATFORM_PERMISSIONS[p as PlatformPermission]?.label ?? p
+
+async function needAuditView(actor: User) {
   if (
     !(await platformAccess(actor)).permissions.includes("platform.audit.view")
   ) {
     throw forbidden("This needs the See the activity log permission.")
   }
-  return getDb()
-    .select({
-      id: auditLog.id,
-      action: auditLog.action,
-      summary: auditLog.summary,
-      detail: auditLog.detail,
-      createdAt: auditLog.createdAt,
-      actor: users.email,
-    })
-    .from(auditLog)
-    .leftJoin(users, eq(auditLog.actorId, users.id))
-    .where(isNull(auditLog.orgId))
-    .orderBy(desc(auditLog.createdAt))
-    .limit(limit)
+}
+
+/** The platform's activity log, a page at a time, filtered. */
+export async function platformActivity(actor: User, filters: AuditFilters) {
+  await needAuditView(actor)
+  return readAudit(null, filters)
+}
+
+/** The platform's activity log, filtered, as CSV. */
+export async function exportPlatformActivity(actor: User, filters: AuditFilters) {
+  await needAuditView(actor)
+  await writePlatformAudit(actor, "staff.audit_export", "Downloaded the platform activity log")
+  return auditCsv(null, filters, "platform-activity.csv")
 }

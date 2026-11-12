@@ -54,6 +54,7 @@ import {
 } from "@/features/admin/components/shell"
 import { useViewer } from "@/features/account/use-viewer"
 import { OwnerProvider } from "@/features/admin/owner"
+import { AuditLog } from "@/features/audit/components/audit-log"
 import { api } from "@/lib/api/client"
 import { PermissionPicker } from "./permission-picker"
 
@@ -1404,30 +1405,7 @@ function ModulesCard({
 /* ---------- activity ---------- */
 
 export function ManageActivity({ slug }: { slug: string }) {
-  const { data, error } = useQuery({
-    queryKey: ["org", slug, "audit"],
-    queryFn: () =>
-      api<{ id: string; summary: string; actor: string; createdAt: string }[]>(
-        `/orgs/${slug}/audit`
-      ),
-  })
-  if (!data) return <Loading error={error} />
-  return (
-    <>
-      <PageTitle>Activity</PageTitle>
-      <Table headers={["When", "Who", "What"]}>
-        {data.map((entry) => (
-          <tr key={entry.id}>
-            <td className="whitespace-nowrap">
-              {formatDateTime(entry.createdAt)}
-            </td>
-            <td>{entry.actor}</td>
-            <td className="text-ink">{entry.summary}</td>
-          </tr>
-        ))}
-      </Table>
-    </>
-  )
+  return <AuditLog base={`/orgs/${slug}/audit`} />
 }
 
 /* ---------- import ---------- */

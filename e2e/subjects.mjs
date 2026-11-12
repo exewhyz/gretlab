@@ -88,7 +88,7 @@ const list = (await tt(`${O}/subjects`)).json
 check("the assign-only role sees the list, can only assign", list?.can.assign && !list.can.create && !list.can.delete, JSON.stringify(list?.can))
 const use = list.subjects.find((s) => s.id === phys.id).classes[0]
 check("it can take a subject off its section", (await tt(`${O}/subjects/classes/${use.id}`, { method: "DELETE" })).status === 200)
-const log = (await owner(`${O}/audit`)).json
+const log = (await owner(`${O}/audit?limit=200`)).json.entries
 check("changes are in the activity log", ["subject.create", "subject.update", "subject.assign", "subject.unassign"].every((a) => log.some((e) => e.action === a)))
 check("deleting a subject takes it off its classes", (await owner(`${O}/subjects/${maths.json.id}`, { method: "DELETE" })).status === 200 && psql(`select count(*) from class_subjects where group_id='${secA.id}'`) === "0")
 

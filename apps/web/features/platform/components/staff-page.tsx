@@ -32,8 +32,8 @@ import {
 } from "@/components/form"
 import { useViewer } from "@/features/account/use-viewer"
 import { Loading, PageTitle, Table } from "@/features/admin/components/shell"
+import { AuditLog } from "@/features/audit/components/audit-log"
 import { api } from "@/lib/api/client"
-import { formatDateTime } from "@/lib/format"
 
 interface Staff {
   userId: string
@@ -390,51 +390,7 @@ function RoleDialog({
   )
 }
 
-interface Activity {
-  id: string
-  action: string
-  summary: string
-  createdAt: string
-  actor: string | null
-}
-
 /** The platform's activity log. */
 export function ActivityPage() {
-  const { data, error } = useQuery({
-    queryKey: ["admin", "activity"],
-    queryFn: () => api<Activity[]>("/admin/activity"),
-  })
-  const [search, setSearch] = useState("")
-  if (!data) return <Loading error={error} />
-  const q = search.trim().toLowerCase()
-  const rows = data.filter(
-    (a) =>
-      !q || a.summary.toLowerCase().includes(q) || (a.actor ?? "").includes(q)
-  )
-  return (
-    <>
-      <PageTitle>Activity</PageTitle>
-      <TextInput
-        aria-label="Search the activity log"
-        placeholder="Search by person or change"
-        className="mb-3 w-72"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-      <Table headers={["When", "Who", "What"]}>
-        {rows.map((a) => (
-          <tr key={a.id} data-testid="activity-row">
-            <td className="text-caption whitespace-nowrap">
-              {formatDateTime(a.createdAt)}
-            </td>
-            <td className="text-caption">{a.actor ?? "—"}</td>
-            <td className="text-ink">{a.summary}</td>
-          </tr>
-        ))}
-      </Table>
-      {rows.length === 0 && (
-        <p className="mt-3 text-body-sm text-body">Nothing yet.</p>
-      )}
-    </>
-  )
+  return <AuditLog base="/admin/activity" />
 }

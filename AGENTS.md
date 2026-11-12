@@ -245,6 +245,18 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - Changes are audited as `hostel.*`.
 - A resident is told when they get a bed, move, or move out (`campus.update`, kind `hostel`, copied to their parents). Their bed shows on My classes and on the parent's child page (`campusOf` → `hostel.stay`).
 
+## Audit log
+
+- One table (`audit_log`) for organizations (`org_id` set) and the platform (null). Always write entries through `writeEntry` in `features/audit/server.ts`; inside organizations, use the `audit()` / `writeAudit()` wrappers, which call it. Each entry records:
+  - **Who:** `actor_id`, plus `actor_label` ("Name <email>" as it was then, so an entry still reads correctly after the account is deleted).
+  - **What:** `action` such as "role.update", and its `category` (the first word, named in packages/judge/src/audit.ts).
+  - **A sentence and details.**
+  - **Where from:** `ip` and `user_agent`.
+  - **`support`:** platform staff acting inside an organization they aren't an active member of.
+- The address and browser come from `lib/api/request-context.ts`: `route()` stores them per request (AsyncLocalStorage), so no call site passes them. The address is recorded only when `lib/api/client-ip.ts` can trust it; a claimed `X-Client-IP` without the proxy secret is ignored. Outside a request (scripts, cron) both are empty.
+- Edits that matter record what changed, in `detail.changes` (`{field, from, to}` from `changesBetween`) and `detail.lists` (`{label, added, removed}` from `listChanges`), using labels people read rather than keys. Current examples are organization settings (fields and modules), and roles in organizations and on the platform (name, description, permissions by label). Add the same to any new edit that changes several things.
+- Reading: `readAudit(orgId | null, filters)` returns a page, newest first: `q`, `category`, `actor`, `from`/`to` (days), `before` (the last entry's "time|id"), and `limit` (default 50, at most 200). It also returns the areas and people to filter by. Malformed filters are a 400. `auditCsv` downloads up to 10,000 entries; fields that look like formulas are made safe, and the download itself is logged. Manage › Activity and Dashboard › Activity both use `AuditLog` (`features/audit/components`).
+
 ## Organizations and permissions
 
 - The platform dashboard is run by platform staff roles (see "Platform staff and roles"; `users.role` is kept in step for older checks). Inside an organization, access comes only from organization roles.
@@ -404,6 +416,11 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/books.mjs`: off until switched on, refused for a company; the catalog (add, a list with a report, members search it, outsiders don't), copies can't drop below loans, a book on loan can't be deleted; lending (has it, none free, the per-person limit, the loan period, a past due date, members only), renew, return, a closed loan, lost (a copy fewer); separate catalog and desk roles; overdue on the desk, in the numbers, in the bell, on the member page, on My classes and on the parent's child page; the audit; the desk, catalog and member pages and dialogs, and phone widths; switching off.
 - `e2e/transport.mjs`: off until switched on, refused for a company; routes (backward pick-ups, a stop listed twice, bad times, duplicate names, no seat limit), the office can't assign and bus duty can't add routes; riders (scoped to a section, a stop from another route, a full bus, moving a stop), the rider and their parent told; riders listed per route; My classes and the parent's child page; fewer seats than riders, removing a used stop, growing a route with riders kept; a list with a report; taking off; removing a route; the audit; the page, the route and riders dialogs, My classes, and a phone width.
 - `e2e/hostel.mjs`:
+- `e2e/audit.mjs`:
+  - What an entry holds: settings changes field by field, modules and permissions added by label, the area, the address (only through the trusted proxy) and browser, support stepping in, and who acted, kept after their account is deleted.
+  - Filters and paging: by area, person, words and dates; pages without repeats; nonsense filters give a 400.
+  - CSV and access: filters apply, changes are written in words, formula-looking names are made safe, the download is logged, and only those allowed can read the log. The platform's log reads the same way.
+  - The page: its filters, the details dialog, and a phone width.
   - Setup: off until switched on, and refused for a company. Hostels (duplicate names refused). Runs of rooms, with existing names skipped and backward runs refused. Lettered beds.
   - Allotting: scoped to a section; a taken bed is refused; moving frees the old bed. The resident and their parent are told. My classes and the parent's child page show the bed.
   - Changing rooms: fewer beds never removes an occupied one, more beds add letters, duplicate room names are refused, and occupied rooms and hostels can't be removed.

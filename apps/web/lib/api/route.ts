@@ -7,6 +7,9 @@ import { isPlatformPermission, type PlatformPermission } from "@workspace/judge"
 import { getCurrentUser } from "@/features/auth/current-user"
 import { platformCan } from "@/features/platform/access"
 
+import { clientIp } from "./client-ip"
+import { withRequest } from "./request-context"
+
 const MAX_BODY_BYTES = 8 * 1024 * 1024
 
 export class ApiError extends Error {
@@ -121,13 +124,21 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
         body = parsed.data
       }
 
-      const data = await handler({
-        user: user as Handler<A, z.infer<S>>["user"],
-        body: body as z.infer<S>,
-        params: (await context.params) as Record<string, string>,
-        query: request.nextUrl.searchParams,
-        request,
-      })
+      const params = (await context.params) as Record<string, string>
+      // Where the request came from, for the audit log (lib/api/request-context.ts).
+      const info = {
+        ip: clientIp(request),
+        userAgent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
+      }
+      const data = await withRequest(info, () =>
+        handler({
+          user: user as Handler<A, z.infer<S>>["user"],
+          body: body as z.infer<S>,
+          params,
+          query: request.nextUrl.searchParams,
+          request,
+        })
+      )
       // A handler may answer with its own Response, for downloads such as CSV.
       if (data instanceof Response) return data
       return NextResponse.json(data ?? { ok: true })
