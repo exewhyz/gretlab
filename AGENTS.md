@@ -345,6 +345,20 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - `saveRegister` doesn't send parents an absence alert for a day their child is on approved leave.
 - The sidebar has Leave under "This school" for everyone, with a count of requests waiting for you (`orgShell().leavePending`). The page has tabs: To decide, Mine, Decided (filtered by status and student/staff, 50 a page). Audited as `leave.*`.
 
+## Staff attendance (module)
+
+- Module key `staffAttendance`, on by default for schools and colleges. Code in `features/staff-attendance`; rules in `packages/judge/src/staff-attendance.ts`, unit-tested: statuses, a check-in's status against the late time, the time in the site's timezone (`timeIn`), settings, and a month in numbers (leave left out, a half day counts half).
+- `staff_attendance` stores one row per org, person and day: a status (present, late, half_day, absent, on_leave), the time they came in, a note and who marked it.
+- "Staff" means active members whose roles grant something, so students (Member role or no role) never show.
+- **Permissions:**
+  - "Take staff attendance" (`staff_attendance.mark`, organization-wide): marks a day (only the people sent are changed; no future days) and sets the late time and whether staff may check themselves in (`module_settings.staffAttendance`, late after 09:00 and self check-in on by default).
+  - "See staff attendance" (`staff_attendance.view`) shows the register and the month.
+- **Self check-in** (`POST staff-attendance/me/check-in`) works for today only, once (409 `already_marked`, including when the office has already marked them). It's late after the late time.
+- **Approved staff leave** (Leave module) shows on the register as "On leave", starts the person as on leave, and fills the month report.
+- **Pages:**
+  - Manage › Staff attendance: a Day tab with buttons per person, the time in and a note; a Month tab with a grid, totals and %.
+  - My attendance (`/orgs/[slug]/my-attendance`) for every staff member: today's check-in and their month. Audited as `staff_attendance.*`.
+
 ## The school home and frame
 
 - **The frame.** Every school page (the home at `/orgs/:slug` and all of `/orgs/:slug/manage/*`) sits in `OrgShell` (`features/home/components/org-shell.tsx`), built on shadcn's Sidebar (`packages/ui`):
@@ -367,6 +381,8 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - **Student view** ("My progress"): built by calling the student's own class functions as them (`classAttendance`, `classTimetable`, `classStream`, `listAssignments`, `listContests`, `campusOf`). It shows attendance across their classes, work due this week, today's lessons, what's coming up (work, contests within 14 days, library books), notices across their classes, and bus, room and library.
   - **Parent view** ("My children"): one card per linked child from `childOverview`, with attendance, an "Absent today" alert, open work, bus, the latest absences and notices, and a link to the child's page.
 - Built only from shadcn components (Card, Badge, Progress, Chart, Empty, Skeleton, Tabs, Sidebar) and Gretlab's theme tokens. The sidebar and chart tokens are in `packages/ui/src/styles/globals.css`. Add components with the shadcn CLI from `packages/ui` and never overwrite existing ones.
+
+- A fifth view, `staff`, is for active members whose roles grant something but who neither oversee the school (admin) nor teach a class (teacher): an office clerk who takes staff attendance or approves leave. Their home has today's check-in (Staff attendance module) and a card for each page their roles open (`visibleOrgNav`).
 
 ## Organizations and permissions
 
@@ -558,6 +574,10 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
   - The pages and the add sheet, at laptop and phone width.
 - `e2e/promotion.mjs`: import (bad rows refused, nothing half-written, scoped to the importer's grade), creating records for existing members, the promotion plan's suggestions, a preview, applying with exceptions, running twice, making the new year current, who may promote, and the wizard at laptop and phone width.
+- `e2e/staff-attendance.mjs`:
+  - Who counts as staff; marking a day (times, notes, corrections, no future days, staff only); who may mark or see.
+  - Self check-in (late after the late time, once a day, switched off); approved leave on the register and in the month; the month report; your own attendance; the staff home; the log.
+  - The pages: saving the day, the month, a phone, My attendance, the sidebar.
 - `e2e/leave.mjs`:
   - Who can ask (parent, student, staff); the class teacher decides their class, the school-wide approvers when there's none, the office staff; nobody decides their own.
   - School days, weekends, half days, overlaps, balances and unpaid leave; refusing with a reason; taking back.

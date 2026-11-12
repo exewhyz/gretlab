@@ -1430,6 +1430,37 @@ export const leaveRequests = pgTable(
   ]
 )
 
+/** A staff member's attendance on a day (Staff attendance module). */
+export const staffAttendance = pgTable(
+  "staff_attendance",
+  {
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** "YYYY-MM-DD" in the site's timezone. */
+    day: text("day").notNull(),
+    /** present, late, half_day, absent or on_leave. */
+    status: text("status").notNull(),
+    /** "HH:MM", when they arrived, if known. */
+    checkIn: text("check_in"),
+    note: text("note").notNull().default(""),
+    /** Who marked it; themselves for a self check-in. */
+    markedBy: uuid("marked_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.orgId, table.userId, table.day] }),
+    index("staff_attendance_day").on(table.orgId, table.day),
+  ]
+)
+
 /** The organization's daily periods, in order (Timetable module). */
 export const timetablePeriods = pgTable(
   "timetable_periods",

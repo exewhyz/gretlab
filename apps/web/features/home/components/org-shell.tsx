@@ -2,6 +2,7 @@
 
 import {
   AirplaneTiltIcon,
+  FingerprintIcon,
   BedIcon,
   BookOpenIcon,
   BooksIcon,
@@ -69,7 +70,7 @@ import { api } from "@/lib/api/client"
 
 export interface Shell {
   org: { slug: string; name: string; type: OrgType; active: boolean }
-  views: ("admin" | "teacher" | "student" | "parent")[]
+  views: ("admin" | "teacher" | "student" | "parent" | "staff")[]
   role: string
   permissions: string[]
   modules: string[]
@@ -99,6 +100,8 @@ const ICONS: Record<string, Icon> = {
   exams: ExamIcon,
   results: ExamIcon,
   leave: AirplaneTiltIcon,
+  "my-attendance": FingerprintIcon,
+  "staff-attendance": IdentificationBadgeIcon,
   subjects: BookOpenIcon,
   timetable: CalendarDotsIcon,
   "my-timetable": CalendarDotsIcon,
@@ -198,6 +201,9 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
   groups.push({
     group: "This school",
     items: [
+      ...(shell.modules.includes("staffAttendance") && shell.permissions.length > 0
+        ? [{ key: "my-attendance", label: "My attendance", href: `${base}/my-attendance` }]
+        : []),
       ...(shell.modules.includes("leave")
         ? [
             {

@@ -190,6 +190,14 @@ export const ORG_NAV: NavItem[] = [
     module: "attendance",
   },
   {
+    key: "staff-attendance",
+    label: "Staff attendance",
+    path: "/staff-attendance",
+    group: "Every day",
+    anyOf: ["staff_attendance.mark", "staff_attendance.view"],
+    module: "staffAttendance",
+  },
+  {
     key: "templates",
     label: "Templates",
     path: "/templates",

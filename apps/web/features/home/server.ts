@@ -21,7 +21,13 @@ import {
   users,
   type User,
 } from "@workspace/db"
-import { enabledModules, PERMISSIONS, type Permission } from "@workspace/judge"
+import {
+  enabledModules,
+  ORG_NAV,
+  PERMISSIONS,
+  visibleOrgNav,
+  type Permission,
+} from "@workspace/judge"
 
 import { listAssignments } from "@/features/assignments/server"
 import { campusOf } from "@/features/campus/server"
@@ -51,7 +57,7 @@ import { classTimetable, periodsOf, slotsOf } from "@/features/timetable/server"
 
 const { and, count, eq, inArray, lt, sql: raw } = sql
 
-export type HomeView = "admin" | "teacher" | "student" | "parent"
+export type HomeView = "admin" | "teacher" | "student" | "parent" | "staff"
 
 const TEACHING: Permission[] = ["attendance.mark", "teaching.log"]
 const OVERSEEING: Permission[] = [
@@ -106,6 +112,9 @@ async function viewsOf(ctx: OrgContext, user: User): Promise<HomeView[]> {
   const views: HomeView[] = []
   if (OVERSEEING.some((p) => canFor(ctx, p, []))) views.push("admin")
   if (taughtGroups(ctx).length > 0) views.push("teacher")
+  // Office staff with narrower roles (leave, staff attendance, fees) still get a home.
+  if (views.length === 0 && ctx.membership?.status === "active" && held.length > 0)
+    views.push("staff")
   if (ctx.membership?.status === "active" && held.length === 0) {
     const [seat] = await db
       .select({ groupId: groupMembers.groupId })
@@ -1026,17 +1035,41 @@ async function parentHome(ctx: OrgContext, user: User) {
   }
 }
 
+/** Staff who neither oversee the school nor teach: their pages and today's check-in. */
+function staffHome(ctx: OrgContext) {
+  const held = new Set(heldAnywhere(ctx))
+  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const base = `/orgs/${ctx.org.slug}`
+  const links = visibleOrgNav(ORG_NAV, {
+    orgType: ctx.org.type,
+    can: (p) => held.has(p),
+    enabledModules: modules,
+  }).flatMap((g) =>
+    g.items
+      .filter((i) => i.key !== "overview")
+      .map((i) => ({
+        key: i.key,
+        label: i.label,
+        group: g.group as string,
+        href: `${base}/manage${i.path}`,
+      }))
+  )
+  if (modules.has("leave")) links.push({ key: "leave", label: "Leave", group: "This school", href: `${base}/leave` })
+  return { links, checkIn: modules.has("staffAttendance") }
+}
+
 /** The dashboards for the views this person has here. */
 export async function orgHome(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
   const views = await viewsOf(ctx, user)
+  const staff = views.includes("staff") ? staffHome(ctx) : null
   const [admin, teacher, student, parent] = await Promise.all([
     views.includes("admin") ? adminHome(ctx) : null,
     views.includes("teacher") ? teacherHome(ctx, user) : null,
     views.includes("student") ? studentHome(ctx, user) : null,
     views.includes("parent") ? parentHome(ctx, user) : null,
   ])
-  return { views, admin, teacher, student, parent }
+  return { views, admin, teacher, student, parent, staff }
 }
 
 /** Which views a person has, for the page to decide what to render. */

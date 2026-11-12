@@ -139,6 +139,17 @@ export const PERMISSIONS = {
       "Approve or refuse leave for students and staff, and set the kinds of staff leave (Leave module). Grant this, or the finer actions under it.",
     module: "Members",
   },
+  "staff_attendance.mark": {
+    label: "Take staff attendance",
+    description:
+      "Mark teachers' and staff's attendance for a day, correct it, and set the late time and self check-in (Staff attendance module).",
+    module: "Members",
+  },
+  "staff_attendance.view": {
+    label: "See staff attendance",
+    description: "See the staff register and the monthly staff attendance report.",
+    module: "Members",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:

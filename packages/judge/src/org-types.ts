@@ -54,6 +54,13 @@ export const MODULES = {
     for: ["school", "college"],
     ready: true,
   },
+  staffAttendance: {
+    label: "Staff attendance",
+    description:
+      "A daily register of teachers and staff, self check-in with a late time, approved leave shown, and a monthly report.",
+    for: ["school", "college"],
+    ready: true,
+  },
   attendance: {
     label: "Attendance",
     description:
@@ -124,13 +131,13 @@ export const ORG_TYPE_CONFIG: Record<OrgType, OrgTypeConfig> = {
     label: "School",
     groupLevels: ["Grade", "Section"],
     groupsLabel: "Classes",
-    modules: ["records", "exams", "leave", "attendance", "timetable", "subjects", "parents"],
+    modules: ["records", "exams", "leave", "staffAttendance", "attendance", "timetable", "subjects", "parents"],
   },
   college: {
     label: "College",
     groupLevels: ["Branch", "Batch"],
     groupsLabel: "Batches",
-    modules: ["records", "exams", "leave", "attendance", "timetable", "subjects"],
+    modules: ["records", "exams", "leave", "staffAttendance", "attendance", "timetable", "subjects"],
   },
   cohort: {
     label: "Cohort program",

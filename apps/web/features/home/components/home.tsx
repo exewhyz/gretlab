@@ -48,6 +48,7 @@ import {
   CampusSummary,
   type CampusData,
 } from "@/features/campus/components/campus"
+import { CheckInCard } from "@/features/staff-attendance/components/staff-attendance"
 import { api } from "@/lib/api/client"
 
 import { useShell } from "./org-shell"
@@ -157,7 +158,7 @@ interface ParentData {
   }[]
 }
 
-type View = "admin" | "teacher" | "student" | "parent"
+type View = "admin" | "teacher" | "student" | "parent" | "staff"
 
 interface Home {
   views: View[]
@@ -165,6 +166,10 @@ interface Home {
   teacher: TeacherData | null
   student: StudentData | null
   parent: ParentData | null
+  staff: {
+    links: { key: string; label: string; group: string; href: string }[]
+    checkIn: boolean
+  } | null
 }
 
 const LABEL: Record<View, string> = {
@@ -172,6 +177,7 @@ const LABEL: Record<View, string> = {
   teacher: "Teaching",
   student: "My progress",
   parent: "My children",
+  staff: "My work",
 }
 
 /** The school's home: a dashboard for each of this person's views here (tabs if several). */
@@ -214,6 +220,9 @@ export function OrgHome({ slug }: { slug: string }) {
       )}
       {view === "parent" && data.parent && (
         <ParentHome slug={slug} data={data.parent} />
+      )}
+      {view === "staff" && data.staff && (
+        <StaffHome slug={slug} data={data.staff} />
       )}
     </div>
   )
@@ -1211,6 +1220,33 @@ function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/** Office staff: today's check-in and the pages their roles open. */
+function StaffHome({
+  slug,
+  data,
+}: {
+  slug: string
+  data: NonNullable<Home["staff"]>
+}) {
+  return (
+    <div className="grid gap-4" data-testid="staff-home">
+      {data.checkIn && <CheckInCard slug={slug} />}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {data.links.map((l) => (
+          <Link
+            key={l.key}
+            href={l.href}
+            className="rounded-xl border border-hairline bg-card p-4 transition-colors hover:border-hairline-strong"
+          >
+            <div className="text-caption text-muted-foreground">{l.group}</div>
+            <div className="font-medium text-ink">{l.label}</div>
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }
