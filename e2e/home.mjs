@@ -42,7 +42,9 @@ for (const g of [a3.id, a5.id]) await owner(`${O}/subjects/${maths.id}/classes`,
 const P = await owner(`${O}/timetable/periods`, { method: "PUT", body: { days: [1, 2, 3, 4, 5, 6, 7], periods: [
   { name: "Period 1", starts: "08:30", ends: "09:15", isBreak: false }, { name: "Period 2", starts: "09:15", ends: "10:00", isBreak: false },
   { name: "Break", starts: "10:00", ends: "10:15", isBreak: true }, { name: "Period 3", starts: "10:15", ends: "11:00", isBreak: false }] } })
-const wd = ((new Date().getDay() + 6) % 7) + 1
+// The school's weekday today (its timezone, not this machine's).
+const serverToday = (await owner(`${O}/attendance`)).today
+const wd = ((new Date(`${serverToday}T00:00:00Z`).getUTCDay() + 6) % 7) + 1
 const cs = (g) => psql(`select id from class_subjects where group_id='${g}'`)
 await owner(`${O}/timetable/slots`, { method: "PUT", body: { groupId: a3.id, day: wd, periodId: P.periods[0].id, classSubjectId: cs(a3.id) } })
 await owner(`${O}/timetable/slots`, { method: "PUT", body: { groupId: a5.id, day: wd, periodId: P.periods[3].id, classSubjectId: cs(a5.id) } })

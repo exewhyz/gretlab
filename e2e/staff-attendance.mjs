@@ -123,6 +123,8 @@ check("a teacher sees their own attendance", mine?.todays?.status === "present" 
 
 const vHome = (await viewer(`${O}/home`)).json
 check("office staff who neither run the school nor teach get a staff home", vHome?.views.join() === "staff" && vHome.staff.checkIn === true && vHome.staff.links.some((l) => l.label === "Staff attendance"), JSON.stringify(vHome?.views))
+check("the staff home shows today's staff register in numbers", vHome?.staff.staffToday?.total === 5 && typeof vHome.staff.staffToday.unmarked === "number", JSON.stringify(vHome?.staff?.staffToday))
+check("teachers have check-in on their home", (await t1(`${O}/home`)).json?.teacher?.checkIn === true)
 check("teachers keep the teaching home", (await t1(`${O}/home`)).json?.views.join() === "teacher")
 
 const log = (await owner(`${O}/audit?category=staff_attendance&limit=100`)).json?.entries ?? []
@@ -164,6 +166,7 @@ const nav = sp.getByRole("navigation", { name: "Organization" })
 await nav.getByRole("link", { name: "My attendance" }).waitFor({ timeout: 30000 })
 check("staff have My attendance and the register in the sidebar", await nav.getByRole("link", { name: "Staff attendance" }).isVisible())
 check("their home shows today's check-in", (await sp.getByTestId("today-status").innerText()).includes("Late"))
+check("...the staff register as a tile, and their pages as cards", (await sp.getByTestId("staff-tile").filter({ hasText: "Staff present today" }).count()) === 1 && (await sp.getByTestId("staff-page").filter({ hasText: "Staff attendance" }).count()) === 1)
 await sp.screenshot({ path: SHOTS + "staff-home.png", fullPage: true })
 const kp = await view("sa-s1@example.com", 1440)
 await kp.goto(`${BASE}${O}`)

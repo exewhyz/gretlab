@@ -1738,3 +1738,88 @@ export async function publishedFor(orgId: string, userId: string) {
     .orderBy(desc(termExams.publishedAt))
     .limit(5)
 }
+
+/**
+ * Papers this teacher still has marks to enter in, for the teacher's home: their own
+ * subjects, in the current year's exams that aren't published. Never throws.
+ */
+export async function papersToMark(ctx: OrgContext) {
+  try {
+    const modules = enabledModules(ctx.org.type, ctx.org.modules)
+    if (
+      !modules.has("exams") ||
+      !modules.has("records") ||
+      !modules.has("subjects")
+    )
+      return []
+    const db = getDb()
+    const [year] = await db
+      .select()
+      .from(academicYears)
+      .where(
+        and(
+          eq(academicYears.orgId, ctx.org.id),
+          eq(academicYears.isCurrent, true)
+        )
+      )
+    if (!year) return []
+    const papers = await db
+      .select({
+        id: examPapers.id,
+        examId: termExams.id,
+        exam: termExams.name,
+        groupId: examPapers.groupId,
+        subjectId: examPapers.subjectId,
+        subject: subjects.name,
+      })
+      .from(examPapers)
+      .innerJoin(termExams, eq(examPapers.examId, termExams.id))
+      .innerJoin(subjects, eq(examPapers.subjectId, subjects.id))
+      .where(
+        and(eq(termExams.yearId, year.id), sql.isNull(termExams.publishedAt))
+      )
+    if (papers.length === 0) return []
+    const teacherOf = await subjectTeachers(ctx, [
+      ...new Set(papers.map((p) => p.groupId)),
+    ])
+    const mine = papers.filter(
+      (p) => teacherOf(p.groupId, p.subjectId) === ctx.user.id
+    )
+    if (mine.length === 0) return []
+    const groupIds = [...new Set(mine.map((p) => p.groupId))]
+    const [entered, seats] = await Promise.all([
+      db
+        .select({ paperId: examMarks.paperId, n: count() })
+        .from(examMarks)
+        .where(
+          inArray(
+            examMarks.paperId,
+            mine.map((p) => p.id)
+          )
+        )
+        .groupBy(examMarks.paperId),
+      db
+        .select({ groupId: enrolments.groupId, n: count() })
+        .from(enrolments)
+        .where(
+          and(
+            eq(enrolments.yearId, year.id),
+            eq(enrolments.status, "active"),
+            inArray(enrolments.groupId, groupIds)
+          )
+        )
+        .groupBy(enrolments.groupId),
+    ])
+    return mine
+      .map((p) => ({
+        ...p,
+        class: pathName(ctx, p.groupId),
+        entered: Number(entered.find((e) => e.paperId === p.id)?.n ?? 0),
+        students: Number(seats.find((s) => s.groupId === p.groupId)?.n ?? 0),
+      }))
+      .filter((p) => p.students > 0 && p.entered < p.students)
+      .slice(0, 8)
+  } catch {
+    return []
+  }
+}

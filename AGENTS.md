@@ -423,6 +423,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 
 - The admin checklist also has class teachers (this year), this year's exams and admissions (a year chosen), each when its module is on. "Needs attention" also lists new applications and leave waiting for this person; an attention link may be a full `/orgs/...` path (leave lives outside Manage).
 
+- **One frame for the working areas.** `components/app-frame.tsx` (AppFrame) is the shadcn Sidebar layout: full on laptops and PCs, an icon rail on tablets, a slide-out menu on phones, and a header with notifications, theme and account. `OrgShell` (navigation "Organization") and the platform admin's `AdminShell` (navigation "Dashboard", with "Back to the site") both hand it their own groups of links with icons. Change the frame there, not in each area.
+- **The admin platform:**
+  - The shared `Card`, `Table` and `Loading` in `features/admin/components/shell.tsx` have the shadcn card and table look and skeletons, so every admin page follows.
+  - The overview has the platform's figures as tiles (people and new this week, organizations active and waiting, problems, contests), schools waiting for approval with Approve, two weeks of submissions as a chart, the last 24 hours by verdict, and the judge queue's health (`getOverview()` in `features/admin/server.ts`).
+- **The teacher's home** also shows today's check-in (Staff attendance), marks still to enter in their own subjects (`papersToMark()`, current year's unpublished exams), and leave waiting for them as class teacher.
+- **The staff home** has a greeting, today's check-in, tiles for what waits (leave to decide, new applications) and today's staff register (`staffToday()`), and their pages as cards with what each is for. Item links in the homes' lists may be full `/orgs/...` paths (the shared list handles both).
+
 ## Organizations and permissions
 
 - The platform dashboard is run by platform staff roles (see "Platform staff and roles"; `users.role` is kept in step for older checks). Inside an organization, access comes only from organization roles.

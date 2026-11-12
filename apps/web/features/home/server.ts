@@ -38,6 +38,8 @@ import { today } from "@/features/catalog/server"
 import { classAttendance, classStream } from "@/features/classes/server"
 import { listContests } from "@/features/contests/server"
 import { pendingLeaveCount } from "@/features/leave/server"
+import { papersToMark } from "@/features/results/server"
+import { staffToday } from "@/features/staff-attendance/server"
 import { newApplications } from "@/features/admissions/server"
 import { childOverview } from "@/features/parents/server"
 import { rolePermissions } from "@/features/orgs/access"
@@ -117,7 +119,11 @@ async function viewsOf(ctx: OrgContext, user: User): Promise<HomeView[]> {
   if (OVERSEEING.some((p) => canFor(ctx, p, []))) views.push("admin")
   if (taughtGroups(ctx).length > 0) views.push("teacher")
   // Office staff with narrower roles (leave, staff attendance, fees) still get a home.
-  if (views.length === 0 && ctx.membership?.status === "active" && held.length > 0)
+  if (
+    views.length === 0 &&
+    ctx.membership?.status === "active" &&
+    held.length > 0
+  )
     views.push("staff")
   if (ctx.membership?.status === "active" && held.length === 0) {
     const [seat] = await db
@@ -512,21 +518,33 @@ async function adminHome(ctx: OrgContext) {
         await db
           .select({ id: academicYears.id })
           .from(academicYears)
-          .where(and(eq(academicYears.orgId, ctx.org.id), eq(academicYears.isCurrent, true)))
+          .where(
+            and(
+              eq(academicYears.orgId, ctx.org.id),
+              eq(academicYears.isCurrent, true)
+            )
+          )
           .limit(1)
       )[0]
     : undefined
   const [[leadCount], [examCount], newApps, leaveWaiting] = await Promise.all([
     year
-      ? db.select({ n: count() }).from(classTeachers).where(eq(classTeachers.yearId, year.id))
+      ? db
+          .select({ n: count() })
+          .from(classTeachers)
+          .where(eq(classTeachers.yearId, year.id))
       : [{ n: 0 }],
     modules.has("exams") && year
-      ? db.select({ n: count() }).from(termExams).where(eq(termExams.yearId, year.id))
+      ? db
+          .select({ n: count() })
+          .from(termExams)
+          .where(eq(termExams.yearId, year.id))
       : [{ n: 0 }],
     newApplications(ctx),
     pendingLeaveCount(ctx),
   ])
-  const admissionsSetUp = readAdmissionSettings(ctx.org.moduleSettings).yearId != null
+  const admissionsSetUp =
+    readAdmissionSettings(ctx.org.moduleSettings).yearId != null
 
   const steps = [
     {
@@ -850,8 +868,14 @@ async function teacherHome(ctx: OrgContext, user: User) {
   const toTake = modules.has("attendance")
     ? classes.filter((c) => !c.taken)
     : []
+  // The newer processes: marks still to enter in their subjects, leave waiting for them.
+  const [toMark, leaveWaiting] = await Promise.all([
+    papersToMark(ctx),
+    pendingLeaveCount(ctx),
+  ])
   return {
     day,
+    checkIn: modules.has("staffAttendance"),
     tiles: {
       lessons: periods.filter((p) => !p.isBreak).length,
       toTake: toTake.length,
@@ -871,6 +895,24 @@ async function teacherHome(ctx: OrgContext, user: User) {
         text: `${c.name} not taken today`,
         action: "Take",
         href: `/attendance?groupId=${c.id}`,
+      })),
+      ...(leaveWaiting > 0
+        ? [
+            {
+              kind: "Leave",
+              tone: "plain",
+              text: `${leaveWaiting} leave request${leaveWaiting === 1 ? "" : "s"} to decide`,
+              action: "Decide",
+              href: `/orgs/${ctx.org.slug}/leave`,
+            },
+          ]
+        : []),
+      ...toMark.map((p) => ({
+        kind: "Marks",
+        tone: "plain",
+        text: `${p.subject}, ${p.class}: ${p.entered} of ${p.students} in (${p.exam})`,
+        action: "Enter",
+        href: `/exams/${p.examId}/papers/${p.id}`,
       })),
       ...low.slice(0, 5).map((s) => ({
         kind: "Attendance",
@@ -1114,8 +1156,8 @@ async function parentHome(ctx: OrgContext, user: User) {
   }
 }
 
-/** Staff who neither oversee the school nor teach: their pages and today's check-in. */
-function staffHome(ctx: OrgContext) {
+/** Staff who neither oversee the school nor teach: today, what waits for them, their pages. */
+async function staffHome(ctx: OrgContext) {
   const held = new Set(heldAnywhere(ctx))
   const modules = enabledModules(ctx.org.type, ctx.org.modules)
   const base = `/orgs/${ctx.org.slug}`
@@ -1133,15 +1175,45 @@ function staffHome(ctx: OrgContext) {
         href: `${base}/manage${i.path}`,
       }))
   )
-  if (modules.has("leave")) links.push({ key: "leave", label: "Leave", group: "This school", href: `${base}/leave` })
-  return { links, checkIn: modules.has("staffAttendance") }
+  if (modules.has("leave"))
+    links.push({
+      key: "leave",
+      label: "Leave",
+      group: "This school",
+      href: `${base}/leave`,
+    })
+  const [day, leaveWaiting, applications, staffDay] = await Promise.all([
+    today(),
+    pendingLeaveCount(ctx),
+    newApplications(ctx),
+    staffToday(ctx),
+  ])
+  return {
+    day,
+    links,
+    checkIn: modules.has("staffAttendance"),
+    waiting: {
+      leave:
+        modules.has("leave") &&
+        (held.has("leave.students") ||
+          held.has("leave.staff") ||
+          leaveWaiting > 0)
+          ? leaveWaiting
+          : null,
+      applications:
+        held.has("admissions.manage") && modules.has("admissions")
+          ? applications
+          : null,
+    },
+    staffToday: staffDay,
+  }
 }
 
 /** The dashboards for the views this person has here. */
 export async function orgHome(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
   const views = await viewsOf(ctx, user)
-  const staff = views.includes("staff") ? staffHome(ctx) : null
+  const staff = views.includes("staff") ? await staffHome(ctx) : null
   const [admin, teacher, student, parent] = await Promise.all([
     views.includes("admin") ? adminHome(ctx) : null,
     views.includes("teacher") ? teacherHome(ctx, user) : null,

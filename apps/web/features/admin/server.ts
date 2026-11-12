@@ -2,6 +2,7 @@ import {
   contests,
   getDb,
   languageConfigs,
+  organizations,
   problems,
   runners,
   sql,
@@ -69,12 +70,19 @@ export async function updateUser(
   const [target] = await getDb().select().from(users).where(eq(users.id, id))
   if (!target) throw notFound("User not found")
   // Blocking staff takes their access away: only for people whose access you hold.
-  const [mine, theirs] = await Promise.all([platformAccess(actor), platformAccess(target)])
+  const [mine, theirs] = await Promise.all([
+    platformAccess(actor),
+    platformAccess(target),
+  ])
   if (
     (theirs.owner && !mine.owner) ||
     !theirs.permissions.every((p) => mine.permissions.includes(p))
   ) {
-    throw new ApiError(403, "forbidden", "You can't block someone with more access than you.")
+    throw new ApiError(
+      403,
+      "forbidden",
+      "You can't block someone with more access than you."
+    )
   }
   const [user] = await getDb()
     .update(users)
@@ -165,10 +173,66 @@ export async function getOverview() {
         )
         .groupBy(submissions.verdict),
     ])
+  // Organizations, sign-ups waiting, new people, and two weeks of submissions by day.
+  const fortnight = new Date(Date.now() - 13 * 24 * 60 * 60_000)
+  fortnight.setUTCHours(0, 0, 0, 0)
+  const [orgCounts, pending, [newUsers], perDay] = await Promise.all([
+    db
+      .select({ active: organizations.active, n: count() })
+      .from(organizations)
+      .groupBy(organizations.active),
+    db
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+        slug: organizations.slug,
+        type: organizations.type,
+        createdAt: organizations.createdAt,
+      })
+      .from(organizations)
+      .where(eq(organizations.signupStatus, "pending"))
+      .orderBy(organizations.createdAt)
+      .limit(10),
+    db
+      .select({ n: count() })
+      .from(users)
+      .where(gte(users.createdAt, new Date(Date.now() - 7 * 24 * 60 * 60_000))),
+    db
+      .select({
+        day: sql.sql<string>`to_char(date_trunc('day', ${submissions.createdAt} at time zone 'UTC'), 'YYYY-MM-DD')`,
+        n: count(),
+      })
+      .from(submissions)
+      .where(
+        and(
+          gte(submissions.createdAt, fortnight),
+          eq(submissions.kind, "submit")
+        )
+      )
+      .groupBy(sql.sql`1`),
+  ])
+  const days = Array.from({ length: 14 }, (_, i) =>
+    new Date(fortnight.getTime() + i * 24 * 60 * 60_000)
+      .toISOString()
+      .slice(0, 10)
+  )
   return {
     users: userCount,
     problems: problemCount,
     contests: contestCount,
+    newUsers7d: Number(newUsers?.n ?? 0),
+    organizations: {
+      total: orgCounts.reduce((s, r) => s + Number(r.n), 0),
+      active: Number(orgCounts.find((r) => r.active)?.n ?? 0),
+      pending: pending.map((o) => ({
+        ...o,
+        createdAt: o.createdAt.toISOString(),
+      })),
+    },
+    submissionsByDay: days.map((day) => ({
+      day,
+      total: Number(perDay.find((d) => d.day === day)?.n ?? 0),
+    })),
     queue,
     verdictsLast24h: verdicts.map((item) => ({
       verdict: item.verdict ?? "unknown",

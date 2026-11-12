@@ -107,6 +107,7 @@ const asT2 = (await t2(`${O}/exams/${half.id}`)).json
 check("a section's teacher sees its papers, marking only their own subject", asT2?.classes.length === 1 && asT2.classes[0].papers.length === 3 && asT2.classes[0].papers.filter((p) => p.canMark).map((p) => p.subject).join() === "Science", JSON.stringify(asT2?.classes))
 const asT1 = (await t1(`${O}/exams/${half.id}`)).json
 check("a grade's teacher sees both sections", asT1?.classes.length === 2 && asT1.classes.flatMap((c) => c.papers).filter((p) => p.canMark).length === 2)
+check("the subject teacher's home lists marks to enter", (await t2(`${O}/home`)).json?.teacher?.todo.some((x) => x.kind === "Marks" && x.text.startsWith("Science, Grade 5 › A: 0 of 3")), JSON.stringify((await t2(`${O}/home`)).json?.teacher?.todo))
 check("the paper shows its subject teacher", asT1?.classes[0].papers.find((p) => p.subject === "Mathematics")?.teacher === "Exm t1")
 
 // ---------- marks

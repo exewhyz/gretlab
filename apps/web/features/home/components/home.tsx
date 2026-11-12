@@ -1,7 +1,14 @@
 "use client"
 
 import {
+  AirplaneTiltIcon,
   ArrowRightIcon,
+  CalendarCheckIcon,
+  ClipboardTextIcon,
+  ExamIcon,
+  IdentificationBadgeIcon,
+  StudentIcon,
+  UsersIcon,
   CalendarDotsIcon,
   CheckIcon,
   CheckSquareIcon,
@@ -84,6 +91,7 @@ interface AdminData {
 
 interface TeacherData {
   day: string
+  checkIn?: boolean
   tiles: { lessons: number; toTake: number; students: number; low: number }
   periods: {
     time: string
@@ -167,8 +175,20 @@ interface Home {
   student: StudentData | null
   parent: ParentData | null
   staff: {
+    day: string
     links: { key: string; label: string; group: string; href: string }[]
     checkIn: boolean
+    waiting: { leave: number | null; applications: number | null }
+    staffToday: {
+      total: number
+      unmarked: number
+      present: number
+      late: number
+      half: number
+      absent: number
+      leave: number
+      percent: number | null
+    } | null
   } | null
 }
 
@@ -358,7 +378,7 @@ function TaskList({
           </Badge>
           <span className="min-w-0 flex-1">{t.text}</span>
           <Link
-            href={`${base}${t.href}`}
+            href={t.href.startsWith("/orgs/") ? t.href : `${base}${t.href}`}
             className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             {t.action}
@@ -705,7 +725,7 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
             .map((s) => (
               <Link
                 key={s.title}
-                href={s.href.startsWith("/orgs/") ? s.href : `${manage}${s.href}`}
+                href={`${manage}${s.href}`}
                 className="group/short"
               >
                 <Card
@@ -739,6 +759,7 @@ function TeacherHome({ slug, data }: { slug: string; data: TeacherData }) {
   return (
     <div className="grid gap-5" data-testid="teacher-home">
       <Greeting day={data.day} title="Teaching today" />
+      {data.checkIn && <CheckInCard slug={slug} />}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Tile
@@ -1224,7 +1245,46 @@ function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
   )
 }
 
-/** Office staff: today's check-in and the pages their roles open. */
+/** What each page is for, on the staff home's cards. */
+const PAGE_HINTS: Record<string, string> = {
+  "staff-attendance": "Mark today's staff register, see the month",
+  leave: "Ask for leave, decide requests",
+  admissions: "Review applications and admit students",
+  students: "Records, admission numbers, classes",
+  "academic-years": "Years, class teachers, promotion",
+  exams: "Exams, marks and report cards",
+  members: "Everyone in the school",
+  groups: "Classes and sections",
+  parents: "Link parents to students",
+  attendance: "Take a class's register",
+  "attendance-report": "A class's month",
+  timetable: "Periods and class timetables",
+  subjects: "What each class takes, and who teaches it",
+  books: "Books and loans",
+  transport: "Routes, stops and riders",
+  hostel: "Rooms, beds and residents",
+  notices: "Post to a class or everyone",
+  reports: "Attendance and marks",
+  roles: "Who may do what",
+  invites: "Links to join",
+  import: "Add people from a spreadsheet",
+}
+
+const PAGE_ICONS: Record<string, Icon> = {
+  "staff-attendance": IdentificationBadgeIcon,
+  leave: AirplaneTiltIcon,
+  admissions: ClipboardTextIcon,
+  students: StudentIcon,
+  "academic-years": CalendarCheckIcon,
+  exams: ExamIcon,
+  members: UsersIcon,
+  attendance: CheckSquareIcon,
+  timetable: CalendarDotsIcon,
+  notices: MegaphoneIcon,
+  reports: ChartBarIcon,
+}
+
+/** Office staff (no class to teach, not running the school): today, what waits, their pages. */
 function StaffHome({
   slug,
   data,
@@ -1232,21 +1292,120 @@ function StaffHome({
   slug: string
   data: NonNullable<Home["staff"]>
 }) {
+  const { data: viewer } = useViewer()
+  const first = (viewer?.user?.name ?? "").split(" ")[0]
+  const t = data.staffToday
+  const tiles = [
+    ...(data.waiting.leave != null
+      ? [
+          {
+            label: "Leave to decide",
+            value: String(data.waiting.leave),
+            hint: data.waiting.leave ? "Waiting for you" : "Nothing waiting",
+            tone: data.waiting.leave ? ("primary" as const) : undefined,
+            href: `/orgs/${slug}/leave`,
+          },
+        ]
+      : []),
+    ...(data.waiting.applications != null
+      ? [
+          {
+            label: "New applications",
+            value: String(data.waiting.applications),
+            hint: "Admissions",
+            tone: data.waiting.applications ? ("primary" as const) : undefined,
+            href: `/orgs/${slug}/manage/admissions`,
+          },
+        ]
+      : []),
+    ...(t
+      ? [
+          {
+            label: "Staff present today",
+            value: `${t.present + t.late + t.half} of ${t.total}`,
+            hint:
+              [
+                t.late && `${t.late} late`,
+                t.absent && `${t.absent} absent`,
+                t.leave && `${t.leave} on leave`,
+                t.unmarked && `${t.unmarked} not marked`,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "Everyone's in",
+            tone: t.unmarked ? ("primary" as const) : undefined,
+            href: `/orgs/${slug}/manage/staff-attendance`,
+          },
+        ]
+      : []),
+  ]
+  const groups = [...new Set(data.links.map((l) => l.group))]
   return (
-    <div className="grid gap-4" data-testid="staff-home">
+    <div className="grid gap-5" data-testid="staff-home">
+      <Greeting
+        day={data.day}
+        title={first ? `${greeting()}, ${first}` : greeting()}
+      />
       {data.checkIn && <CheckInCard slug={slug} />}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {data.links.map((l) => (
-          <Link
-            key={l.key}
-            href={l.href}
-            className="rounded-xl border border-hairline bg-card p-4 transition-colors hover:border-hairline-strong"
-          >
-            <div className="text-caption text-muted-foreground">{l.group}</div>
-            <div className="font-medium text-ink">{l.label}</div>
-          </Link>
-        ))}
-      </div>
+      {tiles.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {tiles.map((tile) => (
+            <Link
+              key={tile.label}
+              href={tile.href}
+              className="block"
+              data-testid="staff-tile"
+            >
+              <Tile
+                label={tile.label}
+                value={tile.value}
+                hint={tile.hint}
+                tone={tile.tone}
+              />
+            </Link>
+          ))}
+        </div>
+      )}
+      {groups.map((g) => (
+        <section key={g} aria-label={g} className="grid gap-2.5">
+          <h2 className="text-body-sm font-medium text-muted-foreground">
+            {g}
+          </h2>
+          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3">
+            {data.links
+              .filter((l) => l.group === g)
+              .map((l) => {
+                const I = PAGE_ICONS[l.key] ?? ArrowRightIcon
+                return (
+                  <Link
+                    key={l.key}
+                    href={l.href}
+                    className="group/short"
+                    data-testid="staff-page"
+                  >
+                    <Card
+                      size="sm"
+                      className="flex-row items-center gap-3 px-4 transition-colors group-hover/short:ring-foreground/20"
+                    >
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-ink">
+                        <I className="size-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-body-sm font-semibold text-ink">
+                          {l.label}
+                        </span>
+                        {PAGE_HINTS[l.key] && (
+                          <span className="block text-xs text-muted-foreground">
+                            {PAGE_HINTS[l.key]}
+                          </span>
+                        )}
+                      </span>
+                    </Card>
+                  </Link>
+                )
+              })}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }

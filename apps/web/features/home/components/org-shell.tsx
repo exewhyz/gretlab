@@ -40,33 +40,10 @@ import {
 } from "@phosphor-icons/react"
 import { useQuery } from "@tanstack/react-query"
 import { ORG_NAV, visibleOrgNav, type OrgType } from "@workspace/judge"
-import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useState, type ReactNode } from "react"
+import type { ReactNode } from "react"
 
-import { Badge } from "@workspace/ui/components/badge"
-import { Separator } from "@workspace/ui/components/separator"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarRail,
-  SidebarTrigger,
-} from "@workspace/ui/components/sidebar"
-import { Skeleton } from "@workspace/ui/components/skeleton"
-import { TooltipProvider } from "@workspace/ui/components/tooltip"
-
-import { ThemeToggle } from "@/components/theme-toggle"
-import { AccountMenu } from "@/features/account/account-menu"
-import { NotificationBell } from "@/features/notifications/components/bell"
+import { AppFrame } from "@/components/app-frame"
 import { api } from "@/lib/api/client"
 
 export interface Shell {
@@ -206,8 +183,15 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
   groups.push({
     group: "This school",
     items: [
-      ...(shell.modules.includes("staffAttendance") && shell.permissions.length > 0
-        ? [{ key: "my-attendance", label: "My attendance", href: `${base}/my-attendance` }]
+      ...(shell.modules.includes("staffAttendance") &&
+      shell.permissions.length > 0
+        ? [
+            {
+              key: "my-attendance",
+              label: "My attendance",
+              href: `${base}/my-attendance`,
+            },
+          ]
         : []),
       ...(shell.modules.includes("leave")
         ? [
@@ -215,7 +199,9 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
               key: "leave",
               label: "Leave",
               href: `${base}/leave`,
-              badge: shell.leavePending ? String(shell.leavePending) : undefined,
+              badge: shell.leavePending
+                ? String(shell.leavePending)
+                : undefined,
             },
           ]
         : []),
@@ -225,23 +211,10 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
   return groups
 }
 
-/** Tablets get the icon rail, larger screens the full sidebar; phones the slide-out menu. */
-function useWideEnough() {
-  const [open, setOpen] = useState(true)
-  useEffect(() => {
-    const query = window.matchMedia("(min-width: 1024px)")
-    const apply = () => setOpen(query.matches)
-    apply()
-    query.addEventListener("change", apply)
-    return () => query.removeEventListener("change", apply)
-  }, [])
-  return [open, setOpen] as const
-}
-
 /**
- * The frame of every school page: a sidebar shaped by who you are here (shadcn Sidebar:
- * full on laptops and PCs, an icon rail on tablets, a slide-out menu on phones) and a
- * header with the school, your role, notifications, theme and account.
+ * The frame of every school page: a sidebar shaped by who you are here (full on laptops
+ * and PCs, an icon rail on tablets, a slide-out menu on phones) and a header with the
+ * school, your role, notifications, theme and account (components/app-frame.tsx).
  */
 export function OrgShell({
   slug,
@@ -252,116 +225,36 @@ export function OrgShell({
 }) {
   const { data: shell } = useShell(slug)
   const pathname = usePathname()
-  const [open, setOpen] = useWideEnough()
   const groups = shell ? navFor(shell) : []
   const isActive = (href: string) =>
     href === `/orgs/${slug}`
       ? pathname === href
       : pathname === href || pathname.startsWith(`${href}/`)
-
   return (
-    <TooltipProvider>
-      <SidebarProvider open={open} onOpenChange={setOpen}>
-        <Sidebar collapsible="icon">
-          <SidebarHeader>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  size="lg"
-                  render={<Link href={`/orgs/${slug}`} />}
-                  tooltip={shell?.org.name ?? "School"}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary font-mono text-xs font-bold text-primary-foreground"
-                  >
-                    {(shell?.org.name ?? "·").slice(0, 2).toUpperCase()}
-                  </span>
-                  <span className="grid min-w-0 flex-1 text-left leading-tight">
-                    {shell ? (
-                      <>
-                        <span className="truncate text-sm font-semibold text-ink">
-                          {shell.org.name}
-                        </span>
-                        <span className="truncate text-xs text-muted-foreground">
-                          {shell.role}
-                          {!shell.org.active && " · Suspended"}
-                        </span>
-                      </>
-                    ) : (
-                      <Skeleton className="h-8 w-32" />
-                    )}
-                  </span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarHeader>
-          <SidebarContent>
-            {!shell &&
-              Array.from({ length: 6 }, (_, i) => (
-                <div key={i} className="px-3 py-1.5">
-                  <Skeleton className="h-6 w-full" />
-                </div>
-              ))}
-            <nav aria-label="Organization" className="flex flex-col gap-2">
-              {groups.map((g) => (
-                <SidebarGroup key={g.group || "home"}>
-                  {g.group && <SidebarGroupLabel>{g.group}</SidebarGroupLabel>}
-                  <SidebarMenu>
-                    {g.items.map((item) => {
-                      const Icon = ICONS[item.key] ?? SquaresFourIcon
-                      return (
-                        <SidebarMenuItem key={item.href}>
-                          <SidebarMenuButton
-                            isActive={isActive(item.href)}
-                            tooltip={item.label}
-                            render={<Link href={item.href} />}
-                          >
-                            <Icon />
-                            <span>{item.label}</span>
-                          </SidebarMenuButton>
-                          {item.badge && (
-                            <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
-                          )}
-                        </SidebarMenuItem>
-                      )
-                    })}
-                  </SidebarMenu>
-                </SidebarGroup>
-              ))}
-            </nav>
-          </SidebarContent>
-          <SidebarRail />
-        </Sidebar>
-        <SidebarInset className="min-w-0 bg-canvas">
-          <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-hairline bg-canvas/95 px-3 backdrop-blur sm:px-4">
-            <SidebarTrigger aria-label="Toggle the menu" />
-            <Separator orientation="vertical" className="mx-1 h-5" />
-            <Link
-              href="/"
-              className="font-mono text-sm font-bold tracking-tighter text-primary"
-              aria-label="Gretlab home"
-            >
-              &gt;&gt;&gt;
-            </Link>
-            <span className="min-w-0 truncate text-sm font-medium text-ink">
-              {shell?.org.name}
-            </span>
-            {shell && (
-              <Badge variant="secondary" className="hidden sm:inline-flex">
-                {shell.role}
-              </Badge>
-            )}
-            <span className="flex-1" />
-            <NotificationBell />
-            <ThemeToggle />
-            <AccountMenu />
-          </header>
-          <div className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-            <div className="mx-auto w-full max-w-[1440px]">{children}</div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </TooltipProvider>
+    <AppFrame
+      brand={{
+        mark: (shell?.org.name ?? "·").slice(0, 2).toUpperCase(),
+        title: shell?.org.name,
+        subtitle: shell
+          ? `${shell.role}${!shell.org.active ? " · Suspended" : ""}`
+          : undefined,
+        href: `/orgs/${slug}`,
+        tooltip: shell?.org.name ?? "School",
+      }}
+      navLabel="Organization"
+      loading={!shell}
+      groups={groups.map((g) => ({
+        group: g.group,
+        items: g.items.map((i) => ({
+          ...i,
+          icon: ICONS[i.key] ?? SquaresFourIcon,
+        })),
+      }))}
+      isActive={isActive}
+      title={shell?.org.name}
+      badge={shell?.role}
+    >
+      {children}
+    </AppFrame>
   )
 }
