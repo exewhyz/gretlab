@@ -14,7 +14,7 @@ import { z } from "zod"
  * every level above has it on, so what the platform turns off an organization can't use.
  */
 
-export type NotificationAudience = "students" | "staff" | "everyone"
+export type NotificationAudience = "students" | "parents" | "staff" | "everyone"
 
 export interface EventDefinition {
   label: string
@@ -86,6 +86,21 @@ export const NOTIFICATION_EVENTS = {
       "Someone replies to a question a person asked in a class discussion.",
     audience: "everyone",
     kinds: ["discussion_reply"],
+    emailByDefault: true,
+  },
+  "parent.updates": {
+    label: "Your child's notices and marks",
+    description:
+      "Parents get a copy of what their child is told: class notices, new work, marks and teachers' notes; and a note when they're linked to a child.",
+    audience: "parents",
+    kinds: ["child_update", "parent_linked"],
+    emailByDefault: true,
+  },
+  "parent.absence": {
+    label: "Absent from class",
+    description: "Parents hear the same day when their child is marked absent.",
+    audience: "parents",
+    kinds: ["child_absent"],
     emailByDefault: true,
   },
   "staff.assignment_published": {

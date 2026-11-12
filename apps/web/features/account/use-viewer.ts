@@ -16,6 +16,7 @@ export interface Viewer {
     name: string | null
     role: "student" | "teacher" | "admin"
     teaches: boolean
+    parent: boolean
     platform: { permissions: PlatformPermission[]; role: string | null; owner: boolean }
   } | null
   features: {

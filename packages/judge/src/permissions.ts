@@ -97,6 +97,12 @@ export const PERMISSIONS = {
     description: "The organization's periods and school days, and each class's weekly timetable. Grant this, or the finer actions under it.",
     module: "Teaching",
   },
+  "parents.manage": {
+    label: "Manage parent accounts",
+    description:
+      "Link parents to the students of the groups this applies to, and see who they are (Parent accounts module). Grant this, or the finer actions under it.",
+    module: "Members",
+  },
   "attendance.mark": {
     label: "Take attendance",
     description:
@@ -318,6 +324,18 @@ export const PERMISSIONS = {
     module: "Teaching",
     parent: "timetable.manage",
   },
+  "parents.view": {
+    label: "See parents",
+    description: "See the parents linked to the students of the groups this applies to.",
+    module: "Members",
+    parent: "parents.manage",
+  },
+  "parents.link": {
+    label: "Link and unlink parents",
+    description: "Link parents to students of the groups this applies to, one at a time or from a list, and remove links.",
+    module: "Members",
+    parent: "parents.manage",
+  },
   "org.members.assign_roles": {
     label: "Assign roles",
     description:
@@ -399,6 +417,7 @@ export const SYSTEM_ROLES = {
       "reports.view",
       "attendance.mark",
       "attendance.view",
+      "parents.view",
     ] as Permission[],
   },
   member: {

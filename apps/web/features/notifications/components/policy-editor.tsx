@@ -17,7 +17,7 @@ interface Row {
   event: string
   label: string
   description: string
-  audience: "students" | "staff" | "everyone"
+  audience: "students" | "parents" | "staff" | "everyone"
   emailOnly: boolean
   own: Switches
   locked: Switches
@@ -30,6 +30,7 @@ interface Data {
 
 const GROUPS: { audience: Row["audience"]; title: string }[] = [
   { audience: "students", title: "To students" },
+  { audience: "parents", title: "To parents" },
   { audience: "everyone", title: "To anyone" },
   { audience: "staff", title: "To teachers and staff" },
 ]

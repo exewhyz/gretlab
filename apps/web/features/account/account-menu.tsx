@@ -63,6 +63,7 @@ function useSections(): NavItem[] {
             also: ["/lists"],
           },
           orgs.length > 0 && { href: "/classes", label: "My classes" },
+          user?.parent && { href: "/children", label: "My children" },
           user &&
             viewer?.features.assignments && {
               href: "/assignments",

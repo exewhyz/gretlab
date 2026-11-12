@@ -11,7 +11,7 @@ interface Row {
   event: string
   label: string
   description: string
-  audience: "students" | "staff" | "everyone"
+  audience: "students" | "parents" | "staff" | "everyone"
   on: boolean
   canChoose: boolean
   alwaysIn: string[]

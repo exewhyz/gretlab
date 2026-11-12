@@ -1,6 +1,7 @@
 import {
   attendance,
   getDb,
+  guardians,
   notifications,
   orgGroups,
   organizations,
@@ -11,6 +12,7 @@ import {
 } from "@workspace/db"
 import {
   deliveryFor,
+  enabledModules,
   eventOfKind,
   readPreferences,
   type EventPolicy,
@@ -77,8 +79,8 @@ export async function notify(userIds: string[], n: NewNotification) {
   const told = { inApp: 0, email: 0 }
   const ids = [...new Set(userIds)]
   if (ids.length === 0) return told
+  const event = eventOfKind(n.kind)
   try {
-    const event = eventOfKind(n.kind)
     const policy = event ? await policyFor(event, n.orgId ?? null) : UNLISTED
     const emailing = policy.email && mailEnabled()
     if (!policy.inApp && !emailing) return told
@@ -127,7 +129,63 @@ export async function notify(userIds: string[], n: NewNotification) {
   } catch (error) {
     console.error("[notifications] couldn't store:", error)
   }
+  if (n.orgId && event && COPIED_TO_PARENTS.has(event)) {
+    await tellParents(n.orgId, ids, (child) => ({
+      kind: "child_update",
+      title: `${child}: ${n.title}`,
+      body: n.body,
+    }))
+  }
   return told
+}
+
+/** What a student is told that their parents get a copy of. */
+const COPIED_TO_PARENTS = new Set<string>([
+  "assignment.published",
+  "feedback.released",
+  "assignment.extension",
+  "class.notice",
+  "class.teacher_note",
+])
+
+/**
+ * Tells the parents of these students (Parent accounts module, linked in this
+ * organization), one notification per child, linking to that child's page. Never throws.
+ */
+export async function tellParents(
+  orgId: string,
+  studentIds: string[],
+  message: (childName: string) => Omit<NewNotification, "href" | "orgId">
+) {
+  if (studentIds.length === 0) return
+  try {
+    const db = getDb()
+    const [org] = await db
+      .select({ slug: organizations.slug, type: organizations.type, modules: organizations.modules })
+      .from(organizations)
+      .where(eq(organizations.id, orgId))
+    if (!org || !enabledModules(org.type, org.modules).has("parents")) return
+    const rows = await db
+      .select({ parentId: guardians.parentId, studentId: guardians.studentId, name: users.name, email: users.email })
+      .from(guardians)
+      .innerJoin(users, eq(guardians.studentId, users.id))
+      .where(and(eq(guardians.orgId, orgId), inArray(guardians.studentId, studentIds)))
+    const byChild = new Map<string, { name: string; parentIds: string[] }>()
+    for (const r of rows) {
+      const entry = byChild.get(r.studentId) ?? { name: r.name ?? r.email, parentIds: [] }
+      entry.parentIds.push(r.parentId)
+      byChild.set(r.studentId, entry)
+    }
+    for (const [studentId, child] of byChild) {
+      await notify(child.parentIds, {
+        ...message(child.name),
+        href: `/orgs/${org.slug}/children/${studentId}`,
+        orgId,
+      })
+    }
+  } catch (error) {
+    console.error("[notifications] couldn't tell parents:", error)
+  }
 }
 
 export interface Reminder {

@@ -756,6 +756,37 @@ export const roleAssignments = pgTable(
   (table) => [index("role_assignments_user").on(table.userId, table.orgId)]
 )
 
+/**
+ * A parent (or guardian) of a student in an organization (Parent accounts module). A parent
+ * isn't a member: this link alone lets them follow that one student, read only.
+ */
+export const guardians = pgTable(
+  "guardians",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Mother, Father, Guardian, or whatever the school writes; may be empty. */
+    relation: text("relation").notNull().default(""),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("guardians_link").on(table.orgId, table.parentId, table.studentId),
+    index("guardians_parent").on(table.parentId),
+    index("guardians_student").on(table.orgId, table.studentId),
+  ]
+)
+
 /** A link or code that lets people join, optionally into a group and with a role. */
 export const orgInvites = pgTable(
   "org_invites",

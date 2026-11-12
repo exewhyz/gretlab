@@ -88,6 +88,14 @@ export const ORG_NAV: NavItem[] = [
     group: "People",
     anyOf: ["org.members.import"],
   },
+  {
+    key: "parents",
+    label: "Parents",
+    path: "/parents",
+    group: "People",
+    anyOf: ["parents.view", "parents.link"],
+    module: "parents",
+  },
 
   {
     key: "assignments",

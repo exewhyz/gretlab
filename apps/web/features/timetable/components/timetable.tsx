@@ -52,7 +52,7 @@ const dayName = (d: number) =>
   WEEKDAYS.find((w) => w.day === d)?.short ?? String(d)
 
 /** A week: periods down, days across. Cells show a subject, or a picker when editing. */
-function WeekGrid({
+export function WeekGrid({
   days,
   periods,
   cells,

@@ -23,7 +23,12 @@ import {
   writeAudit,
   type OrgContext,
 } from "@/features/orgs/server"
+import { tellParents } from "@/features/notifications/server"
 import { ApiError, notFound } from "@/lib/api/route"
+
+/** The day before a "YYYY-MM-DD" day. */
+const dayBefore = (day: string) =>
+  new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
 
 /*
  * The Attendance module: a register per group, day and (optionally) period. A register is a
@@ -185,6 +190,10 @@ export async function saveRegister(
           })
           .returning({ id: teachingSessions.id })
       )[0]!.id
+    const before = await tx
+      .select({ userId: attendance.userId, status: attendance.status })
+      .from(attendance)
+      .where(eq(attendance.sessionId, id))
     await tx.delete(attendance).where(eq(attendance.sessionId, id))
     if (input.marks.length) {
       await tx.insert(attendance).values(
@@ -196,8 +205,23 @@ export async function saveRegister(
         }))
       )
     }
-    return { id, corrected: Boolean(existing) }
+    const wasAbsent = new Set(
+      before.filter((b) => b.status === "absent").map((b) => b.userId)
+    )
+    const newlyAbsent = input.marks
+      .filter((m) => m.status === "absent" && !wasAbsent.has(m.userId))
+      .map((m) => m.userId)
+    return { id, corrected: Boolean(existing), newlyAbsent }
   })
+  // Parents hear about an absence the same day (or the next, for a late register), once.
+  if (result.newlyAbsent.length && input.day >= dayBefore(await today())) {
+    const when = input.day === (await today()) ? "today" : `on ${input.day}`
+    await tellParents(cc.ctx.org.id, result.newlyAbsent, (child) => ({
+      kind: "child_absent",
+      title: `${child} was marked absent ${when}`,
+      body: `${group}${input.period ? `, ${input.period}` : ""}. Contact the school if this isn't right.`,
+    }))
+  }
   await writeAudit(
     cc.ctx,
     result.corrected ? "attendance.correct" : "attendance.take",

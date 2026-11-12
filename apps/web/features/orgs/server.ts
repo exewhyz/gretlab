@@ -219,7 +219,7 @@ async function audit(
 
 const newToken = () => randomBytes(16).toString("base64url")
 
-async function userByEmail(tx: Tx | Db, email: string) {
+export async function userByEmail(tx: Tx | Db, email: string) {
   const [found] = await tx.select().from(users).where(eq(users.email, email))
   if (found) return found
   // Someone who hasn't signed in yet: the account is waiting for their first sign-in.

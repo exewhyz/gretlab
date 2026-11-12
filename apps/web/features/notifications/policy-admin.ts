@@ -23,6 +23,7 @@ import {
 
 import { needFor, orgContext, writeAudit } from "@/features/orgs/server"
 import { writePlatformAudit } from "@/features/platform/staff"
+import { isParent } from "@/features/parents/server"
 import { teachesAnywhere } from "@/features/teaching/server"
 
 import { mailEnabled } from "./mailer"
@@ -157,7 +158,7 @@ export interface PreferenceRow {
 /** Their notification settings: one row per event that can concern them. */
 export async function myPreferences(user: User) {
   const db = getDb()
-  const [[me], memberships, platform, staff] = await Promise.all([
+  const [[me], memberships, platform, staff, parent] = await Promise.all([
     db
       .select({
         emailOn: users.emailNotifications,
@@ -178,6 +179,7 @@ export async function myPreferences(user: User) {
       ),
     platformOverrides(),
     teachesAnywhere(user),
+    isParent(user.id),
   ])
   const person = {
     emailOn: me?.emailOn ?? true,
@@ -185,7 +187,9 @@ export async function myPreferences(user: User) {
   }
   const isStaff = staff || user.role !== "student"
   const events: PreferenceRow[] = NOTIFICATION_EVENT_KEYS.filter(
-    (event) => definition(event).audience !== "staff" || isStaff
+    (event) =>
+      (definition(event).audience !== "staff" || isStaff) &&
+      (definition(event).audience !== "parents" || parent)
   ).map((event) => {
     const site = effectivePolicy(event, platform, null)
     const inOrgs = memberships.map((m) => ({

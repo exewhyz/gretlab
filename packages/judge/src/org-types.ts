@@ -57,7 +57,7 @@ export const MODULES = {
     description:
       "Parents sign in to follow their children's work, attendance and results.",
     for: ["school", "college", "cohort"],
-    ready: false,
+    ready: true,
   },
   library: {
     label: "Library",
