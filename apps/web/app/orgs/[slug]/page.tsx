@@ -10,8 +10,8 @@ import { OrgProfileView } from "@/features/orgs/components/public"
 export const metadata: Metadata = { title: "Organization" }
 
 /**
- * The school's home for the people who run or teach in it (the dashboards in the school
- * frame); its public profile for everyone else.
+ * The school's home for everyone with a place in it (admin, teacher, student, parent:
+ * the dashboards in the school frame); its public profile for everyone else.
  */
 export default async function OrgPage({
   params,
@@ -21,7 +21,7 @@ export default async function OrgPage({
   const { slug } = await params
   const user = await getCurrentUser()
   const views = user ? await homeViews(slug, user) : []
-  if (views.includes("admin") || views.includes("teacher")) {
+  if (views.length > 0) {
     return (
       <OrgShell slug={slug}>
         <OrgHome slug={slug} />

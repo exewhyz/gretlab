@@ -44,6 +44,10 @@ import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { useViewer } from "@/features/account/use-viewer"
+import {
+  CampusSummary,
+  type CampusData,
+} from "@/features/campus/components/campus"
 import { api } from "@/lib/api/client"
 
 import { useShell } from "./org-shell"
@@ -105,24 +109,79 @@ interface TeacherData {
   attendanceOn: boolean
 }
 
-interface Home {
-  views: ("admin" | "teacher" | "student" | "parent")[]
-  admin: AdminData | null
-  teacher: TeacherData | null
+interface StudentData {
+  day: string
+  classes: { id: string; name: string }[]
+  tiles: {
+    attendance: number | null
+    dueThisWeek: number
+    classes: number
+    booksOut: number | null
+  }
+  lessons: {
+    starts: string
+    ends: string
+    subject: string
+    teacher: string
+    isBreak: boolean
+  }[]
+  coming: {
+    kind: string
+    title: string
+    detail: string
+    at: string
+    href: string
+    action: string
+  }[]
+  notices: {
+    id: string
+    at: string
+    text: string
+    by: string | null
+    group: string
+  }[]
+  campus: CampusData & { slug?: string }
 }
 
-const LABEL = { admin: "School", teacher: "Teaching" } as const
+interface ParentData {
+  day: string
+  children: {
+    id: string
+    name: string
+    classes: string[]
+    attendance: number | null
+    absentToday: boolean
+    work: number
+    bus: string | null
+    news: { kind: string; tone: Tone; text: string; at: string }[]
+  }[]
+}
 
-/** The school's home: the admin and teaching dashboards, as this person's roles allow. */
+type View = "admin" | "teacher" | "student" | "parent"
+
+interface Home {
+  views: View[]
+  admin: AdminData | null
+  teacher: TeacherData | null
+  student: StudentData | null
+  parent: ParentData | null
+}
+
+const LABEL: Record<View, string> = {
+  admin: "School",
+  teacher: "Teaching",
+  student: "My progress",
+  parent: "My children",
+}
+
+/** The school's home: a dashboard for each of this person's views here (tabs if several). */
 export function OrgHome({ slug }: { slug: string }) {
   const { data, error } = useQuery({
     queryKey: ["org", slug, "home"],
     queryFn: () => api<Home>(`/orgs/${slug}/home`),
   })
-  const shown = (data?.views ?? []).filter(
-    (v): v is "admin" | "teacher" => v === "admin" || v === "teacher"
-  )
-  const [picked, setPicked] = useState<"admin" | "teacher" | null>(null)
+  const shown = data?.views ?? []
+  const [picked, setPicked] = useState<View | null>(null)
   if (error)
     return (
       <p role="alert" className="text-body-sm text-destructive">
@@ -134,10 +193,7 @@ export function OrgHome({ slug }: { slug: string }) {
   return (
     <div className="grid gap-5" data-testid="org-home">
       {shown.length > 1 && (
-        <Tabs
-          value={view}
-          onValueChange={(v) => setPicked(v as "admin" | "teacher")}
-        >
+        <Tabs value={view} onValueChange={(v) => setPicked(v as View)}>
           <TabsList aria-label="Show my home as">
             {shown.map((v) => (
               <TabsTrigger key={v} value={v}>
@@ -152,6 +208,12 @@ export function OrgHome({ slug }: { slug: string }) {
       )}
       {view === "teacher" && data.teacher && (
         <TeacherHome slug={slug} data={data.teacher} />
+      )}
+      {view === "student" && data.student && (
+        <StudentHome slug={slug} data={data.student} />
+      )}
+      {view === "parent" && data.parent && (
+        <ParentHome slug={slug} data={data.parent} />
       )}
     </div>
   )
@@ -822,6 +884,333 @@ function TeacherHome({ slug, data }: { slug: string; data: TeacherData }) {
           </div>
         )}
       </section>
+    </div>
+  )
+}
+
+/* ---------- a student ---------- */
+
+const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  })
+
+/** Whether a lesson "HH:MM"–"HH:MM" is on now, by this device's clock. */
+function isNow(starts: string, ends: string) {
+  const d = new Date()
+  const m = d.getHours() * 60 + d.getMinutes()
+  const at = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
+  return m >= at(starts) && m < at(ends)
+}
+
+function StudentHome({ slug, data }: { slug: string; data: StudentData }) {
+  const { data: viewer } = useViewer()
+  const first = (viewer?.user?.name ?? "").split(" ")[0]
+  return (
+    <div className="grid gap-5" data-testid="student-home">
+      <Greeting
+        day={data.day}
+        title={first ? `Hi ${first}, here's your week` : "Your week"}
+      />
+
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <Card size="sm" data-testid="home-tile">
+          <CardHeader>
+            <CardDescription>Attendance</CardDescription>
+            <div className="text-3xl leading-tight font-semibold tracking-tight text-primary-active tabular-nums">
+              {data.tiles.attendance == null
+                ? "—"
+                : `${data.tiles.attendance}%`}
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            {data.tiles.attendance != null && (
+              <Meter
+                value={data.tiles.attendance}
+                bad={data.tiles.attendance < 75}
+              />
+            )}
+            <span className="text-xs text-muted-foreground">
+              Late counts as present
+            </span>
+          </CardContent>
+        </Card>
+        <Tile
+          label="Due this week"
+          value={String(data.tiles.dueThisWeek)}
+          hint="Assignments and exams"
+        />
+        <Tile
+          label="My classes"
+          value={String(data.tiles.classes)}
+          hint={data.classes.map((c) => c.name).join(", ")}
+        />
+        {data.tiles.booksOut != null ? (
+          <Tile
+            label="Library books"
+            value={String(data.tiles.booksOut)}
+            hint="Out with you now"
+          />
+        ) : (
+          <Tile
+            label="Notices"
+            value={String(data.notices.length)}
+            hint="In your classes"
+          />
+        )}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Card data-testid="student-today">
+          <CardHeader>
+            <CardTitle className="text-title-md">Today</CardTitle>
+            {data.classes[0] && (
+              <CardAction>
+                <Link
+                  href={`/orgs/${slug}/classes/${data.classes[0].id}?tab=timetable`}
+                  className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
+                >
+                  My week <ArrowRightIcon className="size-3.5" />
+                </Link>
+              </CardAction>
+            )}
+          </CardHeader>
+          <CardContent>
+            {data.lessons.length === 0 ? (
+              <Empty className="border border-dashed border-hairline">
+                <EmptyHeader>
+                  <EmptyTitle>No lessons on the timetable today</EmptyTitle>
+                  <EmptyDescription>
+                    Your classes' pages have their work and notices.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <ol className="grid gap-1">
+                {data.lessons.map((l, i) => {
+                  const now = !l.isBreak && isNow(l.starts, l.ends)
+                  return (
+                    <li
+                      key={i}
+                      className={cn(
+                        "grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5",
+                        now && "bg-primary/10",
+                        l.isBreak && "text-muted-foreground"
+                      )}
+                    >
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {l.starts}
+                      </span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-body-sm font-semibold">
+                          {l.subject}
+                        </span>
+                        {now && <Badge>Now</Badge>}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {l.teacher}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ol>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="coming-up">
+          <CardHeader>
+            <CardTitle className="text-title-md">Coming up</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.coming.length === 0 ? (
+              <p className="text-body-sm text-muted-foreground">
+                Nothing due. Enjoy it.
+              </p>
+            ) : (
+              <ul className="grid">
+                {data.coming.map((c, i) => (
+                  <li
+                    key={i}
+                    className="flex items-center gap-3 border-t border-hairline-soft py-2.5 first:border-t-0"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <Badge variant="secondary">{c.kind}</Badge>
+                        <span className="truncate text-body-sm font-medium">
+                          {c.title}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {c.detail} · {shortDate(c.at)}
+                      </span>
+                    </span>
+                    <Link
+                      href={c.href}
+                      className={buttonVariants({
+                        variant: "outline",
+                        size: "sm",
+                      })}
+                    >
+                      {c.action}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-title-md">Notices</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.notices.length === 0 ? (
+              <p className="text-body-sm text-muted-foreground">
+                No notices in your classes yet.
+              </p>
+            ) : (
+              <ul className="grid">
+                {data.notices.map((n) => (
+                  <li
+                    key={n.id}
+                    className="border-t border-hairline-soft py-2.5 first:border-t-0"
+                  >
+                    <p className="text-xs text-muted-foreground">
+                      {n.group}
+                      {n.by && ` · ${n.by}`} · {shortDate(n.at)}
+                    </p>
+                    <p className="text-body-sm whitespace-pre-wrap">{n.text}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <div className="[&_[data-testid=campus]]:grid-cols-1">
+          <CampusSummary data={data.campus} slug={slug} own />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ---------- a parent ---------- */
+
+function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
+  return (
+    <div className="grid gap-5" data-testid="parent-home">
+      <Greeting day={data.day} title="My children" />
+      {data.children.length === 0 ? (
+        <Empty className="border border-dashed border-hairline">
+          <EmptyHeader>
+            <EmptyTitle>No children linked here</EmptyTitle>
+            <EmptyDescription>
+              The school links parents to their children.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {data.children.map((c) => (
+            <Card key={c.id} data-testid="child-card">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary-active"
+                  >
+                    {c.name
+                      .split(/\s+/)
+                      .map((w) => w[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <CardTitle className="text-title-md">{c.name}</CardTitle>
+                    <CardDescription className="truncate">
+                      {c.classes.join(", ") || "Not in a class yet"}
+                    </CardDescription>
+                  </div>
+                </div>
+                {c.absentToday && (
+                  <CardAction>
+                    <Badge variant="destructive">Absent today</Badge>
+                  </CardAction>
+                )}
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    {
+                      label: "Attendance",
+                      value: c.attendance == null ? "—" : `${c.attendance}%`,
+                      tone:
+                        c.attendance != null && c.attendance < 75
+                          ? "text-destructive"
+                          : "text-ink",
+                    },
+                    {
+                      label: "Open work",
+                      value: String(c.work),
+                      tone: "text-ink",
+                    },
+                    { label: "Bus", value: c.bus ?? "—", tone: "text-ink" },
+                  ].map((s) => (
+                    <div
+                      key={s.label}
+                      className="min-w-0 rounded-lg bg-muted/60 px-3 py-2.5"
+                    >
+                      <div className="text-xs text-muted-foreground">
+                        {s.label}
+                      </div>
+                      <div className={cn("truncate text-title-sm", s.tone)}>
+                        {s.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {c.news.length > 0 && (
+                  <ul className="grid">
+                    {c.news.map((n, i) => (
+                      <li
+                        key={i}
+                        className="flex items-baseline gap-3 border-t border-hairline-soft py-2 text-body-sm first:border-t-0"
+                      >
+                        <Badge
+                          variant={
+                            n.tone === "bad" ? "destructive" : "secondary"
+                          }
+                        >
+                          {n.kind}
+                        </Badge>
+                        <span className="min-w-0 flex-1">{n.text}</span>
+                        <span className="text-xs whitespace-nowrap text-muted-foreground">
+                          {shortDate(n.at)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/orgs/${slug}/children/${c.id}`}
+                    className={buttonVariants({ size: "sm" })}
+                  >
+                    Open
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

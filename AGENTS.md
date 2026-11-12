@@ -282,13 +282,15 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - `teacher`: a teaching role (`attendance.mark` / `teaching.log`) given for particular groups;
   - `student`: an active member sitting in a group and holding no permissions;
   - `parent`: linked to a child, with the Parent accounts module on.
-- **The home** (`GET /orgs/:slug/home`, `orgHome`) computes only the views the person has. Someone with both admin and teacher views switches between them with tabs. For now, students, parents and visitors still get the public profile at `/orgs/:slug`.
+- **The home** (`GET /orgs/:slug/home`, `orgHome`) computes only the views the person has, and someone with several switches between them with tabs. Everyone with a view gets the home at `/orgs/:slug`; visitors get the public profile.
   - **School view:**
     - the setup checklist, shown until every step is done, with steps only for modules that are on;
     - students, teachers, classes and present today. Students are members holding no role, and teachers hold a teaching role that isn't owner or admin;
     - attendance class by class today, the last ten days with registers (a shadcn Chart);
     - needs attention, coverage, and shortcuts limited by permission.
   - **Teaching view:** today's lessons from the timetable, registers to take, students below 75% (four or more marks), and their classes.
+  - **Student view** ("My progress"): built by calling the student's own class functions as them (`classAttendance`, `classTimetable`, `classStream`, `listAssignments`, `listContests`, `campusOf`). It shows attendance across their classes, work due this week, today's lessons, what's coming up (work, contests within 14 days, library books), notices across their classes, and bus, room and library.
+  - **Parent view** ("My children"): one card per linked child from `childOverview`, with attendance, an "Absent today" alert, open work, bus, the latest absences and notices, and a link to the child's page.
 - Built only from shadcn components (Card, Badge, Progress, Chart, Empty, Skeleton, Tabs, Sidebar) and Gretlab's theme tokens. The sidebar and chart tokens are in `packages/ui/src/styles/globals.css`. Add components with the shadcn CLI from `packages/ui` and never overwrite existing ones.
 
 ## Organizations and permissions

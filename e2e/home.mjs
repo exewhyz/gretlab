@@ -1,8 +1,10 @@
 /**
- * The school's home: who gets which view (admin, teacher; students and parents keep the
- * public page for now), the admin numbers against the seeded school (students, teachers,
+ * The school's home: who gets which view (admin, teacher, student, parent; a visitor gets
+ * the public page), the admin numbers against the seeded school (students, teachers,
  * classes, present today, open registers, the setup checklist, needs attention, coverage),
- * the teacher's day from the timetable, their classes and to-dos, the sidebar's groups by
+ * the teacher's day from the timetable, their classes and to-dos, a student's week (their
+ * own class, today's lessons, attendance, notices), a parent's children (absent today),
+ * the sidebar's groups by
  * permission, and every width (PC, laptop, tablet, phone) without sideways scrolling.
  *   node e2e/home.mjs [base-url] [screenshot-dir]
  */
@@ -86,6 +88,19 @@ check("the teacher's day comes from the timetable, with the break between", t.pe
 check("only their own classes", t.classes.map((c) => c.name).sort().join() === "Grade 3 · A,Grade 5 · A")
 check("registers to take and students below 75%", t.tiles.toTake === 1 && t.tiles.low >= 1 && t.todo.some((x) => x.kind === "Register"), JSON.stringify(t.tiles))
 
+// ---------- a student and a parent
+psql(`insert into users(email,name,role,handle) values ('gf-out@example.com','Outsider','student','gf-out') on conflict do nothing`)
+await teacherC(`${O}/classes/${a3.id}/stream`, { body: { text: "Bring your maths books tomorrow" } })
+const sh = (await student(`${O}/home`))?.student
+check("a student's home shows their own class", sh?.classes.length === 1 && sh.classes[0].name === "Grade 3 · A", JSON.stringify(sh?.classes))
+check("...today's lessons from the class timetable", sh?.lessons.length === 1 && sh.lessons[0].subject === "Mathematics", JSON.stringify(sh?.lessons))
+check("...their attendance", typeof sh?.tiles.attendance === "number" && sh.tiles.attendance < 100)
+check("...and their class's notices", sh?.notices.some((n) => n.text === "Bring your maths books tomorrow"))
+const ph = (await parent(`${O}/home`))?.parent
+check("a parent's home shows their child", ph?.children.length === 1 && ph.children[0].name === "Asha K", JSON.stringify(ph?.children?.map((c) => c.name)))
+check("...absent today, with the news", ph?.children[0].absentToday === true && ph.children[0].news.some((n) => n.kind === "Absent"))
+check("a parent sees no school or teaching data", (await parent(`${O}/home`))?.admin === null && (await parent(`${O}/home`))?.teacher === null)
+
 // ---------- the pages, at every width
 const browser = await chromium.launch()
 const view = async (email, width) => {
@@ -119,10 +134,28 @@ const tnav = await tp.locator('nav[aria-label="Organization"]').innerText()
 check("a teacher's sidebar leaves out what they can't open", !tnav.includes("Settings") && !tnav.includes("Invites") && !tnav.includes("Import") && tnav.includes("Attendance"), tnav.replace(/\n/g, " | ").slice(0, 300))
 check("the teacher sees their day and classes", (await tp.getByTestId("my-class-card").count()) === 2 && (await tp.getByTestId("my-day").innerText()).includes("Take register"))
 await tp.screenshot({ path: SHOTS + "home-teacher.png", fullPage: true })
-const sp = await view("gf-2@example.com", 1440)
-await sp.goto(`${BASE}${O}`)
-await sp.waitForLoadState("networkidle")
-check("a student still gets the public page for now", (await sp.getByTestId("org-home").count()) === 0)
+for (const width of [1440, 390]) {
+  const sp = await view("gf-2@example.com", width)
+  await sp.goto(`${BASE}${O}`)
+  await sp.getByTestId("student-home").waitFor({ timeout: 30000 })
+  check(`a student's home fits at ${width}px`, await sp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+  if (width === 1440) {
+    check("a student's sidebar has their learning links", (await sp.locator('nav[aria-label="Organization"]').innerText()).includes("My classes"))
+    await sp.screenshot({ path: SHOTS + "home-student.png", fullPage: true })
+  }
+  const pp = await view("gf-parent@example.com", width)
+  await pp.goto(`${BASE}${O}`)
+  await pp.getByTestId("child-card").waitFor({ timeout: 30000 })
+  check(`a parent's home fits at ${width}px`, await pp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+  if (width === 1440) {
+    check("the child card says absent today", (await pp.getByTestId("child-card").innerText()).includes("Absent today"))
+    await pp.screenshot({ path: SHOTS + "home-parent.png", fullPage: true })
+  }
+}
+const vp = await view("gf-out@example.com", 1440)
+await vp.goto(`${BASE}${O}`)
+await vp.waitForLoadState("networkidle")
+check("a visitor gets the public page", (await vp.getByTestId("org-home").count()) === 0)
 const mp = await view("gf-0@example.com", 1440)
 await mp.goto(`${BASE}${O}/manage/members`)
 await mp.locator('nav[aria-label="Organization"]').waitFor({ timeout: 30000 })
