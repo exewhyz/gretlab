@@ -57,6 +57,7 @@ function useSections(): NavItem[] {
           { href: "/playground", label: "Playground" },
         ]
       : [
+          user && { href: "/home", label: "Home" },
           viewer?.features.practice && {
             href: "/problems",
             label: "Problems",

@@ -396,6 +396,17 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - `students/id-cards/pdf?groupId`: a section's current-year students, ten 85.6 × 54 mm cards to an A4 sheet; audited `records.id_cards`.
 - **Buttons:** Download PDF on the report card page, "All report cards (PDF)" on an exam's Results tab, Transfer certificates on a student's profile (issue and print, and the list), and "ID cards (PDF)" on Students once a section is chosen.
 
+## The member's home (/home)
+
+- Signed-in people land on `/home` from `/`; visitors still go to the problems (or contests when practice is off). The header's main navigation starts with Home for signed-in people (Learn mode).
+- `memberDashboard()` in `features/me/dashboard.ts` gathers, from what already exists:
+  - their schools (`myOrganizations`, active ones, plus requests waiting) and children (`myChildren`);
+  - work due (`listAssignments`: open and unfinished, due this week, overdue late work, the next five);
+  - contests live or starting within three weeks (`listContests`);
+  - practice (`getProfile`: solved by level, the streak, twelve weeks of activity, recent solves) and the daily challenge (`getDaily`).
+  - A part whose site feature is off is left out, and a part that fails never breaks the page.
+- The page (`features/me/components/home.tsx`) has a greeting, tiles (due this week, overdue, solved, streak), Due next with progress, Contests, Today's challenge, Practice with a heatmap, and the schools and children as cards.
+
 ## The school home and frame
 
 - **The frame.** Every school page (the home at `/orgs/:slug` and all of `/orgs/:slug/manage/*`) sits in `OrgShell` (`features/home/components/org-shell.tsx`), built on shadcn's Sidebar (`packages/ui`):
@@ -620,6 +631,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
   - The pages and the add sheet, at laptop and phone width.
 - `e2e/promotion.mjs`: import (bad rows refused, nothing half-written, scoped to the importer's grade), creating records for existing members, the promotion plan's suggestions, a preview, applying with exceptions, running twice, making the new year current, who may promote, and the wizard at laptop and phone width.
+- `e2e/member-home.mjs`: where `/` leads (visitors, signed in), what the home gathers (schools and requests waiting, a parent's child, practice, work and contests), features switched off, no home for visitors; the page at laptop and phone width with Home in the header.
 - `e2e/pdfs.mjs`: report cards for the student, parent and staff (nobody else); a class's report cards; names outside the fonts; transfer certificates (who may issue and print, dates, numbering, marking transferred, sealed as issued, the log); ID cards; the buttons. Each PDF is opened with pdf-lib to check it's valid, with the right page count and title.
 - `e2e/admissions.mjs`:
   - Closed by default; opening (who may, a year, grades only); applying (checks, duplicates, five at most, numbers per year, sealed details); the office told, the list, filters, search, the sidebar and home counts.
