@@ -345,6 +345,18 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - Marks entry (`/manage/exams/[id]/papers/[paperId]`): Enter moves to the next student, bad marks are flagged before saving, and leaving with unsaved marks warns.
   - The report card at `/orgs/[slug]/results/[studentId]` (`me` for your own): printable. Linked from the student's sidebar (Results), the parent's child page and the staff student profile.
 
+- **Grading by kind** (`KindDefinition.grading`): schools, coaching institutes and other organizations grade by marks (the CBSE scale by default); colleges by credits (the UGC ten-point scale O, A+, A, B+, B, C, P, F by default; `defaultScale`, `readExamSettings(…, grading)`).
+- **Terms** (`academic_terms`, "Semesters" in a college, "Terms" in a school, from the kind's `terms.parts`):
+  - Managed on the Exams page (add, rename, remove). Removing one leaves its exams without a term.
+  - An exam may belong to a term (`term_exams.term_id`, which must be in the exam's year).
+- **Credits** (colleges): courses (`subjects.credits`, whole or halves up to 40) carry credits.
+  - In each term, a course's percentage is that term's exams weighted (averaged when none has a weight), graded on the scale with its points.
+  - The term's SGPA is credits × points over credits, to two decimals. A course at 0 points (F) is a backlog and its credits aren't earned.
+  - The CGPA weighs every term so far by its credits, from the years the viewer may see.
+  - `sgpa()`, `cgpa()` and `creditsProblem()` are in `results.ts`, unit-tested. `reportCard().credits` carries the year's grade cards and the CGPA.
+  - The report card page and its PDF show a grade card per term (code, course, credits, grade, points; SGPA, credits earned, backlogs) and the CGPA above the marks. A class's PDF shows the grade cards without the CGPA.
+- **The kind's words on the pages:** Exams is titled with `terms.assessments` (Assessments, Tests), Students with `terms.learners`, Academic years with `terms.periods`.
+
 ## Leave (module)
 
 - On by default for schools and colleges. Code in `features/leave`; rules in `packages/judge/src/leave.ts`, unit-tested. The rules cover school days in a span (the timetable's days, Mon–Fri by default), half days (0.5), a request's limits (at most 90 days at once, at most 30 days after the fact), overlaps, staff leave types and balances.
@@ -652,6 +664,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
   - The pages and the add sheet, at laptop and phone width.
 - `e2e/promotion.mjs`: import (bad rows refused, nothing half-written, scoped to the importer's grade), creating records for existing members, the promotion plan's suggestions, a preview, applying with exceptions, running twice, making the new year current, who may promote, and the wizard at laptop and phone width.
+- `e2e/college.mjs`: courses with credits (halves only; schools don't ask); semesters (once per year, an exam's must be the year's, removing one keeps its exams); mid- and end-semester weights into each course's grade on the UGC scale; SGPA per semester (9.47, 8.82), a failed course as a backlog, the CGPA by credits; the grade card on the page, in the PDF and on a phone; schools keep percentages; the college's words.
 - `e2e/org-kinds.mjs`: each kind's levels and role names; the kind locked (platform admins too); modules limited by kind; the platform's per-kind policy applied to existing organizations at once, by staff allowed to, audited; the kind's words in the frame and homes; the create form's picker, warning and confirmation; the admin's kinds page; Settings showing the kind read-only. It puts the policies back through the API (clearing the server's cache) before its clean-up.
 - `e2e/links.mjs`: every link works for the person it's shown to. As the platform admin, a school owner, a teacher, office staff, a student and a parent it opens their home and follows the links on each page (one page of each kind, ids collapsed, up to `LINKS_LIMIT` pages), failing on any error status, sign-in bounce, or a "not found" / "not part of your role" page. Download links under `/api/` must answer 200. `LINKS_DUMP=file` writes the pages reached, to compare against all pages for ones nothing links to.
 - `e2e/member-home.mjs`: where `/` leads (visitors, signed in), what the home gathers (schools and requests waiting, a parent's child, practice, work and contests), features switched off, no home for visitors; the page at laptop and phone width with Home in the header.

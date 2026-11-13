@@ -28,6 +28,8 @@ export const college = {
     groupLead: "Faculty advisor",
     period: "Academic year",
     periods: "Academic years",
+    part: "Semester",
+    parts: "Semesters",
     assessment: "Assessment",
     assessments: "Assessments",
   },
@@ -57,6 +59,7 @@ export const college = {
     "timetable",
     "subjects",
   ],
+  grading: "credits",
   roleNames: {
     owner: "Owner",
     admin: "Admin",

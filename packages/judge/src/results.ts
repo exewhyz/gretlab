@@ -24,6 +24,26 @@ export const DEFAULT_SCALE: GradeBand[] = [
   { min: 0, grade: "E", points: null },
 ]
 
+/**
+ * The UGC's ten-point letter grades for credit-based colleges (cut-offs vary by university;
+ * this is a common one). F carries 0 points: the course is failed and its credits not earned.
+ */
+export const UGC_SCALE: GradeBand[] = [
+  { min: 90, grade: "O", points: 10 },
+  { min: 80, grade: "A+", points: 9 },
+  { min: 70, grade: "A", points: 8 },
+  { min: 60, grade: "B+", points: 7 },
+  { min: 55, grade: "B", points: 6 },
+  { min: 50, grade: "C", points: 5 },
+  { min: 40, grade: "P", points: 4 },
+  { min: 0, grade: "F", points: 0 },
+]
+
+/** The scale an organization starts with: by its kind's way of grading. */
+export const defaultScale = (
+  grading: "marks" | "credits" | "none" = "marks"
+) => (grading === "credits" ? UGC_SCALE : DEFAULT_SCALE)
+
 /** Ready-made remarks a school starts with; {name} becomes the student's first name. */
 export const DEFAULT_REMARKS = [
   "{name} works hard and is a pleasure to teach.",
@@ -46,52 +66,80 @@ export interface ResultsSettings {
 }
 
 /** The module's settings (organizations.module_settings.exams), with defaults. */
-export function readExamSettings(moduleSettings: unknown): ResultsSettings {
-  const raw = (moduleSettings as { exams?: { scale?: unknown; remarks?: unknown } } | null)?.exams
+export function readExamSettings(
+  moduleSettings: unknown,
+  grading: "marks" | "credits" | "none" = "marks"
+): ResultsSettings {
+  const raw = (
+    moduleSettings as { exams?: { scale?: unknown; remarks?: unknown } } | null
+  )?.exams
   const scale = Array.isArray(raw?.scale) ? (raw.scale as GradeBand[]) : null
   const remarks = Array.isArray(raw?.remarks)
-    ? (raw.remarks as unknown[]).filter((r): r is string => typeof r === "string")
+    ? (raw.remarks as unknown[]).filter(
+        (r): r is string => typeof r === "string"
+      )
     : null
   return {
-    scale: scale && !scaleProblem(scale) ? sortScale(scale) : DEFAULT_SCALE,
+    scale:
+      scale && !scaleProblem(scale) ? sortScale(scale) : defaultScale(grading),
     remarks: remarks ?? DEFAULT_REMARKS,
   }
 }
 
 /** A remark from the bank for one student: {name} is their first name. */
 export const fillRemark = (template: string, fullName: string) =>
-  template.replaceAll("{name}", fullName.trim().split(/\s+/)[0] || "The student")
+  template.replaceAll(
+    "{name}",
+    fullName.trim().split(/\s+/)[0] || "The student"
+  )
 
 /** A comment bank cleaned up: trimmed, no blanks or repeats, at most 100 of 300 characters. */
-export function cleanRemarkBank(remarks: string[]): { bank: string[]; problem: string | null } {
+export function cleanRemarkBank(remarks: string[]): {
+  bank: string[]
+  problem: string | null
+} {
   const seen = new Set<string>()
   const bank: string[] = []
   for (const r of remarks) {
     const text = r.trim().replace(/\s+/g, " ")
     if (!text || seen.has(text.toLowerCase())) continue
-    if (text.length > 300) return { bank, problem: "Keep each remark to 300 characters." }
+    if (text.length > 300)
+      return { bank, problem: "Keep each remark to 300 characters." }
     seen.add(text.toLowerCase())
     bank.push(text)
   }
-  if (bank.length > 100) return { bank, problem: "At most 100 remarks in the bank." }
+  if (bank.length > 100)
+    return { bank, problem: "At most 100 remarks in the bank." }
   return { bank, problem: null }
 }
 
-export const sortScale = (scale: GradeBand[]) => [...scale].sort((a, b) => b.min - a.min)
+export const sortScale = (scale: GradeBand[]) =>
+  [...scale].sort((a, b) => b.min - a.min)
 
 /** Why a grading scale can't be used, or null. */
 export function scaleProblem(scale: GradeBand[]): string | null {
-  if (scale.length < 2 || scale.length > 20) return "A scale has 2 to 20 grades."
+  if (scale.length < 2 || scale.length > 20)
+    return "A scale has 2 to 20 grades."
   const grades = new Set<string>()
   const mins = new Set<number>()
   for (const b of scale) {
     const grade = typeof b.grade === "string" ? b.grade.trim() : ""
-    if (!grade || grade.length > 12) return "Name every grade, in at most 12 characters."
-    if (typeof b.min !== "number" || !Number.isFinite(b.min) || b.min < 0 || b.min > 100)
+    if (!grade || grade.length > 12)
+      return "Name every grade, in at most 12 characters."
+    if (
+      typeof b.min !== "number" ||
+      !Number.isFinite(b.min) ||
+      b.min < 0 ||
+      b.min > 100
+    )
       return "Each grade starts at a percentage from 0 to 100."
-    if (b.points != null && (typeof b.points !== "number" || b.points < 0 || b.points > 100))
+    if (
+      b.points != null &&
+      (typeof b.points !== "number" || b.points < 0 || b.points > 100)
+    )
       return "Grade points are a number from 0 to 100."
-    if (grades.has(grade.toLowerCase())) return `"${grade}" is in the scale twice.`
+    if (grades.has(grade.toLowerCase()))
+      return `"${grade}" is in the scale twice.`
     if (mins.has(b.min)) return `Two grades start at ${b.min}%.`
     grades.add(grade.toLowerCase())
     mins.add(b.min)
@@ -106,13 +154,21 @@ export function bandFor(scale: GradeBand[], percent: number): GradeBand {
   return sorted.find((b) => percent >= b.min) ?? sorted[sorted.length - 1]!
 }
 
-export const gradeFor = (scale: GradeBand[], percent: number) => bandFor(scale, percent).grade
+export const gradeFor = (scale: GradeBand[], percent: number) =>
+  bandFor(scale, percent).grade
 
 /** Why a paper's full and pass marks don't work, or null. */
-export function paperProblem(p: { maxMarks: number; passMarks: number }): string | null {
+export function paperProblem(p: {
+  maxMarks: number
+  passMarks: number
+}): string | null {
   if (!Number.isInteger(p.maxMarks) || p.maxMarks < 1 || p.maxMarks > 1000)
     return "Full marks are a whole number from 1 to 1000."
-  if (!Number.isFinite(p.passMarks) || p.passMarks < 0 || p.passMarks > p.maxMarks)
+  if (
+    !Number.isFinite(p.passMarks) ||
+    p.passMarks < 0 ||
+    p.passMarks > p.maxMarks
+  )
     return "Pass marks are from 0 to the full marks."
   return null
 }
@@ -156,16 +212,40 @@ export interface ExamSummary {
 }
 
 /** A student's result over their papers in one exam. An absence counts as 0 and a fail. */
-export function summarize(papers: PaperMark[], scale: GradeBand[]): ExamSummary {
+export function summarize(
+  papers: PaperMark[],
+  scale: GradeBand[]
+): ExamSummary {
   if (papers.length === 0)
-    return { obtained: 0, maxMarks: 0, percent: null, grade: null, result: "none", failed: 0 }
+    return {
+      obtained: 0,
+      maxMarks: 0,
+      percent: null,
+      grade: null,
+      result: "none",
+      failed: 0,
+    }
   const outcomes = papers.map(paperOutcome)
-  const obtained = papers.reduce((s, p) => s + (p.absent ? 0 : (p.marks ?? 0)), 0)
+  const obtained = papers.reduce(
+    (s, p) => s + (p.absent ? 0 : (p.marks ?? 0)),
+    0
+  )
   const maxMarks = papers.reduce((s, p) => s + p.maxMarks, 0)
   const percent = round1((100 * obtained) / maxMarks)
   const failed = outcomes.filter((o) => o === "fail" || o === "absent").length
-  const result = outcomes.includes("pending") ? "incomplete" : failed ? "fail" : "pass"
-  return { obtained, maxMarks, percent, grade: gradeFor(scale, percent), result, failed }
+  const result = outcomes.includes("pending")
+    ? "incomplete"
+    : failed
+      ? "fail"
+      : "pass"
+  return {
+    obtained,
+    maxMarks,
+    percent,
+    grade: gradeFor(scale, percent),
+    result,
+    failed,
+  }
 }
 
 /**
@@ -174,7 +254,9 @@ export function summarize(papers: PaperMark[], scale: GradeBand[]): ExamSummary 
  * 70 work as well as 3 and 7; an exam the student has no papers in drops out and the rest
  * are scaled up. null when nothing counts.
  */
-export function weighted(parts: { weight: number; percent: number | null }[]): number | null {
+export function weighted(
+  parts: { weight: number; percent: number | null }[]
+): number | null {
   const counted = parts.filter((p) => p.weight > 0 && p.percent != null)
   const total = counted.reduce((s, p) => s + p.weight, 0)
   if (total === 0) return null
@@ -182,7 +264,9 @@ export function weighted(parts: { weight: number; percent: number | null }[]): n
 }
 
 /** Competition ranks (1, 2, 2, 4) by score, highest first; those without a score get none. */
-export function ranks(scores: { id: string; score: number | null }[]): Map<string, number> {
+export function ranks(
+  scores: { id: string; score: number | null }[]
+): Map<string, number> {
   const scored = scores
     .filter((s): s is { id: string; score: number } => s.score != null)
     .sort((a, b) => b.score - a.score)
@@ -202,9 +286,59 @@ export function examProblem(e: {
   weight: number
 }): string | null {
   const name = e.name.trim()
-  if (name.length < 2 || name.length > 60) return "Name the exam in 2 to 60 characters."
+  if (name.length < 2 || name.length > 60)
+    return "Name the exam in 2 to 60 characters."
   if (!Number.isInteger(e.weight) || e.weight < 0 || e.weight > 100)
     return "The weight is a whole number from 0 to 100."
-  if (e.startsOn && e.endsOn && e.endsOn < e.startsOn) return "The exam can't end before it starts."
+  if (e.startsOn && e.endsOn && e.endsOn < e.startsOn)
+    return "The exam can't end before it starts."
+  return null
+}
+
+/* ---------- credits: SGPA and CGPA ---------- */
+
+/** One course in a semester: its credits and the grade points earned (null: no result yet). */
+export interface CreditCourse {
+  credits: number
+  points: number | null
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100
+
+/**
+ * A semester's grade point average: credits × points over the credits, for courses with a
+ * result and credits (two decimals, as transcripts show). Earned credits leave out failed
+ * courses (0 points). null when nothing counts yet.
+ */
+export function sgpa(courses: CreditCourse[]) {
+  const counted = courses.filter((c) => c.credits > 0 && c.points != null)
+  const credits = counted.reduce((s, c) => s + c.credits, 0)
+  if (credits === 0) return null
+  return {
+    sgpa: round2(
+      counted.reduce((s, c) => s + c.credits * c.points!, 0) / credits
+    ),
+    credits,
+    earned: counted
+      .filter((c) => c.points! > 0)
+      .reduce((s, c) => s + c.credits, 0),
+    backlogs: counted.filter((c) => c.points === 0).length,
+  }
+}
+
+/** The cumulative average: each semester's SGPA weighted by its credits. */
+export function cgpa(semesters: { sgpa: number; credits: number }[]) {
+  const credits = semesters.reduce((s, t) => s + t.credits, 0)
+  if (credits === 0) return null
+  return round2(semesters.reduce((s, t) => s + t.sgpa * t.credits, 0) / credits)
+}
+
+/** Why a course's credits can't be saved, or null: up to 40, in halves. */
+export function creditsProblem(credits: number | null) {
+  if (credits == null) return null
+  if (!Number.isFinite(credits) || credits < 0 || credits > 40)
+    return "Credits are from 0 to 40."
+  if (Math.round(credits * 2) !== credits * 2)
+    return "Credits go in halves at most."
   return null
 }

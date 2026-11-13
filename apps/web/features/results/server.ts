@@ -1,4 +1,5 @@
 import {
+  academicTerms,
   academicYears,
   classSubjects,
   classTeachers,
@@ -18,9 +19,11 @@ import {
 } from "@workspace/db"
 import {
   bandFor,
+  cgpa,
   cleanRemarkBank,
   enabledModules,
   examProblem,
+  KINDS,
   markProblem,
   paperOutcome,
   paperProblem,
@@ -30,6 +33,7 @@ import {
   scaleProblem,
   sortScale,
   SUBJECT_REMARK_MAX,
+  sgpa,
   summarize,
   weighted,
   type GradeBand,
@@ -79,8 +83,18 @@ export const examSchema = z.object({
   startsOn: optionalDay,
   endsOn: optionalDay,
   weight: z.number().int().min(0).max(100).default(0),
+  /** The term (semester) it's part of; null for none. */
+  termId: z.uuid().nullable().optional(),
 })
 export const examPatchSchema = examSchema.omit({ yearId: true }).partial()
+
+export const termSchema = z.object({
+  yearId: z.uuid(),
+  name: z.string().trim().min(2, "Name the term").max(40),
+  startsOn: optionalDay,
+  endsOn: optionalDay,
+})
+export const termPatchSchema = termSchema.omit({ yearId: true }).partial()
 
 export const scaleSchema = z.object({
   remarks: z.array(z.string().max(1000)).max(200).optional(),
@@ -194,7 +208,8 @@ function leavesOf(ctx: OrgContext, groupIds: string[]) {
   return [...out]
 }
 
-const settingsOf = (ctx: OrgContext) => readExamSettings(ctx.org.moduleSettings)
+const settingsOf = (ctx: OrgContext) =>
+  readExamSettings(ctx.org.moduleSettings, KINDS[ctx.org.type].grading)
 
 /** The subject teacher of each (class, subject), looking up the class's grades too. */
 async function subjectTeachers(ctx: OrgContext, groupIds: string[]) {
@@ -401,6 +416,110 @@ async function yearsOf(orgId: string) {
     .orderBy(desc(academicYears.startsOn))
 }
 
+/* ---------- terms (semesters) ---------- */
+
+async function termsOf(yearId: string) {
+  return getDb()
+    .select()
+    .from(academicTerms)
+    .where(eq(academicTerms.yearId, yearId))
+    .orderBy(
+      asc(academicTerms.position),
+      asc(academicTerms.startsOn),
+      asc(academicTerms.createdAt)
+    )
+}
+
+/** Adds a term to a year: Semester 1, Term 2. */
+export async function addTerm(
+  slug: string,
+  user: User,
+  input: z.infer<typeof termSchema>
+) {
+  const ctx = await context(slug, user)
+  if (!canSetup(ctx))
+    throw forbidden("Only those who set up exams can add terms.")
+  const [year] = await getDb()
+    .select()
+    .from(academicYears)
+    .where(
+      and(
+        eq(academicYears.id, input.yearId),
+        eq(academicYears.orgId, ctx.org.id)
+      )
+    )
+  if (!year) throw notFound("Year not found")
+  if (input.startsOn && input.endsOn && input.endsOn < input.startsOn)
+    throw new ApiError(400, "bad_term", "A term can't end before it starts.")
+  const position = (await termsOf(year.id)).length
+  try {
+    const [term] = await getDb()
+      .insert(academicTerms)
+      .values({ ...input, orgId: ctx.org.id, position })
+      .returning()
+    await writeAudit(ctx, "exam.term", `Added ${input.name} to ${year.name}`, {
+      termId: term!.id,
+    })
+    return { id: term!.id }
+  } catch (error) {
+    if (duplicate(error))
+      throw conflict("duplicate", `${year.name} already has ${input.name}.`)
+    throw error
+  }
+}
+
+async function ownTerm(ctx: OrgContext, id: string) {
+  if (!z.uuid().safeParse(id).success) throw notFound("Term not found")
+  const [term] = await getDb()
+    .select()
+    .from(academicTerms)
+    .where(and(eq(academicTerms.id, id), eq(academicTerms.orgId, ctx.org.id)))
+  if (!term) throw notFound("Term not found")
+  return term
+}
+
+export async function updateTerm(
+  slug: string,
+  user: User,
+  id: string,
+  input: z.infer<typeof termPatchSchema>
+) {
+  const ctx = await context(slug, user)
+  if (!canSetup(ctx))
+    throw forbidden("Only those who set up exams can change terms.")
+  const term = await ownTerm(ctx, id)
+  const next = { ...term, ...input }
+  if (next.startsOn && next.endsOn && next.endsOn < next.startsOn)
+    throw new ApiError(400, "bad_term", "A term can't end before it starts.")
+  try {
+    await getDb()
+      .update(academicTerms)
+      .set(input)
+      .where(eq(academicTerms.id, id))
+  } catch (error) {
+    if (duplicate(error))
+      throw conflict("duplicate", `That year already has ${next.name}.`)
+    throw error
+  }
+  await writeAudit(ctx, "exam.term", `Changed the term ${next.name}`, {
+    termId: id,
+  })
+  return { ok: true }
+}
+
+/** Removes a term; its exams stay, without a term. */
+export async function deleteTerm(slug: string, user: User, id: string) {
+  const ctx = await context(slug, user)
+  if (!canSetup(ctx))
+    throw forbidden("Only those who set up exams can remove terms.")
+  const term = await ownTerm(ctx, id)
+  await getDb().delete(academicTerms).where(eq(academicTerms.id, id))
+  await writeAudit(ctx, "exam.term_delete", `Removed the term ${term.name}`, {
+    termId: id,
+  })
+  return { ok: true }
+}
+
 /** The exams of a year (the current one by default), with how far marking has got. */
 export async function listExams(slug: string, user: User, yearId?: string) {
   const ctx = await context(slug, user)
@@ -436,17 +555,28 @@ export async function listExams(slug: string, user: User, yearId?: string) {
           .groupBy(examPapers.examId),
       ])
     : [[], []]
+  const terms = year ? await termsOf(year.id) : []
   return {
     years,
     year,
     canSetup: canSetup(ctx),
     scale: settingsOf(ctx).scale,
+    grading: KINDS[ctx.org.type].grading,
+    words: KINDS[ctx.org.type].terms,
+    terms: terms.map((t) => ({
+      id: t.id,
+      name: t.name,
+      startsOn: t.startsOn,
+      endsOn: t.endsOn,
+    })),
     exams: exams.map((e) => ({
       id: e.id,
       name: e.name,
       startsOn: e.startsOn,
       endsOn: e.endsOn,
       weight: e.weight,
+      termId: e.termId,
+      term: terms.find((t) => t.id === e.termId)?.name ?? null,
       published: e.publishedAt != null,
       papers: Number(papers.find((p) => p.examId === e.id)?.n ?? 0),
       marks: Number(entered.find((p) => p.examId === e.id)?.n ?? 0),
@@ -474,6 +604,11 @@ export async function addExam(
   if (!year) throw notFound("Year not found")
   const problem = examProblem(input)
   if (problem) throw new ApiError(400, "bad_exam", problem)
+  if (
+    input.termId &&
+    !(await termsOf(year.id)).some((t) => t.id === input.termId)
+  )
+    throw new ApiError(400, "bad_term", "Choose a term of that year.")
   try {
     const [exam] = await getDb()
       .insert(termExams)
@@ -511,6 +646,11 @@ export async function updateExam(
   const next = { ...exam, ...input }
   const problem = examProblem(next)
   if (problem) throw new ApiError(400, "bad_exam", problem)
+  if (
+    input.termId &&
+    !(await termsOf(exam.yearId)).some((t) => t.id === input.termId)
+  )
+    throw new ApiError(400, "bad_term", "Choose a term of that year.")
   try {
     await getDb().update(termExams).set(input).where(eq(termExams.id, id))
   } catch (error) {
@@ -714,6 +854,7 @@ export async function getExam(slug: string, user: User, id: string) {
       startsOn: exam.startsOn,
       endsOn: exam.endsOn,
       weight: exam.weight,
+      termId: exam.termId,
       published: exam.publishedAt != null,
       publishedAt: exam.publishedAt?.toISOString() ?? null,
     },
@@ -1500,10 +1641,171 @@ export async function reportCard(
       },
     ]
   )
+  // Credit-graded kinds (colleges): each term's grade card, and the CGPA so far.
+  let credits: Awaited<ReturnType<typeof creditCard>> | null = null
+  if (KINDS[ctx.org.type].grading === "credits") {
+    const earlier = shown.filter((y) => y.startsOn < year.startsOn && y.groupId)
+    const before = await Promise.all(
+      earlier.map(async (y) => {
+        const ex = await db
+          .select()
+          .from(termExams)
+          .where(
+            and(
+              eq(termExams.yearId, y.id),
+              staff(y.groupId) ? undefined : isNotNull(termExams.publishedAt)
+            )
+          )
+        const [c] = await composeCards(
+          ctx,
+          { id: y.id, name: y.name, groupId: y.groupId },
+          ex,
+          [
+            {
+              id,
+              name: "",
+              admissionNo: null,
+              rollNo: y.rollNo,
+              status: y.status,
+            },
+          ]
+        )
+        return { yearId: y.id, card: c! }
+      })
+    )
+    credits = await creditCard(
+      ctx,
+      [...before, { yearId: year.id, card: card! }],
+      year.id
+    )
+  }
   return {
     ...card!,
+    credits,
     years: shown.map((y) => ({ id: y.id, name: y.name })),
     viewer: isSelf ? "student" : isParent ? "parent" : "staff",
+  }
+}
+
+/**
+ * Grade cards by term for credit-graded kinds: in each term, a course's percentage is its
+ * exams in that term weighted (or averaged, with no weights), graded on the scale with its
+ * points; the term's SGPA weighs points by the course's credits; the CGPA weighs every
+ * term so far by its credits. Only the asked-for year's terms are listed.
+ */
+async function creditCard(
+  ctx: OrgContext,
+  years: { yearId: string; card: ReportCardData }[],
+  showYear: string
+) {
+  const scale = settingsOf(ctx).scale
+  const subjectIds = [
+    ...new Set(years.flatMap((y) => y.card.subjects.map((s) => s.subjectId))),
+  ]
+  const yearIds = years.map((y) => y.yearId)
+  const [info, terms] = await Promise.all([
+    subjectIds.length
+      ? getDb()
+          .select({
+            id: subjects.id,
+            code: subjects.code,
+            credits: subjects.credits,
+          })
+          .from(subjects)
+          .where(inArray(subjects.id, subjectIds))
+      : [],
+    getDb()
+      .select()
+      .from(academicTerms)
+      .where(inArray(academicTerms.yearId, yearIds))
+      .orderBy(asc(academicTerms.position), asc(academicTerms.createdAt)),
+  ])
+  const all: {
+    id: string
+    name: string
+    yearId: string
+    courses: {
+      subjectId: string
+      code: string
+      name: string
+      credits: number | null
+      percent: number | null
+      grade: string | null
+      points: number | null
+    }[]
+    sgpa: number | null
+    credits: number
+    earned: number
+    backlogs: number
+  }[] = []
+  for (const y of years) {
+    const yearTerms = terms.filter((t) => t.yearId === y.yearId)
+    for (const t of yearTerms) {
+      const exams = y.card.exams.filter((e) => e.termId === t.id)
+      if (exams.length === 0) continue
+      const courses = y.card.subjects
+        .map((s) => {
+          const parts = exams.flatMap((e) => {
+            const p = e.papers.find((x) => x.subjectId === s.subjectId)
+            if (!p || (p.marks == null && !p.absent)) return []
+            return [
+              {
+                weight: e.weight,
+                percent: (100 * (p.absent ? 0 : p.marks!)) / p.maxMarks,
+              },
+            ]
+          })
+          if (
+            parts.length === 0 &&
+            !exams.some((e) =>
+              e.papers.some((p) => p.subjectId === s.subjectId)
+            )
+          )
+            return null
+          const weightedPct = weighted(parts)
+          const percent =
+            weightedPct ??
+            (parts.length
+              ? Math.round(
+                  (10 * parts.reduce((a, b) => a + b.percent, 0)) / parts.length
+                ) / 10
+              : null)
+          const band = percent == null ? null : bandFor(scale, percent)
+          const c = info.find((i) => i.id === s.subjectId)
+          return {
+            subjectId: s.subjectId,
+            code: c?.code ?? "",
+            name: s.name,
+            credits: c?.credits ?? null,
+            percent,
+            grade: band?.grade ?? null,
+            points: band ? (band.points ?? null) : null,
+          }
+        })
+        .filter((c): c is NonNullable<typeof c> => c !== null)
+      const s = sgpa(
+        courses.map((c) => ({ credits: c.credits ?? 0, points: c.points }))
+      )
+      all.push({
+        id: t.id,
+        name: t.name,
+        yearId: y.yearId,
+        courses,
+        sgpa: s?.sgpa ?? null,
+        credits: s?.credits ?? 0,
+        earned: s?.earned ?? 0,
+        backlogs: s?.backlogs ?? 0,
+      })
+    }
+  }
+  const done = all.filter((t) => t.sgpa != null) as {
+    sgpa: number
+    credits: number
+  }[]
+  return {
+    terms: all.filter((t) => t.yearId === showYear),
+    cgpa: cgpa(done),
+    earned: all.reduce((a, t) => a + t.earned, 0),
   }
 }
 
@@ -1580,6 +1882,7 @@ async function composeCards(
         id: e.id,
         name: e.name,
         weight: e.weight,
+        termId: e.termId,
         published: e.publishedAt != null,
         papers: sheet.papers.map((p, j) => ({
           subjectId: p.subjectId,
@@ -1650,6 +1953,7 @@ async function composeCards(
 }
 
 export type ReportCardData = Awaited<ReturnType<typeof composeCards>>[number]
+export type CreditCardData = Awaited<ReturnType<typeof creditCard>>
 
 /**
  * Report cards for every student of a class in a year (for printing them all). Staff who

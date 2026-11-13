@@ -27,6 +27,8 @@ export const coaching = {
     groupLead: "Batch coordinator",
     period: "Session",
     periods: "Sessions",
+    part: "Term",
+    parts: "Terms",
     assessment: "Test",
     assessments: "Tests",
   },
@@ -53,6 +55,7 @@ export const coaching = {
     "subjects",
     "parents",
   ],
+  grading: "marks",
   roleNames: {
     owner: "Owner",
     admin: "Admin",

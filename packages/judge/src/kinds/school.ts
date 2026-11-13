@@ -28,6 +28,8 @@ export const school = {
     groupLead: "Class teacher",
     period: "Academic year",
     periods: "Academic years",
+    part: "Term",
+    parts: "Terms",
     assessment: "Exam",
     assessments: "Exams",
   },
@@ -58,6 +60,7 @@ export const school = {
     "subjects",
     "parents",
   ],
+  grading: "marks",
   roleNames: {
     owner: "Owner",
     admin: "Admin",

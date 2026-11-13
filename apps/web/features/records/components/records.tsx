@@ -103,9 +103,11 @@ export function AcademicYears({ slug }: { slug: string }) {
   const { data, error } = useQuery({
     queryKey: key,
     queryFn: () =>
-      api<{ can: { years: boolean }; years: Year[] }>(
-        `/orgs/${slug}/academic-years`
-      ),
+      api<{
+        can: { years: boolean }
+        years: Year[]
+        terms?: { periods: string; groupLead: string }
+      }>(`/orgs/${slug}/academic-years`),
   })
   const [editing, setEditing] = useState<Year | "new" | null>(null)
   const [current, setCurrent] = useState<Year | null>(null)
@@ -147,7 +149,7 @@ export function AcademicYears({ slug }: { slug: string }) {
           )
         }
       >
-        Academic years
+        {data.terms?.periods ?? "Academic years"}
       </PageTitle>
       <p className="mb-4 max-w-2xl text-body-sm text-muted-foreground">
         Each student has a class for each year. The current year&apos;s classes
@@ -473,6 +475,7 @@ interface Row {
 }
 
 interface List {
+  terms?: { learners: string; groupLead: string }
   can: { view: boolean; edit: boolean; years: boolean }
   year: { id: string; name: string } | null
   total: number
@@ -546,7 +549,7 @@ export function Students({ slug }: { slug: string }) {
           </div>
         }
       >
-        Students
+        {data.terms?.learners ?? "Students"}
       </PageTitle>
       {data.year && <Unrecorded slug={slug} />}
       {!data.year && (

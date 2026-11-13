@@ -6,7 +6,7 @@ import {
   users,
   type User,
 } from "@workspace/db"
-import { enabledModules } from "@workspace/judge"
+import { KINDS } from "@workspace/judge"
 import { z } from "zod"
 
 import { teachersOfGroup } from "@/features/classes/server"
@@ -36,6 +36,14 @@ export const subjectSchema = z.object({
     .regex(/^[A-Za-z0-9_-]*$/, "Letters, digits, - and _ only")
     .default(""),
   description: z.string().trim().max(1000).default(""),
+  /** Credits, for kinds that grade by credits (a college course: 3, 4, 1.5). */
+  credits: z
+    .number()
+    .min(0)
+    .max(40)
+    .refine((n) => Math.round(n * 2) === n * 2, "Credits go in halves at most")
+    .nullable()
+    .default(null),
 })
 
 export const assignSchema = z.object({
@@ -137,6 +145,9 @@ export async function listSubjects(slug: string, user: User) {
   }
   return {
     can,
+    /** Credit-graded kinds (colleges) give each course its credits. */
+    usesCredits: KINDS[ctx.org.type].grading === "credits",
+    terms: KINDS[ctx.org.type].terms,
     levels: ctx.org.groupLevels,
     choosable: choosable.map((g) => g.id),
     groups: [...shown.values()].map((g) => ({
@@ -149,6 +160,7 @@ export async function listSubjects(slug: string, user: User) {
       name: s.name,
       code: s.code,
       description: s.description,
+      credits: s.credits,
       classes: uses
         .filter((u) => u.subjectId === s.id)
         .map((u) => ({

@@ -22,6 +22,7 @@ import {
   admissionPrefix,
   changesBetween,
   enabledModules,
+  KINDS,
   ENROLMENT_STATUSES,
   isNoLoginEmail,
   nextAdmissionNo,
@@ -196,6 +197,7 @@ export async function listYears(slug: string, user: User) {
       .groupBy(enrolments.yearId),
   ])
   return {
+    terms: KINDS[ctx.org.type].terms,
     can,
     years: years.map((y) => ({
       id: y.id,
@@ -432,6 +434,7 @@ export async function listStudents(
   )
   const page = Math.max(1, filters.page ?? 1)
   return {
+    terms: KINDS[ctx.org.type].terms,
     can,
     year: year ? { id: year.id, name: year.name } : null,
     total: visible.length,

@@ -31,6 +31,7 @@ interface Subject {
   name: string
   code: string
   description: string
+  credits: number | null
   classes: {
     id: string
     groupId: string
@@ -42,6 +43,7 @@ interface Subject {
 
 interface Data {
   can: { create: boolean; edit: boolean; delete: boolean; assign: boolean }
+  usesCredits?: boolean
   levels: string[]
   choosable: string[]
   groups: { id: string; name: string; parentId: string | null }[]
@@ -102,6 +104,14 @@ export function ManageSubjects({ slug }: { slug: string }) {
                     {s.code && (
                       <span className="ml-2 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-body">
                         {s.code}
+                      </span>
+                    )}
+                    {data.usesCredits && s.credits != null && (
+                      <span
+                        className="ml-2 text-caption"
+                        data-testid="subject-credits"
+                      >
+                        {s.credits} credit{s.credits === 1 ? "" : "s"}
                       </span>
                     )}
                   </div>
@@ -178,6 +188,7 @@ export function ManageSubjects({ slug }: { slug: string }) {
       {editing && (
         <SubjectDialog
           slug={slug}
+          usesCredits={Boolean(data.usesCredits)}
           subject={editing === "new" ? null : editing}
           onDone={() => {
             setEditing(null)
@@ -202,10 +213,12 @@ export function ManageSubjects({ slug }: { slug: string }) {
 
 function SubjectDialog({
   slug,
+  usesCredits,
   subject,
   onDone,
 }: {
   slug: string
+  usesCredits: boolean
   subject: Subject | null
   onDone: () => void
 }) {
@@ -213,15 +226,22 @@ function SubjectDialog({
     name: subject?.name ?? "",
     code: subject?.code ?? "",
     description: subject?.description ?? "",
+    credits: subject?.credits == null ? "" : String(subject.credits),
   })
+  const body = {
+    name: form.name,
+    code: form.code,
+    description: form.description,
+    credits: form.credits.trim() === "" ? null : Number(form.credits),
+  }
   const save = useMutation({
     mutationFn: () =>
       subject
         ? api(`/orgs/${slug}/subjects/${subject.id}`, {
             method: "PUT",
-            body: form,
+            body,
           })
-        : api(`/orgs/${slug}/subjects`, { body: form }),
+        : api(`/orgs/${slug}/subjects`, { body }),
     onSuccess: onDone,
   })
   return (
@@ -252,6 +272,20 @@ function SubjectDialog({
               onChange={(e) => setForm({ ...form, code: e.target.value })}
             />
           </Field>
+          {usesCredits && (
+            <Field
+              label="Credits"
+              help="For the SGPA: 4 for a full course, 1.5 for a lab."
+            >
+              <TextInput
+                type="number"
+                min={0}
+                step="0.5"
+                value={form.credits}
+                onChange={(e) => setForm({ ...form, credits: e.target.value })}
+              />
+            </Field>
+          )}
           <Field label="Description (optional)">
             <TextArea
               rows={2}

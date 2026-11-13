@@ -2,6 +2,11 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import {
+  cgpa,
+  creditsProblem,
+  defaultScale,
+  sgpa,
+  UGC_SCALE,
   cleanRemarkBank,
   DEFAULT_REMARKS,
   DEFAULT_SCALE,
@@ -114,4 +119,42 @@ test("remarks: the bank and filling in a name", () => {
   assert.deepEqual(cleanRemarkBank([" Good  work ", "good work", "", "Fine"]), { bank: ["Good work", "Fine"], problem: null })
   assert.ok(cleanRemarkBank(["x".repeat(301)]).problem)
   assert.ok(cleanRemarkBank(Array.from({ length: 101 }, (_, i) => `R${i}`)).problem)
+})
+
+test("colleges grade on the UGC ten-point scale", () => {
+  assert.equal(scaleProblem(UGC_SCALE), null)
+  assert.equal(gradeFor(UGC_SCALE, 90), "O")
+  assert.equal(gradeFor(UGC_SCALE, 79.9), "A")
+  assert.equal(gradeFor(UGC_SCALE, 39), "F")
+  assert.deepEqual(defaultScale("credits"), UGC_SCALE)
+  assert.deepEqual(defaultScale("marks"), DEFAULT_SCALE)
+  assert.deepEqual(readExamSettings({}, "credits").scale, UGC_SCALE)
+})
+
+test("SGPA weighs grade points by credits; F earns no credits", () => {
+  const s = sgpa([
+    { credits: 4, points: 9 },
+    { credits: 3, points: 8 },
+    { credits: 1, points: 10 },
+    { credits: 2, points: 0 },
+    { credits: 3, points: null },
+  ])
+  // (36 + 24 + 10 + 0) / 10 = 7
+  assert.deepEqual(s, { sgpa: 7, credits: 10, earned: 8, backlogs: 1 })
+  assert.equal(sgpa([{ credits: 0, points: 10 }]), null)
+  assert.equal(sgpa([{ credits: 3, points: 7 }, { credits: 3, points: 8 }])?.sgpa, 7.5)
+  assert.equal(sgpa([{ credits: 3, points: 9 }, { credits: 4, points: 8 }])?.sgpa, 8.43)
+})
+
+test("CGPA weighs semesters by their credits", () => {
+  assert.equal(cgpa([{ sgpa: 8, credits: 20 }, { sgpa: 9, credits: 22 }]), 8.52)
+  assert.equal(cgpa([]), null)
+})
+
+test("course credits", () => {
+  assert.equal(creditsProblem(4), null)
+  assert.equal(creditsProblem(1.5), null)
+  assert.equal(creditsProblem(null), null)
+  assert.ok(creditsProblem(1.25))
+  assert.ok(creditsProblem(50))
 })

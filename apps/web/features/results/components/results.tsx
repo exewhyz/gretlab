@@ -106,9 +106,18 @@ interface ExamItem {
   startsOn: string | null
   endsOn: string | null
   weight: number
+  termId?: string | null
+  term?: string | null
   published: boolean
   papers: number
   marks: number
+}
+
+interface Term {
+  id: string
+  name: string
+  startsOn: string | null
+  endsOn: string | null
 }
 
 interface ExamList {
@@ -116,6 +125,14 @@ interface ExamList {
   year: { id: string; name: string } | null
   canSetup: boolean
   scale: Band[]
+  grading?: "marks" | "credits" | "none"
+  words?: {
+    part: string
+    parts: string
+    assessment: string
+    assessments: string
+  }
+  terms?: Term[]
   exams: ExamItem[]
 }
 
@@ -131,7 +148,9 @@ export function Exams({ slug }: { slug: string }) {
   const [editing, setEditing] = useState<ExamItem | "new" | null>(null)
   const [scaleOpen, setScaleOpen] = useState(false)
   const [bankOpen, setBankOpen] = useState(false)
+  const [termsOpen, setTermsOpen] = useState(false)
   if (!data) return <Loading error={error} />
+  const parts = data.words?.parts ?? "Terms"
   const refresh = () =>
     client.invalidateQueries({ queryKey: ["org", slug, "exams"] })
   const totalWeight = data.exams.reduce((s, e) => s + e.weight, 0)
@@ -142,6 +161,14 @@ export function Exams({ slug }: { slug: string }) {
           data.canSetup &&
           data.year && (
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setTermsOpen(true)}>
+                {parts}
+                {(data.terms?.length ?? 0) > 0 && (
+                  <span className="tabular-nums opacity-70">
+                    {data.terms!.length}
+                  </span>
+                )}
+              </Button>
               <Button variant="outline" onClick={() => setBankOpen(true)}>
                 Comment bank
               </Button>
@@ -155,7 +182,7 @@ export function Exams({ slug }: { slug: string }) {
           )
         }
       >
-        Exams
+        {data.words?.assessments ?? "Exams"}
       </PageTitle>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         {data.years.length > 1 && (
@@ -234,6 +261,7 @@ export function Exams({ slug }: { slug: string }) {
                     ? `${shortDate(e.startsOn)}${e.endsOn && e.endsOn !== e.startsOn ? ` – ${shortDate(e.endsOn)}` : ""}`
                     : "No dates"}
                   {e.weight > 0 && ` · weight ${e.weight}`}
+                  {e.term && ` · ${e.term}`}
                 </CardDescription>
                 <CardAction>
                   {e.published ? (
@@ -277,11 +305,23 @@ export function Exams({ slug }: { slug: string }) {
         <ExamDialog
           slug={slug}
           yearId={data.year.id}
+          terms={data.terms ?? []}
+          partWord={data.words?.part ?? "Term"}
           exam={editing === "new" ? null : editing}
           onDone={(changed) => (setEditing(null), changed && void refresh())}
         />
       )}
       {bankOpen && <BankDialog slug={slug} onDone={() => setBankOpen(false)} />}
+      {termsOpen && data.year && (
+        <TermsDialog
+          slug={slug}
+          year={data.year}
+          terms={data.terms ?? []}
+          parts={parts}
+          part={data.words?.part ?? "Term"}
+          onDone={(changed) => (setTermsOpen(false), changed && void refresh())}
+        />
+      )}
       {scaleOpen && (
         <ScaleDialog
           slug={slug}
@@ -296,12 +336,19 @@ export function Exams({ slug }: { slug: string }) {
 function ExamDialog({
   slug,
   yearId,
+  terms = [],
+  partWord = "Term",
   exam,
   onDone,
 }: {
   slug: string
   yearId: string
-  exam: Pick<ExamItem, "id" | "name" | "startsOn" | "endsOn" | "weight"> | null
+  terms?: Term[]
+  partWord?: string
+  exam: Pick<
+    ExamItem,
+    "id" | "name" | "startsOn" | "endsOn" | "weight" | "termId"
+  > | null
   onDone: (changed: boolean) => void
 }) {
   const [form, setForm] = useState({
@@ -309,10 +356,15 @@ function ExamDialog({
     startsOn: exam?.startsOn ?? "",
     endsOn: exam?.endsOn ?? "",
     weight: String(exam?.weight ?? 0),
+    termId: exam?.termId ?? "",
   })
   const save = useMutation({
     mutationFn: () => {
-      const body = { ...form, weight: Number(form.weight) || 0 }
+      const body = {
+        ...form,
+        weight: Number(form.weight) || 0,
+        termId: form.termId || null,
+      }
       return exam
         ? api(`/orgs/${slug}/exams/${exam.id}`, { method: "PATCH", body })
         : api(`/orgs/${slug}/exams`, { body: { ...body, yearId } })
@@ -356,6 +408,24 @@ function ExamDialog({
               />
             </Field>
           </div>
+          {terms.length > 0 && (
+            <Field
+              label={partWord}
+              help={`Its marks count in this ${partWord.toLowerCase()}'s result.`}
+            >
+              <SelectInput
+                value={form.termId}
+                onChange={(e) => setForm({ ...form, termId: e.target.value })}
+              >
+                <option value="">None</option>
+                {terms.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+          )}
           <Field
             label="Weight in the year's result"
             help="0 if it doesn't count. Weights are relative: 30 and 70, or 3 and 7."
@@ -383,6 +453,142 @@ function ExamDialog({
 }
 
 /** The school's ready-made remarks, one per line. */
+/** The year's terms (a college's semesters): add, rename, remove. */
+function TermsDialog({
+  slug,
+  year,
+  terms,
+  parts,
+  part,
+  onDone,
+}: {
+  slug: string
+  year: { id: string; name: string }
+  terms: Term[]
+  parts: string
+  part: string
+  onDone: (changed: boolean) => void
+}) {
+  const [changed, setChanged] = useState(false)
+  const [list, setList] = useState(terms)
+  const [form, setForm] = useState({
+    name: `${part} ${terms.length + 1}`,
+    startsOn: "",
+    endsOn: "",
+  })
+  const add = useMutation({
+    mutationFn: () =>
+      api<{ id: string }>(`/orgs/${slug}/exams/terms`, {
+        body: { ...form, yearId: year.id },
+      }),
+    onSuccess: (r) => {
+      setList([
+        ...list,
+        {
+          id: r.id,
+          name: form.name,
+          startsOn: form.startsOn || null,
+          endsOn: form.endsOn || null,
+        },
+      ])
+      setForm({ name: `${part} ${list.length + 2}`, startsOn: "", endsOn: "" })
+      setChanged(true)
+    },
+  })
+  const remove = useMutation({
+    mutationFn: (id: string) =>
+      api(`/orgs/${slug}/exams/terms/${id}`, { method: "DELETE" }),
+    onSuccess: (_, id) => {
+      setList(list.filter((t) => t.id !== id))
+      setChanged(true)
+    },
+  })
+  return (
+    <Dialog open onOpenChange={(open) => !open && onDone(changed)}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {parts}, {year.name}
+          </DialogTitle>
+          <DialogDescription>
+            Each {part.toLowerCase()} has its own exams and its own result;
+            colleges get an SGPA per {part.toLowerCase()} and a CGPA over them.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="grid gap-1" data-testid="terms">
+          {list.length === 0 && (
+            <li className="text-body-sm text-muted-foreground">None yet.</li>
+          )}
+          {list.map((t) => (
+            <li
+              key={t.id}
+              className="flex items-center justify-between gap-2 rounded-lg border border-hairline px-3 py-2 text-body-sm"
+            >
+              <span>
+                <span className="font-medium text-ink">{t.name}</span>
+                {t.startsOn && (
+                  <span className="ml-2 text-caption text-muted-foreground">
+                    {shortDate(t.startsOn)}
+                    {t.endsOn && ` – ${shortDate(t.endsOn)}`}
+                  </span>
+                )}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Remove ${t.name}`}
+                onClick={() => remove.mutate(t.id)}
+              >
+                Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <form
+          className="grid gap-3 border-t border-hairline pt-3"
+          onSubmit={(e) => (e.preventDefault(), add.mutate())}
+        >
+          <Field label={`New ${part.toLowerCase()}`}>
+            <TextInput
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Starts">
+              <TextInput
+                type="date"
+                value={form.startsOn}
+                onChange={(e) => setForm({ ...form, startsOn: e.target.value })}
+              />
+            </Field>
+            <Field label="Ends">
+              <TextInput
+                type="date"
+                value={form.endsOn}
+                onChange={(e) => setForm({ ...form, endsOn: e.target.value })}
+              />
+            </Field>
+          </div>
+          {(add.error || remove.error) && (
+            <FormMessage
+              message={{
+                text: (add.error ?? remove.error)!.message,
+                kind: "err",
+              }}
+            />
+          )}
+          <DialogFooter>
+            <Button type="submit" disabled={add.isPending || !form.name.trim()}>
+              Add {part.toLowerCase()}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function BankDialog({ slug, onDone }: { slug: string; onDone: () => void }) {
   const { data, error } = useQuery({
     queryKey: ["org", slug, "exam-settings"],
@@ -1724,6 +1930,28 @@ interface ReportCardData {
     subjectRemarks: { subject: string; text: string }[]
   }[]
   final: { percent: number; grade: string } | null
+  /** Credit-graded kinds: each term's grade card and the CGPA so far. */
+  credits?: {
+    terms: {
+      id: string
+      name: string
+      courses: {
+        subjectId: string
+        code: string
+        name: string
+        credits: number | null
+        percent: number | null
+        grade: string | null
+        points: number | null
+      }[]
+      sgpa: number | null
+      credits: number
+      earned: number
+      backlogs: number
+    }[]
+    cgpa: number | null
+    earned: number
+  } | null
   viewer: "student" | "parent" | "staff"
 }
 
@@ -1816,6 +2044,99 @@ export function ReportCard({
             </div>
           ))}
         </dl>
+        {data.credits && data.credits.terms.length > 0 && (
+          <section className="grid gap-4" data-testid="grade-card">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <h2 className="text-title-sm text-ink">Grade card</h2>
+              <div className="flex gap-4 text-body-sm">
+                <span>
+                  CGPA{" "}
+                  <span
+                    className="text-title-md font-semibold text-ink tabular-nums"
+                    data-testid="cgpa"
+                  >
+                    {data.credits.cgpa == null
+                      ? "–"
+                      : data.credits.cgpa.toFixed(2)}
+                  </span>
+                </span>
+                <span className="text-muted-foreground">
+                  {data.credits.earned} credits earned
+                </span>
+              </div>
+            </div>
+            {data.credits.terms.map((t) => (
+              <div key={t.id} className="grid gap-2" data-testid="grade-term">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="font-medium text-ink">{t.name}</h3>
+                  <span className="text-body-sm text-muted-foreground">
+                    SGPA{" "}
+                    <span
+                      className="font-semibold text-ink tabular-nums"
+                      data-testid="sgpa"
+                    >
+                      {t.sgpa == null ? "–" : t.sgpa.toFixed(2)}
+                    </span>
+                    {" · "}
+                    {t.earned} of {t.credits} credits
+                    {t.backlogs > 0 && (
+                      <span className="text-destructive">
+                        {" "}
+                        · {t.backlogs} backlog{t.backlogs === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-body-sm">
+                    <thead>
+                      <tr className="border-b border-hairline text-left text-caption text-muted-foreground">
+                        <th className="py-1.5 pr-3 font-medium">Code</th>
+                        <th className="py-1.5 pr-3 font-medium">Course</th>
+                        <th className="px-2 py-1.5 text-right font-medium">
+                          Credits
+                        </th>
+                        <th className="px-2 py-1.5 text-right font-medium">
+                          Grade
+                        </th>
+                        <th className="px-2 py-1.5 text-right font-medium">
+                          Points
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {t.courses.map((c) => (
+                        <tr
+                          key={c.subjectId}
+                          className="border-b border-hairline/60"
+                        >
+                          <td className="py-1.5 pr-3 font-mono text-xs text-muted-foreground">
+                            {c.code || "–"}
+                          </td>
+                          <td className="py-1.5 pr-3 text-ink">{c.name}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">
+                            {c.credits ?? "–"}
+                          </td>
+                          <td
+                            className={cn(
+                              "px-2 py-1.5 text-right font-medium",
+                              c.points === 0 && "text-destructive"
+                            )}
+                          >
+                            {c.grade ?? "–"}
+                          </td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">
+                            {c.points ?? "–"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
         {data.exams.length === 0 ? (
           <p className="py-8 text-center text-body-sm text-muted-foreground">
             No results published for {data.year.name} yet.

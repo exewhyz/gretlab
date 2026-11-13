@@ -67,6 +67,7 @@ node e2e/pdfs.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/member-home.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/links.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/org-kinds.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+node e2e/college.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 
 kill $RUNNER 2>/dev/null
 lsof -ti:3100 | xargs kill 2>/dev/null

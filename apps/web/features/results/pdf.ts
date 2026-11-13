@@ -9,7 +9,7 @@ import {
   Writer,
 } from "@/lib/pdf/document"
 
-import type { ReportCardData } from "./server"
+import type { CreditCardData, ReportCardData } from "./server"
 
 /*
  * Report cards as PDF: one A4 page (or more, for many subjects) per student, laid out like
@@ -31,7 +31,7 @@ const RESULT: Record<string, { label: string; color: RGB }> = {
 }
 
 export async function reportCardsPdf(
-  cards: ReportCardData[],
+  cards: (ReportCardData & { credits?: CreditCardData | null })[],
   printedOn: string
 ) {
   const first = cards[0]
@@ -59,6 +59,45 @@ export async function reportCardsPdf(
       3
     )
     w.gap(10)
+    // Credit-graded kinds: each term's grade card first, with the SGPA and the CGPA.
+    if (card.credits && card.credits.terms.length > 0) {
+      w.text(
+        `Grade card${card.credits.cgpa != null ? `  ·  CGPA ${card.credits.cgpa.toFixed(2)}` : ""}  ·  ${card.credits.earned} credits earned`,
+        { bold: true, size: 11 }
+      )
+      w.gap(4)
+      for (const t of card.credits.terms) {
+        w.text(
+          `${t.name}  ·  SGPA ${t.sgpa == null ? "–" : t.sgpa.toFixed(2)}  ·  ${t.earned} of ${t.credits} credits${t.backlogs ? `  ·  ${t.backlogs} backlog${t.backlogs === 1 ? "" : "s"}` : ""}`,
+          { size: 9.5, color: COLORS.body }
+        )
+        w.gap(2)
+        w.table(
+          [
+            { label: "Code", width: 1.4 },
+            { label: "Course", width: 5 },
+            { label: "Credits", width: 1.1, align: "right" },
+            { label: "Grade", width: 1, align: "center" },
+            { label: "Points", width: 1, align: "right" },
+          ],
+          t.courses.map((c, i) => ({
+            shade: i % 2 === 1,
+            cells: [
+              c.code || "–",
+              c.name,
+              c.credits == null ? "–" : String(c.credits),
+              {
+                text: c.grade ?? "–",
+                bold: true,
+                color: c.points === 0 ? COLORS.danger : undefined,
+              },
+              c.points == null ? "–" : String(c.points),
+            ],
+          }))
+        )
+        w.gap(10)
+      }
+    }
     if (card.exams.length === 0) {
       w.text(`No results for ${card.year.name} yet.`, {
         color: COLORS.muted,

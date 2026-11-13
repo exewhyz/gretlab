@@ -1224,6 +1224,8 @@ export const subjects = pgTable(
     /** A short code ("MATH"); "" for none. */
     code: text("code").notNull().default(""),
     description: text("description").notNull().default(""),
+    /** Credits, where the kind grades by credits (a college course: 3, 4, 1.5). */
+    credits: doublePrecision("credits"),
     createdAt: createdAt(),
   },
   (table) => [
@@ -1260,6 +1262,33 @@ export const classSubjects = pgTable(
 )
 
 /**
+ * A term within an academic year: a semester in a college, a term in a school. Exams
+ * belong to one; credit-graded kinds work out an SGPA per term and a CGPA across them.
+ */
+export const academicTerms = pgTable(
+  "academic_terms",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    yearId: uuid("year_id")
+      .notNull()
+      .references(() => academicYears.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** "YYYY-MM-DD", optional. */
+    startsOn: text("starts_on"),
+    endsOn: text("ends_on"),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("academic_terms_name").on(table.yearId, sql`lower(${table.name})`),
+    index("academic_terms_org").on(table.orgId),
+  ]
+)
+
+/**
  * An exam in an academic year (Exams module): "Unit test 1", "Half-yearly". `weight`
  * says how much it counts toward the year's result (0: it doesn't). Results are seen by
  * students and parents only once published, and marks are locked while they are.
@@ -1279,6 +1308,10 @@ export const termExams = pgTable(
     startsOn: text("starts_on"),
     endsOn: text("ends_on"),
     weight: integer("weight").notNull().default(0),
+    /** The term (semester) it's part of, if the organization uses terms. */
+    termId: uuid("term_id").references(() => academicTerms.id, {
+      onDelete: "set null",
+    }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: createdAt(),
   },

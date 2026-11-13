@@ -25,6 +25,9 @@ export interface KindTerms {
   /** The span work is organized in: Academic year, Session, Cohort run. */
   period: string
   periods: string
+  /** A part of a period: Semester, Term, Module. */
+  part: string
+  parts: string
   /** A formal test: Exam, Assessment. */
   assessment: string
   assessments: string
@@ -52,6 +55,11 @@ export interface KindDefinition {
   capabilities: readonly string[]
   /** Of those, the ones on when an organization of this kind starts. */
   defaults: readonly string[]
+  /**
+   * How it grades: by marks and a percentage scale (schools, coaching), by credits and grade
+   * points with SGPA and CGPA (colleges), or not at all (cohorts, companies, communities).
+   */
+  grading: "marks" | "credits" | "none"
   /** What its built-in roles are called (the permissions stay the same). */
   roleNames: { owner: string; admin: string; teacher: string; member: string }
   /** The platform's default for a capable module that isn't on by default. */
