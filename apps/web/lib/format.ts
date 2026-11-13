@@ -16,3 +16,12 @@ export const formatDate = (value: string | Date) =>
     month: "short",
     year: "numeric",
   })
+
+/** "3 Nov 2026" for a plain day (YYYY-MM-DD), the same in every timezone. */
+export const formatDay = (day: string) =>
+  new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  })

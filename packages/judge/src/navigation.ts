@@ -277,6 +277,14 @@ export const ORG_NAV: NavItem[] = [
     module: "attendance",
   },
   {
+    key: "training",
+    label: "Training",
+    path: "/training",
+    group: "Academics",
+    anyOf: ["gradebook.view", "assignments.manage"],
+    module: "training",
+  },
+  {
     key: "progress",
     label: "Progress",
     path: "/progress",

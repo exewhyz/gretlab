@@ -2186,6 +2186,10 @@ export const courseClasses = pgTable(
       .references(() => orgGroups.id, { onDelete: "cascade" }),
     /** YYYY-MM-DD */
     startsOn: text("starts_on").notNull(),
+    /** Assigned training: finish by this day (YYYY-MM-DD). */
+    dueOn: text("due_on"),
+    /** Assigned training: done again every this many months (compliance). */
+    renewMonths: integer("renew_months"),
     addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
@@ -2362,6 +2366,8 @@ export const certificates = pgTable(
     detail: text("detail").notNull().default(""),
     issuedBy: uuid("issued_by").references(() => users.id, { onDelete: "set null" }),
     issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+    /** For training that must be renewed: no longer valid after this day (YYYY-MM-DD). */
+    expiresOn: text("expires_on"),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
   (table) => [

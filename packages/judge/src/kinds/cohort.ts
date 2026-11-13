@@ -32,7 +32,7 @@ export const cohort = {
     assessments: "Assessments",
   },
   groupLevels: ["Cohort", "Pod"],
-  capabilities: ["attendance", "timetable", "subjects", "leave"],
+  capabilities: ["attendance", "timetable", "subjects", "leave", "training"],
   defaults: ["attendance"],
   grading: "none",
   groupDates: true,

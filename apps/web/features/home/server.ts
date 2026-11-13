@@ -45,6 +45,7 @@ import { staffToday } from "@/features/staff-attendance/server"
 import { newApplications } from "@/features/admissions/server"
 import { childOverview } from "@/features/parents/server"
 import { homeRuns } from "@/features/runs/server"
+import { listTraining, myTraining } from "@/features/training/server"
 import { rolePermissions } from "@/features/orgs/access"
 import {
   canFor,
@@ -1228,15 +1229,44 @@ export async function orgHome(slug: string, user: User) {
     views.includes("parent") ? parentHome(ctx, user) : null,
     homeRuns(ctx, user),
   ])
+  const [mine, team] = await Promise.all([
+    views.includes("student") ? myTraining(ctx, user) : null,
+    views.includes("teacher") && ctx.modules.has("training") ? teamTraining(slug, user) : null,
+  ])
   return {
     views,
     runs,
+    training: { mine, team },
     admin,
     teacher,
     student,
     parent,
     staff,
     terms: kindTerms(ctx.org.type),
+  }
+}
+
+/** A manager's team view of training: who's late or due soon, across what they see. */
+async function teamTraining(slug: string, user: User) {
+  const list = await listTraining(slug, user)
+  const sum = (k: "overdue" | "expired" | "due" | "expiring" | "done") =>
+    list.trainings.reduce((n, t) => n + t.counts[k], 0)
+  return {
+    assigned: list.trainings.reduce((n, t) => n + t.people, 0),
+    done: sum("done") + sum("expiring"),
+    late: sum("overdue") + sum("expired"),
+    soon: sum("due") + sum("expiring"),
+    trainings: list.trainings
+      .filter((t) => t.counts.overdue + t.counts.expired + t.counts.due + t.counts.expiring > 0)
+      .slice(0, 5)
+      .map((t) => ({
+        courseId: t.courseId,
+        groupId: t.groupId,
+        course: t.course,
+        group: t.group,
+        late: t.counts.overdue + t.counts.expired,
+        soon: t.counts.due + t.counts.expiring,
+      })),
   }
 }
 

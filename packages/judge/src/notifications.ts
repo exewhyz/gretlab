@@ -65,6 +65,13 @@ export const NOTIFICATION_EVENTS = {
     kinds: ["teacher_note"],
     emailByDefault: true,
   },
+  "training.reminder": {
+    label: "Training reminder",
+    description: "Someone is reminded to finish or renew training assigned to them.",
+    audience: "students",
+    kinds: ["training_due"],
+    emailByDefault: true,
+  },
   "certificate.issued": {
     label: "Certificate",
     description: "A student earns a certificate.",

@@ -31,7 +31,7 @@ export const other = {
     assessments: "Assessments",
   },
   groupLevels: ["Group"],
-  capabilities: ["attendance", "timetable", "subjects", "library"],
+  capabilities: ["attendance", "timetable", "subjects", "library", "training"],
   defaults: [],
   grading: "marks",
   groupDates: false,

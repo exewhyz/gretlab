@@ -112,6 +112,12 @@ export const MODULES = {
     description: "Hostels, rooms and beds, and who stays where.",
     ready: true,
   },
+  training: {
+    label: "Assigned training",
+    description:
+      "Courses assigned to teams with due dates, renewed every few months for compliance, with who's done, overdue or expiring, and certificates that expire.",
+    ready: true,
+  },
   finance: {
     label: "Fees and payments",
     description: "Fee plans, invoices and online payments.",

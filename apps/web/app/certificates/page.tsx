@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
 import { getCurrentUser } from "@/features/auth/current-user"
 import { myCertificates } from "@/features/certificates/server"
-import { formatDate } from "@/lib/format"
+import { formatDate, formatDay } from "@/lib/format"
 
 export const metadata: Metadata = { title: "My certificates", robots: { index: false } }
 
@@ -37,7 +37,13 @@ export default async function Page() {
                   <span className="font-semibold text-ink">{c.title}</span>
                   <span className="text-caption">
                     {c.org ?? "Gretlab"} · {formatDate(c.issuedAt)}
-                    {c.revoked && " · Revoked"}
+                    {c.revoked
+                      ? " · Revoked"
+                      : c.expired
+                        ? " · Expired"
+                        : c.expiresOn
+                          ? ` · Valid until ${formatDay(c.expiresOn)}`
+                          : ""}
                   </span>
                   <span className="font-mono text-xs text-body">{c.code}</span>
                 </Link>

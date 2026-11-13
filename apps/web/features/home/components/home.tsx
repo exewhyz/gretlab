@@ -22,7 +22,7 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { createContext, useContext, useState } from "react"
 
-import { KINDS, type KindTerms, type RunState } from "@workspace/judge"
+import { KINDS, type KindTerms, type RunState, type TrainingStatus } from "@workspace/judge"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import { Badge } from "@workspace/ui/components/badge"
@@ -59,6 +59,8 @@ import {
 } from "@/features/campus/components/campus"
 import { MyCourseAttendance } from "@/features/attendance/components/attendance"
 import { runLabel, runPercent, runStatus } from "@/features/runs/format"
+import { StatusBadge } from "@/features/training/components/training"
+import { formatDay } from "@/lib/format"
 import { CheckInCard } from "@/features/staff-attendance/components/staff-attendance"
 import { api } from "@/lib/api/client"
 
@@ -189,7 +191,27 @@ interface Runs {
   leading: { id: string; name: string; run: { id: string; name: string; state: RunState } }[]
 }
 
+interface MyTrainingItem {
+  courseId: string
+  course: string
+  href: string
+  status: TrainingStatus
+  needBy: string | null
+  validUntil: string | null
+  progress: { done: number; total: number }
+}
+
+interface TeamTraining {
+  assigned: number
+  done: number
+  late: number
+  soon: number
+  trainings: { courseId: string; groupId: string; course: string; group: string; late: number; soon: number }[]
+}
+
 interface Home {
+  /** Assigned training (the training module): their own, and a manager's teams'. */
+  training?: { mine: MyTrainingItem[] | null; team: TeamTraining | null }
   terms?: KindTerms
   views: View[]
   /** Runs (cohorts) for kinds whose groups have dates; null otherwise. */
@@ -258,10 +280,20 @@ export function OrgHome({ slug }: { slug: string }) {
           <AdminHome slug={slug} data={data.admin} />
         )}
         {view === "teacher" && data.teacher && (
-          <TeacherHome slug={slug} data={data.teacher} runs={data.runs ?? null} />
+          <TeacherHome
+            slug={slug}
+            data={data.teacher}
+            runs={data.runs ?? null}
+            training={data.training?.team ?? null}
+          />
         )}
         {view === "student" && data.student && (
-          <StudentHome slug={slug} data={data.student} runs={data.runs ?? null} />
+          <StudentHome
+            slug={slug}
+            data={data.student}
+            runs={data.runs ?? null}
+            training={data.training?.mine ?? null}
+          />
         )}
         {view === "parent" && data.parent && (
           <ParentHome slug={slug} data={data.parent} />
@@ -785,10 +817,12 @@ function TeacherHome({
   slug,
   data,
   runs,
+  training,
 }: {
   slug: string
   data: TeacherData
   runs: Runs | null
+  training: TeamTraining | null
 }) {
   const terms = useTerms()
   const manage = `/orgs/${slug}/manage`
@@ -800,6 +834,7 @@ function TeacherHome({
       />
       {data.checkIn && <CheckInCard slug={slug} />}
       {runs && runs.leading.length > 0 && <LeadingRuns slug={slug} runs={runs} />}
+      {training && training.assigned > 0 && <TeamTrainingCard slug={slug} data={training} />}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Tile
@@ -978,6 +1013,85 @@ function isNow(starts: string, ends: string) {
   return m >= at(starts) && m < at(ends)
 }
 
+/** An employee's assigned training, most urgent first, each linked to where it's taken. */
+function MyTrainingCard({ items }: { items: MyTrainingItem[] }) {
+  const open = items.filter((i) => i.status !== "done").length
+  return (
+    <Card data-testid="my-training">
+      <CardHeader>
+        <CardTitle className="text-title-md">My training</CardTitle>
+        <CardDescription>
+          {open ? `${open} to finish or renew` : "All done and up to date"}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="grid gap-2">
+          {items.map((t) => (
+            <li
+              key={t.courseId}
+              data-testid="my-training-item"
+              className="flex flex-wrap items-center justify-between gap-2"
+            >
+              <Link href={t.href} className="min-w-0 font-medium text-ink hover:underline">
+                {t.course}
+              </Link>
+              <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="tabular-nums">
+                  {t.progress.done}/{t.progress.total}
+                </span>
+                {t.needBy && t.status !== "done" && <span>by {formatDay(t.needBy)}</span>}
+                {t.status === "done" && t.validUntil && (
+                  <span>valid until {formatDay(t.validUntil)}</span>
+                )}
+                <StatusBadge status={t.status} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** A manager's team view: how their teams are doing with training, and what's late. */
+function TeamTrainingCard({ slug, data }: { slug: string; data: TeamTraining }) {
+  return (
+    <Card size="sm" data-testid="team-training">
+      <CardHeader>
+        <CardTitle className="text-title-md">Team training</CardTitle>
+        <CardDescription>
+          {data.done} of {data.assigned} done ·{" "}
+          <span className={data.late ? "font-medium text-destructive" : ""} data-testid="team-late">
+            {data.late} late
+          </span>{" "}
+          · {data.soon} due soon
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        {data.trainings.map((t) => (
+          <Link
+            key={`${t.groupId}:${t.courseId}`}
+            href={`/orgs/${slug}/manage/training/${t.groupId}/${t.courseId}`}
+            className="flex flex-wrap justify-between gap-2 text-body-sm hover:underline"
+          >
+            <span className="text-ink">
+              {t.course} <span className="text-muted-foreground">· {t.group}</span>
+            </span>
+            <span className="text-xs">
+              {t.late > 0 && <span className="text-destructive">{t.late} late</span>}
+              {t.late > 0 && t.soon > 0 && " · "}
+              {t.soon > 0 && <span className="text-primary-active">{t.soon} soon</span>}
+            </span>
+          </Link>
+        ))}
+        <Link href={`/orgs/${slug}/manage/training`} className="text-body-sm font-medium text-primary hover:underline">
+          All training
+        </Link>
+      </CardContent>
+    </Card>
+  )
+}
+
 /** A learner's runs: which cohort, its week, their pod and its mentor. */
 function MyRuns({ runs }: { runs: Runs }) {
   const terms = useTerms()
@@ -1050,10 +1164,12 @@ function StudentHome({
   slug,
   data,
   runs,
+  training,
 }: {
   slug: string
   data: StudentData
   runs: Runs | null
+  training: MyTrainingItem[] | null
 }) {
   const terms = useTerms()
   const { data: viewer } = useViewer()
@@ -1113,6 +1229,7 @@ function StudentHome({
       </div>
 
       {runs && runs.learning.length > 0 && <MyRuns runs={runs} />}
+      {training && training.length > 0 && <MyTrainingCard items={training} />}
 
       <MyCourseAttendance slug={slug} />
 

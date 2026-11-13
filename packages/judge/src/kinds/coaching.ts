@@ -44,6 +44,7 @@ export const coaching = {
     "subjects",
     "parents",
     "library",
+    "training",
     "finance",
   ],
   defaults: [

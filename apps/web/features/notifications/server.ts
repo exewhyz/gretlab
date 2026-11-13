@@ -193,7 +193,7 @@ export async function tellParents(
 
 export interface Reminder {
   id: string
-  kind: "due_soon" | "contest_soon" | "attendance_low" | "library_due"
+  kind: "due_soon" | "contest_soon" | "attendance_low" | "library_due" | "training_due"
   title: string
   body: string
   href: string
@@ -285,6 +285,22 @@ async function remindersFor(user: User): Promise<Reminder[]> {
       body: "Return or renew it at the library.",
       href: `/orgs/${loan.slug}/books`,
       at: `${loan.dueOn}T00:00:00.000Z`,
+    })
+  }
+  // Assigned training overdue, due within a week, expired or about to (loaded here so the
+  // modules don't import each other at start).
+  const { trainingReminders } = await import("@/features/training/server")
+  for (const t of await trainingReminders(user).catch(() => [])) {
+    const renew = t.status === "expired" || t.status === "expiring"
+    out.push({
+      id: `training:${t.courseId}`,
+      kind: "training_due",
+      title: renew
+        ? `${t.course}: ${t.status === "expired" ? "expired" : "renew"} by ${t.needBy}`
+        : `${t.course} is ${t.status === "overdue" ? "overdue" : "due"} (${t.needBy})`,
+      body: `${t.org}: ${t.progress.done} of ${t.progress.total} done.`,
+      href: t.href,
+      at: `${t.needBy ?? t.validUntil}T00:00:00.000Z`,
     })
   }
   return out.sort((a, b) => a.at.localeCompare(b.at))

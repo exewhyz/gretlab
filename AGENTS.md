@@ -568,6 +568,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - **Graduation** from a run's page issues `graduation` certificates (`issueCertificates`, needs "Manage assignments" on the run): once per learner per run, only for people in it, only for groups with dates.
 - Homes: a learner sees their cohort, its week, their pod and its mentor; a mentor sees the pods they lead, linked to their progress (`homeRuns`, `runs` in the home data; null for kinds without runs).
 
+## Assigned training (companies)
+
+- The `training` module (on from the start for companies; optional for cohorts, coaching and other kinds; `features/training`): a course assigned to a department or team with a due date and, for compliance, renewal every N months (`course_classes.due_on`, `renew_months`). People take it on their team's page like any course, where the due date shows. Manage › Training lists each training with how many are done, late or due soon; a training's page lists each person with their team, progress, status, needed-by date, when they finished and until when it's valid, with Remind (a `training_due` notification), Certify finished (course certificates) and Change/Remove for those who may manage it.
+- Statuses (`packages/judge/src/training.ts`, unit-tested): todo, due (within 7 days), overdue, done, expiring (within 30 days), expired. With renewal, work older than the renewal period stops counting (`renewalCutoffs` in `features/courses/classes.ts`), so the course asks again and the person redoes it; it's valid until their oldest item's last completion plus the renewal.
+- Course certificates for renewed training get `certificates.expires_on`; the public page and My certificates say "Valid until" or "Expired", and a new one can be issued once the last has expired.
+- Who sees what: L&D admins everything; a manager (a team's lead, given the Manager role on it) the part of each training within the teams they see grades for; employees their own on their home (My training) and in the bell's reminders when overdue, due within a week, expired or expiring. A manager's home has Team training: done, late and due soon.
+
 ## Calendar
 
 - `/calendar` (account menu) lists everything with a date for the viewer, by day (`features/calendar/server.ts`, `eventsFor`): published assignments' due times with their own extension, exam windows, peer reviews still to write that have a due time, and contests they registered for or their organizations run (the platform's open contests don't fill everyone's calendar).

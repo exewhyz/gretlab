@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto"
 import { certificates, getDb, organizations, sql, users, type User } from "@workspace/db"
 import { KINDS } from "@workspace/judge"
 
+import { today } from "@/features/catalog/server"
 import { classContext, studentsIn } from "@/features/classes/server"
 import { courseFinishers } from "@/features/courses/classes"
 import { notify } from "@/features/notifications/server"
@@ -33,18 +34,24 @@ export async function issueCertificates(slug: string, user: User, groupId: strin
   let title: string
   let detail: string
   let sourceId: string | null = null
+  let expires = new Map<string, string | null>()
   if (input.kind === "course") {
     const f = await courseFinishers(slug, user, groupId, input.courseId)
-    // Once per student per course: finishing again doesn't make another.
+    // Once per student per course: finishing again doesn't make another, unless the last
+    // one expired (training renewed every few months).
+    const day = await today()
     const had = new Set(
       (
         await getDb()
-          .select({ userId: certificates.userId })
+          .select({ userId: certificates.userId, expiresOn: certificates.expiresOn })
           .from(certificates)
           .where(and(eq(certificates.kind, "course"), eq(certificates.sourceId, input.courseId)))
-      ).map((r) => r.userId)
+      )
+        .filter((r) => !r.expiresOn || r.expiresOn >= day)
+        .map((r) => r.userId)
     )
     people = f.finishers.filter((s) => !had.has(s.id))
+    expires = new Map(f.finishers.map((s) => [s.id, s.validUntil]))
     title = f.course.title
     detail = `Completed all ${f.modules} modules of the course in ${className}, ${cc.ctx.org.name}.`
     sourceId = input.courseId
@@ -93,6 +100,7 @@ export async function issueCertificates(slug: string, user: User, groupId: strin
         sourceId,
         title,
         detail,
+        expiresOn: expires.get(p.id) ?? null,
         issuedBy: user.id,
       }))
     )
@@ -148,6 +156,7 @@ export async function revokeCertificate(slug: string, user: User, groupId: strin
 }
 
 export async function myCertificates(user: User) {
+  const day = await today()
   const rows = await getDb()
     .select({ c: certificates, org: organizations.name })
     .from(certificates)
@@ -161,6 +170,8 @@ export async function myCertificates(user: User) {
     org: r.org,
     issuedAt: r.c.issuedAt,
     revoked: r.c.revokedAt !== null,
+    expiresOn: r.c.expiresOn,
+    expired: r.c.expiresOn !== null && r.c.expiresOn < day,
   }))
 }
 
@@ -186,6 +197,9 @@ export async function verifyCertificate(code: string) {
     issuer: row.issuer?.includes("@") ? null : row.issuer,
     issuedAt: row.c.issuedAt,
     revokedAt: row.c.revokedAt,
+    /** Training renewed every few months: valid until this day. */
+    expiresOn: row.c.expiresOn,
+    expired: row.c.expiresOn !== null && row.c.expiresOn < (await today()),
   }
 }
 

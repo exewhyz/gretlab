@@ -8,7 +8,7 @@ import {
   submissions,
   type User,
 } from "@workspace/db"
-import { markQuestion, releaseModules } from "@workspace/judge"
+import { addMonths, markQuestion, releaseModules } from "@workspace/judge"
 
 import { today } from "@/features/catalog/server"
 import { classContext, studentsIn } from "@/features/classes/server"
@@ -25,19 +25,24 @@ import { outlineOf, type OutlineItem } from "./server"
  * course.ts the release rules) and practise in them. Practice is never graded.
  */
 
-const { and, eq, inArray, sql: raw } = sql
+const { and, eq, inArray, max, sql: raw } = sql
 
 /** Tries after which a practice question shows its answer even when still wrong. */
 const SHOW_AFTER_TRIES = 3
 
-async function finished(userIds: string[], items: OutlineItem[]) {
+/**
+ * What these people have done of these items: each item's latest right answer or accepted
+ * submission. With `cutoffs` (training renewed every few months), work from before an
+ * item's cutoff no longer counts, so it's done again.
+ */
+export async function finished(userIds: string[], items: OutlineItem[], cutoffs?: Map<string, Date>) {
   const problemIds = items.filter((i) => i.kind === "problem").map((i) => i.id)
   const questionIds = items.filter((i) => i.kind === "question").map((i) => i.id)
   const db = getDb()
   const [solved, answered] = await Promise.all([
     problemIds.length && userIds.length
       ? db
-          .selectDistinct({ userId: submissions.userId, id: submissions.problemId })
+          .select({ userId: submissions.userId, id: submissions.problemId, at: max(submissions.createdAt) })
           .from(submissions)
           .where(
             and(
@@ -47,6 +52,7 @@ async function finished(userIds: string[], items: OutlineItem[]) {
               eq(submissions.verdict, "AC")
             )
           )
+          .groupBy(submissions.userId, submissions.problemId)
       : [],
     questionIds.length && userIds.length
       ? db
@@ -56,6 +62,7 @@ async function finished(userIds: string[], items: OutlineItem[]) {
             answer: practiceAnswers.answer,
             correct: practiceAnswers.correct,
             tries: practiceAnswers.tries,
+            at: practiceAnswers.answeredAt,
           })
           .from(practiceAnswers)
           .where(
@@ -66,14 +73,43 @@ async function finished(userIds: string[], items: OutlineItem[]) {
           )
       : [],
   ])
-  const done = new Map<string, Set<string>>()
-  for (const r of [...solved, ...answered.filter((a) => a.correct)]) {
-    if (!r.userId) continue
-    const set = done.get(r.userId) ?? new Set<string>()
-    set.add(r.id!)
-    done.set(r.userId, set)
+  const stale = (id: string, at: Date | null) => {
+    const cut = cutoffs?.get(id)
+    return Boolean(cut && (!at || new Date(at) < cut))
   }
-  return { done, answers: answered }
+  const done = new Map<string, Set<string>>()
+  /** When each item was last done, per person (only items that count). */
+  const latest = new Map<string, Map<string, Date>>()
+  for (const r of [...solved, ...answered.filter((a) => a.correct)]) {
+    if (!r.userId || !r.id || !r.at || stale(r.id, r.at)) continue
+    const set = done.get(r.userId) ?? new Set<string>()
+    set.add(r.id)
+    done.set(r.userId, set)
+    const times = latest.get(r.userId) ?? new Map<string, Date>()
+    times.set(r.id, new Date(r.at))
+    latest.set(r.userId, times)
+  }
+  // A stale answer reads as not answered yet, so the question is asked afresh.
+  const answers = answered.filter((a) => !stale(a.id, a.at))
+  return { done, latest, answers }
+}
+
+/** Items of renewed courses, with the day before which work on them no longer counts. */
+export function renewalCutoffs(
+  maps: { courseId: string; renewMonths: number | null }[],
+  outlines: Map<string, { items: OutlineItem[] }[]>,
+  day: string
+) {
+  const cutoffs = new Map<string, Date>()
+  for (const m of maps) {
+    if (!m.renewMonths) continue
+    const cut = new Date(`${addMonths(day, -m.renewMonths)}T00:00:00Z`)
+    for (const item of (outlines.get(m.courseId) ?? []).flatMap((x) => x.items)) {
+      const before = cutoffs.get(item.id)
+      if (!before || cut > before) cutoffs.set(item.id, cut)
+    }
+  }
+  return cutoffs
 }
 
 export async function classCourses(slug: string, user: User, groupId: string) {
@@ -91,7 +127,12 @@ export async function classCourses(slug: string, user: User, groupId: string) {
   const teacher = cc.teaches
   const allItems = [...outlines.values()].flat().flatMap((m) => m.items)
   const students = teacher ? await studentsIn(cc) : []
-  const progress = await finished(teacher ? students.map((s) => s.id) : [user.id], allItems)
+  const cutoffs = renewalCutoffs(
+    maps.map((m) => ({ courseId: m.course.id, renewMonths: m.map.renewMonths })),
+    outlines,
+    day
+  )
+  const progress = await finished(teacher ? students.map((s) => s.id) : [user.id], allItems, cutoffs)
   const mine = progress.done.get(user.id) ?? new Set<string>()
   const canAdd = canFor(ctx, "assignments.manage", [[groupId]])
 
@@ -114,6 +155,8 @@ export async function classCourses(slug: string, user: User, groupId: string) {
       title: course.title,
       description: course.description,
       startsOn: map.startsOn,
+      dueOn: map.dueOn,
+      renewMonths: map.renewMonths,
       groupId: map.groupId,
       from: map.groupId === groupId ? null : (ctx.groups.find((g) => g.id === map.groupId)?.name ?? null),
       canRemove: map.groupId === groupId && canAdd,
@@ -281,24 +324,49 @@ export async function answerPractice(
   }
 }
 
-/** Students of this class who finished every item of one of its courses. */
+/**
+ * Students of this class who finished every item of one of its courses. For training
+ * renewed every few months, only work within that time counts, and each finisher's
+ * `validUntil` is when their oldest item expires.
+ */
 export async function courseFinishers(slug: string, user: User, groupId: string, courseId: string) {
   const cc = await classContext(slug, user, groupId)
-  const [map] = await getDb()
-    .select({ course: courses })
+  const maps = await getDb()
+    .select({ course: courses, renewMonths: courseClasses.renewMonths })
     .from(courseClasses)
     .innerJoin(courses, eq(courseClasses.courseId, courses.id))
     .where(and(eq(courseClasses.courseId, courseId), inArray(courseClasses.groupId, groupChain(cc.ctx, groupId))))
-  if (!map) throw notFound("This class doesn't have that course")
-  const modules = (await outlineOf([courseId])).get(courseId) ?? []
+  if (!maps.length) throw notFound("This class doesn't have that course")
+  // Given at several levels, the most demanding renewal holds.
+  const renewMonths = Math.min(...maps.map((m) => m.renewMonths ?? Infinity))
+  const renew = Number.isFinite(renewMonths) ? renewMonths : null
+  const outlines = await outlineOf([courseId])
+  const modules = outlines.get(courseId) ?? []
   const items = modules.flatMap((m) => m.items)
   const students = await studentsIn(cc)
-  const { done } = await finished(students.map((s) => s.id), items)
+  const day = await today()
+  const { done, latest } = await finished(
+    students.map((s) => s.id),
+    items,
+    renewalCutoffs([{ courseId, renewMonths: renew }], outlines, day)
+  )
+  const validUntil = (id: string) => {
+    if (!renew) return null
+    const times = [...(latest.get(id)?.values() ?? [])]
+    const oldest = new Date(Math.min(...times.map((t) => t.getTime())))
+    return addMonths(oldest.toISOString().slice(0, 10), renew)
+  }
   return {
     cc,
-    course: map.course,
+    course: maps[0]!.course,
     modules: modules.length,
     total: students.length,
-    finishers: items.length === 0 ? [] : students.filter((s) => items.every((i) => done.get(s.id)?.has(i.id))),
+    renewMonths: renew,
+    finishers:
+      items.length === 0
+        ? []
+        : students
+            .filter((s) => items.every((i) => done.get(s.id)?.has(i.id)))
+            .map((s) => ({ ...s, validUntil: validUntil(s.id) })),
   }
 }

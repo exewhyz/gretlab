@@ -31,7 +31,7 @@ import {
 } from "@/features/catalog/components/daily-question"
 import { KIND_LABEL } from "@/features/questions/components/question-editor"
 import { api } from "@/lib/api/client"
-import { formatDate } from "@/lib/format"
+import { formatDate, formatDay } from "@/lib/format"
 
 /*
  * A class's Course tab. Teachers give it courses (each from a start day) and see how far
@@ -52,6 +52,9 @@ interface ClassCourse {
   title: string
   description: string
   startsOn: string
+  /** Assigned training: finish by, and renewed every this many months. */
+  dueOn?: string | null
+  renewMonths?: number | null
   from: string | null
   canRemove: boolean
   modules: {
@@ -119,6 +122,8 @@ export function ClassCourses({ slug, groupId }: { slug: string; groupId: string 
                 <p className="text-caption">
                   From {formatDate(`${course.startsOn}T00:00:00`)}
                   {course.from && ` · Given to ${course.from}`}
+                  {course.dueOn && ` · Due ${formatDay(course.dueOn)}`}
+                  {course.renewMonths && ` · Renewed every ${course.renewMonths} months`}
                   {!data.teacher && total > 0 && ` · ${done} of ${total} done`}
                 </p>
                 {course.description && <p className="mt-1 max-w-3xl text-body-sm">{course.description}</p>}
