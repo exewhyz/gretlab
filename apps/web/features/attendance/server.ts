@@ -1,6 +1,10 @@
 import {
+  academicTerms,
+  academicYears,
   attendance,
   getDb,
+  groupMembers,
+  organizations,
   sql,
   teachingSessions,
   users,
@@ -8,7 +12,10 @@ import {
 } from "@workspace/db"
 import {
   ATTENDANCE_STATUSES,
+  classesToReach,
   countsAsPresent,
+  eligibility,
+  readAttendanceSettings,
   enabledModules,
   summarizeAttendance,
   type AttendanceStatus,
@@ -17,8 +24,10 @@ import { z } from "zod"
 
 import { today } from "@/features/catalog/server"
 import { classContext, studentsIn } from "@/features/classes/server"
+import { subjectsOfGroups } from "@/features/subjects/server"
 import {
   canFor,
+  groupChain,
   orgContext,
   writeAudit,
   type OrgContext,
@@ -29,7 +38,9 @@ import { ApiError, notFound } from "@/lib/api/route"
 
 /** The day before a "YYYY-MM-DD" day. */
 const dayBefore = (day: string) =>
-  new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+  new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000)
+    .toISOString()
+    .slice(0, 10)
 
 /*
  * The Attendance module: a register per group, day and (optionally) period. A register is a
@@ -39,7 +50,7 @@ const dayBefore = (day: string) =>
  * register a day (period ""); colleges one per period or subject.
  */
 
-const { and, asc, eq, gte, inArray, lt } = sql
+const { and, asc, eq, gte, inArray, isNull, isNotNull, lt, lte } = sql
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/
 const MONTH = /^\d{4}-\d{2}$/
@@ -48,6 +59,12 @@ export const registerQuerySchema = z.object({
   groupId: z.uuid(),
   day: z.string().regex(DAY, "Choose the day"),
   period: z.string().trim().max(60).default(""),
+  /** The course it's for (a college's course-wise attendance); null for none. */
+  subjectId: z.uuid().nullable().default(null),
+})
+
+export const attendanceSettingsSchema = z.object({
+  minPercent: z.number().int().min(0).max(100),
 })
 
 export const registerSaveSchema = registerQuerySchema.extend({
@@ -70,7 +87,17 @@ async function access(slug: string, user: User, groupId: string) {
   return { cc, mark, view }
 }
 
-async function findRegister(groupId: string, day: string, period: string) {
+const sameCourse = (subjectId: string | null) =>
+  subjectId
+    ? eq(teachingSessions.subjectId, subjectId)
+    : isNull(teachingSessions.subjectId)
+
+async function findRegister(
+  groupId: string,
+  day: string,
+  period: string,
+  subjectId: string | null
+) {
   const [row] = await getDb()
     .select()
     .from(teachingSessions)
@@ -79,10 +106,24 @@ async function findRegister(groupId: string, day: string, period: string) {
         eq(teachingSessions.groupId, groupId),
         eq(teachingSessions.day, day),
         eq(teachingSessions.period, period),
+        sameCourse(subjectId),
         eq(teachingSessions.kind, "register")
       )
     )
   return row ?? null
+}
+
+/** The courses a class takes (its own and its grade's), for registers by course. */
+async function coursesOf(cc: { ctx: OrgContext; groupId: string }) {
+  if (!cc.ctx.modules.has("subjects")) return []
+  const rows = await subjectsOfGroups(cc.ctx.org.id, [
+    ...groupChain(cc.ctx, cc.groupId),
+  ])
+  const seen = new Map<string, { id: string; name: string; code: string }>()
+  for (const r of rows)
+    if (!seen.has(r.subjectId))
+      seen.set(r.subjectId, { id: r.subjectId, name: r.name, code: r.code })
+  return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** One day's register for a group: its students and their marks so far. */
@@ -98,12 +139,17 @@ export async function getRegister(
       "forbidden",
       "Seeing attendance for this group isn't part of your role."
     )
-  const [students, register] = await Promise.all([
+  const [students, register, courses] = await Promise.all([
     studentsIn(cc),
-    findRegister(input.groupId, input.day, input.period),
+    findRegister(input.groupId, input.day, input.period, input.subjectId),
+    coursesOf(cc),
   ])
   const away = cc.ctx.modules.has("leave")
-    ? await onLeave(cc.ctx.org.id, students.map((s) => s.id), input.day)
+    ? await onLeave(
+        cc.ctx.org.id,
+        students.map((s) => s.id),
+        input.day
+      )
     : new Map<string, string>()
   const marks = register
     ? await getDb()
@@ -123,6 +169,9 @@ export async function getRegister(
     groupId: input.groupId,
     day: input.day,
     period: input.period,
+    subjectId: input.subjectId,
+    /** Courses a register can be for (Subjects module). */
+    courses,
     canMark: mark,
     taken: register !== null,
     takenBy: takenBy ? (takenBy.name ?? takenBy.email) : null,
@@ -158,6 +207,15 @@ export async function saveRegister(
       "Attendance can't be taken for a day that hasn't come yet."
     )
   }
+  if (
+    input.subjectId &&
+    !(await coursesOf(cc)).some((c) => c.id === input.subjectId)
+  )
+    throw new ApiError(
+      400,
+      "not_a_course",
+      "That class doesn't take that course."
+    )
   const students = new Set((await studentsIn(cc)).map((s) => s.id))
   if (input.marks.some((m) => !students.has(m.userId))) {
     throw new ApiError(
@@ -177,6 +235,7 @@ export async function saveRegister(
           eq(teachingSessions.groupId, input.groupId),
           eq(teachingSessions.day, input.day),
           eq(teachingSessions.period, input.period),
+          sameCourse(input.subjectId),
           eq(teachingSessions.kind, "register")
         )
       )
@@ -191,6 +250,7 @@ export async function saveRegister(
             teacherId: user.id,
             day: input.day,
             period: input.period,
+            subjectId: input.subjectId,
             kind: "register",
             minutes: 0,
           })
@@ -353,4 +413,259 @@ export async function attendanceGroups(slug: string, user: User) {
     groups: [...shown.values()],
     today: await today(),
   }
+}
+
+/* ---------- course-wise attendance and the minimum to sit exams ---------- */
+
+const settingsOf = (ctx: OrgContext) =>
+  readAttendanceSettings(ctx.org.moduleSettings)
+
+/** The span eligibility is counted over: the term (semester) under way, else the current year. */
+async function countingSpan(ctx: OrgContext, day: string) {
+  const db = getDb()
+  const [year] = await db
+    .select()
+    .from(academicYears)
+    .where(
+      and(
+        eq(academicYears.orgId, ctx.org.id),
+        eq(academicYears.isCurrent, true)
+      )
+    )
+  if (year) {
+    const [term] = await db
+      .select()
+      .from(academicTerms)
+      .where(
+        and(
+          eq(academicTerms.yearId, year.id),
+          isNotNull(academicTerms.startsOn),
+          lte(academicTerms.startsOn, day),
+          gte(academicTerms.endsOn, day)
+        )
+      )
+    if (term?.startsOn && term.endsOn)
+      return { from: term.startsOn, to: term.endsOn, label: term.name }
+    return { from: year.startsOn, to: year.endsOn, label: year.name }
+  }
+  return { from: "0000-01-01", to: "9999-12-31", label: "All time" }
+}
+
+/**
+ * Each student's attendance in each course of a class over the term under way, with who is
+ * short of the minimum to sit exams (and how many classes would get them there).
+ */
+export async function courseAttendance(
+  slug: string,
+  user: User,
+  groupId: string
+) {
+  if (!z.uuid().safeParse(groupId).success) throw notFound("Class not found")
+  const { cc, view } = await access(slug, user, groupId)
+  if (!view)
+    throw new ApiError(
+      403,
+      "forbidden",
+      "Seeing attendance for this group isn't part of your role."
+    )
+  const day = await today()
+  const span = await countingSpan(cc.ctx, day)
+  const { minPercent } = settingsOf(cc.ctx)
+  const db = getDb()
+  const [students, courses, sessions] = await Promise.all([
+    studentsIn(cc),
+    coursesOf(cc),
+    db
+      .select({
+        id: teachingSessions.id,
+        subjectId: teachingSessions.subjectId,
+      })
+      .from(teachingSessions)
+      .where(
+        and(
+          inArray(teachingSessions.groupId, cc.inside),
+          eq(teachingSessions.kind, "register"),
+          isNotNull(teachingSessions.subjectId),
+          gte(teachingSessions.day, span.from),
+          lte(teachingSessions.day, span.to)
+        )
+      ),
+  ])
+  const marks = sessions.length
+    ? await db
+        .select({
+          sessionId: attendance.sessionId,
+          userId: attendance.userId,
+          status: attendance.status,
+        })
+        .from(attendance)
+        .where(
+          inArray(
+            attendance.sessionId,
+            sessions.map((s) => s.id)
+          )
+        )
+    : []
+  const courseOf = new Map(sessions.map((s) => [s.id, s.subjectId!]))
+  const taught = courses.filter((c) =>
+    sessions.some((s) => s.subjectId === c.id)
+  )
+  const rows = students.map((s) => {
+    const own = marks.filter((m) => m.userId === s.id)
+    const byCourse = Object.fromEntries(
+      taught.map((c) => {
+        const sum = summarizeAttendance(
+          own
+            .filter((m) => courseOf.get(m.sessionId) === c.id)
+            .map((m) => m.status as AttendanceStatus)
+        )
+        return [
+          c.id,
+          {
+            percent: sum.percent,
+            attended: sum.present + sum.late,
+            held: sum.counted,
+            status: eligibility(sum.percent, minPercent),
+            toReach: classesToReach(
+              sum.present + sum.late,
+              sum.counted,
+              minPercent
+            ),
+          },
+        ]
+      })
+    )
+    return {
+      id: s.id,
+      name: s.name ?? s.handle ?? s.email,
+      courses: byCourse,
+      short: Object.values(byCourse).filter((c) => c.status === "short").length,
+    }
+  })
+  return {
+    minPercent,
+    span,
+    courses: taught,
+    students: rows.sort(
+      (a, b) => b.short - a.short || a.name.localeCompare(b.name)
+    ),
+    shortStudents: rows.filter((r) => r.short > 0).length,
+  }
+}
+
+/** A student's own attendance by course in their classes, with how far from the minimum. */
+export async function myCourseAttendance(slug: string, user: User) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  const seats = await getDb()
+    .select({ groupId: groupMembers.groupId })
+    .from(groupMembers)
+    .where(
+      and(
+        eq(groupMembers.userId, user.id),
+        inArray(
+          groupMembers.groupId,
+          ctx.groups
+            .map((g) => g.id)
+            .concat(["00000000-0000-0000-0000-000000000000"])
+        )
+      )
+    )
+  const day = await today()
+  const span = await countingSpan(ctx, day)
+  const { minPercent } = settingsOf(ctx)
+  const out: {
+    course: string
+    code: string
+    percent: number | null
+    attended: number
+    held: number
+    status: ReturnType<typeof eligibility>
+    toReach: number | null
+  }[] = []
+  for (const seat of seats) {
+    const courses = await coursesOf({ ctx, groupId: seat.groupId })
+    const rows = await getDb()
+      .select({
+        subjectId: teachingSessions.subjectId,
+        status: attendance.status,
+      })
+      .from(attendance)
+      .innerJoin(
+        teachingSessions,
+        eq(attendance.sessionId, teachingSessions.id)
+      )
+      .where(
+        and(
+          eq(attendance.userId, user.id),
+          eq(teachingSessions.groupId, seat.groupId),
+          eq(teachingSessions.kind, "register"),
+          isNotNull(teachingSessions.subjectId),
+          gte(teachingSessions.day, span.from),
+          lte(teachingSessions.day, span.to)
+        )
+      )
+    for (const c of courses) {
+      const own = rows.filter((r) => r.subjectId === c.id)
+      if (own.length === 0) continue
+      const sum = summarizeAttendance(
+        own.map((r) => r.status as AttendanceStatus)
+      )
+      out.push({
+        course: c.name,
+        code: c.code,
+        percent: sum.percent,
+        attended: sum.present + sum.late,
+        held: sum.counted,
+        status: eligibility(sum.percent, minPercent),
+        toReach: classesToReach(
+          sum.present + sum.late,
+          sum.counted,
+          minPercent
+        ),
+      })
+    }
+  }
+  return { minPercent, span, courses: out }
+}
+
+export async function attendanceSettings(slug: string, user: User) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  return { ...settingsOf(ctx), canEdit: canFor(ctx, "org.settings.manage", []) }
+}
+
+/** Sets the minimum attendance to sit exams. */
+export async function saveAttendanceSettings(
+  slug: string,
+  user: User,
+  input: z.infer<typeof attendanceSettingsSchema>
+) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!canFor(ctx, "org.settings.manage", []))
+    throw new ApiError(
+      403,
+      "forbidden",
+      "Only those who manage settings can change this."
+    )
+  const settings = (ctx.org.moduleSettings ?? {}) as Record<string, unknown>
+  await getDb()
+    .update(organizations)
+    .set({
+      moduleSettings: {
+        ...settings,
+        attendance: {
+          ...((settings.attendance as object) ?? {}),
+          minPercent: input.minPercent,
+        },
+      },
+    })
+    .where(eq(organizations.id, ctx.org.id))
+  await writeAudit(
+    ctx,
+    "attendance.settings",
+    `Set the minimum attendance to sit exams to ${input.minPercent}%`
+  )
+  return { ...input, canEdit: true }
 }

@@ -12,6 +12,7 @@ export const GET = route({ access: "user" }, ({ user, params, query }) => {
     groupId: query.get("groupId"),
     day: query.get("day"),
     period: query.get("period") ?? "",
+    subjectId: query.get("subjectId") || null,
   })
   if (!parsed.success) {
     throw new ApiError(

@@ -57,6 +57,7 @@ import {
   CampusSummary,
   type CampusData,
 } from "@/features/campus/components/campus"
+import { MyCourseAttendance } from "@/features/attendance/components/attendance"
 import { CheckInCard } from "@/features/staff-attendance/components/staff-attendance"
 import { api } from "@/lib/api/client"
 
@@ -1009,6 +1010,8 @@ function StudentHome({ slug, data }: { slug: string; data: StudentData }) {
           />
         )}
       </div>
+
+      <MyCourseAttendance slug={slug} />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Card data-testid="student-today">

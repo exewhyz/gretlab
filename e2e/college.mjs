@@ -2,7 +2,9 @@
  * A college: courses with credits, semesters in the academic year, mid- and end-semester
  * assessments weighted into each course's grade on the UGC ten-point scale, the SGPA per
  * semester (a failed course is a backlog, its credits not earned) and the CGPA across
- * them, on the report card page and in its PDF; schools keep percentages; the kind's words.
+ * them, on the report card page and in its PDF; schools keep percentages; the kind's words;
+ * registers by course, attendance per course over the term, the minimum to sit exams (75%
+ * by default, set by the institution) with who's short and how many classes they need.
  *   node e2e/college.mjs [base-url] [screenshot-dir]
  */
 import { execFileSync } from "node:child_process"
@@ -114,6 +116,31 @@ const sem3 = await term("Summer term")
 const extra = await exam("Summer test", sem3.id, 0)
 check("removing a semester keeps its assessments, without one", (await owner(`${O}/exams/terms/${sem3.id}`, { method: "DELETE" })).status === 200 && psql(`select coalesce(term_id::text,'none') from term_exams where id='${extra.id}'`) === "none")
 
+// ---------- course-wise attendance and the 75% rule
+const k2 = await client("cl-s2@example.com")
+const today = (await owner(`${O}/attendance`)).json?.today
+const back = (n) => new Date(Date.parse(`${today}T00:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10)
+const reg = (subjectId, day, s1Status, s2Status, period = "") => owner(`${O}/attendance/register`, { method: "PUT", body: { groupId: batch.id, day, period, subjectId, marks: [{ userId: s1.id, status: s1Status }, { userId: s2.id, status: s2Status }] } })
+const physics = (await owner(`${O}/subjects`, { body: { name: "Physics", code: "PH101", credits: 4 } })).json
+check("a register's course must be one the batch takes", (await reg(physics.id, back(1), "present", "present")).status === 400)
+check("the register offers the batch's courses", (await owner(`${O}/attendance/register?groupId=${batch.id}&day=${back(1)}`)).json?.courses.map((c) => c.code).sort().join() === "CS201,CS291,MA201")
+for (const [n, st] of [[1, "present"], [2, "absent"], [3, "present"], [4, "absent"]]) await reg(ds.id, back(n), "present", st, "Period 1")
+await reg(ma.id, back(1), "present", "present", "Period 1")
+await reg(ma.id, back(2), "late", "present", "Period 1")
+check("two courses in the same period are separate registers", psql(`select count(*) from teaching_sessions where group_id='${batch.id}' and day='${back(1)}' and period='Period 1' and kind='register'`) === "2")
+const cr = (await owner(`${O}/attendance/courses?groupId=${batch.id}`)).json
+const ravis = cr?.students.find((x) => x.id === s2.id)
+check("attendance is counted per course", cr?.courses.map((c) => c.code).sort().join() === "CS201,MA201" && ravis?.courses[ds.id]?.percent === 50 && ravis.courses[ma.id]?.percent === 100, JSON.stringify(ravis?.courses))
+check("below 75% is short, with the classes needed to reach it", ravis?.courses[ds.id]?.status === "short" && ravis.courses[ds.id].toReach === 4 && cr.shortStudents === 1 && cr.minPercent === 75)
+check("late counts as there", cr?.students.find((x) => x.id === s1.id)?.courses[ma.id]?.percent === 100)
+const mine = (await k2(`${O}/attendance/me`)).json
+check("a student sees their own, and how far from the minimum", mine?.courses.find((c) => c.code === "CS201")?.status === "short" && mine.courses.find((c) => c.code === "CS201")?.toReach === 4)
+check("a student can't change the minimum", (await k2(`${O}/attendance/settings`, { method: "PUT", body: { minPercent: 40 } })).status === 403)
+await owner(`${O}/attendance/settings`, { method: "PUT", body: { minPercent: 50 } })
+const at50 = (await owner(`${O}/attendance/courses?groupId=${batch.id}`)).json
+check("the school sets its own minimum", at50?.minPercent === 50 && at50.students.find((x) => x.id === s2.id)?.courses[ds.id]?.status === "at_risk" && at50.shortStudents === 0)
+await owner(`${O}/attendance/settings`, { method: "PUT", body: { minPercent: 75 } })
+
 // ---------- the pages
 const browser = await chromium.launch()
 const view = async (email, width) => {
@@ -137,6 +164,26 @@ const phone = await view("cl-s1@example.com", 390)
 await phone.goto(`${BASE}${O}/results/me`)
 await phone.getByTestId("grade-card").waitFor({ timeout: 30000 })
 check("...and fits a phone", await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+const pickBatch = async (page) => {
+  await page.getByRole("button", { name: "Class" }).first().click()
+  const picker = page.getByTestId("group-picker")
+  await picker.getByLabel("Search groups").fill("B.Tech")
+  await picker.getByRole("option", { name: "CSE › B.Tech 2026", exact: true }).click()
+}
+await o.goto(`${BASE}${O}/manage/attendance-report`)
+await o.getByRole("tab", { name: "By course" }).click()
+await pickBatch(o)
+await o.getByTestId("course-report").waitFor({ timeout: 30000 })
+check("the report shows attendance by course, with who's short", (await o.getByTestId("short-count").innerText()).includes("1 short") && (await o.getByTestId("course-row").count()) === 2)
+await o.screenshot({ path: SHOTS + "course-attendance.png", fullPage: true })
+await o.goto(`${BASE}${O}/manage/attendance`)
+await pickBatch(o)
+await o.getByLabel("Course").waitFor({ timeout: 30000 })
+check("the register asks which course", (await o.getByLabel("Course").locator("option").count()) === 4)
+const rp = await view("cl-s2@example.com", 1440)
+await rp.goto(`${BASE}${O}`)
+await rp.getByTestId("my-course-attendance").waitFor({ timeout: 30000 })
+check("a student's home shows their attendance by course", (await rp.getByTestId("to-reach").first().innerText()).includes("next 4 classes"))
 await browser.close()
 
 cleanup()

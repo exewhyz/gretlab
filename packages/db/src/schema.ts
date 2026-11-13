@@ -1200,13 +1200,23 @@ export const teachingSessions = pgTable(
     kind: text("kind").$type<"class" | "register">().notNull().default("class"),
     /** A register's period or subject ("Period 3", "Physics"); "" for a whole-day register. */
     period: text("period").notNull().default(""),
+    /** The course a register is for (colleges' course-wise attendance); null for none. */
+    subjectId: uuid("subject_id").references((): AnyPgColumn => subjects.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
   },
   (table) => [
-    // One register per group, day and period.
+    // One register per group, day, period and course.
     uniqueIndex("attendance_register_unique")
-      .on(table.groupId, table.day, table.period)
+      .on(
+        table.groupId,
+        table.day,
+        table.period,
+        sql`coalesce(${table.subjectId}, '00000000-0000-0000-0000-000000000000'::uuid)`
+      )
       .where(sql`${table.kind} = 'register'`),
+    index("teaching_sessions_subject").on(table.subjectId, table.day),
     index("teaching_sessions_group").on(table.groupId, table.day),
     index("teaching_sessions_teacher").on(table.teacherId, table.day),
   ]

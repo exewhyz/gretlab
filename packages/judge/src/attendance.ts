@@ -48,3 +48,53 @@ export function summarizeAttendance(
     percent: counted ? Math.round((100 * (present + late)) / counted) : null,
   }
 }
+
+/* ---------- the minimum to sit exams (colleges' 75% rule) ---------- */
+
+export interface AttendanceSettings {
+  /** The least attendance, in percent, to be eligible for the end-of-term exams. */
+  minPercent: number
+}
+
+/** The module's settings (organizations.module_settings.attendance), with defaults. */
+export function readAttendanceSettings(
+  moduleSettings: unknown
+): AttendanceSettings {
+  const raw = (
+    moduleSettings as { attendance?: { minPercent?: unknown } } | null
+  )?.attendance
+  const min = raw?.minPercent
+  return {
+    minPercent:
+      typeof min === "number" && Number.isInteger(min) && min >= 0 && min <= 100
+        ? min
+        : 75,
+  }
+}
+
+export type Eligibility = "eligible" | "at_risk" | "short" | "none"
+
+/** Eligible, at risk (within five points above the minimum), short of it, or nothing taken yet. */
+export function eligibility(
+  percent: number | null,
+  minPercent: number
+): Eligibility {
+  if (percent == null) return "none"
+  if (percent < minPercent) return "short"
+  return percent < minPercent + 5 ? "at_risk" : "eligible"
+}
+
+/**
+ * How many classes in a row someone must attend to reach the minimum from here: the least
+ * k with (present + k) / (counted + k) ≥ min. 0 when already there; null when it can't be
+ * reached (a minimum of 100% after missing one).
+ */
+export function classesToReach(
+  present: number,
+  counted: number,
+  minPercent: number
+) {
+  if (counted === 0 || 100 * present >= minPercent * counted) return 0
+  if (minPercent >= 100) return null
+  return Math.ceil((minPercent * counted - 100 * present) / (100 - minPercent))
+}

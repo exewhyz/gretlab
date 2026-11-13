@@ -435,6 +435,13 @@
       "when": 1794554363649,
       "tag": "0061_college_terms",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1794556956719,
+      "tag": "0062_course_attendance",
+      "breakpoints": true
     }
   ]
 }
