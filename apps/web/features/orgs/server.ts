@@ -48,7 +48,12 @@ import {
 import type { z } from "zod"
 
 import { ApiError, notFound } from "@/lib/api/route"
-import { auditCsv, readAudit, writeEntry, type AuditFilters } from "@/features/audit/server"
+import {
+  auditCsv,
+  readAudit,
+  writeEntry,
+  type AuditFilters,
+} from "@/features/audit/server"
 import { notify } from "@/features/notifications/server"
 import { platformCan } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
@@ -364,7 +369,11 @@ async function createOrgInTx(
   tx: Tx,
   input: { name: string; slug: string; type: OrgType },
   ownerId: string,
-  extra: { active?: boolean; signupStatus?: string | null; listed?: boolean } = {}
+  extra: {
+    active?: boolean
+    signupStatus?: string | null
+    listed?: boolean
+  } = {}
 ) {
   const [org] = await tx
     .insert(organizations)
@@ -404,10 +413,17 @@ export async function signupMode() {
  * sign-ups are reviewed it waits, inactive, for a platform admin; when open it's ready at
  * once. The optional set-up adds the current academic year and grades with sections.
  */
-export async function signUpOrganization(user: User, input: z.infer<typeof signupSchema>) {
+export async function signUpOrganization(
+  user: User,
+  input: z.infer<typeof signupSchema>
+) {
   const mode = await signupMode()
   if (mode === "off")
-    throw new ApiError(403, "signup_off", "Registering a school here is switched off. Ask the site's admins.")
+    throw new ApiError(
+      403,
+      "signup_off",
+      "Registering a school here is switched off. Ask the site's admins."
+    )
   const db = getDb()
   // A few a day per person, so the directory can't be flooded.
   const [recent] = await db
@@ -421,22 +437,49 @@ export async function signUpOrganization(user: User, input: z.infer<typeof signu
       )
     )
   if (Number(recent?.n ?? 0) >= 3)
-    throw new ApiError(429, "too_many", "You've registered 3 today. Try again tomorrow.")
+    throw new ApiError(
+      429,
+      "too_many",
+      "You've registered 3 today. Try again tomorrow."
+    )
   if (input.year) {
     const problem = yearProblem(input.year)
     if (problem) throw new ApiError(400, "bad_year", problem)
   }
   if (input.grades && input.grades.to < input.grades.from)
-    throw new ApiError(400, "bad_grades", "The last grade can't come before the first.")
-  if (input.grades && new Set(input.grades.sections.map((s) => s.toLowerCase())).size !== input.grades.sections.length)
+    throw new ApiError(
+      400,
+      "bad_grades",
+      "The last grade can't come before the first."
+    )
+  if (
+    input.grades &&
+    new Set(input.grades.sections.map((s) => s.toLowerCase())).size !==
+      input.grades.sections.length
+  )
     throw new ApiError(400, "bad_grades", "Each section once.")
-  const [taken] = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.slug, input.slug))
-  if (taken) throw new ApiError(409, "slug_taken", "That web address is taken. Try another.")
+  const [taken] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.slug, input.slug))
+  if (taken)
+    throw new ApiError(
+      409,
+      "slug_taken",
+      "That web address is taken. Try another."
+    )
   const pending = mode === "review"
   const org = await db.transaction(async (tx) => {
-    const org = await createOrgInTx(tx, input, user.id, pending ? { active: false, signupStatus: "pending" } : {})
+    const org = await createOrgInTx(
+      tx,
+      input,
+      user.id,
+      pending ? { active: false, signupStatus: "pending" } : {}
+    )
     if (input.year)
-      await tx.insert(academicYears).values({ orgId: org.id, ...input.year, isCurrent: true })
+      await tx
+        .insert(academicYears)
+        .values({ orgId: org.id, ...input.year, isCurrent: true })
     if (input.grades) {
       const levels = ORG_TYPE_CONFIG[input.type].groupLevels
       for (let n = input.grades.from; n <= input.grades.to; n++) {
@@ -445,19 +488,36 @@ export async function signUpOrganization(user: User, input: z.infer<typeof signu
           .values({ orgId: org.id, name: `${levels[0] ?? "Grade"} ${n}` })
           .returning()
         if (levels.length > 1)
-          await tx.insert(orgGroups).values(
-            input.grades.sections.map((name) => ({ orgId: org.id, parentId: grade!.id, name }))
-          )
+          await tx
+            .insert(orgGroups)
+            .values(
+              input.grades.sections.map((name) => ({
+                orgId: org.id,
+                parentId: grade!.id,
+                name,
+              }))
+            )
       }
     }
-    await audit(tx, { org, user }, "org.signup", `Registered ${org.name}${pending ? ", waiting for approval" : ""}`, {
-      year: input.year?.name ?? null,
-      grades: input.grades ? `${input.grades.from}-${input.grades.to} × ${input.grades.sections.length}` : null,
-    })
+    await audit(
+      tx,
+      { org, user },
+      "org.signup",
+      `Registered ${org.name}${pending ? ", waiting for approval" : ""}`,
+      {
+        year: input.year?.name ?? null,
+        grades: input.grades
+          ? `${input.grades.from}-${input.grades.to} × ${input.grades.sections.length}`
+          : null,
+      }
+    )
     return org
   })
   if (pending) {
-    const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"))
+    const admins = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, "admin"))
     await notify(
       admins.map((a) => a.id),
       {
@@ -499,7 +559,9 @@ export async function setOrganizationActive(
       .select({ id: roleAssignments.userId })
       .from(roleAssignments)
       .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
-      .where(and(eq(roleAssignments.orgId, org.id), eq(orgRoles.systemKey, "owner")))
+      .where(
+        and(eq(roleAssignments.orgId, org.id), eq(orgRoles.systemKey, "owner"))
+      )
     await notify(
       owners.map((o) => o.id),
       {
@@ -605,7 +667,12 @@ export async function getOrganization(slug: string, viewer: User | null) {
     admissionsOpen: (() => {
       const modules = enabledModules(org.type, org.modules, policies[org.type])
       const a = readAdmissionSettings(org.moduleSettings)
-      return modules.has("admissions") && modules.has("records") && a.open && !!a.yearId
+      return (
+        modules.has("admissions") &&
+        modules.has("records") &&
+        a.open &&
+        !!a.yearId
+      )
     })(),
   }
 }
@@ -1222,12 +1289,19 @@ export async function updateSettings(
       .where(eq(organizations.id, ctx.org.id))
       .returning()
     const changes = changesBetween(ctx.org, org!, SETTING_LABELS)
-    const moduleLabel = (key: string) => MODULES[key as keyof typeof MODULES]?.label ?? key
+    const moduleLabel = (key: string) =>
+      MODULES[key as keyof typeof MODULES]?.label ?? key
     const lists = [
       listChanges(
         "Modules",
         [...ctx.modules].map(moduleLabel),
-        [...enabledModules(org!.type, org!.modules, (await kindPolicies())[org!.type])].map(moduleLabel)
+        [
+          ...enabledModules(
+            org!.type,
+            org!.modules,
+            (await kindPolicies())[org!.type]
+          ),
+        ].map(moduleLabel)
       ),
     ].filter(Boolean)
     const what = [...changes.map((c) => c.field), ...lists.map((l) => l!.label)]
@@ -1235,7 +1309,9 @@ export async function updateSettings(
       tx,
       ctx,
       "org.settings",
-      what.length ? `Changed ${what.join(", ").toLowerCase()}` : "Saved the settings unchanged",
+      what.length
+        ? `Changed ${what.join(", ").toLowerCase()}`
+        : "Saved the settings unchanged",
       { changes, lists }
     )
     return org!
@@ -1779,9 +1855,16 @@ export async function updateRole(
     await tx.update(orgRoles).set(input).where(eq(orgRoles.id, id))
     const label = (p: string) => PERMISSIONS[p as Permission]?.label ?? p
     await audit(tx, ctx, "role.update", `Changed role ${input.name}`, {
-      changes: changesBetween(role, input, { name: "Name", description: "Description" }),
+      changes: changesBetween(role, input, {
+        name: "Name",
+        description: "Description",
+      }),
       lists: [
-        listChanges("Permissions", role.permissions.map(label), input.permissions.map(label)),
+        listChanges(
+          "Permissions",
+          role.permissions.map(label),
+          input.permissions.map(label)
+        ),
       ].filter(Boolean),
     })
   })
@@ -1817,14 +1900,22 @@ const SETTING_LABELS = {
 }
 
 /** Manage › Activity: a page of the organization's log, filtered. */
-export async function listAudit(slug: string, user: User, filters: AuditFilters) {
+export async function listAudit(
+  slug: string,
+  user: User,
+  filters: AuditFilters
+) {
   const ctx = await context(slug, user)
   need(ctx, "org.audit.view")
   return readAudit(ctx.org.id, filters)
 }
 
 /** The organization's log, filtered, as CSV. */
-export async function exportAudit(slug: string, user: User, filters: AuditFilters) {
+export async function exportAudit(
+  slug: string,
+  user: User,
+  filters: AuditFilters
+) {
   const ctx = await context(slug, user)
   need(ctx, "org.audit.view")
   await audit(getDb(), ctx, "org.audit_export", "Downloaded the activity log")
@@ -2014,9 +2105,19 @@ export async function importMembers(
     }
 
     if (out.role) {
-      const role = roles.find(
-        (r) => r.name.toLowerCase() === out.role.toLowerCase()
-      )
+      // A role by its name here (Faculty), or a built-in one by its usual name (Teacher),
+      // so a spreadsheet written for any kind still works.
+      const wanted = out.role.toLowerCase()
+      const role =
+        roles.find((r) => r.name.toLowerCase() === wanted) ??
+        roles.find(
+          (r) =>
+            r.systemKey &&
+            (r.systemKey === wanted ||
+              SYSTEM_ROLES[
+                r.systemKey as keyof typeof SYSTEM_ROLES
+              ]?.name.toLowerCase() === wanted)
+        )
       if (!role) return fail(`No role "${out.role}"`)
       if (role.systemKey === "owner") return fail("Owners can't be imported")
       if (role.systemKey !== "member") {

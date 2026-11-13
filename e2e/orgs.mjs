@@ -70,7 +70,7 @@ const created = await api.admin("/admin/organizations", { body: { name: "Test Co
 check("platform admin creates a college with an owner", created.status === 200, JSON.stringify(created.json).slice(0, 150))
 check("the address must be unique", (await api.admin("/admin/organizations", { body: { name: "Dup", slug: "orgtest-college", type: "college", ownerEmail: PEOPLE.owner[0] } })).status === 409)
 const summary = (await api.owner(`${O}/manage`)).json
-check("the owner can manage it, with every permission", summary?.isOwner && summary.permissions.length >= 30 && ["assignments.manage", "assignments.grade", "org.notifications.manage"].every((p) => summary.permissions.includes(p)) && summary.org.groupLevels.join() === "Branch,Batch", JSON.stringify(summary?.org))
+check("the owner can manage it, with every permission", summary?.isOwner && summary.permissions.length >= 30 && ["assignments.manage", "assignments.grade", "org.notifications.manage"].every((p) => summary.permissions.includes(p)) && summary.org.groupLevels.join() === "Department,Batch", JSON.stringify(summary?.org))
 check("others can't open management", (await api.s1(`${O}/manage`)).status === 403)
 const roles = (await api.owner(`${O}/roles`)).json
 const role = (key) => roles.find((r) => r.systemKey === key)
@@ -103,7 +103,7 @@ check("students can't create groups", (await api.s1(`${O}/groups`, { body: { nam
 
 // ---------- invites
 const teacherInvite = (await api.owner(`${O}/invites`, { body: { label: "CSE teachers", roleId: role("teacher").id, groupId: cse.id, maxUses: 1, expiresInDays: 7 } })).json
-check("invite link shows what it's for, before sign-in", (await anon(`/invites/${teacherInvite.token}`)).json?.role === "Teacher" && (await anon(`/invites/${teacherInvite.token}`)).json.group === "CSE")
+check("invite link shows what it's for, before sign-in", (await anon(`/invites/${teacherInvite.token}`)).json?.role === "Faculty" && (await anon(`/invites/${teacherInvite.token}`)).json.group === "CSE")
 check("a teacher joins with it", (await api.teacher(`/invites/${teacherInvite.token}`, { body: { shareProgress: false } })).status === 200)
 check("a one-use link can't be used twice", (await api.s2(`/invites/${teacherInvite.token}`, { body: { shareProgress: false } })).status === 410)
 const personal = (await api.owner(`${O}/invites`, { body: { label: "for s2", email: PEOPLE.s2[0] } })).json
@@ -154,7 +154,7 @@ check("the log needs its permission", (await api.campus(`${O}/audit`)).status ==
 // ---------- several organizations, leaving, privacy
 await api.admin("/admin/organizations", { body: { name: "Test Company", slug: "orgtest-company", type: "company", ownerEmail: PEOPLE.owner[0] } })
 await api.owner("/orgs/orgtest-company", { method: "PATCH", body: { joinPolicy: "open" } })
-check("a company names its groups as teams", (await api.owner("/orgs/orgtest-company/manage")).json.org.groupLevels.join() === "Team")
+check("a company names its groups as teams", (await api.owner("/orgs/orgtest-company/manage")).json.org.groupLevels.join() === "Department,Team")
 check("open policy: join at once", (await api.s1("/orgs/orgtest-company/join", { body: { shareProgress: false } })).json?.status === "active")
 const mine = (await api.s1("/me/orgs")).json
 check("one person, two organizations", mine.length === 2 && mine.find((o) => o.slug === "orgtest-college").roles.includes("Admin"), JSON.stringify(mine.map((o) => [o.slug, o.roles])))
@@ -649,7 +649,7 @@ await groupsDialog.waitFor({ state: "hidden", timeout: 15000 })
 // Giving a role for one group, picked from the tree.
 await o.getByTestId("member-row").filter({ hasText: PEOPLE.s2[0] }).getByRole("button", { name: "Add role" }).click()
 const roleDialog = o.getByRole("dialog", { name: /a role$/ })
-await roleDialog.getByLabel("Role to give").selectOption({ label: "Teacher" })
+await roleDialog.getByLabel("Role to give").selectOption({ label: "Faculty" })
 await roleDialog.getByRole("button", { name: "Where it applies" }).click()
 check("the picker shows the tree with level names", await o.getByTestId("group-picker").getByRole("option", { name: "3rd Year", exact: true }).isVisible() && /Year/.test(await o.getByTestId("group-picker").textContent()))
 await o.getByTestId("group-picker").getByLabel("Search groups").fill("Lab")
@@ -662,7 +662,7 @@ await roleDialog.getByRole("button", { name: "Give role" }).click()
 const s2member = o.getByTestId("member-row").filter({ hasText: PEOPLE.s2[0] })
 await s2member.getByText("3rd Year › Sec B › Lab 3").waitFor({ timeout: 15000 })
 check("a role can be given for one group from the members page", true)
-await s2member.getByRole("button", { name: `Remove Teacher from ${PEOPLE.s2[0]}` }).click()
+await s2member.getByRole("button", { name: `Remove Faculty from ${PEOPLE.s2[0]}` }).click()
 await o.getByRole("alertdialog").getByRole("button", { name: "Take role" }).click()
 await s2member.getByText("3rd Year › Sec B › Lab 3").waitFor({ state: "detached", timeout: 15000 })
 check("and taken away after confirming", true)
