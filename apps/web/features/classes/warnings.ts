@@ -24,6 +24,24 @@ import { classContext, classwork, studentsIn } from "./server"
 const { and, eq, inArray, max } = sql
 
 export async function classWarnings(slug: string, user: User, groupId: string) {
+  const { students: list, total } = await learnerSignals(slug, user, groupId)
+  const rank = { risk: 0, watch: 1 } as const
+  return {
+    rules: WARNING_RULES,
+    students: list
+      .filter((s) => s.level !== null)
+      .map(({ id, name, email, level, reasons }) => ({ id, name, email, level, reasons }))
+      .sort((a, b) => rank[a.level!] - rank[b.level!] || a.name.localeCompare(b.name)),
+    total,
+  }
+}
+
+/**
+ * Every student of a class with what the warnings are worked out from: work done of work
+ * due, attendance, last activity, and the warning itself (null when all's well). The
+ * class's early warnings and a cohort's progress page both read it.
+ */
+export async function learnerSignals(slug: string, user: User, groupId: string) {
   const cc = await classContext(slug, user, groupId)
   const { ctx } = cc
   needFor(ctx, "gradebook.view", [[groupId]])
@@ -94,16 +112,14 @@ export async function classWarnings(slug: string, user: User, groupId: string) {
       email: s.email,
       level: warning.level,
       reasons: warning.reasons.map(describeReason),
+      /** Work past its due date: how much was handed in. */
+      done: finished.filter((f) => !f.missed).length,
+      due: finished.length,
+      attendance: att ? { present: Number(att.present), total: att.total } : null,
+      lastActive: seen ? new Date(seen).toISOString() : null,
     }
   })
-  const rank = { risk: 0, watch: 1 } as const
-  return {
-    rules: WARNING_RULES,
-    students: list
-      .filter((s) => s.level !== null)
-      .sort((a, b) => rank[a.level!] - rank[b.level!] || a.name.localeCompare(b.name)),
-    total: students.length,
-  }
+  return { ctx, students: list, total: students.length }
 }
 
 /** A teacher's note to some of the class's students, to their bell (and email). */

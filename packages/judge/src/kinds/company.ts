@@ -34,6 +34,8 @@ export const company = {
   capabilities: ["attendance"],
   defaults: [],
   grading: "none",
+  groupDates: false,
+  leadPerGroup: true,
   roleNames: {
     owner: "Owner",
     admin: "L&D admin",

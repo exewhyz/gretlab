@@ -35,6 +35,8 @@ export const cohort = {
   capabilities: ["attendance", "timetable", "subjects", "leave"],
   defaults: ["attendance"],
   grading: "none",
+  groupDates: true,
+  leadPerGroup: true,
   roleNames: {
     owner: "Owner",
     admin: "Program manager",

@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto"
 
 import { certificates, getDb, organizations, sql, users, type User } from "@workspace/db"
+import { KINDS } from "@workspace/judge"
 
 import { classContext, studentsIn } from "@/features/classes/server"
 import { courseFinishers } from "@/features/courses/classes"
@@ -17,7 +18,7 @@ import type { IssueInput } from "./schemas"
  * signing in, and says when one was revoked.
  */
 
-const { and, desc, eq } = sql
+const { and, desc, eq, isNull } = sql
 
 /** No 0/O or 1/I/L, so a code read aloud or typed is unambiguous. */
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
@@ -47,6 +48,29 @@ export async function issueCertificates(slug: string, user: User, groupId: strin
     title = f.course.title
     detail = `Completed all ${f.modules} modules of the course in ${className}, ${cc.ctx.org.name}.`
     sourceId = input.courseId
+  } else if (input.kind === "graduation") {
+    const kind = KINDS[cc.ctx.org.type]
+    const group = cc.ctx.groups.find((g) => g.id === groupId)!
+    if (!kind.groupDates || !group.startsOn || !group.endsOn) {
+      throw new ApiError(400, "no_run", "Only a group with run dates has graduates.")
+    }
+    const students = new Set((await studentsIn(cc)).map((s) => s.id))
+    if (input.userIds.some((id) => !students.has(id))) {
+      throw new ApiError(400, "not_in_class", "Only people in it can graduate from it.")
+    }
+    // Once per person per run.
+    const had = new Set(
+      (
+        await getDb()
+          .select({ userId: certificates.userId })
+          .from(certificates)
+          .where(and(eq(certificates.kind, "graduation"), eq(certificates.sourceId, groupId), isNull(certificates.revokedAt)))
+      ).map((r) => r.userId)
+    )
+    people = input.userIds.filter((id) => !had.has(id)).map((id) => ({ id }))
+    title = `${className}, ${cc.ctx.org.name}`
+    detail = `Completed the ${kind.terms.group.toLowerCase()}, ${group.startsOn} to ${group.endsOn}.`
+    sourceId = groupId
   } else {
     const students = new Set((await studentsIn(cc)).map((s) => s.id))
     if (input.userIds.some((id) => !students.has(id))) {

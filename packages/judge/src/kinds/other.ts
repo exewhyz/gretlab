@@ -34,6 +34,8 @@ export const other = {
   capabilities: ["attendance", "timetable", "subjects", "library"],
   defaults: [],
   grading: "marks",
+  groupDates: false,
+  leadPerGroup: true,
   roleNames: {
     owner: "Owner",
     admin: "Admin",

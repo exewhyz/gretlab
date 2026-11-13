@@ -560,6 +560,14 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Given in a class by whoever may set its work (`features/certificates`, `certificates`), from the Course tab's Certificates panel: for finishing one of the class's courses (every item done; once per student per course, even if revoked) or one the teacher writes for chosen students of the class. Students are notified and find them under My certificates (account menu, `/certificates`).
 - Each has a short public code (`ABCDE-23456`, no 0/O/1/I/L) and a page at `/certificates/<code>` that anyone can open without signing in: name (never email), title, college, issuer, date, and whether it's valid or revoked. It prints as the certificate. Revoking keeps the record and says so on the page; issuing and revoking are in the activity log.
 
+## Cohort runs and mentors
+
+- Kinds say whether their groups run between dates (`groupDates`: cohort, coaching) and whether each group has its own lead (`leadPerGroup`: everything but schools and colleges, which name class teachers per academic year). `org_groups.starts_on`/`ends_on`/`lead_id`, set with `PUT /orgs/<slug>/groups/<id>/run` (`setGroupRun`, needs "Edit groups"), from the Groups page's "Dates & mentor". Kinds without them get 400 `not_for_kind`. A new lead who doesn't teach the group yet is given the kind's instructor role (Mentor) on it; the role stays if they stop leading.
+- Where a run is (`packages/judge/src/runs.ts`, unit-tested): upcoming with days to go, week N of M while running, or finished. Display helpers in `features/runs/format.ts`.
+- **Progress** (Manage › Academics, only for kinds with runs; `features/runs`): each run with its week and its pods' mentors, and a run's page with every learner's work handed in of work due, attendance, last activity and early warning (`learnerSignals` in `features/classes/warnings.ts`, which the class's Needs attention also reads), by pod. Program managers see whole runs; a mentor sees only the pods they can see grades for.
+- **Graduation** from a run's page issues `graduation` certificates (`issueCertificates`, needs "Manage assignments" on the run): once per learner per run, only for people in it, only for groups with dates.
+- Homes: a learner sees their cohort, its week, their pod and its mentor; a mentor sees the pods they lead, linked to their progress (`homeRuns`, `runs` in the home data; null for kinds without runs).
+
 ## Calendar
 
 - `/calendar` (account menu) lists everything with a date for the viewer, by day (`features/calendar/server.ts`, `eventsFor`): published assignments' due times with their own extension, exam windows, peer reviews still to write that have a due time, and contests they registered for or their organizations run (the platform's open contests don't fill everyone's calendar).

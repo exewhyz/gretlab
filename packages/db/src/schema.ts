@@ -690,6 +690,11 @@ export const orgGroups = pgTable(
     parentId: uuid("parent_id"),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
+    /** For kinds whose groups run between dates (a cohort): YYYY-MM-DD, inclusive. */
+    startsOn: text("starts_on"),
+    endsOn: text("ends_on"),
+    /** For kinds with a lead per group (a pod's mentor), not per academic year. */
+    leadId: uuid("lead_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
   (table) => [index("org_groups_org").on(table.orgId, table.parentId)]
@@ -2350,7 +2355,7 @@ export const certificates = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    kind: text("kind").$type<"course" | "custom">().notNull(),
+    kind: text("kind").$type<"course" | "custom" | "graduation">().notNull(),
     /** The course it's for (kind course). */
     sourceId: uuid("source_id"),
     title: text("title").notNull(),

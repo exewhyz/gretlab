@@ -43,6 +43,7 @@ import {
   changesBetween,
   listChanges,
   yearProblem,
+  runProblem,
   type OrgType,
 } from "@workspace/judge"
 import type { z } from "zod"
@@ -67,6 +68,7 @@ import type {
   assignRoleSchema,
   importSchema,
   groupSchema,
+  groupRunSchema,
   inviteSchema,
   memberUpdateSchema,
   orgCreateSchema,
@@ -1631,8 +1633,19 @@ export async function listGroups(slug: string, user: User) {
           )
         )
     : []
+  const leadIds = [...new Set(ctx.groups.flatMap((g) => (g.leadId ? [g.leadId] : [])))]
+  const leads = leadIds.length
+    ? (
+        await getDb()
+          .select({ id: users.id, name: users.name, email: users.email })
+          .from(users)
+          .where(inArray(users.id, leadIds))
+      ).map((u) => ({ id: u.id, name: u.name ?? u.email }))
+    : []
+  const kind = KINDS[ctx.org.type]
   return {
     levels: ctx.org.groupLevels,
+    run: { dates: kind.groupDates, lead: kind.leadPerGroup, leadTerm: kind.terms.groupLead },
     canManageAll: can(ctx, "org.groups.manage"),
     groups: ctx.groups
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -1653,6 +1666,10 @@ export async function listGroups(slug: string, user: User) {
           // People sitting directly in a group that now has groups inside it.
           notPlaced: isLeaf(ctx, g.id) ? 0 : direct,
           canManage: can(ctx, "org.groups.manage", g.id),
+          canEdit: can(ctx, "org.groups.edit", g.id),
+          startsOn: g.startsOn,
+          endsOn: g.endsOn,
+          lead: g.leadId ? (leads.find((l) => l.id === g.leadId) ?? null) : null,
         }
       }),
   }
@@ -1729,6 +1746,79 @@ export async function updateGroup(
       `Renamed ${group.name} to ${input.name}`
     )
   })
+}
+
+/**
+ * A group's run and lead, for kinds that have them: a cohort's dates, a pod's mentor. The
+ * lead is given the kind's instructor role on the group if nothing gives them teaching
+ * there yet, so they can run it (it stays when they stop leading; take it off in People).
+ */
+export async function setGroupRun(
+  slug: string,
+  user: User,
+  id: string,
+  input: z.infer<typeof groupRunSchema>
+) {
+  const ctx = await context(slug, user)
+  const group = groupIn(ctx, id)
+  need(ctx, "org.groups.edit", id)
+  const kind = KINDS[ctx.org.type]
+  const datesGiven = input.startsOn !== undefined || input.endsOn !== undefined
+  if (datesGiven && !kind.groupDates)
+    throw new ApiError(400, "not_for_kind", `${kind.terms.groups} don't run between dates in a ${kind.noun}.`)
+  if (input.leadId !== undefined && !kind.leadPerGroup)
+    throw new ApiError(400, "not_for_kind", `A ${kind.noun} names its ${kind.terms.groupLead.toLowerCase()}s per year, in Academic years.`)
+  const startsOn = input.startsOn === undefined ? group.startsOn : input.startsOn
+  const endsOn = input.endsOn === undefined ? group.endsOn : input.endsOn
+  const problem = runProblem(startsOn, endsOn)
+  if (problem) throw new ApiError(400, "bad_run", problem)
+  let lead: { id: string; email: string; name: string | null } | null = null
+  if (input.leadId) {
+    const [row] = await getDb()
+      .select({ id: users.id, email: users.email, name: users.name })
+      .from(orgMembers)
+      .innerJoin(users, eq(orgMembers.userId, users.id))
+      .where(and(eq(orgMembers.orgId, ctx.org.id), eq(orgMembers.userId, input.leadId), eq(orgMembers.status, "active")))
+    if (!row) throw new ApiError(400, "not_member", "The lead has to be an active member.")
+    lead = row
+  }
+  const instructor = lead ? await systemRole(getDb(), ctx.org.id, "teacher") : null
+  if (instructor) needSubset(ctx, rolePermissions(instructor), id)
+  await getDb().transaction(async (tx) => {
+    await tx
+      .update(orgGroups)
+      .set({
+        startsOn,
+        endsOn,
+        ...(input.leadId !== undefined ? { leadId: input.leadId } : {}),
+      })
+      .where(eq(orgGroups.id, id))
+    if (lead && instructor) {
+      const [held] = await tx
+        .select({ systemKey: orgRoles.systemKey, permissions: orgRoles.permissions, groupId: roleAssignments.groupId })
+        .from(roleAssignments)
+        .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
+        .where(and(eq(roleAssignments.orgId, ctx.org.id), eq(roleAssignments.userId, lead.id)))
+        .then((rows) =>
+          rows.filter(
+            (r) =>
+              (r.groupId === null || chainOf(ctx, id).includes(r.groupId)) &&
+              rolePermissions(r).includes("teaching.log")
+          )
+        )
+      if (!held) await giveRole(tx, ctx.org.id, lead.id, instructor.id, id)
+    }
+    const parts = [
+      datesGiven ? (startsOn ? `runs ${startsOn} to ${endsOn}` : "no dates") : null,
+      input.leadId !== undefined
+        ? lead
+          ? `${kind.terms.groupLead} ${lead.name ?? lead.email}`
+          : `no ${kind.terms.groupLead.toLowerCase()}`
+        : null,
+    ].filter(Boolean)
+    await audit(tx, ctx, "group.run", `${group.name}: ${parts.join(", ")}`)
+  })
+  return { startsOn, endsOn, leadId: input.leadId === undefined ? group.leadId : input.leadId }
 }
 
 /**

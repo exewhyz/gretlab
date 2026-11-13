@@ -60,6 +60,8 @@ export const college = {
     "subjects",
   ],
   grading: "credits",
+  groupDates: false,
+  leadPerGroup: false,
   roleNames: {
     owner: "Owner",
     admin: "Admin",

@@ -22,7 +22,7 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { createContext, useContext, useState } from "react"
 
-import { KINDS, type KindTerms } from "@workspace/judge"
+import { KINDS, type KindTerms, type RunState } from "@workspace/judge"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import { Badge } from "@workspace/ui/components/badge"
@@ -58,6 +58,7 @@ import {
   type CampusData,
 } from "@/features/campus/components/campus"
 import { MyCourseAttendance } from "@/features/attendance/components/attendance"
+import { runLabel, runPercent, runStatus } from "@/features/runs/format"
 import { CheckInCard } from "@/features/staff-attendance/components/staff-attendance"
 import { api } from "@/lib/api/client"
 
@@ -175,9 +176,24 @@ type View = "admin" | "teacher" | "student" | "parent" | "staff"
 const TermsContext = createContext<KindTerms>(KINDS.school.terms)
 const useTerms = () => useContext(TermsContext)
 
+interface Runs {
+  learning: {
+    id: string
+    name: string
+    startsOn: string
+    endsOn: string
+    state: RunState
+    pod: { id: string; name: string } | null
+    lead: string | null
+  }[]
+  leading: { id: string; name: string; run: { id: string; name: string; state: RunState } }[]
+}
+
 interface Home {
   terms?: KindTerms
   views: View[]
+  /** Runs (cohorts) for kinds whose groups have dates; null otherwise. */
+  runs?: Runs | null
   admin: AdminData | null
   teacher: TeacherData | null
   student: StudentData | null
@@ -242,10 +258,10 @@ export function OrgHome({ slug }: { slug: string }) {
           <AdminHome slug={slug} data={data.admin} />
         )}
         {view === "teacher" && data.teacher && (
-          <TeacherHome slug={slug} data={data.teacher} />
+          <TeacherHome slug={slug} data={data.teacher} runs={data.runs ?? null} />
         )}
         {view === "student" && data.student && (
-          <StudentHome slug={slug} data={data.student} />
+          <StudentHome slug={slug} data={data.student} runs={data.runs ?? null} />
         )}
         {view === "parent" && data.parent && (
           <ParentHome slug={slug} data={data.parent} />
@@ -765,7 +781,15 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
 
 /* ---------- teaching ---------- */
 
-function TeacherHome({ slug, data }: { slug: string; data: TeacherData }) {
+function TeacherHome({
+  slug,
+  data,
+  runs,
+}: {
+  slug: string
+  data: TeacherData
+  runs: Runs | null
+}) {
   const terms = useTerms()
   const manage = `/orgs/${slug}/manage`
   return (
@@ -775,6 +799,7 @@ function TeacherHome({ slug, data }: { slug: string; data: TeacherData }) {
         title={`${terms.instructor === "Mentor" ? "Mentoring" : terms.instructor === "Manager" ? "Your team" : "Teaching"} today`}
       />
       {data.checkIn && <CheckInCard slug={slug} />}
+      {runs && runs.leading.length > 0 && <LeadingRuns slug={slug} runs={runs} />}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Tile
@@ -953,7 +978,83 @@ function isNow(starts: string, ends: string) {
   return m >= at(starts) && m < at(ends)
 }
 
-function StudentHome({ slug, data }: { slug: string; data: StudentData }) {
+/** A learner's runs: which cohort, its week, their pod and its mentor. */
+function MyRuns({ runs }: { runs: Runs }) {
+  const terms = useTerms()
+  return (
+    <div className="grid gap-3 md:grid-cols-2" data-testid="my-runs">
+      {runs.learning.map((r) => (
+        <Card key={r.id} size="sm" data-testid="my-run">
+          <CardHeader>
+            <CardDescription>{terms.group}</CardDescription>
+            <CardTitle className="text-title-md">{r.name}</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-semibold text-ink" data-testid="my-run-week">
+                {runStatus(r.state)}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {runLabel(r.startsOn, r.endsOn)}
+              </span>
+            </div>
+            <Meter value={runPercent(r.state)} />
+            <span className="text-body-sm text-body" data-testid="my-run-lead">
+              {r.pod ? `${r.pod.name} · ` : ""}
+              {r.lead
+                ? `${terms.groupLead}: ${r.lead}`
+                : `No ${terms.groupLead.toLowerCase()} yet`}
+            </span>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+/** A mentor's pods, each with where its run is, linked to its progress. */
+function LeadingRuns({ slug, runs }: { slug: string; runs: Runs }) {
+  const terms = useTerms()
+  return (
+    <Card size="sm" data-testid="leading-runs">
+      <CardHeader>
+        <CardTitle className="text-title-md">
+          You&apos;re the {terms.groupLead.toLowerCase()} of
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="grid gap-1.5">
+          {runs.leading.map((g) => (
+            <li key={g.id} className="flex flex-wrap items-baseline justify-between gap-2">
+              <Link
+                href={`/orgs/${slug}/manage/progress/${g.run.id}`}
+                className="font-medium text-ink hover:underline"
+              >
+                {g.name}
+                {g.id !== g.run.id && (
+                  <span className="text-muted-foreground"> · {g.run.name}</span>
+                )}
+              </Link>
+              <span className="text-xs text-muted-foreground">
+                {runStatus(g.run.state)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+function StudentHome({
+  slug,
+  data,
+  runs,
+}: {
+  slug: string
+  data: StudentData
+  runs: Runs | null
+}) {
   const terms = useTerms()
   const { data: viewer } = useViewer()
   const first = (viewer?.user?.name ?? "").split(" ")[0]
@@ -1010,6 +1111,8 @@ function StudentHome({ slug, data }: { slug: string; data: StudentData }) {
           />
         )}
       </div>
+
+      {runs && runs.learning.length > 0 && <MyRuns runs={runs} />}
 
       <MyCourseAttendance slug={slug} />
 

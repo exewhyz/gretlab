@@ -56,6 +56,8 @@ export const coaching = {
     "parents",
   ],
   grading: "marks",
+  groupDates: true,
+  leadPerGroup: true,
   roleNames: {
     owner: "Owner",
     admin: "Admin",

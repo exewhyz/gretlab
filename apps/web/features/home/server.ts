@@ -44,6 +44,7 @@ import { papersToMark } from "@/features/results/server"
 import { staffToday } from "@/features/staff-attendance/server"
 import { newApplications } from "@/features/admissions/server"
 import { childOverview } from "@/features/parents/server"
+import { homeRuns } from "@/features/runs/server"
 import { rolePermissions } from "@/features/orgs/access"
 import {
   canFor,
@@ -1220,14 +1221,16 @@ export async function orgHome(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
   const views = await viewsOf(ctx, user)
   const staff = views.includes("staff") ? await staffHome(ctx) : null
-  const [admin, teacher, student, parent] = await Promise.all([
+  const [admin, teacher, student, parent, runs] = await Promise.all([
     views.includes("admin") ? adminHome(ctx) : null,
     views.includes("teacher") ? teacherHome(ctx, user) : null,
     views.includes("student") ? studentHome(ctx, user) : null,
     views.includes("parent") ? parentHome(ctx, user) : null,
+    homeRuns(ctx, user),
   ])
   return {
     views,
+    runs,
     admin,
     teacher,
     student,

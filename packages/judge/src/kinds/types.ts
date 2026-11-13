@@ -60,6 +60,13 @@ export interface KindDefinition {
    * points with SGPA and CGPA (colleges), or not at all (cohorts, companies, communities).
    */
   grading: "marks" | "credits" | "none"
+  /** Its groups run between dates (a cohort, a coaching batch): week 3 of 12. */
+  groupDates: boolean
+  /**
+   * Each group has its own lead (a pod's mentor, a team's manager), not a lead per academic
+   * year (a school's class teacher, kept in class_teachers).
+   */
+  leadPerGroup: boolean
   /** What its built-in roles are called (the permissions stay the same). */
   roleNames: { owner: string; admin: string; teacher: string; member: string }
   /** The platform's default for a capable module that isn't on by default. */

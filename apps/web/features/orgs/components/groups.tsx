@@ -42,7 +42,10 @@ import {
   type Group,
   type Member,
   type Message,
+  type RunInfo,
 } from "./manage-shared"
+import { runLabel } from "@/features/runs/format"
+import { RunDialog } from "./run-dialog"
 
 /*
  * The Groups page: a collapsible tree of an organization's groups (branches, batches,
@@ -172,6 +175,7 @@ export function ManageGroups({ slug }: { slug: string }) {
             group={g}
             groups={groups}
             levels={data.levels}
+            runInfo={data.run}
             childLevel={data.levels[g.depth + 1] ?? null}
             hasInside={hasInside(g.id)}
             expanded={expanded.has(g.id)}
@@ -202,6 +206,7 @@ function GroupRow({
   group: g,
   groups,
   levels,
+  runInfo,
   childLevel,
   hasInside,
   expanded,
@@ -214,6 +219,7 @@ function GroupRow({
   group: Group
   groups: Group[]
   levels: string[]
+  runInfo?: RunInfo
   childLevel: string | null
   hasInside: boolean
   expanded: boolean
@@ -225,6 +231,8 @@ function GroupRow({
   const [mode, setMode] = useState<"child" | "rename" | null>(null)
   const [text, setText] = useState("")
   const [deleting, setDeleting] = useState(false)
+  const [running, setRunning] = useState(false)
+  const runs = Boolean(runInfo && (runInfo.dates || runInfo.lead))
   return (
     <div
       className="grid gap-1.5 rounded-sm px-2 py-1.5 hover:bg-muted"
@@ -261,7 +269,26 @@ function GroupRow({
             {g.notPlaced} not placed yet
           </span>
         )}
+        {g.startsOn && g.endsOn && (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-ink" data-testid="group-run">
+            {runLabel(g.startsOn, g.endsOn)}
+          </span>
+        )}
+        {g.lead && runInfo && (
+          <span className="text-xs text-body" data-testid="group-lead">
+            {runInfo.leadTerm}: {g.lead.name}
+          </span>
+        )}
         <span className="flex-1" />
+        {runs && g.canEdit && runInfo && (
+          <Button size="xs" variant="ghost" onClick={() => setRunning(true)}>
+            {runInfo.dates && runInfo.lead
+              ? `Dates & ${runInfo.leadTerm.toLowerCase()}`
+              : runInfo.dates
+                ? "Dates"
+                : runInfo.leadTerm}
+          </Button>
+        )}
         {g.canManage && (
           <>
             {childLevel && (
@@ -297,6 +324,9 @@ function GroupRow({
           </>
         )}
       </div>
+      {running && runInfo && (
+        <RunDialog slug={slug} group={g} info={runInfo} onClose={() => setRunning(false)} />
+      )}
       <DeleteGroupDialog
         slug={slug}
         group={g}

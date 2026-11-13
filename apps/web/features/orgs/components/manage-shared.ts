@@ -45,6 +45,19 @@ export interface Group {
   /** People sitting directly in it although it has groups inside. */
   notPlaced: number
   canManage: boolean
+  canEdit?: boolean
+  /** Run dates (kinds whose groups run between dates), YYYY-MM-DD. */
+  startsOn?: string | null
+  endsOn?: string | null
+  /** Its own lead (kinds with a lead per group): a pod's mentor. */
+  lead?: { id: string; name: string } | null
+}
+
+/** Whether this kind's groups have run dates and their own lead, and what a lead is called. */
+export interface RunInfo {
+  dates: boolean
+  lead: boolean
+  leadTerm: string
 }
 
 export interface Role {
@@ -86,7 +99,12 @@ export const useGroups = (slug: string) =>
   useQuery({
     queryKey: ["org", slug, "groups"],
     queryFn: () =>
-      api<{ levels: string[]; canManageAll: boolean; groups: Group[] }>(
+      api<{
+        levels: string[]
+        run?: RunInfo
+        canManageAll: boolean
+        groups: Group[]
+      }>(
         `/orgs/${slug}/groups`
       ),
   })

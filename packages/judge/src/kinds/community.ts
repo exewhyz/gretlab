@@ -34,6 +34,8 @@ export const community = {
   capabilities: [],
   defaults: [],
   grading: "none",
+  groupDates: false,
+  leadPerGroup: true,
   roleNames: {
     owner: "Owner",
     admin: "Admin",

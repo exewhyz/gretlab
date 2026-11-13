@@ -61,6 +61,8 @@ export const school = {
     "parents",
   ],
   grading: "marks",
+  groupDates: false,
+  leadPerGroup: false,
   roleNames: {
     owner: "Owner",
     admin: "Admin",

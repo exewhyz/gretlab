@@ -75,6 +75,15 @@ export const groupSchema = z.object({
   parentId: z.uuid().nullable().default(null),
 })
 
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date")
+
+/** A group's run (cohort dates) and lead (a pod's mentor), for kinds that have them. */
+export const groupRunSchema = z.object({
+  startsOn: day.nullable().optional(),
+  endsOn: day.nullable().optional(),
+  leadId: z.uuid().nullable().optional(),
+})
+
 const permissions = z
   .array(z.enum(PERMISSION_KEYS as [string, ...string[]]))
   .max(PERMISSION_KEYS.length)

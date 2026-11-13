@@ -277,6 +277,15 @@ export const ORG_NAV: NavItem[] = [
     module: "attendance",
   },
   {
+    key: "progress",
+    label: "Progress",
+    path: "/progress",
+    group: "Academics",
+    anyOf: ["gradebook.view"],
+    // Kinds whose groups run between dates: a cohort's weeks, a batch's run.
+    orgTypes: ORG_TYPES.filter((t) => KINDS[t].groupDates),
+  },
+  {
     key: "outcomes",
     label: "Outcomes",
     path: "/outcomes",
