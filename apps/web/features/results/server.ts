@@ -157,7 +157,7 @@ const duplicate = (error: unknown) => {
 
 async function context(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
-  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const modules = ctx.modules
   if (!modules.has("exams"))
     throw notFound("Exams aren't switched on for this organization.")
   if (!modules.has("records") || !modules.has("subjects"))
@@ -1434,7 +1434,7 @@ export async function reportCard(
     .orderBy(desc(academicYears.startsOn))
   const isSelf = id === user.id
   let isParent = false
-  if (!isSelf && enabledModules(ctx.org.type, ctx.org.modules).has("parents")) {
+  if (!isSelf && ctx.modules.has("parents")) {
     const [link] = await db
       .select({ id: guardians.id })
       .from(guardians)
@@ -1745,7 +1745,7 @@ export async function publishedFor(orgId: string, userId: string) {
  */
 export async function papersToMark(ctx: OrgContext) {
   try {
-    const modules = enabledModules(ctx.org.type, ctx.org.modules)
+    const modules = ctx.modules
     if (
       !modules.has("exams") ||
       !modules.has("records") ||

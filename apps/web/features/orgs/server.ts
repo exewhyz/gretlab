@@ -28,6 +28,8 @@ import {
   readAdmissionSettings,
   grantsPermission,
   isModuleKey,
+  KINDS,
+  type ModuleKey,
   moduleAvailable,
   MODULES,
   ORG_TYPE_CONFIG,
@@ -51,6 +53,7 @@ import { notify } from "@/features/notifications/server"
 import { platformCan } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
 import { getSettings } from "@/features/settings/server"
+import { kindPolicies, moduleOptions } from "./kinds"
 
 import { rolePermissions } from "./access"
 
@@ -87,6 +90,8 @@ interface OrgContext {
   membership: typeof orgMembers.$inferSelect | null
   grants: (Grant & { systemKey: string | null })[]
   groups: OrgGroup[]
+  /** The modules on here: the kind's, as the platform allows, as the org chose. */
+  modules: Set<ModuleKey>
 }
 
 async function loadOrg(slug: string) {
@@ -101,7 +106,7 @@ async function loadOrg(slug: string) {
 async function context(slug: string, user: User): Promise<OrgContext> {
   const org = await loadOrg(slug)
   const db = getDb()
-  const [[membership], rows, groups] = await Promise.all([
+  const [[membership], rows, groups, policies] = await Promise.all([
     db
       .select()
       .from(orgMembers)
@@ -121,6 +126,7 @@ async function context(slug: string, user: User): Promise<OrgContext> {
         )
       ),
     db.select().from(orgGroups).where(eq(orgGroups.orgId, org.id)),
+    kindPolicies(),
   ])
   const active = membership?.status === "active"
   return {
@@ -133,6 +139,7 @@ async function context(slug: string, user: User): Promise<OrgContext> {
       ? rows.map((row) => ({ ...row, permissions: rolePermissions(row) }))
       : [],
     groups,
+    modules: enabledModules(org.type, org.modules, policies[org.type]),
   }
 }
 
@@ -369,11 +376,13 @@ async function createOrgInTx(
       ...extra,
     })
     .returning()
+  // Built-in roles carry the kind's names (Faculty, Mentor, Manager); permissions are the same.
+  const names = KINDS[input.type].roleNames as Record<string, string>
   await tx.insert(orgRoles).values(
     Object.entries(SYSTEM_ROLES).map(([key, role]) => ({
       orgId: org!.id,
       systemKey: key,
-      name: role.name,
+      name: names[key] ?? role.name,
       description: role.description,
       permissions: [...role.permissions],
     }))
@@ -570,6 +579,7 @@ export async function getOrganization(slug: string, viewer: User | null) {
     .from(orgMembers)
     .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.status, "active")))
   const permissions = ctx ? heldAnywhere(ctx) : []
+  const policies = await kindPolicies()
   return {
     slug: org.slug,
     name: org.name,
@@ -593,7 +603,7 @@ export async function getOrganization(slug: string, viewer: User | null) {
     pendingApproval: isMember && org.signupStatus === "pending",
     /** Taking applications now (Admissions module): the page offers to apply. */
     admissionsOpen: (() => {
-      const modules = enabledModules(org.type, org.modules)
+      const modules = enabledModules(org.type, org.modules, policies[org.type])
       const a = readAdmissionSettings(org.moduleSettings)
       return modules.has("admissions") && modules.has("records") && a.open && !!a.yearId
     })(),
@@ -1130,7 +1140,15 @@ export async function getManageSummary(slug: string, user: User) {
       /** What this org chose, over its type's defaults. */
       moduleChoices: readModuleChoices(ctx.org.modules),
       /** The modules on right now (defaults + choices, limited to the type and ready ones). */
-      modules: [...enabledModules(ctx.org.type, ctx.org.modules)],
+      modules: [...ctx.modules],
+      /** Modules this kind may have here, with the platform's level (optional or on by default). */
+      moduleOptions: await moduleOptions(ctx.org.type),
+      /** What the kind is, in its own words (it can't be changed). */
+      kind: {
+        label: KINDS[ctx.org.type].label,
+        description: KINDS[ctx.org.type].description,
+        terms: KINDS[ctx.org.type].terms,
+      },
     },
     permissions,
     /** Whether a permission reaches the whole organization, not just some groups. */
@@ -1152,11 +1170,20 @@ export async function updateSettings(
 ) {
   const ctx = await context(slug, user)
   need(ctx, "org.settings.manage")
+  // An organization's kind is chosen once, when it's created, and never changed.
+  if (input.type !== undefined && input.type !== ctx.org.type)
+    throw new ApiError(
+      409,
+      "kind_locked",
+      `${ctx.org.name} is a ${KINDS[ctx.org.type].label.toLowerCase()}; the kind of an organization can't be changed. Create a new organization for another kind.`
+    )
+  input = { ...input, type: undefined }
   if (input.modules) {
-    const type = input.type ?? ctx.org.type
+    const type = ctx.org.type
+    const policy = (await kindPolicies())[type]
     for (const [key, on] of Object.entries(input.modules)) {
       if (!on || !isModuleKey(key)) continue
-      if (!moduleAvailable(type, key) || !MODULES[key].ready) {
+      if (!moduleAvailable(type, key, policy)) {
         throw new ApiError(
           400,
           "module_unavailable",
@@ -1199,8 +1226,8 @@ export async function updateSettings(
     const lists = [
       listChanges(
         "Modules",
-        [...enabledModules(ctx.org.type, ctx.org.modules)].map(moduleLabel),
-        [...enabledModules(org!.type, org!.modules)].map(moduleLabel)
+        [...ctx.modules].map(moduleLabel),
+        [...enabledModules(org!.type, org!.modules, (await kindPolicies())[org!.type])].map(moduleLabel)
       ),
     ].filter(Boolean)
     const what = [...changes.map((c) => c.field), ...lists.map((l) => l!.label)]

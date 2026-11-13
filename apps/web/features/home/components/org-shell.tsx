@@ -55,6 +55,8 @@ export interface Shell {
   pending: number
   children: { id: string; name: string }[]
   leavePending?: number
+  terms?: { groups: string }
+  noun?: string
   admissionsNew?: number
 }
 
@@ -143,14 +145,18 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
               ? String(shell.admissionsNew)
               : undefined,
       }))
-    if (items.length) groups.push({ group: g.group, items })
+    if (items.length) groups.push({ group: g.label, items })
   }
   // Students: their own pages.
   if (shell.views.includes("student")) {
     groups.push({
       group: "Learning",
       items: [
-        { key: "classes", label: "My classes", href: "/classes" },
+        {
+          key: "classes",
+          label: `My ${(shell.terms?.groups ?? "Classes").toLowerCase()}`,
+          href: "/classes",
+        },
         ...(shell.modules.includes("library")
           ? [{ key: "books", label: "Library", href: `${base}/books` }]
           : []),
@@ -181,7 +187,7 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
   }
   // Everyone: the school's profile, membership and what it shares with members.
   groups.push({
-    group: "This school",
+    group: `This ${shell.noun ?? "school"}`,
     items: [
       ...(shell.modules.includes("staffAttendance") &&
       shell.permissions.length > 0
@@ -205,7 +211,11 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
             },
           ]
         : []),
-      { key: "profile", label: "About the school", href: `${base}/about` },
+      {
+        key: "profile",
+        label: `About the ${shell.noun ?? "school"}`,
+        href: `${base}/about`,
+      },
     ],
   })
   return groups

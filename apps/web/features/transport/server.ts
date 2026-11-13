@@ -84,7 +84,7 @@ export const ridersImportSchema = z.object({
 const forbidden = (message: string) => new ApiError(403, "forbidden", message)
 
 function needModule(ctx: OrgContext) {
-  if (!enabledModules(ctx.org.type, ctx.org.modules).has("transport")) {
+  if (!ctx.modules.has("transport")) {
     throw notFound("Transport isn't switched on for this organization.")
   }
 }

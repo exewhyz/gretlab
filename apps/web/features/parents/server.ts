@@ -29,6 +29,7 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 import { classTimetable } from "@/features/timetable/server"
+import { kindPolicies } from "@/features/orgs/kinds"
 import { ApiError, notFound } from "@/lib/api/route"
 
 /*
@@ -68,8 +69,8 @@ export const importSchema = z.object({
 
 const forbidden = (message: string) => new ApiError(403, "forbidden", message)
 
-export function parentsOn(ctx: { org: OrgContext["org"] }) {
-  return enabledModules(ctx.org.type, ctx.org.modules).has("parents")
+export function parentsOn(ctx: { modules: OrgContext["modules"] }) {
+  return ctx.modules.has("parents")
 }
 
 function needModule(ctx: OrgContext) {
@@ -365,8 +366,9 @@ export async function myChildren(user: User) {
     .innerJoin(users, eq(guardians.studentId, users.id))
     .where(and(eq(guardians.parentId, user.id), eq(organizations.active, true)))
     .orderBy(asc(users.name))
+  const policies = await kindPolicies()
   return rows
-    .filter((r) => parentsOn(r))
+    .filter((r) => enabledModules(r.org.type, r.org.modules, policies[r.org.type]).has("parents"))
     .map((r) => ({
       id: r.studentId,
       name: r.name ?? r.email,
@@ -419,7 +421,7 @@ export async function childOverview(
       results: false,
     }
   }
-  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const modules = ctx.modules
   const quiet = <T>(p: Promise<T>) => p.catch(() => null)
   const classes = await Promise.all(
     seat.groupIds.map(async (groupId) => {

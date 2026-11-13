@@ -44,7 +44,7 @@ export const assignSchema = z.object({
 })
 
 function needModule(ctx: OrgContext) {
-  if (!enabledModules(ctx.org.type, ctx.org.modules).has("subjects")) {
+  if (!ctx.modules.has("subjects")) {
     throw notFound("Subjects aren't switched on for this organization.")
   }
 }

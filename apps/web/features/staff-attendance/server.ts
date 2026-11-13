@@ -74,7 +74,7 @@ const forbidden = (message: string) => new ApiError(403, "forbidden", message)
 
 async function context(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
-  if (!enabledModules(ctx.org.type, ctx.org.modules).has("staffAttendance"))
+  if (!ctx.modules.has("staffAttendance"))
     throw notFound("Staff attendance isn't switched on for this organization.")
   return ctx
 }
@@ -126,7 +126,7 @@ async function staffOf(ctx: OrgContext) {
 
 /** Staff on approved leave each day of a span, with the kind's key. */
 async function leaveIn(ctx: OrgContext, from: string, to: string) {
-  if (!enabledModules(ctx.org.type, ctx.org.modules).has("leave")) return []
+  if (!ctx.modules.has("leave")) return []
   return getDb()
     .select({
       userId: leaveRequests.userId,
@@ -477,7 +477,7 @@ export async function saveStaffSettings(
 export async function staffToday(ctx: OrgContext) {
   try {
     if (
-      !enabledModules(ctx.org.type, ctx.org.modules).has("staffAttendance") ||
+      !ctx.modules.has("staffAttendance") ||
       !canView(ctx)
     )
       return null

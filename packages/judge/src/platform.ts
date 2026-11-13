@@ -35,9 +35,15 @@ export const PLATFORM_PERMISSIONS = {
     module: "Teaching",
   },
   "platform.orgs.manage": {
-    label: "Manage colleges",
+    label: "Manage organizations",
     description:
-      "Create colleges and name their owners, and suspend or reactivate them. Grant this, or the finer actions under it.",
+      "Create schools, colleges and other organizations and name their owners, approve sign-ups, and suspend or reactivate them. Grant this, or the finer actions under it.",
+    module: "Platform",
+  },
+  "platform.kinds.manage": {
+    label: "Manage organization kinds",
+    description:
+      "Decide, for each kind of organization (school, college, cohort…), which modules are off, optional, or on from the start. Applies to every organization of that kind at once.",
     module: "Platform",
   },
   "platform.users.manage": {
@@ -112,14 +118,14 @@ export const PLATFORM_PERMISSIONS = {
     parent: "platform.work.manage",
   },
   "platform.orgs.create": {
-    label: "Create colleges",
-    description: "Add a college and name its first owner.",
+    label: "Create organizations",
+    description: "Add a school, college or other organization and name its first owner.",
     module: "Platform",
     parent: "platform.orgs.manage",
   },
   "platform.orgs.suspend": {
-    label: "Suspend colleges",
-    description: "Suspend a college or bring it back.",
+    label: "Suspend organizations",
+    description: "Suspend an organization, bring it back, or approve one that signed up.",
     module: "Platform",
     parent: "platform.orgs.manage",
   },
@@ -220,7 +226,7 @@ export const PLATFORM_ROLES = {
   support: {
     name: "Support",
     description:
-      "Helps people: accounts, colleges, submissions and the activity log.",
+      "Helps people: accounts, organizations, submissions and the activity log.",
     permissions: [
       "platform.users.manage",
       "platform.orgs.manage",

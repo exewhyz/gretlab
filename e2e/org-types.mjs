@@ -48,8 +48,8 @@ check("a company can be created", (await make("typ-company", "company")).status 
 check("an unknown kind is refused", (await make("typ-bad", "castle")).status === 400)
 const school = (await owner("/orgs/typ-school/manage")).json
 check("a school starts with Grade › Section", school?.org.groupLevels.join() === "Grade,Section", JSON.stringify(school?.org.groupLevels))
-check("a cohort starts with Cohort", (await owner("/orgs/typ-cohort/manage")).json?.org.groupLevels.join() === "Cohort")
-check("a company starts with Team", (await owner("/orgs/typ-company/manage")).json?.org.groupLevels.join() === "Team")
+check("a cohort starts with Cohort › Pod", (await owner("/orgs/typ-cohort/manage")).json?.org.groupLevels.join() === "Cohort,Pod")
+check("a company starts with Department › Team", (await owner("/orgs/typ-company/manage")).json?.org.groupLevels.join() === "Department,Team")
 check("a school starts with its ready default modules on", school?.org.modules.join() === "records,exams,admissions,leave,staffAttendance,attendance,timetable,subjects,parents" && JSON.stringify(school?.org.moduleChoices) === "{}", JSON.stringify(school?.org.modules))
 
 // ---------- switching modules
@@ -79,7 +79,7 @@ check("a school's settings list its modules", (await page.getByTestId("module-ho
 await page.screenshot({ path: SHOTS + "org-modules.png", fullPage: true })
 await page.goto(`${BASE}/orgs/typ-company/manage/settings`)
 await page.getByRole("button", { name: "Save settings" }).waitFor({ timeout: 30000 })
-check("a company has no Modules card", (await page.getByTestId("org-modules").count()) === 0)
+check("a company offers only what a company can have", (await page.getByTestId("org-modules").count()) === 1 && (await page.getByTestId("module-attendance").count()) === 1 && (await page.getByTestId("module-records").count()) === 0)
 await browser.close()
 
 cleanup()

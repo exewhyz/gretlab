@@ -57,7 +57,7 @@ export const registerSaveSchema = registerQuerySchema.extend({
 })
 
 function needModule(ctx: OrgContext) {
-  if (!enabledModules(ctx.org.type, ctx.org.modules).has("attendance")) {
+  if (!ctx.modules.has("attendance")) {
     throw notFound("Attendance isn't switched on for this organization.")
   }
 }
@@ -102,7 +102,7 @@ export async function getRegister(
     studentsIn(cc),
     findRegister(input.groupId, input.day, input.period),
   ])
-  const away = enabledModules(cc.ctx.org.type, cc.ctx.org.modules).has("leave")
+  const away = cc.ctx.modules.has("leave")
     ? await onLeave(cc.ctx.org.id, students.map((s) => s.id), input.day)
     : new Map<string, string>()
   const marks = register
@@ -221,7 +221,7 @@ export async function saveRegister(
   })
   // Parents hear about an absence the same day (or the next, for a late register), once;
   // not for a child on leave they already know about.
-  if (result.newlyAbsent.length && enabledModules(cc.ctx.org.type, cc.ctx.org.modules).has("leave")) {
+  if (result.newlyAbsent.length && cc.ctx.modules.has("leave")) {
     const away = await onLeave(cc.ctx.org.id, result.newlyAbsent, input.day)
     result.newlyAbsent = result.newlyAbsent.filter((id) => !away.has(id))
   }

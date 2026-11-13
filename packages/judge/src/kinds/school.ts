@@ -1,0 +1,67 @@
+import type { KindDefinition } from "./types.ts"
+
+/** A K-12 school: grades and sections, an academic year, term exams, parents. */
+export const school = {
+  key: "school",
+  label: "School",
+  noun: "school",
+  description:
+    "Grades and sections, an academic year, term exams and report cards, with parents.",
+  examples:
+    "Primary, secondary and senior secondary schools (CBSE, ICSE, state boards).",
+  decides: [
+    "Classes are grades with sections (Grade 5 › A), each with a class teacher.",
+    "Work is organized by academic year; students are promoted from one year to the next.",
+    "Exams give marks and percentage grades (CBSE scale by default) on a report card.",
+    "Parents get accounts to follow their children.",
+    "Admissions, transport, hostel and the library are available.",
+  ],
+  terms: {
+    learner: "Student",
+    learners: "Students",
+    instructor: "Teacher",
+    instructors: "Teachers",
+    guardian: "Parent",
+    guardians: "Parents",
+    group: "Class",
+    groups: "Classes",
+    groupLead: "Class teacher",
+    period: "Academic year",
+    periods: "Academic years",
+    assessment: "Exam",
+    assessments: "Exams",
+  },
+  groupLevels: ["Grade", "Section"],
+  capabilities: [
+    "records",
+    "admissions",
+    "exams",
+    "leave",
+    "staffAttendance",
+    "attendance",
+    "timetable",
+    "subjects",
+    "parents",
+    "library",
+    "transport",
+    "hostel",
+    "finance",
+  ],
+  defaults: [
+    "records",
+    "admissions",
+    "exams",
+    "leave",
+    "staffAttendance",
+    "attendance",
+    "timetable",
+    "subjects",
+    "parents",
+  ],
+  roleNames: {
+    owner: "Owner",
+    admin: "Admin",
+    teacher: "Teacher",
+    member: "Member",
+  },
+} as const satisfies KindDefinition

@@ -4,6 +4,7 @@ import { enabledModules } from "@workspace/judge"
 import { loansOf } from "@/features/books/server"
 import { stayOf } from "@/features/hostel/server"
 import { rideOf } from "@/features/transport/server"
+import { kindPolicies, modulesOf } from "@/features/orgs/kinds"
 
 /*
  * A person's life at school beyond their classes: library books now, and their bus route
@@ -17,7 +18,7 @@ const { and, asc, eq } = sql
 type Org = Pick<typeof organizations.$inferSelect, "id" | "type" | "modules">
 
 export async function campusOf(org: Org, userId: string) {
-  const modules = enabledModules(org.type, org.modules)
+  const modules = await modulesOf(org)
   const [library, transport, hostel] = await Promise.all([
     modules.has("library")
       ? loansOf(org.id, userId).then((loans) => ({ loans }))
@@ -56,8 +57,9 @@ export async function myCampus(user: User) {
       )
     )
     .orderBy(asc(organizations.name))
+  const policies = await kindPolicies()
   const withModules = orgs.filter((o) => {
-    const on = enabledModules(o.type, o.modules)
+    const on = enabledModules(o.type, o.modules, policies[o.type])
     return CAMPUS_MODULES.some((m) => on.has(m))
   })
   return Promise.all(

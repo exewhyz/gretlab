@@ -3,65 +3,87 @@ import { test } from "node:test"
 
 import {
   enabledModules,
+  isModuleKey,
+  KINDS,
+  kindCan,
+  kindTerms,
   MODULE_KEYS,
   MODULES,
+  moduleAvailable,
+  moduleLevel,
   ORG_TYPE_CONFIG,
   ORG_TYPES,
+  readKindPolicy,
   readModuleChoices,
 } from "./org-types.ts"
 import { ORG_NAV, visibleOrgNav } from "./navigation.ts"
 
-test("every type's default modules are ones that type may use", () => {
-  for (const type of ORG_TYPES) {
-    for (const key of ORG_TYPE_CONFIG[type].modules) {
-      assert.ok(
-        (MODULES[key].for as readonly string[]).includes(type),
-        `${type} defaults to ${key}, which it can't use`
-      )
-    }
+test("every kind is defined once, in the order offered", () => {
+  assert.deepEqual(Object.keys(KINDS), [...ORG_TYPES])
+  for (const t of ORG_TYPES) assert.equal(KINDS[t].key, t)
+})
+
+test("each kind's modules are real, and its defaults are ones it can use", () => {
+  for (const t of ORG_TYPES) {
+    for (const m of KINDS[t].capabilities) assert.ok(isModuleKey(m), `${t}: unknown module ${m}`)
+    for (const m of KINDS[t].defaults)
+      assert.ok((KINDS[t].capabilities as readonly string[]).includes(m), `${t} defaults to ${m}, which it can't use`)
   }
 })
 
+test("each kind explains itself and names its people", () => {
+  for (const t of ORG_TYPES) {
+    const k = KINDS[t]
+    assert.ok(k.description && k.decides.length >= 2 && k.examples, t)
+    assert.ok(k.terms.learners && k.terms.instructors && k.terms.groups && k.groupLevels.length >= 1, t)
+    // A kind has guardians only when it can run parent accounts.
+    assert.equal(k.terms.guardian != null, kindCan(t, "parents"), `${t} guardians vs the parents module`)
+  }
+  assert.equal(kindTerms("cohort").learners, "Learners")
+  assert.equal(kindTerms("college").instructors, "Faculty")
+  assert.equal(ORG_TYPE_CONFIG.coaching.groupsLabel, "Batches")
+})
+
 test("only known, boolean choices are read", () => {
-  assert.deepEqual(
-    readModuleChoices({ attendance: true, nope: true, library: "yes" }),
-    {
-      attendance: true,
-    }
-  )
+  assert.deepEqual(readModuleChoices({ attendance: true, nope: true, library: "yes" }), { attendance: true })
   assert.deepEqual(readModuleChoices(null), {})
   assert.deepEqual(readModuleChoices("x"), {})
 })
 
 test("a module that isn't ready is never on, whatever is chosen", () => {
-  // Nothing is ready yet in this catalog.
   for (const key of MODULE_KEYS) {
     if (MODULES[key].ready) continue
     assert.equal(enabledModules("school", { [key]: true }).has(key), false)
   }
 })
 
-test("defaults, overrides and type limits (with a ready module)", () => {
-  const ready = MODULES.attendance as { ready: boolean }
-  const before = ready.ready
-  ready.ready = true
-  try {
-    assert.equal(enabledModules("school", {}).has("attendance"), true) // type default
-    assert.equal(
-      enabledModules("school", { attendance: false }).has("attendance"),
-      false
-    ) // turned off
-    assert.equal(enabledModules("company", {}).has("attendance"), false) // not a company default
-    assert.equal(
-      enabledModules("company", { attendance: true }).has("attendance"),
-      false
-    ) // companies can't use it
-  } finally {
-    ready.ready = before
-  }
+test("the kind, then the platform, then the organization decide", () => {
+  // The kind's defaults with no policy and no choices.
+  assert.equal(enabledModules("school", {}).has("attendance"), true)
+  assert.equal(enabledModules("college", {}).has("parents"), false)
+  // The organization turns a default off, or an optional one on.
+  assert.equal(enabledModules("school", { attendance: false }).has("attendance"), false)
+  assert.equal(enabledModules("college", { parents: true }).has("parents"), true)
+  // A kind can't have what it can't support, whatever is chosen or set.
+  assert.equal(enabledModules("company", { records: true }, { records: "default" }).has("records"), false)
+  assert.equal(moduleLevel("community", "attendance", { attendance: "default" }), "off")
+  // The platform switches a module off for a kind: off for everyone, whatever they chose.
+  assert.equal(enabledModules("school", { library: true }, { library: "off" }).has("library"), false)
+  assert.equal(moduleAvailable("school", "library", { library: "off" }), false)
+  // ...or makes an optional one on by default.
+  assert.equal(enabledModules("college", {}, { parents: "default" }).has("parents"), true)
+  // An organization's own "off" still wins over a default.
+  assert.equal(enabledModules("college", { parents: false }, { parents: "default" }).has("parents"), false)
 })
 
-test("the Groups page is named for the org type", () => {
+test("a stored policy keeps only what the kind can use", () => {
+  assert.deepEqual(readKindPolicy("company", { attendance: "default", records: "default", library: "nah" }), {
+    attendance: "default",
+  })
+  assert.deepEqual(readKindPolicy("school", null), {})
+})
+
+test("the Groups page is named for the kind", () => {
   const label = (type: (typeof ORG_TYPES)[number]) =>
     visibleOrgNav(ORG_NAV, { orgType: type, can: () => true })
       .flatMap((g) => g.items)
@@ -69,5 +91,6 @@ test("the Groups page is named for the org type", () => {
   assert.equal(label("school"), "Classes")
   assert.equal(label("company"), "Teams")
   assert.equal(label("college"), "Batches")
+  assert.equal(label("cohort"), "Cohorts")
   assert.equal(label("other"), "Groups")
 })

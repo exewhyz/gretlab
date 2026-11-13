@@ -1,4 +1,10 @@
-import { ORG_TYPE_CONFIG, ORG_TYPES, type OrgType } from "./org-types.ts"
+import {
+  KINDS,
+  ORG_TYPE_CONFIG,
+  ORG_TYPES,
+  type KindTerms,
+  type OrgType,
+} from "./org-types.ts"
 import type { Permission } from "./permissions.ts"
 
 /*
@@ -38,6 +44,8 @@ export interface NavItem {
   module?: string
   /** A different label for some org types (e.g. Groups is \"Classes\" in a school). */
   labels?: Partial<Record<OrgType, string>>
+  /** Named with the kind's own word (Students, Learners, Employees). Wins over `labels`. */
+  term?: keyof KindTerms
 }
 
 /** The current org features, grouped. New modules (attendance, timetable, ...) are added here. */
@@ -99,6 +107,7 @@ export const ORG_NAV: NavItem[] = [
   {
     key: "students",
     label: "Students",
+    term: "learners",
     path: "/students",
     group: "People",
     anyOf: ["students.view", "students.edit"],
@@ -107,6 +116,7 @@ export const ORG_NAV: NavItem[] = [
   {
     key: "parents",
     label: "Parents",
+    term: "guardians",
     path: "/parents",
     group: "People",
     anyOf: ["parents.view", "parents.link"],
@@ -123,6 +133,7 @@ export const ORG_NAV: NavItem[] = [
   {
     key: "academic-years",
     label: "Academic years",
+    term: "periods",
     path: "/academic-years",
     group: "Academics",
     anyOf: ["students.years"],
@@ -131,6 +142,7 @@ export const ORG_NAV: NavItem[] = [
   {
     key: "exams",
     label: "Exams",
+    term: "assessments",
     path: "/exams",
     group: "Academics",
     anyOf: ["exams.setup", "exams.marks", "exams.view"],
@@ -319,7 +331,21 @@ export interface NavContext {
 
 export interface NavGroupView {
   group: NavGroup
+  /** The heading shown for it in this kind ("School" is "College" in a college). */
+  label: string
   items: { key: string; label: string; path: string }[]
+}
+
+/** A group's heading for a kind: the "School" group is the kind's own name, and so on. */
+export function navGroupLabel(group: NavGroup, type: OrgType) {
+  const noun = KINDS[type].noun
+  if (group === "School") return noun.charAt(0).toUpperCase() + noun.slice(1)
+  if (
+    group === "Academics" &&
+    (type === "company" || type === "community" || type === "other")
+  )
+    return "Learning"
+  return group
 }
 
 /** The groups and items a viewer should see, in order; empty groups are dropped. */
@@ -339,10 +365,18 @@ export function visibleOrgNav(
       )
       .map((item) => ({
         key: item.key,
-        label: item.labels?.[ctx.orgType] ?? item.label,
+        label:
+          (item.term ? KINDS[ctx.orgType].terms[item.term] : null) ??
+          item.labels?.[ctx.orgType] ??
+          item.label,
         path: item.path,
       }))
-    if (visible.length) out.push({ group, items: visible })
+    if (visible.length)
+      out.push({
+        group,
+        label: navGroupLabel(group, ctx.orgType),
+        items: visible,
+      })
   }
   return out
 }

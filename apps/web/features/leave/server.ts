@@ -94,7 +94,7 @@ const conflict = (code: string, message: string) => new ApiError(409, code, mess
 
 async function context(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
-  if (!enabledModules(ctx.org.type, ctx.org.modules).has("leave"))
+  if (!ctx.modules.has("leave"))
     throw notFound("Leave isn't switched on for this organization.")
   return ctx
 }
@@ -161,7 +161,7 @@ const decidesStudent = (
 /** Students this person may ask leave for: themselves (if they sit in a class) and their children. */
 async function studentsFor(ctx: OrgContext) {
   const db = getDb()
-  const children = enabledModules(ctx.org.type, ctx.org.modules).has("parents")
+  const children = ctx.modules.has("parents")
     ? await db
         .select({ id: guardians.studentId, name: users.name, email: users.email })
         .from(guardians)
@@ -280,7 +280,7 @@ async function filterDecidable(ctx: OrgContext, rows: Row[]) {
 /** How many requests wait for this person (for the sidebar). Never throws. */
 export async function pendingLeaveCount(ctx: OrgContext) {
   try {
-    if (!enabledModules(ctx.org.type, ctx.org.modules).has("leave")) return 0
+    if (!ctx.modules.has("leave")) return 0
     if (!isStaff(ctx)) return 0
     return (await decidable(ctx)).length
   } catch {

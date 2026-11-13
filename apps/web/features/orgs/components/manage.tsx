@@ -1086,7 +1086,6 @@ function SettingsForm({
           name: form.name,
           description: form.description,
           website: form.website,
-          type: form.type,
           listed: form.listed,
           joinPolicy: form.joinPolicy,
           emailDomains: split(form.emailDomains),
@@ -1119,17 +1118,17 @@ function SettingsForm({
               onChange={(e) => set("name", e.target.value)}
             />
           </Field>
-          <Field label="Kind">
-            <SelectInput
-              value={form.type}
-              onChange={(e) => set("type", e.target.value as OrgType)}
-            >
-              {Object.entries(ORG_TYPE).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </SelectInput>
+          <Field
+            label="Kind"
+            help="Chosen when it was created, and can't be changed: its structure, words and modules depend on it."
+          >
+            <TextInput
+              readOnly
+              aria-readonly="true"
+              value={initial.kind?.label ?? ORG_TYPE[form.type]}
+              className="bg-muted"
+              data-testid="org-kind"
+            />
           </Field>
         </div>
         <Field label="About" help="Shown on the organization's page.">
@@ -1279,7 +1278,9 @@ function ModulesCard({
   org: Summary["org"]
   onSaved: () => void
 }) {
-  const available = MODULE_KEYS.filter((k) => moduleAvailable(org.type, k))
+  // What the server allows here: the kind's modules, as the platform has set them.
+  const options = org.moduleOptions ?? []
+  const available = options.map((o) => o.key)
   const toggle = useMutation({
     mutationFn: ({ key, on }: { key: ModuleKey; on: boolean }) =>
       api(`/orgs/${slug}`, {

@@ -1,0 +1,218 @@
+"use client"
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
+
+import { Badge } from "@workspace/ui/components/badge"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@workspace/ui/components/table"
+import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
+
+import { FormMessage, SelectInput } from "@/components/form"
+import { api } from "@/lib/api/client"
+
+import { Loading, PageTitle } from "./shell"
+
+type Level = "off" | "optional" | "default"
+
+interface Overview {
+  modules: { key: string; label: string; description: string; ready: boolean }[]
+  kinds: {
+    key: string
+    label: string
+    description: string
+    examples: string
+    decides: string[]
+    terms: Record<string, string | null>
+    groupLevels: string[]
+    organizations: number
+    levels: Record<string, Level | null>
+  }[]
+}
+
+const LEVELS: { value: Level; label: string }[] = [
+  { value: "default", label: "On from the start" },
+  { value: "optional", label: "Optional" },
+  { value: "off", label: "Off" },
+]
+
+/**
+ * Admin › Organization kinds: what each kind is, and which of the modules it can support
+ * are off, optional (organizations switch them on) or on from the start. A change applies
+ * to every organization of the kind at once.
+ */
+export function AdminKinds() {
+  const client = useQueryClient()
+  const { data, error } = useQuery({
+    queryKey: ["admin", "kinds"],
+    queryFn: () => api<Overview>("/admin/kinds"),
+  })
+  const [picked, setPicked] = useState("school")
+  const save = useMutation({
+    mutationFn: (v: { kind: string; key: string; level: Level }) =>
+      api<Overview>(`/admin/kinds/${v.kind}`, {
+        method: "PUT",
+        body: { modules: { [v.key]: v.level } },
+      }),
+    onSuccess: (next) => client.setQueryData(["admin", "kinds"], next),
+  })
+  if (!data) return <Loading error={error} />
+  const kind = data.kinds.find((k) => k.key === picked) ?? data.kinds[0]!
+  const t = kind.terms
+  return (
+    <div className="grid gap-5" data-testid="admin-kinds">
+      <div>
+        <PageTitle>Organization kinds</PageTitle>
+        <p className="-mt-2 max-w-3xl text-body-sm text-muted-foreground">
+          Each organization is one kind, chosen when it&apos;s created and never
+          changed. The kind decides its structure and words; here you decide
+          which modules each kind gets. A change applies to every organization
+          of that kind at once; organizations can still switch optional ones on
+          or off.
+        </p>
+      </div>
+      <Tabs value={kind.key} onValueChange={(v) => setPicked(String(v))}>
+        <TabsList className="flex-wrap">
+          {data.kinds.map((k) => (
+            <TabsTrigger key={k.key} value={k.key}>
+              {k.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-title-md">{kind.label}</CardTitle>
+            <CardDescription>{kind.description}</CardDescription>
+            <CardAction>
+              <Badge variant="secondary" data-testid="kind-orgs">
+                {kind.organizations} organization
+                {kind.organizations === 1 ? "" : "s"}
+              </Badge>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="grid gap-4 text-body-sm">
+            <div className="text-muted-foreground">
+              For example: {kind.examples}
+            </div>
+            <ul className="grid list-disc gap-1 pl-5 text-body">
+              {kind.decides.map((d) => (
+                <li key={d}>{d}</li>
+              ))}
+            </ul>
+            <dl
+              className="grid grid-cols-2 gap-x-4 gap-y-2"
+              data-testid="kind-terms"
+            >
+              {(
+                [
+                  ["Learners", t.learners],
+                  ["Instructors", t.instructors],
+                  ["Groups", `${t.groups} (${kind.groupLevels.join(" › ")})`],
+                  ["Led by", t.groupLead],
+                  ["Organized by", t.period],
+                  ["Assessments", t.assessments],
+                  ["Guardians", t.guardians ?? "None"],
+                ] as const
+              ).map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-caption text-muted-foreground">{k}</dt>
+                  <dd className="text-ink">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+        <Card className="pb-0">
+          <CardHeader>
+            <CardTitle className="text-title-md">Modules</CardTitle>
+            <CardDescription>
+              What a {kind.label.toLowerCase()} can have. Modules it can&apos;t
+              support aren&apos;t offered.
+            </CardDescription>
+          </CardHeader>
+          {save.error && (
+            <div className="px-6">
+              <FormMessage
+                message={{ text: save.error.message, kind: "err" }}
+              />
+            </div>
+          )}
+          <Table data-testid="kind-modules">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">Module</TableHead>
+                <TableHead className="w-52 pr-6">
+                  For a {kind.label.toLowerCase()}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.modules.map((m) => {
+                const level = kind.levels[m.key]
+                return (
+                  <TableRow key={m.key} data-testid="kind-module">
+                    <TableCell className="pl-6 whitespace-normal">
+                      <div className="font-medium text-ink">
+                        {m.label}
+                        {!m.ready && (
+                          <Badge variant="outline" className="ml-2">
+                            Coming soon
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-caption text-muted-foreground">
+                        {m.description}
+                      </div>
+                    </TableCell>
+                    <TableCell className="pr-6">
+                      {level == null ? (
+                        <span className="text-caption text-muted-foreground">
+                          Not for this kind
+                        </span>
+                      ) : (
+                        <SelectInput
+                          aria-label={`${m.label} for ${kind.label}`}
+                          value={level}
+                          disabled={save.isPending}
+                          onChange={(e) =>
+                            save.mutate({
+                              kind: kind.key,
+                              key: m.key,
+                              level: e.target.value as Level,
+                            })
+                          }
+                        >
+                          {LEVELS.map((l) => (
+                            <option key={l.value} value={l.value}>
+                              {l.label}
+                            </option>
+                          ))}
+                        </SelectInput>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
+    </div>
+  )
+}

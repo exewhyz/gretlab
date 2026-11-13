@@ -23,6 +23,7 @@ import { listAssignments } from "@/features/assignments/server"
 import { dueLoans } from "@/features/books/server"
 import { listContests } from "@/features/contests/server"
 import { getSettings } from "@/features/settings/server"
+import { modulesOf } from "@/features/orgs/kinds"
 
 import { mailEnabled } from "./mailer"
 import { drainOutbox, queueEmails } from "./outbox"
@@ -166,7 +167,7 @@ export async function tellParents(
       .select({ slug: organizations.slug, type: organizations.type, modules: organizations.modules })
       .from(organizations)
       .where(eq(organizations.id, orgId))
-    if (!org || !enabledModules(org.type, org.modules).has("parents")) return
+    if (!org || !(await modulesOf(org)).has("parents")) return
     const rows = await db
       .select({ parentId: guardians.parentId, studentId: guardians.studentId, name: users.name, email: users.email })
       .from(guardians)

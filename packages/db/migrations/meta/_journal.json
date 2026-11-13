@@ -421,6 +421,13 @@
       "when": 1794505873284,
       "tag": "0059_transfer_certificates",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1794550957451,
+      "tag": "0060_org_kinds",
+      "breakpoints": true
     }
   ]
 }

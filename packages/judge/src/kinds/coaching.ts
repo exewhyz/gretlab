@@ -1,0 +1,62 @@
+import type { KindDefinition } from "./types.ts"
+
+/** A coaching or tuition institute: courses run in batches, tests, parents kept informed. */
+export const coaching = {
+  key: "coaching",
+  label: "Coaching institute",
+  noun: "institute",
+  description:
+    "Courses run in batches with regular tests, attendance and parents kept informed.",
+  examples:
+    "Tuition centres, entrance-exam coaching (JEE, NEET), language and skill institutes.",
+  decides: [
+    "Learners are grouped in batches under courses (JEE 2027 › Morning batch).",
+    "Work is organized by session; batches start and finish through the year.",
+    "Regular tests give marks and ranks; parents can follow progress.",
+    "Admissions and attendance are on; hostel and transport aren't part of it.",
+  ],
+  terms: {
+    learner: "Student",
+    learners: "Students",
+    instructor: "Faculty member",
+    instructors: "Faculty",
+    guardian: "Parent",
+    guardians: "Parents",
+    group: "Batch",
+    groups: "Batches",
+    groupLead: "Batch coordinator",
+    period: "Session",
+    periods: "Sessions",
+    assessment: "Test",
+    assessments: "Tests",
+  },
+  groupLevels: ["Course", "Batch"],
+  capabilities: [
+    "records",
+    "admissions",
+    "exams",
+    "leave",
+    "staffAttendance",
+    "attendance",
+    "timetable",
+    "subjects",
+    "parents",
+    "library",
+    "finance",
+  ],
+  defaults: [
+    "records",
+    "admissions",
+    "exams",
+    "attendance",
+    "timetable",
+    "subjects",
+    "parents",
+  ],
+  roleNames: {
+    owner: "Owner",
+    admin: "Admin",
+    teacher: "Faculty",
+    member: "Member",
+  },
+} as const satisfies KindDefinition

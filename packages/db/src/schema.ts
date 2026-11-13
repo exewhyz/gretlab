@@ -597,9 +597,11 @@ export const runners = pgTable("runners", {
 
 /* ---------- organizations ---------- */
 
+/** The kinds (packages/judge/src/kinds): a new kind adds its key here, in the same order. */
 export const orgType = pgEnum("org_type", [
   "school",
   "college",
+  "coaching",
   "cohort",
   "company",
   "community",
@@ -663,6 +665,18 @@ export const organizations = pgTable("organizations", {
   /** The week (its Monday, YYYY-MM-DD) of the last weekly summary sent, so each goes once. */
   digestWeek: text("digest_week"),
   createdAt: createdAt(),
+})
+
+/**
+ * The platform's decisions for a kind of organization (Admin › Organization kinds): for
+ * each module the kind can support, off, optional or on by default. Kinds with no row use
+ * their own defaults (packages/judge/src/kinds).
+ */
+export const orgKindPolicies = pgTable("org_kind_policies", {
+  kind: orgType("kind").primaryKey(),
+  modules: jsonb("modules").$type<Record<string, string>>().notNull().default({}),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
 
 /** Branches, batches, teams or cohorts: a tree inside one organization. */

@@ -1,0 +1,66 @@
+import type { KindDefinition } from "./types.ts"
+
+/** A college or university: departments, programs and batches, semesters, faculty. */
+export const college = {
+  key: "college",
+  label: "College",
+  noun: "college",
+  description:
+    "Departments, programs and batches, semesters, faculty and course outcomes.",
+  examples:
+    "Engineering, arts and science colleges, universities and their departments.",
+  decides: [
+    "Batches sit under departments and programs (CSE › B.Tech 2026), each with a faculty advisor.",
+    "Teaching is by course, taught by faculty; outcomes (CO–PO) are on.",
+    "Work is organized by academic year; students move up a year or graduate.",
+    "Assessments are per course; parents are optional, off at the start.",
+    "Admissions, hostel, transport and the library are available.",
+  ],
+  terms: {
+    learner: "Student",
+    learners: "Students",
+    instructor: "Faculty member",
+    instructors: "Faculty",
+    guardian: "Parent",
+    guardians: "Parents",
+    group: "Batch",
+    groups: "Batches",
+    groupLead: "Faculty advisor",
+    period: "Academic year",
+    periods: "Academic years",
+    assessment: "Assessment",
+    assessments: "Assessments",
+  },
+  groupLevels: ["Department", "Batch"],
+  capabilities: [
+    "records",
+    "admissions",
+    "exams",
+    "leave",
+    "staffAttendance",
+    "attendance",
+    "timetable",
+    "subjects",
+    "parents",
+    "library",
+    "transport",
+    "hostel",
+    "finance",
+  ],
+  defaults: [
+    "records",
+    "admissions",
+    "exams",
+    "leave",
+    "staffAttendance",
+    "attendance",
+    "timetable",
+    "subjects",
+  ],
+  roleNames: {
+    owner: "Owner",
+    admin: "Admin",
+    teacher: "Faculty",
+    member: "Member",
+  },
+} as const satisfies KindDefinition

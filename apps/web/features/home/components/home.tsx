@@ -20,7 +20,9 @@ import {
 } from "@phosphor-icons/react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
-import { useState } from "react"
+import { createContext, useContext, useState } from "react"
+
+import { KINDS, type KindTerms } from "@workspace/judge"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import { Badge } from "@workspace/ui/components/badge"
@@ -168,7 +170,12 @@ interface ParentData {
 
 type View = "admin" | "teacher" | "student" | "parent" | "staff"
 
+/** The organization's own words (Students or Learners, Classes or Cohorts). */
+const TermsContext = createContext<KindTerms>(KINDS.school.terms)
+const useTerms = () => useContext(TermsContext)
+
 interface Home {
+  terms?: KindTerms
   views: View[]
   admin: AdminData | null
   teacher: TeacherData | null
@@ -217,34 +224,36 @@ export function OrgHome({ slug }: { slug: string }) {
   if (!data) return <HomeSkeleton />
   const view = picked && shown.includes(picked) ? picked : shown[0]
   return (
-    <div className="grid gap-5" data-testid="org-home">
-      {shown.length > 1 && (
-        <Tabs value={view} onValueChange={(v) => setPicked(v as View)}>
-          <TabsList aria-label="Show my home as">
-            {shown.map((v) => (
-              <TabsTrigger key={v} value={v}>
-                {LABEL[v]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      )}
-      {view === "admin" && data.admin && (
-        <AdminHome slug={slug} data={data.admin} />
-      )}
-      {view === "teacher" && data.teacher && (
-        <TeacherHome slug={slug} data={data.teacher} />
-      )}
-      {view === "student" && data.student && (
-        <StudentHome slug={slug} data={data.student} />
-      )}
-      {view === "parent" && data.parent && (
-        <ParentHome slug={slug} data={data.parent} />
-      )}
-      {view === "staff" && data.staff && (
-        <StaffHome slug={slug} data={data.staff} />
-      )}
-    </div>
+    <TermsContext.Provider value={data.terms ?? KINDS.school.terms}>
+      <div className="grid gap-5" data-testid="org-home">
+        {shown.length > 1 && (
+          <Tabs value={view} onValueChange={(v) => setPicked(v as View)}>
+            <TabsList aria-label="Show my home as">
+              {shown.map((v) => (
+                <TabsTrigger key={v} value={v}>
+                  {LABEL[v]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
+        {view === "admin" && data.admin && (
+          <AdminHome slug={slug} data={data.admin} />
+        )}
+        {view === "teacher" && data.teacher && (
+          <TeacherHome slug={slug} data={data.teacher} />
+        )}
+        {view === "student" && data.student && (
+          <StudentHome slug={slug} data={data.student} />
+        )}
+        {view === "parent" && data.parent && (
+          <ParentHome slug={slug} data={data.parent} />
+        )}
+        {view === "staff" && data.staff && (
+          <StaffHome slug={slug} data={data.staff} />
+        )}
+      </div>
+    </TermsContext.Provider>
   )
 }
 
@@ -396,6 +405,7 @@ const trendConfig = {
 } satisfies ChartConfig
 
 function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
+  const terms = useTerms()
   const { data: viewer } = useViewer()
   const { data: shell } = useShell(slug)
   const manage = `/orgs/${slug}/manage`
@@ -535,7 +545,7 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Tile
-          label="Students"
+          label={terms.learners}
           value={String(data.tiles.students)}
           hint="Active, in a class"
         />
@@ -557,9 +567,9 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
             hint="Attendance is switched off"
           />
         )}
-        <Tile label="Teachers" value={String(data.tiles.teachers)} />
+        <Tile label={terms.instructors} value={String(data.tiles.teachers)} />
         <Tile
-          label="Classes"
+          label={terms.groups}
           value={String(data.tiles.classes)}
           hint="Where students sit"
         />
@@ -755,10 +765,14 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
 /* ---------- teaching ---------- */
 
 function TeacherHome({ slug, data }: { slug: string; data: TeacherData }) {
+  const terms = useTerms()
   const manage = `/orgs/${slug}/manage`
   return (
     <div className="grid gap-5" data-testid="teacher-home">
-      <Greeting day={data.day} title="Teaching today" />
+      <Greeting
+        day={data.day}
+        title={`${terms.instructor === "Mentor" ? "Mentoring" : terms.instructor === "Manager" ? "Your team" : "Teaching"} today`}
+      />
       {data.checkIn && <CheckInCard slug={slug} />}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -772,7 +786,10 @@ function TeacherHome({ slug, data }: { slug: string; data: TeacherData }) {
           value={String(data.tiles.toTake)}
           tone={data.tiles.toTake ? "primary" : undefined}
         />
-        <Tile label="My students" value={String(data.tiles.students)} />
+        <Tile
+          label={`My ${terms.learners.toLowerCase()}`}
+          value={String(data.tiles.students)}
+        />
         <Tile
           label="Below 75%"
           value={String(data.tiles.low)}
@@ -936,6 +953,7 @@ function isNow(starts: string, ends: string) {
 }
 
 function StudentHome({ slug, data }: { slug: string; data: StudentData }) {
+  const terms = useTerms()
   const { data: viewer } = useViewer()
   const first = (viewer?.user?.name ?? "").split(" ")[0]
   return (
@@ -973,7 +991,7 @@ function StudentHome({ slug, data }: { slug: string; data: StudentData }) {
           hint="Assignments and exams"
         />
         <Tile
-          label="My classes"
+          label={`My ${terms.groups.toLowerCase()}`}
           value={String(data.tiles.classes)}
           hint={data.classes.map((c) => c.name).join(", ")}
         />

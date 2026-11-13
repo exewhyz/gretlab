@@ -7,11 +7,12 @@ import { useState } from "react"
 import { Button } from "@workspace/ui/components/button"
 
 import { ConfirmButton } from "@/components/confirm"
-import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
+import { Field, FormMessage, TextInput } from "@/components/form"
 import { ORG_TYPE, type OrgType } from "@/features/orgs/components/public"
 import { slugify } from "@/features/problems/schemas"
 import { api } from "@/lib/api/client"
 import { formatDate } from "@/lib/format"
+import { KindPicker } from "@/features/orgs/components/kind-picker"
 
 import { Card, Loading, PageTitle, Table } from "./shell"
 
@@ -37,6 +38,7 @@ export function AdminOrganizations() {
     ownerEmail: "",
   })
   const [slugTouched, setSlugTouched] = useState(false)
+  const [kindConfirmed, setKindConfirmed] = useState(false)
   const [message, setMessage] = useState<{
     text: string
     kind?: "ok" | "err"
@@ -56,6 +58,7 @@ export function AdminOrganizations() {
         kind: "ok",
       })
       setForm({ name: "", slug: "", type: form.type, ownerEmail: "" })
+      setKindConfirmed(false)
       setSlugTouched(false)
     },
     onError: (e) => setMessage({ text: e.message, kind: "err" }),
@@ -78,7 +81,7 @@ export function AdminOrganizations() {
       <PageTitle>Organizations</PageTitle>
       <Card className="mb-5 grid gap-3">
         <h2 className="text-title-sm text-ink">New organization</h2>
-        <div className="grid gap-3 min-[901px]:grid-cols-4">
+        <div className="grid gap-3 min-[901px]:grid-cols-3">
           <Field label="Name">
             <TextInput
               value={form.name}
@@ -102,20 +105,6 @@ export function AdminOrganizations() {
               }}
             />
           </Field>
-          <Field label="Kind">
-            <SelectInput
-              value={form.type}
-              onChange={(e) =>
-                setForm({ ...form, type: e.target.value as OrgType })
-              }
-            >
-              {Object.entries(ORG_TYPE).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
           <Field label="Owner's email" help="They manage it after signing in.">
             <TextInput
               type="email"
@@ -124,8 +113,17 @@ export function AdminOrganizations() {
             />
           </Field>
         </div>
+        <KindPicker
+          value={form.type}
+          onChange={(type) => setForm({ ...form, type })}
+          confirmed={kindConfirmed}
+          onConfirm={setKindConfirmed}
+        />
         <div className="flex items-center gap-3">
-          <Button disabled={create.isPending} onClick={() => create.mutate()}>
+          <Button
+            disabled={create.isPending || !kindConfirmed}
+            onClick={() => create.mutate()}
+          >
             Create organization
           </Button>
           <FormMessage message={message} />
@@ -144,7 +142,10 @@ export function AdminOrganizations() {
                 {org.name}
               </Link>
               {org.signupStatus === "pending" ? (
-                <span className="ml-2 text-xs font-semibold text-primary-active" data-testid="awaiting-approval">
+                <span
+                  className="ml-2 text-xs font-semibold text-primary-active"
+                  data-testid="awaiting-approval"
+                >
                   Waiting for approval
                 </span>
               ) : (

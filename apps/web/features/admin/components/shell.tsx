@@ -19,6 +19,7 @@ import {
   PulseIcon,
   QuestionIcon,
   ShieldCheckIcon,
+  ShapesIcon,
   SquaresFourIcon,
   StackIcon,
   TrophyIcon,
@@ -154,6 +155,12 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         icon: BuildingsIcon,
         label: "Organizations",
         needs: ["platform.orgs.manage"],
+      },
+      {
+        href: "/admin/kinds",
+        icon: ShapesIcon,
+        label: "Organization kinds",
+        needs: ["platform.kinds.manage"],
       },
       {
         href: "/admin/staff",

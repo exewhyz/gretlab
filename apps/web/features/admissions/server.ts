@@ -109,7 +109,7 @@ const STATUS_WORDS: Record<ApplicationStatus, string> = {
 
 async function context(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
-  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const modules = ctx.modules
   if (!modules.has("admissions"))
     throw notFound("Admissions aren't open here.")
   if (!modules.has("records"))
@@ -419,7 +419,7 @@ export async function getApplication(slug: string, user: User, id: string) {
           sections: sections.map((g) => ({ id: g, name: pathName(ctx, g) })),
           admissionNo: await suggestAdmissionNo(ctx),
           linksParent:
-            enabledModules(ctx.org.type, ctx.org.modules).has("parents") && row.relation !== "self",
+            ctx.modules.has("parents") && row.relation !== "self",
         }
       : null,
   }
@@ -478,7 +478,7 @@ export async function admit(slug: string, user: User, id: string, input: z.infer
   const admissionNo = input.admissionNo || (await suggestAdmissionNo(ctx))
   await admissionFree(ctx, admissionNo)
   const linkParent =
-    enabledModules(ctx.org.type, ctx.org.modules).has("parents") && row.relation !== "self"
+    ctx.modules.has("parents") && row.relation !== "self"
   // A student who applied for themselves is admitted as their own account.
   const [applicant] = await getDb()
     .select({ email: users.email })
@@ -599,7 +599,7 @@ export async function saveAdmissionSettings(
 /** How many applications wait for this person's first look (for the sidebar). Never throws. */
 export async function newApplications(ctx: OrgContext) {
   try {
-    if (!enabledModules(ctx.org.type, ctx.org.modules).has("admissions") || !manages(ctx)) return 0
+    if (!ctx.modules.has("admissions") || !manages(ctx)) return 0
     const [row] = await getDb()
       .select({ n: count() })
       .from(admissionApplications)

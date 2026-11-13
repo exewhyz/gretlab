@@ -25,6 +25,8 @@ import {
 } from "@workspace/db"
 import {
   enabledModules,
+  KINDS,
+  kindTerms,
   ORG_NAV,
   PERMISSIONS,
   readAdmissionSettings,
@@ -114,7 +116,7 @@ function rolePermissionsHold(held: readonly string[], permission: Permission) {
 async function viewsOf(ctx: OrgContext, user: User): Promise<HomeView[]> {
   const db = getDb()
   const held = heldAnywhere(ctx)
-  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const modules = ctx.modules
   const views: HomeView[] = []
   if (OVERSEEING.some((p) => canFor(ctx, p, []))) views.push("admin")
   if (taughtGroups(ctx).length > 0) views.push("teacher")
@@ -162,7 +164,7 @@ export async function orgShell(slug: string, user: User) {
   const views = await viewsOf(ctx, user)
   const permissions = heldAnywhere(ctx)
   const db = getDb()
-  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const modules = ctx.modules
   const [children, [pending], roles] = await Promise.all([
     views.includes("parent")
       ? db
@@ -220,13 +222,16 @@ export async function orgShell(slug: string, user: User) {
     role:
       roleNames.join(", ") ||
       (views.includes("student")
-        ? "Student"
+        ? kindTerms(ctx.org.type).learner
         : views.includes("parent")
-          ? "Parent"
+          ? (kindTerms(ctx.org.type).guardian ?? "Parent")
           : "Member"),
     permissions,
     modules: [...modules],
     pending: Number(pending?.n ?? 0),
+    /** The kind's words, for the frame (My classes, About the school). */
+    terms: kindTerms(ctx.org.type),
+    noun: KINDS[ctx.org.type].noun,
     leavePending: await pendingLeaveCount(ctx),
     admissionsNew: await newApplications(ctx),
     children: children.map((c) => ({ id: c.id, name: c.name ?? c.email })),
@@ -354,9 +359,10 @@ function todayOf(marks: Mark[], day: string, groupId: string) {
 }
 
 async function adminHome(ctx: OrgContext) {
+  const terms = kindTerms(ctx.org.type)
   const db = getDb()
   const day = await today()
-  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const modules = ctx.modules
   const classes = leaves(ctx)
   const classIds = classes.map((g) => g.id)
   const [
@@ -557,7 +563,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             key: "year",
-            label: "Current academic year",
+            label: `Current ${terms.period.toLowerCase()}`,
             done: hasCurrentYear,
             href: "/academic-years",
           },
@@ -565,7 +571,7 @@ async function adminHome(ctx: OrgContext) {
       : []),
     {
       key: "classes",
-      label: "Classes and sections",
+      label: `${terms.groups} and ${(ctx.org.groupLevels.at(-1) ?? "section").toLowerCase()}s`,
       done: classes.length > 0,
       href: "/groups",
     },
@@ -573,7 +579,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             key: "class-teachers",
-            label: "Class teachers",
+            label: `${terms.groupLead}s`,
             done: Number(leadCount?.n ?? 0) > 0,
             href: "/academic-years",
           },
@@ -581,13 +587,13 @@ async function adminHome(ctx: OrgContext) {
       : []),
     {
       key: "teachers",
-      label: "Add teachers",
+      label: `Add ${terms.instructors.toLowerCase()}`,
       done: teachers.size > 0,
       href: "/members",
     },
     {
       key: "students",
-      label: "Add students",
+      label: `Add ${terms.learners.toLowerCase()}`,
       done: students.size > 0,
       href: modules.has("records") ? "/students" : "/import",
     },
@@ -615,7 +621,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             key: "parents",
-            label: "Link parents",
+            label: `Link ${(terms.guardians ?? "parents").toLowerCase()}`,
             done: Number(linkCount?.n ?? 0) > 0,
             href: "/parents",
           },
@@ -635,7 +641,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             key: "exams",
-            label: "This year's exams",
+            label: `This ${terms.period.toLowerCase()}'s ${terms.assessments.toLowerCase()}`,
             done: Number(examCount?.n ?? 0) > 0,
             href: "/exams",
           },
@@ -718,7 +724,7 @@ async function adminHome(ctx: OrgContext) {
           {
             kind: "Parents",
             tone: "plain",
-            text: `${students.size - linkedStudents} students with no parent linked`,
+            text: `${students.size - linkedStudents} ${terms.learners.toLowerCase()} with no ${(terms.guardian ?? "parent").toLowerCase()} linked`,
             action: "Link",
             href: "/parents",
           },
@@ -784,7 +790,7 @@ async function adminHome(ctx: OrgContext) {
 
 async function teacherHome(ctx: OrgContext, user: User) {
   const day = await today()
-  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const modules = ctx.modules
   const mine = taughtGroups(ctx)
   const ids = mine.map((g) => g.id)
   const [byGroup, marks] = await Promise.all([
@@ -940,7 +946,7 @@ const DAY_MS = 86_400_000
 async function studentHome(ctx: OrgContext, user: User) {
   const slug = ctx.org.slug
   const day = await today()
-  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const modules = ctx.modules
   const seats = await getDb()
     .select({ groupId: groupMembers.groupId })
     .from(groupMembers)
@@ -1159,7 +1165,7 @@ async function parentHome(ctx: OrgContext, user: User) {
 /** Staff who neither oversee the school nor teach: today, what waits for them, their pages. */
 async function staffHome(ctx: OrgContext) {
   const held = new Set(heldAnywhere(ctx))
-  const modules = enabledModules(ctx.org.type, ctx.org.modules)
+  const modules = ctx.modules
   const base = `/orgs/${ctx.org.slug}`
   const links = visibleOrgNav(ORG_NAV, {
     orgType: ctx.org.type,
@@ -1171,7 +1177,7 @@ async function staffHome(ctx: OrgContext) {
       .map((i) => ({
         key: i.key,
         label: i.label,
-        group: g.group as string,
+        group: g.label,
         href: `${base}/manage${i.path}`,
       }))
   )
@@ -1179,7 +1185,7 @@ async function staffHome(ctx: OrgContext) {
     links.push({
       key: "leave",
       label: "Leave",
-      group: "This school",
+      group: `This ${KINDS[ctx.org.type].noun}`,
       href: `${base}/leave`,
     })
   const [day, leaveWaiting, applications, staffDay] = await Promise.all([
@@ -1220,7 +1226,15 @@ export async function orgHome(slug: string, user: User) {
     views.includes("student") ? studentHome(ctx, user) : null,
     views.includes("parent") ? parentHome(ctx, user) : null,
   ])
-  return { views, admin, teacher, student, parent, staff }
+  return {
+    views,
+    admin,
+    teacher,
+    student,
+    parent,
+    staff,
+    terms: kindTerms(ctx.org.type),
+  }
 }
 
 /** Which views a person has, for the page to decide what to render. */

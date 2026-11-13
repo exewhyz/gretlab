@@ -1,17 +1,23 @@
+import { KINDS, type KindTerms, type ModuleLevel } from "./kinds/index.ts"
+
 /*
- * What each kind of organization is like, and which optional modules it may run. One
- * deployment hosts schools, colleges, cohorts, companies and communities; this table is the
- * only place their differences live: what their group levels are called, what the sidebar
- * calls groups, and which modules they start with. A new kind of organization is a new row.
+ * Kinds of organization and the optional modules they may run. Everything about a kind
+ * (its words, levels, capabilities, defaults, role names) lives in its file in ./kinds;
+ * this module derives what the rest of the code reads from there.
  *
- * Modules are optional features an organization turns on or off in its settings (attendance,
- * timetable, library...). The org's stored choices override its type's defaults; a module a
- * type can't use is never on. A module not yet `ready` can't be turned on.
+ * Which modules an organization has is decided in three layers:
+ *   1. the kind's capabilities (./kinds): a module a kind can't support is never on;
+ *   2. the platform's policy for the kind (platform staff, Admin › Organization kinds):
+ *      each capable module is off, optional, or on by default for that kind;
+ *   3. the organization's own choices (Settings › Modules), within what's optional or default.
+ * A module not yet `ready` is never on.
  */
 
+/** Every kind, in the order offered. Must match the keys of KINDS and the org_type enum. */
 export const ORG_TYPES = [
   "school",
   "college",
+  "coaching",
   "cohort",
   "company",
   "community",
@@ -22,13 +28,19 @@ export type OrgType = (typeof ORG_TYPES)[number]
 export const isOrgType = (value: string): value is OrgType =>
   (ORG_TYPES as readonly string[]).includes(value)
 
+export type { KindTerms, ModuleLevel }
+export { KINDS }
+
+/** A kind's words: Students or Learners, Classes or Cohorts. */
+export const kindTerms = (type: OrgType): KindTerms => KINDS[type].terms
+
 export interface OrgTypeConfig {
   label: string
   /** Default names of the group levels, top first (editable per org in Settings). */
   groupLevels: string[]
   /** What the sidebar calls the Groups page. */
   groupsLabel: string
-  /** Modules on by default for this type. */
+  /** Modules on by default for this type (before the platform's policy). */
   modules: ModuleKey[]
 }
 
@@ -37,85 +49,72 @@ export const MODULES = {
     label: "Student records",
     description:
       "Academic years, admission numbers and each student's record, with their class for each year.",
-    for: ["school", "college"],
     ready: true,
   },
   exams: {
     label: "Exams and report cards",
     description:
       "Term exams with marks for every subject, grades, results by class and printable report cards. Needs Student records and Subjects.",
-    for: ["school", "college"],
     ready: true,
   },
   admissions: {
     label: "Admissions",
     description:
       "Parents apply online; the office reviews, waitlists or admits, and admitting creates the student's record and links the parent. Needs Student records.",
-    for: ["school", "college"],
     ready: true,
   },
   leave: {
     label: "Leave",
     description:
       "Students (or their parents) and staff ask for leave; class teachers and the office approve it. Approved student leave is excused in attendance.",
-    for: ["school", "college"],
     ready: true,
   },
   staffAttendance: {
     label: "Staff attendance",
     description:
       "A daily register of teachers and staff, self check-in with a late time, approved leave shown, and a monthly report.",
-    for: ["school", "college"],
     ready: true,
   },
   attendance: {
     label: "Attendance",
     description:
       "A daily register for each class or section, and attendance reports.",
-    for: ["school", "college", "cohort"],
     ready: true,
   },
   timetable: {
     label: "Timetable",
     description: "Weekly periods for every subject, per class or section.",
-    for: ["school", "college"],
     ready: true,
   },
   subjects: {
     label: "Subjects",
     description: "Subjects taught in each class, beyond the coding lab.",
-    for: ["school", "college"],
     ready: true,
   },
   parents: {
     label: "Parent accounts",
     description:
       "Parents sign in to follow their children's work, attendance and results.",
-    for: ["school", "college", "cohort"],
     ready: true,
   },
   library: {
     label: "Library",
     description: "The catalog of books and who has borrowed what.",
-    for: ["school", "college"],
     ready: true,
   },
   transport: {
     label: "Transport",
     description: "Routes, stops and which students ride which route.",
-    for: ["school", "college"],
     ready: true,
   },
   hostel: {
     label: "Hostel",
     description: "Hostels, rooms and beds, and who stays where.",
-    for: ["school", "college"],
     ready: true,
   },
   finance: {
     label: "Fees and payments",
     description: "Fee plans, invoices and online payments.",
-    for: ["school", "college"],
     ready: false,
   },
 } as const satisfies Record<
@@ -123,7 +122,6 @@ export const MODULES = {
   {
     label: string
     description: string
-    for: readonly OrgType[]
     ready: boolean
   }
 >
@@ -133,49 +131,60 @@ export const MODULE_KEYS = Object.keys(MODULES) as ModuleKey[]
 export const isModuleKey = (value: string): value is ModuleKey =>
   value in MODULES
 
-export const ORG_TYPE_CONFIG: Record<OrgType, OrgTypeConfig> = {
-  school: {
-    label: "School",
-    groupLevels: ["Grade", "Section"],
-    groupsLabel: "Classes",
-    modules: ["records", "admissions", "exams", "leave", "staffAttendance", "attendance", "timetable", "subjects", "parents"],
-  },
-  college: {
-    label: "College",
-    groupLevels: ["Branch", "Batch"],
-    groupsLabel: "Batches",
-    modules: ["records", "admissions", "exams", "leave", "staffAttendance", "attendance", "timetable", "subjects"],
-  },
-  cohort: {
-    label: "Cohort program",
-    groupLevels: ["Cohort"],
-    groupsLabel: "Cohorts",
-    modules: ["attendance"],
-  },
-  company: {
-    label: "Company",
-    groupLevels: ["Team"],
-    groupsLabel: "Teams",
-    modules: [],
-  },
-  community: {
-    label: "Community",
-    groupLevels: ["Group"],
-    groupsLabel: "Groups",
-    modules: [],
-  },
-  other: {
-    label: "Organization",
-    groupLevels: ["Group"],
-    groupsLabel: "Groups",
-    modules: [],
-  },
+/** Each kind's basics, derived from its definition (for code that predates ./kinds). */
+export const ORG_TYPE_CONFIG = Object.fromEntries(
+  ORG_TYPES.map((t) => [
+    t,
+    {
+      label: KINDS[t].label,
+      groupLevels: [...KINDS[t].groupLevels],
+      groupsLabel: KINDS[t].terms.groups,
+      modules: KINDS[t].defaults.filter(isModuleKey),
+    },
+  ])
+) as Record<OrgType, OrgTypeConfig>
+
+/** The platform's per-kind decisions: a level for any of the kind's modules. */
+export type KindPolicy = Partial<Record<ModuleKey, ModuleLevel>>
+
+/** Whether a kind can support a module at all. */
+export const kindCan = (type: OrgType, key: ModuleKey) =>
+  (KINDS[type].capabilities as readonly string[]).includes(key)
+
+/** A module's level for a kind: what the platform set, else the kind's own default. */
+export function moduleLevel(
+  type: OrgType,
+  key: ModuleKey,
+  policy?: KindPolicy | null
+): ModuleLevel {
+  if (!kindCan(type, key)) return "off"
+  const set = policy?.[key]
+  if (set === "off" || set === "optional" || set === "default") return set
+  return (KINDS[type].defaults as readonly string[]).includes(key)
+    ? "default"
+    : "optional"
 }
 
-/** A module's availability for a type: usable at all, and whether it can be switched on yet. */
-export function moduleAvailable(type: OrgType, key: ModuleKey) {
-  const m = MODULES[key]
-  return (m.for as readonly OrgType[]).includes(type)
+/** Whether an organization of this kind may switch a module on (capable, allowed, ready). */
+export const moduleAvailable = (
+  type: OrgType,
+  key: ModuleKey,
+  policy?: KindPolicy | null
+) => MODULES[key].ready && moduleLevel(type, key, policy) !== "off"
+
+/** A stored policy cleaned up: only modules the kind can use, at known levels. */
+export function readKindPolicy(type: OrgType, stored: unknown): KindPolicy {
+  if (!stored || typeof stored !== "object") return {}
+  const out: KindPolicy = {}
+  for (const [key, value] of Object.entries(stored)) {
+    if (
+      isModuleKey(key) &&
+      kindCan(type, key) &&
+      (value === "off" || value === "optional" || value === "default")
+    )
+      out[key] = value
+  }
+  return out
 }
 
 /** Stored per-org choices: only known modules, as on/off. Anything else is ignored. */
@@ -191,16 +200,21 @@ export function readModuleChoices(
 }
 
 /**
- * The modules that are on for an organization: its type's defaults, then its own choices,
- * limited to modules its type can use and that are ready.
+ * The modules that are on for an organization: within what its kind can support and the
+ * platform allows for the kind, its own choices, else the level's default.
  */
-export function enabledModules(type: OrgType, stored: unknown): Set<ModuleKey> {
+export function enabledModules(
+  type: OrgType,
+  stored: unknown,
+  policy?: KindPolicy | null
+): Set<ModuleKey> {
   const choices = readModuleChoices(stored)
   const on = new Set<ModuleKey>()
   for (const key of MODULE_KEYS) {
-    if (!moduleAvailable(type, key) || !MODULES[key].ready) continue
-    const chosen = choices[key]
-    if (chosen ?? ORG_TYPE_CONFIG[type].modules.includes(key)) on.add(key)
+    if (!MODULES[key].ready) continue
+    const level = moduleLevel(type, key, policy)
+    if (level === "off") continue
+    if (choices[key] ?? level === "default") on.add(key)
   }
   return on
 }

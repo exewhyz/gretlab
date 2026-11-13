@@ -28,6 +28,7 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/route"
+import { kindPolicies } from "@/features/orgs/kinds"
 
 /*
  * The Library module: an organization's books (`library_books`, with a number of copies)
@@ -76,7 +77,7 @@ export const loanActionSchema = z.object({
 const forbidden = (message: string) => new ApiError(403, "forbidden", message)
 
 function needModule(ctx: OrgContext) {
-  if (!enabledModules(ctx.org.type, ctx.org.modules).has("library")) {
+  if (!ctx.modules.has("library")) {
     throw notFound("The library isn't switched on for this organization.")
   }
 }
@@ -626,9 +627,10 @@ export async function dueLoans(userId: string) {
         sql.lte(libraryLoans.dueOn, soon)
       )
     )
-    .then((rows) =>
-      rows
-        .filter((r) => enabledModules(r.type, r.modules).has("library"))
+    .then(async (rows) => {
+      const policies = await kindPolicies()
+      return rows
+        .filter((r) => enabledModules(r.type, r.modules, policies[r.type]).has("library"))
         .map((r) => ({ ...r, overdue: r.dueOn < day }))
-    )
+    })
 }

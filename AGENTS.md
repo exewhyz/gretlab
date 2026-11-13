@@ -190,9 +190,30 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 
 ## Kinds of organization, modules and the sidebar
 
-- An organization has a kind (`organizations.type`): school, college, cohort, company, community or other. Everything that differs by kind lives in one table, `ORG_TYPE_CONFIG` in `packages/judge/src/org-types.ts`: its display name, default group levels (school Grade › Section, college Branch › Batch, cohort Cohort, company Team), what the sidebar calls the Groups page (Classes, Batches, Cohorts, Teams, Groups) and which modules it starts with. A new kind is a new row (plus an enum value and migration).
-- Modules are optional features an organization switches on in Settings › Modules (`MODULES`: attendance, timetable, subjects, parent accounts, library, transport, hostel, fees). Each lists the kinds that may use it and whether it is `ready`. `organizations.modules` stores only the org's choices; `enabledModules(type, stored)` = the kind's defaults, then the choices, limited to the kinds that may use it and modules that are ready. The settings API refuses switching on a module the kind can't use or that isn't ready (`module_unavailable`). None is ready yet; a module ships by building it and flipping `ready`.
-- The org dashboard sidebar is data: `ORG_NAV` in `packages/judge/src/navigation.ts` lists each page with its named group (Overview, People, Teaching, Content, Reports, Communication, Settings), the permissions that reveal it (any of), the kinds it applies to, an optional `module`, and per-kind labels. `visibleOrgNav()` filters by permission, kind and enabled modules and drops empty groups. A new page is one entry there, never a hand-written link.
+- **Every organization is one kind, chosen at creation and never changed.** The kinds are school, college, coaching institute, cohort program, company, community and other.
+  - `updateSettings` refuses a different `type` (409 `kind_locked`), platform admins included, and Settings shows the kind read-only.
+  - The create form (Admin › Organizations) and school sign-up use `KindPicker`, which shows each kind, what the chosen one decides, and a warning. Create stays off until "I understand this can't be changed" is ticked.
+- **Each kind is one file in `packages/judge/src/kinds/`** (a `KindDefinition`), the only place a kind's differences live:
+  - its label, the noun its people use ("the institute"), a description, examples, and what it decides (shown before creating);
+  - its words (`terms`: learner(s), instructor(s), guardian(s), group(s), group lead, period(s), assessment(s));
+  - its group levels (school Grade › Section, college Department › Batch, coaching Course › Batch, cohort Cohort › Pod, company Department › Team);
+  - the modules it can support (`capabilities`) and those on from the start (`defaults`);
+  - its role names: built-in roles are named Faculty, Mentor, Manager, Learner and so on at creation, with the same permissions.
+  - `ORG_TYPE_CONFIG`, `kindTerms()` and `KINDS` derive from these files.
+  - **To add a kind:** write its file, add it to `KINDS` and `ORG_TYPES` in the same order, and add its key to the `org_type` enum (a migration). `org-types.test.ts` checks the definitions agree.
+- **Modules are decided in three layers** (`enabledModules(type, stored, policy)` in `org-types.ts`, unit-tested):
+  1. the kind's capabilities: a module it can't support is never on;
+  2. the platform's policy for the kind (`org_kind_policies`), set in **Admin › Organization kinds** by staff with "Manage organization kinds" (`platform.kinds.manage`): each capable module is off, optional, or on from the start, for every organization of the kind at once;
+  3. the organization's own choices (Settings › Modules, from `moduleOptions()`), within what's optional or on.
+  - A module not `ready` is never on.
+  - Policies are read through a 30-second cache (`kindPolicies()` in `features/orgs/kinds.ts`), cleared when they change.
+  - The org context carries the result as `ctx.modules`; use it (or `modulesOf(org)` / `kindPolicies()` outside a context), never `enabledModules` without the policy.
+  - Policy changes are audited (`platform.kind_policy`).
+- **The sidebar is data:** `ORG_NAV` in `packages/judge/src/navigation.ts` lists each page with its group, the permissions that reveal it (any of), the kinds it applies to, an optional `module`, and labels.
+  - A `term` names it in the kind's words (Students → Learners, Academic years → Sessions).
+  - `visibleOrgNav()` filters by permission, kind and modules, and names the groups per kind (`navGroupLabel`: "School" becomes College, Institute, Program; "Academics" becomes Learning for companies and communities).
+  - The frame and homes use the kind's words and noun (`orgShell().terms` and `.noun`, `orgHome().terms`).
+  - A new page is one entry there, never a hand-written link.
 
 ## Attendance (module)
 
@@ -631,6 +652,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - No mail to `.invalid` addresses; a parent for a no-login student; the home checklist; the log.
   - The pages and the add sheet, at laptop and phone width.
 - `e2e/promotion.mjs`: import (bad rows refused, nothing half-written, scoped to the importer's grade), creating records for existing members, the promotion plan's suggestions, a preview, applying with exceptions, running twice, making the new year current, who may promote, and the wizard at laptop and phone width.
+- `e2e/org-kinds.mjs`: each kind's levels and role names; the kind locked (platform admins too); modules limited by kind; the platform's per-kind policy applied to existing organizations at once, by staff allowed to, audited; the kind's words in the frame and homes; the create form's picker, warning and confirmation; the admin's kinds page; Settings showing the kind read-only. It puts the policies back through the API (clearing the server's cache) before its clean-up.
 - `e2e/links.mjs`: every link works for the person it's shown to. As the platform admin, a school owner, a teacher, office staff, a student and a parent it opens their home and follows the links on each page (one page of each kind, ids collapsed, up to `LINKS_LIMIT` pages), failing on any error status, sign-in bounce, or a "not found" / "not part of your role" page. Download links under `/api/` must answer 200. `LINKS_DUMP=file` writes the pages reached, to compare against all pages for ones nothing links to.
 - `e2e/member-home.mjs`: where `/` leads (visitors, signed in), what the home gathers (schools and requests waiting, a parent's child, practice, work and contests), features switched off, no home for visitors; the page at laptop and phone width with Home in the header.
 - `e2e/pdfs.mjs`: report cards for the student, parent and staff (nobody else); a class's report cards; names outside the fonts; transfer certificates (who may issue and print, dates, numbering, marking transferred, sealed as issued, the log); ID cards; the buttons. Each PDF is opened with pdf-lib to check it's valid, with the right page count and title.

@@ -64,7 +64,7 @@ export const slotSchema = z.object({
 })
 
 function needModule(ctx: OrgContext) {
-  if (!enabledModules(ctx.org.type, ctx.org.modules).has("timetable")) {
+  if (!ctx.modules.has("timetable")) {
     throw notFound("Timetables aren't switched on for this organization.")
   }
 }

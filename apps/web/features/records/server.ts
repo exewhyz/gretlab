@@ -91,7 +91,7 @@ export const statusSchema = z.object({ status: z.enum(ENROLMENT_STATUSES) })
 const forbidden = (message: string) => new ApiError(403, "forbidden", message)
 
 function needModule(ctx: OrgContext) {
-  if (!enabledModules(ctx.org.type, ctx.org.modules).has("records")) {
+  if (!ctx.modules.has("records")) {
     throw notFound("Student records aren't switched on for this organization.")
   }
 }
@@ -909,7 +909,7 @@ export async function getStudent(slug: string, user: User, id: string) {
     can: {
       edit: coversGroup(ctx, "students.edit", groupId),
       results:
-        enabledModules(ctx.org.type, ctx.org.modules).has("exams") &&
+        ctx.modules.has("exams") &&
         (canFor(ctx, "exams.setup", []) ||
           coversGroup(ctx, "exams.view", groupId) ||
           coversGroup(ctx, "exams.marks", groupId)),

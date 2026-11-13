@@ -1,7 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import type { ModuleKey, Permission } from "@workspace/judge"
+import type { KindTerms, ModuleKey, Permission } from "@workspace/judge"
 
 import { api } from "@/lib/api/client"
 
@@ -25,6 +25,9 @@ export interface Summary {
     allowPaste: boolean
     moduleChoices: Partial<Record<ModuleKey, boolean>>
     modules: ModuleKey[]
+    /** Modules this kind may have here, as the platform set them. */
+    moduleOptions?: { key: ModuleKey; level: "optional" | "default" }[]
+    kind?: { label: string; description: string; terms: KindTerms }
   }
   permissions: Permission[]
   orgWide: Permission[]
