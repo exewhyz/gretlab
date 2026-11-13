@@ -1,11 +1,11 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { readSession } from "@/features/auth/current-user"
 
 import { DEV_LOGIN_ENABLED } from "@/features/auth/options"
-import { SignInForm } from "@/features/auth/sign-in-button"
+import { AuthCard } from "@/features/auth/components/auth-card"
+import { SignInForm } from "@/features/auth/components/password-forms"
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -29,12 +29,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   }
 
   return (
-    <main className="mx-auto grid min-h-dvh max-w-md content-center gap-4 px-4 text-body-sm text-body">
-      <h1 className="text-display-lg text-ink">Sign in</h1>
-      <p>
-        Sign in to submit solutions, use every language and join contests. You
-        can still practise Python without an account.
-      </p>
+    <AuthCard title="Sign in" intro="Welcome back. Sign in to practise, submit and join contests.">
       {error && (
         <p role="alert" className="text-destructive">
           {error === "AccessDenied"
@@ -42,13 +37,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
             : "Sign in didn't work. Please try again."}
         </p>
       )}
-      <SignInForm
-        callbackUrl={safePath(callbackUrl)}
-        devLogin={DEV_LOGIN_ENABLED}
-      />
-      <Link href="/" className="underline underline-offset-2 hover:text-ink">
-        Back to the problems
-      </Link>
-    </main>
+      <SignInForm callbackUrl={safePath(callbackUrl)} devLogin={DEV_LOGIN_ENABLED} />
+    </AuthCard>
   )
 }

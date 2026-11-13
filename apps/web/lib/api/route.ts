@@ -77,6 +77,10 @@ interface Handler<A extends Access, B> {
  * Every API route goes through this: auth, same-origin check, body validation and one
  * error shape. Handlers stay short; business logic belongs in features/x/server.
  */
+/** Fields never sent to a browser, wherever they turn up in a response. */
+const SECRET_FIELDS = new Set(["passwordHash", "password_hash"])
+const withoutSecrets = (key: string, value: unknown) => (SECRET_FIELDS.has(key) ? undefined : value)
+
 export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
   options: {
     access: A
@@ -150,7 +154,10 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
       )
       // A handler may answer with its own Response, for downloads such as CSV.
       if (data instanceof Response) return data
-      return NextResponse.json(data ?? { ok: true })
+      // A safety net: a password hash never leaves the server, even in a whole user row.
+      return new NextResponse(JSON.stringify(data ?? { ok: true }, withoutSecrets), {
+        headers: { "content-type": "application/json" },
+      })
     } catch (error) {
       if (error instanceof ApiError) {
         return NextResponse.json(

@@ -39,6 +39,10 @@ export async function readSession(): Promise<SessionState> {
     .leftJoin(twoFactor, sql.eq(twoFactor.userId, users.id))
     .where(sql.eq(users.email, email.toLowerCase()))
   if (!row || row.user.disabled) return NOBODY
+  // Signed out everywhere since this session began (a password reset).
+  const signedInAt = (session as { signedInAt?: unknown }).signedInAt
+  if (row.user.sessionsValidAfter && (typeof signedInAt !== "number" || signedInAt < row.user.sessionsValidAfter.getTime()))
+    return NOBODY
   if (!row.enabledAt) return { user: row.user, pending: null, twoFactor: false }
   const mfaAt = (session as { mfaAt?: unknown }).mfaAt
   const passed =

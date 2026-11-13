@@ -64,8 +64,37 @@ export const users = pgTable("users", {
     .default({}),
   /** A secret for the person's calendar feed (iCal); null until they turn it on. */
   calendarToken: text("calendar_token").unique(),
+  /** Sign-in with email and password: scrypt, never the password itself. Null: none set. */
+  passwordHash: text("password_hash"),
+  /** When they proved the address is theirs (a sign-up link, a reset, or Google). */
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  /** Wrong passwords in a row, and until when password sign-in waits after too many. */
+  passwordFailures: integer("password_failures").notNull().default(0),
+  passwordLockedUntil: timestamp("password_locked_until", { withTimezone: true }),
+  /** Sessions signed in before this are signed out (a password reset, "sign out everywhere"). */
+  sessionsValidAfter: timestamp("sessions_valid_after", { withTimezone: true }),
   createdAt: createdAt(),
 })
+
+/**
+ * Single-use links sent by email: confirming a new account's address, and resetting a
+ * password. Only a hash of the token is kept, so a database leak gives no working links.
+ */
+export const authTokens = pgTable(
+  "auth_tokens",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"verify" | "reset">().notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("auth_tokens_by_user").on(table.userId, table.kind)]
+)
 
 /** A custom platform role: a name and a set of platform permissions. Built-in ones live in code. */
 export const platformRoles = pgTable("platform_roles", {

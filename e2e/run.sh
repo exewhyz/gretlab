@@ -71,6 +71,7 @@ node e2e/college.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/cohort.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/training.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/community.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+node e2e/password-auth.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 
 kill $RUNNER 2>/dev/null
 lsof -ti:3100 | xargs kill 2>/dev/null

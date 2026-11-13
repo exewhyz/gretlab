@@ -25,7 +25,8 @@ export default function PrivacyPage() {
       <h2 className="mt-4 text-title-md text-ink">Accounts</h2>
       <p>
         You sign in with Google, which shares your name and email with this
-        site. A cookie keeps you signed in. Contest leaderboards show your name
+        site, or with your email and a password. Passwords are stored only as a
+        one-way hash, never as typed. A cookie keeps you signed in. Contest leaderboards show your name
         to other visitors, but never your email.
       </p>
 

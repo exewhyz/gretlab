@@ -91,7 +91,7 @@ export function SecondStep({
       }}
     >
       <p>
-        Signed in with Google as <span className="text-ink">{email}</span>.{" "}
+        Signed in as <span className="text-ink">{email}</span>.{" "}
         {mode === "app" &&
           "Open your authenticator app and type the 6-digit code for this site."}
         {mode === "email" &&

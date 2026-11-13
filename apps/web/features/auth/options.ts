@@ -1,4 +1,4 @@
-import { getDb, sql, users } from "@workspace/db"
+import { authTokens, getDb, sql, users } from "@workspace/db"
 import { emailDomainAllowed } from "@workspace/judge"
 import type { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
@@ -8,14 +8,18 @@ import { freeHandle } from "@/features/catalog/server"
 import { getSettings } from "@/features/settings/server"
 import { isAdminEmail } from "@/lib/admin-emails"
 
+import { checkPassword } from "./password"
 import { confirmApp, confirmEmail, verifySecondStep } from "./two-factor"
 
 /** Sign in as anyone without a password, so never available in a production build. */
 export const DEV_LOGIN_ENABLED =
   process.env.NODE_ENV !== "production" && process.env.AUTH_DEV_LOGIN === "true"
 
-/** Applies registration settings and records the account. Returns whether to allow sign-in. */
-async function admit(rawEmail: string, name: string | null | undefined) {
+/**
+ * Applies registration settings and records the account. Returns whether to allow sign-in.
+ * `verified`: the provider vouches for the address (Google), so it counts as confirmed.
+ */
+async function admit(rawEmail: string, name: string | null | undefined, verified = false) {
   const email = rawEmail.toLowerCase()
   const db = getDb()
   const [existing] = await db
@@ -26,12 +30,24 @@ async function admit(rawEmail: string, name: string | null | undefined) {
 
   if (existing) {
     if (existing.disabled) return false
-    if (admin && existing.role !== "admin") {
-      await db
-        .update(users)
-        .set({ role: "admin" })
-        .where(sql.eq(users.id, existing.id))
+    const set = {
+      ...(admin && existing.role !== "admin" ? { role: "admin" as const } : {}),
+      ...(verified && !existing.emailVerifiedAt
+        ? {
+            emailVerifiedAt: new Date(),
+            // A password set before anyone proved the address could be someone else's
+            // (pre-hijacking): the owner, proven by Google now, starts without it.
+            ...(existing.passwordHash ? { passwordHash: null } : {}),
+          }
+        : {}),
     }
+    if (Object.keys(set).length)
+      await db.update(users).set(set).where(sql.eq(users.id, existing.id))
+    if ("passwordHash" in set)
+      await db
+        .update(authTokens)
+        .set({ usedAt: new Date() })
+        .where(sql.and(sql.eq(authTokens.userId, existing.id), sql.isNull(authTokens.usedAt)))
     return true
   }
 
@@ -48,6 +64,7 @@ async function admit(rawEmail: string, name: string | null | undefined) {
       name,
       handle: await freeHandle(email),
       role: admin ? "admin" : "student",
+      emailVerifiedAt: verified ? new Date() : null,
     })
     .onConflictDoNothing({ target: users.email })
   return true
@@ -58,6 +75,18 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+    }),
+    // Email and password (features/auth/password.ts). A refusal's reason reaches the form
+    // as its error: wrong, unverified or locked, never which part was wrong.
+    CredentialsProvider({
+      id: "password",
+      name: "Email and password",
+      credentials: { email: { type: "email" }, password: { type: "password" } },
+      async authorize(credentials) {
+        const result = await checkPassword(credentials?.email ?? "", credentials?.password ?? "")
+        if (!result.ok) throw new Error(result.reason)
+        return { id: result.user.id, email: result.user.email, name: result.user.name }
+      },
     }),
     ...(DEV_LOGIN_ENABLED
       ? [
@@ -81,9 +110,11 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === "google") {
         const google = profile as GoogleProfile | undefined
         if (!google?.email_verified) return false
-      } else if (!(DEV_LOGIN_ENABLED && account?.provider === "dev")) {
-        return false
+        return user.email ? admit(user.email, user.name, true) : false
       }
+      // The password was checked in authorize, against a confirmed account.
+      if (account?.provider === "password") return user.email ? admit(user.email, user.name) : false
+      if (!(DEV_LOGIN_ENABLED && account?.provider === "dev")) return false
       return user.email ? admit(user.email, user.name) : false
     },
     /**
@@ -95,6 +126,8 @@ export const authOptions: NextAuthOptions = {
       if (trigger === "signIn") {
         delete token.mfaAt
         delete token.mfaError
+        // A password reset or "sign out everywhere" ends sessions from before it.
+        token.signedInAt = Date.now()
       }
       if (
         trigger === "update" &&
@@ -129,6 +162,7 @@ export const authOptions: NextAuthOptions = {
         ...session,
         mfaAt: typeof token.mfaAt === "number" ? token.mfaAt : null,
         mfaError: typeof token.mfaError === "string" ? token.mfaError : null,
+        signedInAt: typeof token.signedInAt === "number" ? token.signedInAt : null,
       }
     },
   },

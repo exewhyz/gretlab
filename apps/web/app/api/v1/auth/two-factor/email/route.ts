@@ -9,6 +9,6 @@ import { ApiError, route } from "@/lib/api/route"
 export const POST = route({ access: "public" }, async () => {
   const { pending } = await readSession()
   if (!pending)
-    throw new ApiError(401, "unauthenticated", "Sign in with Google first.")
+    throw new ApiError(401, "unauthenticated", "Sign in first.")
   return emailSignInCode(pending)
 })

@@ -14,6 +14,8 @@ import {
 } from "@workspace/ui/components/dialog"
 
 import { Field, FormMessage, TextInput } from "@/components/form"
+import { PASSWORD, passwordProblem } from "@workspace/judge"
+
 import { Card, Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { formatDate } from "@/lib/format"
@@ -72,7 +74,7 @@ export function SecuritySettings() {
       <Card data-testid="two-factor">
         <h2 className="mb-1 text-title-sm text-ink">Two-factor sign-in</h2>
         <p className="mb-3 text-body-sm text-body">
-          After Google, you also prove it&apos;s you with a code: from an
+          After your password or Google, you also prove it&apos;s you with a code: from an
           authenticator app on your phone, or sent to your email. Turn on both,
           so losing one doesn&apos;t lock you out.
         </p>
@@ -159,6 +161,8 @@ export function SecuritySettings() {
           </div>
         )}
       </Card>
+      <PasswordCard />
+      <SessionsCard />
       {dialog && (
         <CodeDialog
           kind={dialog.kind}
@@ -560,5 +564,96 @@ function CodeDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Adding a password (to sign in without Google) or changing it, with the current one. */
+function PasswordCard() {
+  const client = useQueryClient()
+  const status = useQuery({
+    queryKey: ["me", "password"],
+    queryFn: () => api<{ hasPassword: boolean }>("/me/password"),
+  })
+  const [open, setOpen] = useState(false)
+  const [current, setCurrent] = useState("")
+  const [password, setPassword] = useState("")
+  const [done, setDone] = useState<string | null>(null)
+  const save = useMutation({
+    mutationFn: () =>
+      api("/me/password", { method: "PUT", body: { current: current || undefined, password } }),
+    onSuccess: () => {
+      setDone(status.data?.hasPassword ? "Password changed." : "Password added: you can sign in with it now.")
+      setOpen(false)
+      setCurrent("")
+      setPassword("")
+      void client.invalidateQueries({ queryKey: ["me", "password"] })
+    },
+  })
+  if (!status.data) return null
+  const has = status.data.hasPassword
+  const problem = password ? passwordProblem(password) : null
+  return (
+    <Card data-testid="password-card">
+      <h2 className="mb-1 text-title-sm text-ink">Password</h2>
+      <p className="mb-3 text-body-sm text-body">
+        {has
+          ? "You can sign in with your email and password, as well as Google."
+          : "You sign in with Google. Add a password to sign in with your email too."}
+      </p>
+      {done && <FormMessage message={{ text: done, kind: "ok" }} />}
+      {open ? (
+        <form
+          className="grid max-w-sm gap-3"
+          onSubmit={(e) => {
+            e.preventDefault()
+            save.mutate()
+          }}
+        >
+          {has && (
+            <Field label="Current password">
+              <TextInput type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+            </Field>
+          )}
+          <Field label="New password" help={problem ?? `At least ${PASSWORD.min} characters.`}>
+            <TextInput type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          </Field>
+          {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+          <div className="flex gap-2">
+            <Button type="submit" disabled={save.isPending || !password || Boolean(problem) || (has && !current)}>
+              Save password
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button variant="outline" onClick={() => setOpen(true)}>
+          {has ? "Change password" : "Add a password"}
+        </Button>
+      )}
+    </Card>
+  )
+}
+
+/** Signing out on every device: a lost phone, a shared computer. */
+function SessionsCard() {
+  const out = useMutation({
+    mutationFn: () => api("/me/sessions", { method: "DELETE" }),
+    onSuccess: () => {
+      window.location.href = "/sign-in"
+    },
+  })
+  return (
+    <Card data-testid="sessions-card">
+      <h2 className="mb-1 text-title-sm text-ink">Signed-in devices</h2>
+      <p className="mb-3 text-body-sm text-body">
+        Left yourself signed in somewhere, or lost a device? Sign out everywhere, this browser
+        included.
+      </p>
+      <Button variant="outline" disabled={out.isPending} onClick={() => out.mutate()}>
+        Sign out everywhere
+      </Button>
+    </Card>
   )
 }
