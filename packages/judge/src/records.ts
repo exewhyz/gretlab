@@ -70,8 +70,15 @@ export const NO_LOGIN_DOMAIN = "students.gretlab.invalid"
 
 export const noLoginEmail = (id: string) => `no-login+${id}@${NO_LOGIN_DOMAIN}`
 
+/** A student account made without a sign-in (young children). */
 export const isNoLoginEmail = (email: string) =>
-  email.toLowerCase().endsWith(".invalid")
+  email.toLowerCase().endsWith(`@${NO_LOGIN_DOMAIN}`)
+
+/**
+ * An address no email can reach (the reserved .invalid domain): no-login students, and
+ * demo accounts (packages/db/src/demo.ts), which sign in with a password but get no mail.
+ */
+export const isUndeliverable = (email: string) => email.toLowerCase().endsWith(".invalid")
 
 /* ---------- promotion ---------- */
 

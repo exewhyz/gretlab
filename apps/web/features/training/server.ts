@@ -91,6 +91,9 @@ async function statusOf(slug: string, user: User, ctx: OrgContext, map: Map_, sc
     items,
     renewalCutoffs([{ courseId: map.courseId, renewMonths: map.renewMonths }], outlines, day)
   )
+  // With renewal, work from before the cutoff doesn't count; it still shows who had it done
+  // once and has lapsed (expired), as against who never did it.
+  const ever = map.renewMonths ? await finished(ids, items) : null
   const certs = ids.length
     ? await getDb()
         .select({ userId: certificates.userId, code: certificates.code, expiresOn: certificates.expiresOn })
@@ -109,7 +112,7 @@ async function statusOf(slug: string, user: User, ctx: OrgContext, map: Map_, sc
       const all = items.length > 0 && items.every((i) => done.get(p.id)?.has(i.id))
       const times = [...(latest.get(p.id)?.values() ?? [])].map((t) => t.getTime())
       const state = trainingState({
-        doneSince: all ? dayOf(new Date(Math.min(...times))) : null,
+        doneSince: all ? dayOf(new Date(Math.min(...times))) : lapsedSince(ever, p.id, items),
         dueOn: map.dueOn,
         renewMonths: map.renewMonths,
         today: day,
@@ -126,6 +129,20 @@ async function statusOf(slug: string, user: User, ctx: OrgContext, map: Map_, sc
       }
     })
     .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * For renewed training someone hasn't done in the current period: when their last full
+ * completion began, if they ever finished it (so it shows as expired); null if never.
+ */
+function lapsedSince(
+  ever: Awaited<ReturnType<typeof finished>> | null,
+  userId: string,
+  items: { id: string }[]
+) {
+  if (!ever || items.length === 0 || !items.every((i) => ever.done.get(userId)?.has(i.id))) return null
+  const times = items.map((i) => ever.latest.get(userId)!.get(i.id)!.getTime())
+  return dayOf(new Date(Math.min(...times)))
 }
 
 const COUNT_KEYS: TrainingStatus[] = ["overdue", "expired", "due", "expiring", "todo", "done"]
@@ -322,12 +339,19 @@ export async function myTraining(ctx: OrgContext, user: User) {
   )
   const mine = done.get(user.id) ?? new Set<string>()
   const times = latest.get(user.id) ?? new Map<string, Date>()
+  const ever = list.some((m) => m.renewMonths)
+    ? await finished([user.id], [...outlines.values()].flat().flatMap((m) => m.items))
+    : null
   const rank: Record<TrainingStatus, number> = { overdue: 0, expired: 1, due: 2, expiring: 3, todo: 4, done: 5 }
   return list
     .map((m) => {
       const items = (outlines.get(m.courseId) ?? []).flatMap((x) => x.items)
       const all = items.length > 0 && items.every((i) => mine.has(i.id))
-      const doneSince = all ? dayOf(new Date(Math.min(...items.map((i) => times.get(i.id)!.getTime())))) : null
+      const doneSince = all
+        ? dayOf(new Date(Math.min(...items.map((i) => times.get(i.id)!.getTime()))))
+        : m.renewMonths
+          ? lapsedSince(ever, user.id, items)
+          : null
       return {
         courseId: m.courseId,
         course: m.title,

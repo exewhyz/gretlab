@@ -597,6 +597,11 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Platform staff with "Manage organization kinds" set each kind's list (Dashboard › Organization kinds › Suggested roles: add, edit, remove, back to default), stored in `org_kind_policies.role_templates` (null: the default), cached 30 seconds and cleared on save, logged (`platform.kind_roles`). Refused: two roles of one name or key, a built-in role's name, unknown permissions. Existing organizations' roles never change with it.
 - Built-in platform roles: Owner, Content admin, Reviewer, Support, Organizations manager, Communications (emails and notifications), Content editor (write library content, not publish or delete), Auditor (read-only).
 
+## Demo data
+
+- `pnpm --filter @workspace/db demo` (`packages/db/src/demo.ts`) shows which database it would wipe and changes nothing; `--wipe=<database name>` (typed exactly) empties every table except configuration (settings, language settings, runners, LTI keys, kind decisions, email wording), re-imports the problem library, and makes one organization of each kind with a few months of realistic activity (`src/demo/*.ts`, seeded randomness: the same data each run, dates relative to today). Re-running replaces it all.
+- Every demo account signs in with email and the password "Gretlab demo 2026"; addresses are on `<org>.demo.invalid`, so no email is ever sent to them (`isUndeliverable` in `packages/judge/src/records.ts`; `isNoLoginEmail` is only the no-login students' domain). The script prints the accounts to try, one per role. Platform admins still come from ADMIN_EMAILS.
+
 ## Calendar
 
 - `/calendar` (account menu) lists everything with a date for the viewer, by day (`features/calendar/server.ts`, `eventsFor`): published assignments' due times with their own extension, exam windows, peer reviews still to write that have a due time, and contests they registered for or their organizations run (the platform's open contests don't fill everyone's calendar).

@@ -125,7 +125,7 @@ check("certifying again doesn't make another", (await owner(`${O}/classes/${eng.
 // ---------- renewal
 psql(`update practice_answers set answered_at = now() - interval '13 months' where user_id='${uid("tr-e1")}' and question_id='${q}'`)
 const r1 = (await detail())?.people.find((p) => p.name === "TR E1")
-check("work older than the renewal stops counting: it's to be done again", r1?.status === "due" && r1.progress.done === 0, JSON.stringify(r1))
+check("work older than the renewal stops counting: it's expired, to be done again", r1?.status === "expired" && r1.needBy < day(0) && r1.progress.done === 0, JSON.stringify(r1))
 const cls = (await e1(`${O}/classes/${platform.id}/courses`)).json
 check("...and the course asks the question afresh", cls?.questions[q]?.answer === null && cls.courses.find((c) => c.id === course.id)?.dueOn === day(3), JSON.stringify(cls?.questions?.[q]))
 check("...but the course without renewal still counts it", (await detail(owner, course2, platform))?.people.find((p) => p.name === "TR E1")?.status === "done")

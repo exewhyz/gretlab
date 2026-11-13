@@ -4,6 +4,7 @@ import { test } from "node:test"
 import {
   admissionPrefix,
   isNoLoginEmail,
+  isUndeliverable,
   nextAdmissionNo,
   nextSerial,
   noLoginEmail,
@@ -72,6 +73,7 @@ test("students who don't sign in have an address that can't receive mail", () =>
   const e = noLoginEmail("abc")
   assert.ok(e.endsWith(".invalid") && isNoLoginEmail(e))
   assert.ok(!isNoLoginEmail("asha@gmail.com"))
+  assert.ok(!isNoLoginEmail("teacher@demo.invalid") && isUndeliverable("teacher@demo.invalid") && isUndeliverable(e))
 })
 
 test("promotion: the same section of the next grade, the top grade graduates", async () => {
