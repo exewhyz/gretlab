@@ -279,6 +279,12 @@ export function AccountMenu() {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem render={<Link href="/home" />}>Home</DropdownMenuItem>
+        {(user.role === "admin" || user.platform.permissions.length > 0) && (
+          <DropdownMenuItem render={<Link href="/admin" />}>
+            Platform admin
+          </DropdownMenuItem>
+        )}
         {viewer.features.profiles && (
           <DropdownMenuItem render={<Link href={`/u/${user.handle}`} />}>
             My profile

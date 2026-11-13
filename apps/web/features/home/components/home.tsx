@@ -427,7 +427,7 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
     {
       title: "Post a notice",
       hint: "A class or everyone",
-      href: "/notices",
+      href: "/notes",
       icon: MegaphoneIcon,
       show: may("notices.manage"),
     },
