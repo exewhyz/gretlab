@@ -45,6 +45,7 @@ export const coaching = {
     "parents",
     "library",
     "training",
+    "events",
     "finance",
   ],
   defaults: [
@@ -59,6 +60,7 @@ export const coaching = {
   grading: "marks",
   groupDates: true,
   leadPerGroup: true,
+  openGroups: false,
   roleNames: {
     owner: "Owner",
     admin: "Admin",

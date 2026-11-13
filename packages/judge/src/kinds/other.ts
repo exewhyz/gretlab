@@ -31,11 +31,12 @@ export const other = {
     assessments: "Assessments",
   },
   groupLevels: ["Group"],
-  capabilities: ["attendance", "timetable", "subjects", "library", "training"],
+  capabilities: ["attendance", "timetable", "subjects", "library", "training", "events"],
   defaults: [],
   grading: "marks",
   groupDates: false,
   leadPerGroup: true,
+  openGroups: true,
   roleNames: {
     owner: "Owner",
     admin: "Admin",

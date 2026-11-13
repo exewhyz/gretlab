@@ -13,6 +13,7 @@ import { buildCalendar, type CalendarEvent } from "@workspace/judge"
 
 import { listAssignments } from "@/features/assignments/server"
 import { listContests } from "@/features/contests/server"
+import { myEvents } from "@/features/events/server"
 import { getSettings } from "@/features/settings/server"
 import { notFound } from "@/lib/api/route"
 
@@ -27,7 +28,7 @@ const { and, eq, inArray, isNull } = sql
 
 export interface Event {
   id: string
-  kind: "due" | "exam" | "contest" | "peer_review"
+  kind: "due" | "exam" | "contest" | "peer_review" | "event"
   title: string
   start: string
   end: string | null
@@ -114,6 +115,19 @@ export async function eventsFor(user: User): Promise<Event[]> {
         done: c.phase === "ended",
       })
     }
+  }
+  // Events they're going to or waiting for (the last month's too, so the week view has them).
+  for (const r of await myEvents(user, new Date(Date.now() - 30 * 86_400_000)).catch(() => [])) {
+    out.push({
+      id: `event-${r.e.id}`,
+      kind: "event",
+      title: r.e.title,
+      start: r.e.startsAt.toISOString(),
+      end: r.e.endsAt.toISOString(),
+      href: `/orgs/${r.slug}/events/${r.e.id}`,
+      detail: `${r.status === "waitlist" ? "On the waitlist" : "Going"}${r.e.location ? ` · ${r.e.location}` : r.e.link ? " · Online" : ""}`,
+      done: r.e.endsAt < new Date(),
+    })
   }
   return out.sort((a, b) => a.start.localeCompare(b.start))
 }

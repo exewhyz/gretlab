@@ -64,7 +64,7 @@ check("saving the same kind is fine", (await patch("school", { type: "school", d
 
 // ---------- modules by kind
 check("a kind can't have what it can't support", (await patch("cohort", { modules: { records: true } })).json?.error?.code === "module_unavailable")
-check("a community has no modules to offer", (await summary("community"))?.org.moduleOptions.length === 0)
+check("a community offers only what it can run: events, on from the start", (await summary("community"))?.org.moduleOptions.map((o) => `${o.key}:${o.level}`).join() === "events:default")
 const collegeOpts = (await summary("college"))?.org.moduleOptions ?? []
 check("a college's parents module is optional, its records on from the start", collegeOpts.find((o) => o.key === "parents")?.level === "optional" && collegeOpts.find((o) => o.key === "records")?.level === "default", JSON.stringify(collegeOpts))
 check("a college starts without parent accounts, a school with them", !(await summary("college"))?.org.modules.includes("parents") && (await summary("school"))?.org.modules.includes("parents"))

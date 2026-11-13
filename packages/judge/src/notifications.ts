@@ -65,6 +65,13 @@ export const NOTIFICATION_EVENTS = {
     kinds: ["teacher_note"],
     emailByDefault: true,
   },
+  "event.update": {
+    label: "Event news",
+    description: "An event someone's coming to changes or is cancelled, or a place comes free for them.",
+    audience: "everyone",
+    kinds: ["event_update", "event_place"],
+    emailByDefault: true,
+  },
   "training.reminder": {
     label: "Training reminder",
     description: "Someone is reminded to finish or renew training assigned to them.",

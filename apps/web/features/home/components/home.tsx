@@ -60,6 +60,7 @@ import {
 import { MyCourseAttendance } from "@/features/attendance/components/attendance"
 import { runLabel, runPercent, runStatus } from "@/features/runs/format"
 import { StatusBadge } from "@/features/training/components/training"
+import { EventCard, type EventView } from "@/features/events/components/events"
 import { formatDay } from "@/lib/format"
 import { CheckInCard } from "@/features/staff-attendance/components/staff-attendance"
 import { api } from "@/lib/api/client"
@@ -210,6 +211,10 @@ interface TeamTraining {
 }
 
 interface Home {
+  /** The next few events this person may see (the events module), or null. */
+  events?: EventView[] | null
+  /** Kinds whose members join groups themselves. */
+  openGroups?: boolean
   /** Assigned training (the training module): their own, and a manager's teams'. */
   training?: { mine: MyTrainingItem[] | null; team: TeamTraining | null }
   terms?: KindTerms
@@ -287,12 +292,17 @@ export function OrgHome({ slug }: { slug: string }) {
             training={data.training?.team ?? null}
           />
         )}
+        {(view === "teacher" || view === "admin") && data.events && data.events.length > 0 && (
+          <UpcomingEvents slug={slug} events={data.events} />
+        )}
         {view === "student" && data.student && (
           <StudentHome
             slug={slug}
             data={data.student}
             runs={data.runs ?? null}
             training={data.training?.mine ?? null}
+            events={data.events ?? null}
+            openGroups={data.openGroups ?? false}
           />
         )}
         {view === "parent" && data.parent && (
@@ -1013,6 +1023,49 @@ function isNow(starts: string, ends: string) {
   return m >= at(starts) && m < at(ends)
 }
 
+/** A community member in no group yet: where to find one. */
+function FindAGroup({ slug }: { slug: string }) {
+  const terms = useTerms()
+  return (
+    <Card size="sm" data-testid="find-a-group">
+      <CardHeader>
+        <CardTitle className="text-title-md">Find your {terms.groups.toLowerCase()}</CardTitle>
+        <CardDescription>
+          Join the {terms.groups.toLowerCase()} you&apos;re into to see their events, notices and contests.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Link href={`/orgs/${slug}/groups`} className="text-body-sm font-medium text-primary hover:underline">
+          Browse {terms.groups.toLowerCase()}
+        </Link>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** The next few events, each with your answer, and a link to them all. */
+function UpcomingEvents({ slug, events }: { slug: string; events: EventView[] }) {
+  return (
+    <section className="grid gap-3" data-testid="upcoming-events">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-title-md font-semibold text-ink">Events</h2>
+        <Link href={`/orgs/${slug}/events`} className="text-body-sm font-medium text-primary hover:underline">
+          All events
+        </Link>
+      </div>
+      {events.length === 0 ? (
+        <p className="text-body-sm text-muted-foreground">No events coming up.</p>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {events.map((e) => (
+            <EventCard key={e.id} slug={slug} e={e} />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 /** An employee's assigned training, most urgent first, each linked to where it's taken. */
 function MyTrainingCard({ items }: { items: MyTrainingItem[] }) {
   const open = items.filter((i) => i.status !== "done").length
@@ -1165,11 +1218,15 @@ function StudentHome({
   data,
   runs,
   training,
+  events,
+  openGroups,
 }: {
   slug: string
   data: StudentData
   runs: Runs | null
   training: MyTrainingItem[] | null
+  events: EventView[] | null
+  openGroups: boolean
 }) {
   const terms = useTerms()
   const { data: viewer } = useViewer()
@@ -1230,6 +1287,8 @@ function StudentHome({
 
       {runs && runs.learning.length > 0 && <MyRuns runs={runs} />}
       {training && training.length > 0 && <MyTrainingCard items={training} />}
+      {openGroups && data.classes.length === 0 && <FindAGroup slug={slug} />}
+      {events && (events.length > 0 || openGroups) && <UpcomingEvents slug={slug} events={events} />}
 
       <MyCourseAttendance slug={slug} />
 

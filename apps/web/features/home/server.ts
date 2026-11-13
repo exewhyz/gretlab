@@ -44,6 +44,7 @@ import { papersToMark } from "@/features/results/server"
 import { staffToday } from "@/features/staff-attendance/server"
 import { newApplications } from "@/features/admissions/server"
 import { childOverview } from "@/features/parents/server"
+import { homeEvents } from "@/features/events/server"
 import { homeRuns } from "@/features/runs/server"
 import { listTraining, myTraining } from "@/features/training/server"
 import { rolePermissions } from "@/features/orgs/access"
@@ -129,7 +130,10 @@ async function viewsOf(ctx: OrgContext, user: User): Promise<HomeView[]> {
     held.length > 0
   )
     views.push("staff")
-  if (ctx.membership?.status === "active" && held.length === 0) {
+  // In a community, members have a home before joining any group: its groups and events.
+  if (ctx.membership?.status === "active" && held.length === 0 && KINDS[ctx.org.type].openGroups) {
+    views.push("student")
+  } else if (ctx.membership?.status === "active" && held.length === 0) {
     const [seat] = await db
       .select({ groupId: groupMembers.groupId })
       .from(groupMembers)
@@ -1229,14 +1233,18 @@ export async function orgHome(slug: string, user: User) {
     views.includes("parent") ? parentHome(ctx, user) : null,
     homeRuns(ctx, user),
   ])
-  const [mine, team] = await Promise.all([
+  const [mine, team, events] = await Promise.all([
     views.includes("student") ? myTraining(ctx, user) : null,
     views.includes("teacher") && ctx.modules.has("training") ? teamTraining(slug, user) : null,
+    homeEvents(ctx, user),
   ])
   return {
     views,
     runs,
     training: { mine, team },
+    events,
+    /** Kinds where members join groups themselves: the home points them to those. */
+    openGroups: KINDS[ctx.org.type].openGroups,
     admin,
     teacher,
     student,

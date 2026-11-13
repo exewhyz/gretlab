@@ -80,6 +80,12 @@ export const PERMISSIONS = {
       "Post and remove notices members see on the organization's page. Grant this, or the finer actions under it.",
     module: "Teaching",
   },
+  "events.manage": {
+    label: "Run events",
+    description:
+      "Create, change and cancel events for the groups this applies to (or everyone), and see who's coming.",
+    module: "Events",
+  },
   "teaching.log": {
     label: "Log teaching",
     description:
@@ -561,6 +567,7 @@ export const SYSTEM_ROLES = {
       "gradebook.view",
       "gradebook.export",
       "notices.manage",
+      "events.manage",
       "teaching.log",
       "reports.view",
       "attendance.mark",

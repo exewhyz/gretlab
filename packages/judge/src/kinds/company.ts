@@ -31,11 +31,12 @@ export const company = {
     assessments: "Assessments",
   },
   groupLevels: ["Department", "Team"],
-  capabilities: ["attendance", "training"],
+  capabilities: ["attendance", "training", "events"],
   defaults: ["training"],
   grading: "none",
   groupDates: false,
   leadPerGroup: true,
+  openGroups: false,
   roleNames: {
     owner: "Owner",
     admin: "L&D admin",

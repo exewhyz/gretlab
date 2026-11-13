@@ -47,6 +47,7 @@ export const college = {
     "library",
     "transport",
     "hostel",
+    "events",
     "finance",
   ],
   defaults: [
@@ -62,6 +63,7 @@ export const college = {
   grading: "credits",
   groupDates: false,
   leadPerGroup: false,
+  openGroups: false,
   roleNames: {
     owner: "Owner",
     admin: "Admin",

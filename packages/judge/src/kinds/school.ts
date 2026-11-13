@@ -47,6 +47,7 @@ export const school = {
     "library",
     "transport",
     "hostel",
+    "events",
     "finance",
   ],
   defaults: [
@@ -63,6 +64,7 @@ export const school = {
   grading: "marks",
   groupDates: false,
   leadPerGroup: false,
+  openGroups: false,
   roleNames: {
     owner: "Owner",
     admin: "Admin",

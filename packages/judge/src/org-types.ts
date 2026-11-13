@@ -112,6 +112,12 @@ export const MODULES = {
     description: "Hostels, rooms and beds, and who stays where.",
     ready: true,
   },
+  events: {
+    label: "Events",
+    description:
+      "Meetups, workshops and talks, in person or online, with places, a waitlist when full and who's coming. On calendars and in reminders.",
+    ready: true,
+  },
   training: {
     label: "Assigned training",
     description:

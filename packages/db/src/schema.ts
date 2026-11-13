@@ -695,6 +695,8 @@ export const orgGroups = pgTable(
     endsOn: text("ends_on"),
     /** For kinds with a lead per group (a pod's mentor), not per academic year. */
     leadId: uuid("lead_id").references(() => users.id, { onDelete: "set null" }),
+    /** For kinds with open groups (a community): members join and leave it themselves. */
+    open: boolean("open").notNull().default(false),
     createdAt: createdAt(),
   },
   (table) => [index("org_groups_org").on(table.orgId, table.parentId)]
@@ -2531,3 +2533,54 @@ export const ltiKeys = pgTable("lti_keys", {
   publicJwk: jsonb("public_jwk").$type<Record<string, string>>().notNull(),
   createdAt: createdAt(),
 })
+
+/**
+ * An organization's events (the "events" module): a meetup, workshop or talk, for everyone
+ * or one group (and the groups inside it), in person or online, with an optional capacity.
+ */
+export const orgEvents = pgTable(
+  "org_events",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** null: everyone in the organization. */
+    groupId: uuid("group_id").references(() => orgGroups.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    location: text("location").notNull().default(""),
+    /** An online meeting's address; shown only to people going. */
+    link: text("link").notNull().default(""),
+    /** Places; null for no limit. Past it, people wait. */
+    capacity: integer("capacity"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("org_events_by_org").on(table.orgId, table.startsAt)]
+)
+
+/** Who's coming to an event: going, waiting for a place, or not going. */
+export const eventRsvps = pgTable(
+  "event_rsvps",
+  {
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => orgEvents.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status").$type<"going" | "waitlist" | "not_going">().notNull(),
+    /** When they last said they were coming: their place in the queue. */
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.eventId, table.userId] }),
+    index("event_rsvps_by_user").on(table.userId),
+  ]
+)
+
+export type OrgEvent = typeof orgEvents.$inferSelect

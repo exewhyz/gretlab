@@ -15,7 +15,7 @@ import { api } from "@/lib/api/client"
 
 interface Event {
   id: string
-  kind: "due" | "exam" | "contest" | "peer_review"
+  kind: "due" | "exam" | "contest" | "peer_review" | "event"
   title: string
   start: string
   end: string | null
@@ -29,6 +29,7 @@ const KIND: Record<Event["kind"], { label: string; tone: string }> = {
   exam: { label: "Exam", tone: "bg-destructive/10 text-destructive" },
   contest: { label: "Contest", tone: "bg-muted text-ink" },
   peer_review: { label: "Reviews", tone: "bg-success/10 text-success" },
+  event: { label: "Event", tone: "bg-primary/10 text-primary-active" },
 }
 
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString("en-CA")

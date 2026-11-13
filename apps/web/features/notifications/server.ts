@@ -193,7 +193,7 @@ export async function tellParents(
 
 export interface Reminder {
   id: string
-  kind: "due_soon" | "contest_soon" | "attendance_low" | "library_due" | "training_due"
+  kind: "due_soon" | "contest_soon" | "attendance_low" | "library_due" | "training_due" | "event_soon"
   title: string
   body: string
   href: string
@@ -285,6 +285,20 @@ async function remindersFor(user: User): Promise<Reminder[]> {
       body: "Return or renew it at the library.",
       href: `/orgs/${loan.slug}/books`,
       at: `${loan.dueOn}T00:00:00.000Z`,
+    })
+  }
+  // Events they're going to, starting within a day.
+  const { myEvents } = await import("@/features/events/server")
+  for (const r of await myEvents(user, new Date()).catch(() => [])) {
+    const until = r.e.startsAt.getTime() - now
+    if (r.status !== "going" || until > DAY_MS || until <= 0) continue
+    out.push({
+      id: `event:${r.e.id}`,
+      kind: "event_soon",
+      title: `${r.e.title} starts ${inWords(until)}`,
+      body: r.e.location || "Online: the link is on the event's page.",
+      href: `/orgs/${r.slug}/events/${r.e.id}`,
+      at: r.e.startsAt.toISOString(),
     })
   }
   // Assigned training overdue, due within a week, expired or about to (loaded here so the

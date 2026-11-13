@@ -1645,7 +1645,12 @@ export async function listGroups(slug: string, user: User) {
   const kind = KINDS[ctx.org.type]
   return {
     levels: ctx.org.groupLevels,
-    run: { dates: kind.groupDates, lead: kind.leadPerGroup, leadTerm: kind.terms.groupLead },
+    run: {
+      dates: kind.groupDates,
+      lead: kind.leadPerGroup,
+      leadTerm: kind.terms.groupLead,
+      open: kind.openGroups,
+    },
     canManageAll: can(ctx, "org.groups.manage"),
     groups: ctx.groups
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -1669,6 +1674,7 @@ export async function listGroups(slug: string, user: User) {
           canEdit: can(ctx, "org.groups.edit", g.id),
           startsOn: g.startsOn,
           endsOn: g.endsOn,
+          open: g.open,
           lead: g.leadId ? (leads.find((l) => l.id === g.leadId) ?? null) : null,
         }
       }),
@@ -1766,6 +1772,8 @@ export async function setGroupRun(
   const datesGiven = input.startsOn !== undefined || input.endsOn !== undefined
   if (datesGiven && !kind.groupDates)
     throw new ApiError(400, "not_for_kind", `${kind.terms.groups} don't run between dates in a ${kind.noun}.`)
+  if (input.open !== undefined && !kind.openGroups)
+    throw new ApiError(400, "not_for_kind", `People don't join ${kind.terms.groups.toLowerCase()} themselves in a ${kind.noun}.`)
   if (input.leadId !== undefined && !kind.leadPerGroup)
     throw new ApiError(400, "not_for_kind", `A ${kind.noun} names its ${kind.terms.groupLead.toLowerCase()}s per year, in Academic years.`)
   const startsOn = input.startsOn === undefined ? group.startsOn : input.startsOn
@@ -1791,6 +1799,7 @@ export async function setGroupRun(
         startsOn,
         endsOn,
         ...(input.leadId !== undefined ? { leadId: input.leadId } : {}),
+        ...(input.open !== undefined ? { open: input.open } : {}),
       })
       .where(eq(orgGroups.id, id))
     if (lead && instructor) {
@@ -1815,10 +1824,82 @@ export async function setGroupRun(
           ? `${kind.terms.groupLead} ${lead.name ?? lead.email}`
           : `no ${kind.terms.groupLead.toLowerCase()}`
         : null,
+      input.open !== undefined ? (input.open ? "open to join" : "closed") : null,
     ].filter(Boolean)
     await audit(tx, ctx, "group.run", `${group.name}: ${parts.join(", ")}`)
   })
-  return { startsOn, endsOn, leadId: input.leadId === undefined ? group.leadId : input.leadId }
+  return {
+    startsOn,
+    endsOn,
+    leadId: input.leadId === undefined ? group.leadId : input.leadId,
+    open: input.open ?? group.open,
+  }
+}
+
+/* ---------- open groups (a community's) ---------- */
+
+function needOpenGroups(ctx: OrgContext) {
+  if (!KINDS[ctx.org.type].openGroups) throw notFound("Not part of this organization")
+  if (ctx.membership?.status !== "active") throw forbidden("Join the organization first.")
+}
+
+/** Groups members may join themselves, with who leads them and whether this person is in. */
+export async function openGroups(slug: string, user: User) {
+  const ctx = await context(slug, user)
+  needOpenGroups(ctx)
+  const open = ctx.groups.filter((g) => g.open)
+  const ids = open.map((g) => g.id)
+  const [seats, leads] = await Promise.all([
+    ids.length
+      ? getDb()
+          .select({ groupId: groupMembers.groupId, userId: groupMembers.userId })
+          .from(groupMembers)
+          .where(inArray(groupMembers.groupId, ids))
+      : [],
+    getDb()
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(inArray(users.id, [...new Set(open.flatMap((g) => (g.leadId ? [g.leadId] : [])))].concat(["00000000-0000-0000-0000-000000000000"]))),
+  ])
+  const kind = KINDS[ctx.org.type]
+  return {
+    terms: kind.terms,
+    groups: open
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        members: seats.filter((s) => s.groupId === g.id).length,
+        lead: g.leadId ? (leads.find((l) => l.id === g.leadId)?.name ?? null) : null,
+        mine: seats.some((s) => s.groupId === g.id && s.userId === user.id),
+      }))
+      .sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.localeCompare(b.name)),
+  }
+}
+
+/** Joins an open group, or leaves one. */
+export async function joinOpenGroup(slug: string, user: User, id: string, join: boolean) {
+  const ctx = await context(slug, user)
+  needOpenGroups(ctx)
+  const group = groupIn(ctx, id)
+  if (!group.open) throw forbidden(`${group.name} isn't open to join; ask its ${KINDS[ctx.org.type].terms.groupLead.toLowerCase()}.`)
+  await getDb().transaction(async (tx) => {
+    if (join) {
+      const [added] = await tx
+        .insert(groupMembers)
+        .values({ groupId: id, userId: user.id })
+        .onConflictDoNothing()
+        .returning()
+      if (added) await audit(tx, ctx, "group.join", `Joined ${group.name}`)
+    } else {
+      const [gone] = await tx
+        .delete(groupMembers)
+        .where(and(eq(groupMembers.groupId, id), eq(groupMembers.userId, user.id)))
+        .returning()
+      if (gone) await audit(tx, ctx, "group.leave", `Left ${group.name}`)
+    }
+  })
+  return openGroups(slug, user)
 }
 
 /**

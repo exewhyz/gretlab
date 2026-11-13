@@ -82,6 +82,8 @@ export const groupRunSchema = z.object({
   startsOn: day.nullable().optional(),
   endsOn: day.nullable().optional(),
   leadId: z.uuid().nullable().optional(),
+  /** Kinds with open groups: members join and leave it themselves. */
+  open: z.boolean().optional(),
 })
 
 const permissions = z

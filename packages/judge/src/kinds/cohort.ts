@@ -32,11 +32,12 @@ export const cohort = {
     assessments: "Assessments",
   },
   groupLevels: ["Cohort", "Pod"],
-  capabilities: ["attendance", "timetable", "subjects", "leave", "training"],
+  capabilities: ["attendance", "timetable", "subjects", "leave", "training", "events"],
   defaults: ["attendance"],
   grading: "none",
   groupDates: true,
   leadPerGroup: true,
+  openGroups: false,
   roleNames: {
     owner: "Owner",
     admin: "Program manager",

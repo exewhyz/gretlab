@@ -51,6 +51,8 @@ export interface Group {
   endsOn?: string | null
   /** Its own lead (kinds with a lead per group): a pod's mentor. */
   lead?: { id: string; name: string } | null
+  /** Open to join (kinds with open groups). */
+  open?: boolean
 }
 
 /** Whether this kind's groups have run dates and their own lead, and what a lead is called. */
@@ -58,6 +60,8 @@ export interface RunInfo {
   dates: boolean
   lead: boolean
   leadTerm: string
+  /** Members join and leave groups themselves (a community). */
+  open?: boolean
 }
 
 export interface Role {

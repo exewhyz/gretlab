@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 
-import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
+import { Check, Field, FormMessage, SelectInput, TextInput } from "@/components/form"
 import { api } from "@/lib/api/client"
 
 
@@ -39,6 +39,7 @@ export function RunDialog({
   const [startsOn, setStartsOn] = useState(group.startsOn ?? "")
   const [endsOn, setEndsOn] = useState(group.endsOn ?? "")
   const [leadId, setLeadId] = useState(group.lead?.id ?? "")
+  const [open, setOpen] = useState(group.open ?? false)
   const members = useQuery({
     queryKey: ["org", slug, "members", "staff"],
     queryFn: () => api<Member[]>(`/orgs/${slug}/members?status=active`),
@@ -55,6 +56,7 @@ export function RunDialog({
         body: {
           ...(info.dates ? { startsOn: startsOn || null, endsOn: endsOn || null } : {}),
           ...(info.lead ? { leadId: leadId || null } : {}),
+          ...(info.open ? { open } : {}),
         },
       }),
     onSuccess: () => {
@@ -106,6 +108,13 @@ export function RunDialog({
                 ))}
               </SelectInput>
             </Field>
+          )}
+          {info.open && (
+            <Check
+              label="Open to join: members join and leave it themselves"
+              checked={open}
+              onCheckedChange={setOpen}
+            />
           )}
         </form>
         {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}

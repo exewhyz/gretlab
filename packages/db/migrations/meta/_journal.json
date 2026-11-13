@@ -456,6 +456,13 @@
       "when": 1794566123897,
       "tag": "0064_training",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1794571735504,
+      "tag": "0065_events",
+      "breakpoints": true
     }
   ]
 }

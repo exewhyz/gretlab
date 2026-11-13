@@ -67,6 +67,8 @@ export interface KindDefinition {
    * year (a school's class teacher, kept in class_teachers).
    */
   leadPerGroup: boolean
+  /** Members find groups and join or leave them themselves (a club's groups). */
+  openGroups: boolean
   /** What its built-in roles are called (the permissions stay the same). */
   roleNames: { owner: string; admin: string; teacher: string; member: string }
   /** The platform's default for a capable module that isn't on by default. */

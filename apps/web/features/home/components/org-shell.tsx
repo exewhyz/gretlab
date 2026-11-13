@@ -10,6 +10,7 @@ import {
   BusIcon,
   CalendarCheckIcon,
   CalendarDotsIcon,
+  CalendarStarIcon,
   ChalkboardTeacherIcon,
   ChartBarIcon,
   CheckSquareIcon,
@@ -38,10 +39,11 @@ import {
   UploadSimpleIcon,
   UserIcon,
   UsersIcon,
+  UsersThreeIcon,
   type Icon,
 } from "@phosphor-icons/react"
 import { useQuery } from "@tanstack/react-query"
-import { ORG_NAV, visibleOrgNav, type OrgType } from "@workspace/judge"
+import { KINDS, ORG_NAV, visibleOrgNav, type OrgType } from "@workspace/judge"
 import { usePathname } from "next/navigation"
 import type { ReactNode } from "react"
 
@@ -114,6 +116,8 @@ const ICONS: Record<string, Icon> = {
   practice: PuzzlePieceIcon,
   child: UserIcon,
   profile: IdentificationBadgeIcon,
+  events: CalendarStarIcon,
+  "open-groups": UsersThreeIcon,
 }
 
 interface Item {
@@ -193,6 +197,21 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
   groups.push({
     group: `This ${shell.noun ?? "school"}`,
     items: [
+      ...(KINDS[shell.org.type].openGroups
+        ? [
+            {
+              key: "open-groups",
+              // Next to the Groups page staff manage, this one says what it's for.
+              label: managed.some((g) => g.items.some((i) => i.key === "groups"))
+                ? `Join ${(shell.terms?.groups ?? "groups").toLowerCase()}`
+                : (shell.terms?.groups ?? "Groups"),
+              href: `${base}/groups`,
+            },
+          ]
+        : []),
+      ...(shell.modules.includes("events")
+        ? [{ key: "events", label: "Events", href: `${base}/events` }]
+        : []),
       ...(shell.modules.includes("staffAttendance") &&
       shell.permissions.length > 0
         ? [

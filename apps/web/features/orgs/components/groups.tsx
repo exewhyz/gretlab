@@ -232,7 +232,7 @@ function GroupRow({
   const [text, setText] = useState("")
   const [deleting, setDeleting] = useState(false)
   const [running, setRunning] = useState(false)
-  const runs = Boolean(runInfo && (runInfo.dates || runInfo.lead))
+  const runs = Boolean(runInfo && (runInfo.dates || runInfo.lead || runInfo.open))
   return (
     <div
       className="grid gap-1.5 rounded-sm px-2 py-1.5 hover:bg-muted"
@@ -274,6 +274,11 @@ function GroupRow({
             {runLabel(g.startsOn, g.endsOn)}
           </span>
         )}
+        {g.open && runInfo?.open && (
+          <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs text-success" data-testid="group-open">
+            Open to join
+          </span>
+        )}
         {g.lead && runInfo && (
           <span className="text-xs text-body" data-testid="group-lead">
             {runInfo.leadTerm}: {g.lead.name}
@@ -286,7 +291,9 @@ function GroupRow({
               ? `Dates & ${runInfo.leadTerm.toLowerCase()}`
               : runInfo.dates
                 ? "Dates"
-                : runInfo.leadTerm}
+                : runInfo.open
+                  ? `${runInfo.leadTerm} & joining`
+                  : runInfo.leadTerm}
           </Button>
         )}
         {g.canManage && (
