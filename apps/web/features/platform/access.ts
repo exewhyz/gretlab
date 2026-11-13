@@ -87,3 +87,14 @@ export async function platformCan(
     permission
   )
 }
+
+/**
+ * How far platform staff reach into organizations they haven't joined: "act" (everything
+ * an organization's admin can do, logged as support), "view" (read-only), or null.
+ */
+export async function orgReach(user: User | null): Promise<"act" | "view" | null> {
+  const { permissions } = await platformAccess(user)
+  if (grantsPlatformPermission(permissions, "platform.orgs.act")) return "act"
+  if (grantsPlatformPermission(permissions, "platform.orgs.view")) return "view"
+  return null
+}

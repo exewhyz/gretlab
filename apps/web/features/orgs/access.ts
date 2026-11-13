@@ -20,6 +20,8 @@ import {
   type SystemRoleKey,
 } from "@workspace/judge"
 
+import { orgReach } from "@/features/platform/access"
+
 const { and, eq, inArray } = sql
 
 /** Built-in roles take their permissions from code, so they gain new ones automatically. */
@@ -44,7 +46,7 @@ export interface Viewpoint {
   user: User | null
   /** Platform teachers and admins: they run platform content. */
   platformStaff: boolean
-  /** Platform admins can also act inside any organization. */
+  /** Platform staff who may act inside any organization ("Act in organizations"). */
   platformAdmin: boolean
   orgs: Map<string, OrgStanding>
 }
@@ -53,7 +55,7 @@ export async function viewpoint(user: User | null): Promise<Viewpoint> {
   const vp: Viewpoint = {
     user,
     platformStaff: user?.role === "teacher" || user?.role === "admin",
-    platformAdmin: user?.role === "admin",
+    platformAdmin: (await orgReach(user)) === "act",
     orgs: new Map(),
   }
   if (!user) return vp

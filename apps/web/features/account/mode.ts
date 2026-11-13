@@ -45,7 +45,9 @@ export function modeOfPage(pathname: string): Mode | null {
   const under = (prefix: string) =>
     pathname === prefix ||
     pathname.startsWith(prefix.endsWith("/") ? prefix : prefix + "/")
-  if (TEACH_PAGES.some(under) || /^\/orgs\/[^/]+\/manage(\/|$)/.test(pathname))
+  // The list of organizations someone helps run is Teach; an organization's own pages
+  // (a student's school) aren't, except its management.
+  if (TEACH_PAGES.some(under) || pathname === "/orgs" || /^\/orgs\/[^/]+\/manage(\/|$)/.test(pathname))
     return "teach"
   if (LEARN_PAGES.some(under)) return "learn"
   return null

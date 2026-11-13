@@ -676,3 +676,19 @@ export function inAudience(
       condition.length === 0 || condition.some((id) => reach.has(id))
   )
 }
+
+/**
+ * What "See inside organizations" (a platform permission) grants in every organization:
+ * the read-only permissions, so support and auditors can look without changing anything.
+ */
+export const ORG_VIEW_PERMISSIONS: Permission[] = [
+  "org.members.view",
+  "students.view",
+  "parents.view",
+  "gradebook.view",
+  "attendance.view",
+  "staff_attendance.view",
+  "exams.view",
+  "reports.view",
+  "org.audit.view",
+]

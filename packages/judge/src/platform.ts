@@ -40,6 +40,18 @@ export const PLATFORM_PERMISSIONS = {
       "Create schools, colleges and other organizations and name their owners, approve sign-ups, and suspend or reactivate them. Grant this, or the finer actions under it.",
     module: "Platform",
   },
+  "platform.orgs.act": {
+    label: "Act in organizations",
+    description:
+      "Do anything an organization's admin can, in every organization, joined or not: people, classes, grades, attendance, leave, settings. Recorded in each organization's activity log as platform support.",
+    module: "Platform",
+  },
+  "platform.orgs.view": {
+    label: "See inside organizations",
+    description:
+      "Read-only, in every organization: its people, classes, grades, attendance, records, results, reports and activity log. No changes.",
+    module: "Platform",
+  },
   "platform.kinds.manage": {
     label: "Manage organization kinds",
     description:
@@ -236,6 +248,7 @@ export const PLATFORM_ROLES = {
       "Onboards and runs organizations: creates, suspends and approves them, and decides what each kind of organization gets.",
     permissions: [
       "platform.orgs.manage",
+      "platform.orgs.act",
       "platform.kinds.manage",
       "platform.audit.view",
     ] as PlatformPermission[],
@@ -266,6 +279,7 @@ export const PLATFORM_ROLES = {
       "platform.audit.view",
       "platform.submissions.view",
       "platform.gradebook.view",
+      "platform.orgs.view",
     ] as PlatformPermission[],
   },
   support: {
@@ -275,6 +289,7 @@ export const PLATFORM_ROLES = {
     permissions: [
       "platform.users.manage",
       "platform.orgs.manage",
+      "platform.orgs.act",
       "platform.submissions.view",
       "platform.audit.view",
     ] as PlatformPermission[],

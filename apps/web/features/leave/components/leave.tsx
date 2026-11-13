@@ -86,6 +86,7 @@ interface Home {
   waiting: Request[]
   canDecideStaff: boolean
   canDecide: boolean
+  canSeeAll?: boolean
 }
 
 const STATUS: Record<Request["status"], { label: string; variant: "default" | "outline" | "secondary" | "destructive" }> = {
@@ -188,6 +189,7 @@ export function LeavePage({ slug }: { slug: string }) {
           )}
           <TabsTrigger value="mine">Mine</TabsTrigger>
           {data.canDecide && <TabsTrigger value="decided">Decided</TabsTrigger>}
+          {!data.canDecide && data.canSeeAll && <TabsTrigger value="all">All requests</TabsTrigger>}
         </TabsList>
         {data.canDecide && (
           <TabsContent value="waiting" className="mt-3">
@@ -229,6 +231,11 @@ export function LeavePage({ slug }: { slug: string }) {
         </TabsContent>
         {data.canDecide && (
           <TabsContent value="decided" className="mt-3">
+            <Decided slug={slug} />
+          </TabsContent>
+        )}
+        {!data.canDecide && data.canSeeAll && (
+          <TabsContent value="all" className="mt-3">
             <Decided slug={slug} />
           </TabsContent>
         )}

@@ -96,13 +96,28 @@ async function context(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
   if (!ctx.modules.has("leave"))
     throw notFound("Leave isn't switched on for this organization.")
+  // Its members, parents linked to a student here, and platform staff who may look inside.
+  if (ctx.membership?.status !== "active" && !ctx.platformViewer) {
+    const [child] = await getDb()
+      .select({ id: guardians.id })
+      .from(guardians)
+      .where(and(eq(guardians.orgId, ctx.org.id), eq(guardians.parentId, user.id)))
+      .limit(1)
+    if (!child) throw notFound("Not found")
+  }
   return ctx
 }
 
 const schoolDays = (ctx: OrgContext) => readTimetableSettings(ctx.org.moduleSettings).days
 const settingsOf = (ctx: OrgContext) => readLeaveSettings(ctx.org.moduleSettings)
+/** On the staff here: asks for their own leave, has balances. Members only. */
 const isStaff = (ctx: OrgContext) =>
   ctx.membership?.status === "active" && heldAnywhere(ctx).length > 0
+/**
+ * May see others' leave: staff, and platform staff who may act in or look inside every
+ * organization (joined or not). Deciding still needs a permission that decides it.
+ */
+const seesOthers = (ctx: OrgContext) => ctx.platformViewer || isStaff(ctx)
 const decidesStaff = (ctx: OrgContext) => canFor(ctx, "leave.staff", [])
 
 const isLeaf = (ctx: OrgContext, groupId: string) =>
@@ -281,7 +296,7 @@ async function filterDecidable(ctx: OrgContext, rows: Row[]) {
 export async function pendingLeaveCount(ctx: OrgContext) {
   try {
     if (!ctx.modules.has("leave")) return 0
-    if (!isStaff(ctx)) return 0
+    if (!seesOthers(ctx)) return 0
     return (await decidable(ctx)).length
   } catch {
     return 0
@@ -310,7 +325,7 @@ export async function leaveHome(slug: string, user: User) {
     .orderBy(desc(leaveRequests.startsOn))
     .limit(100)
   const balance = staff ? await usedDays(ctx, user.id) : null
-  const waiting = staff ? await decidable(ctx) : []
+  const waiting = seesOthers(ctx) ? await decidable(ctx) : []
   return {
     today: await today(),
     schoolDays: schoolDays(ctx),
@@ -324,6 +339,8 @@ export async function leaveHome(slug: string, user: User) {
     mine: await present(ctx, mine),
     waiting: await present(ctx, waiting),
     canDecideStaff: decidesStaff(ctx),
+    /** Sees others' requests without deciding them (platform staff who only look). */
+    canSeeAll: seesOthers(ctx),
     canDecide:
       waiting.length > 0 ||
       decidesStaff(ctx) ||
@@ -350,7 +367,7 @@ export async function listRequests(
   filters: z.infer<typeof listSchema>
 ) {
   const ctx = await context(slug, user)
-  if (!isStaff(ctx)) throw forbidden("Only staff can see others' leave.")
+  if (!seesOthers(ctx)) throw forbidden("Only staff can see others' leave.")
   const where = [eq(leaveRequests.orgId, ctx.org.id), ne(leaveRequests.userId, user.id)]
   if (filters.status) where.push(eq(leaveRequests.status, filters.status))
   if (filters.kind) where.push(eq(leaveRequests.kind, filters.kind))
@@ -360,7 +377,8 @@ export async function listRequests(
     .where(and(...where))
     .orderBy(desc(leaveRequests.startsOn), desc(leaveRequests.createdAt))
     .limit(2000)
-  const mine = await filterDecidable(ctx, rows)
+  // Platform staff who only look inside organizations see every request, deciding none.
+  const mine = ctx.platformViewer && !ctx.platformAdmin ? rows : await filterDecidable(ctx, rows)
   const page = filters.page ?? 1
   return {
     total: mine.length,

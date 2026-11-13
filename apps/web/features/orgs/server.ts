@@ -26,6 +26,7 @@ import {
   domainMatches,
   enabledModules,
   readAdmissionSettings,
+  ORG_VIEW_PERMISSIONS,
   grantsPermission,
   isModuleKey,
   KINDS,
@@ -56,7 +57,7 @@ import {
   type AuditFilters,
 } from "@/features/audit/server"
 import { notify } from "@/features/notifications/server"
-import { platformCan } from "@/features/platform/access"
+import { orgReach, platformCan } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
 import { getSettings } from "@/features/settings/server"
 import { kindPolicies, kindRoleTemplates, moduleOptions } from "./kinds"
@@ -92,8 +93,13 @@ const forbidden = (message = "You don't have permission to do that.") =>
 interface OrgContext {
   org: Organization
   user: User
-  /** Platform admins can step into any organization for support; it's logged. */
+  /**
+   * Platform staff who may act in any organization ("Act in organizations"; owners have
+   * it): everything an admin can do, joined or not, logged as support.
+   */
   platformAdmin: boolean
+  /** Platform staff who may look inside any organization, read-only ("See inside organizations"). */
+  platformViewer: boolean
   membership: typeof orgMembers.$inferSelect | null
   grants: (Grant & { systemKey: string | null })[]
   groups: OrgGroup[]
@@ -113,7 +119,7 @@ async function loadOrg(slug: string) {
 async function context(slug: string, user: User): Promise<OrgContext> {
   const org = await loadOrg(slug)
   const db = getDb()
-  const [[membership], rows, groups, policies] = await Promise.all([
+  const [[membership], rows, groups, policies, reach] = await Promise.all([
     db
       .select()
       .from(orgMembers)
@@ -134,17 +140,21 @@ async function context(slug: string, user: User): Promise<OrgContext> {
       ),
     db.select().from(orgGroups).where(eq(orgGroups.orgId, org.id)),
     kindPolicies(),
+    orgReach(user),
   ])
   const active = membership?.status === "active"
   return {
     org,
     user,
-    platformAdmin: user.role === "admin",
+    platformAdmin: reach === "act",
+    platformViewer: reach !== null,
     membership: membership ?? null,
-    // Roles only count while the person is an active member.
-    grants: active
-      ? rows.map((row) => ({ ...row, permissions: rolePermissions(row) }))
-      : [],
+    // Roles only count while the person is an active member. Platform staff who may look
+    // inside every organization see it as with a read-only role across it.
+    grants: [
+      ...(active ? rows.map((row) => ({ ...row, permissions: rolePermissions(row) })) : []),
+      ...(reach === "view" ? [{ permissions: ORG_VIEW_PERMISSIONS, groupId: null, systemKey: null }] : []),
+    ],
     groups,
     modules: enabledModules(org.type, org.modules, policies[org.type]),
   }
@@ -648,7 +658,7 @@ export async function getOrganization(slug: string, viewer: User | null) {
   const ctx = viewer ? await context(slug, viewer) : null
   const isMember = ctx?.membership?.status === "active"
   // Unlisted organizations are only visible to their members.
-  if ((!org.listed || !org.active) && !isMember && !ctx?.platformAdmin) {
+  if ((!org.listed || !org.active) && !isMember && !ctx?.platformViewer) {
     throw notFound("Organization not found")
   }
   const [counted] = await getDb()
@@ -2172,7 +2182,7 @@ export type { OrgContext }
 /** Loads an organization and what this person may do in it. */
 export async function orgContext(slug: string, user: User) {
   const ctx = await context(slug, user)
-  if (!ctx.org.active && !ctx.platformAdmin) {
+  if (!ctx.org.active && !ctx.platformViewer) {
     if (ctx.org.signupStatus === "pending")
       throw new ApiError(
         403,

@@ -28,19 +28,27 @@ interface NavItem {
   also?: string[]
 }
 
-/** Whether this person has a teaching side at all: an organization role or platform staff. */
-export function canTeach(viewer: Viewer | undefined) {
+/**
+ * This person's Teach side, if any, and where it starts: their classes if they teach,
+ * else the organizations they help run (a librarian, the office), else the platform's
+ * dashboard (platform staff). Null for people who only learn.
+ */
+export function useTeachSide(): { home: string } | null {
+  const { data: viewer } = useViewer()
+  const { orgs } = useContentScope()
   const user = viewer?.user
-  return Boolean(
-    user && (user.teaches || user.role === "teacher" || user.role === "admin")
-  )
+  if (!user) return null
+  if (user.teaches) return { home: "/teach" }
+  if (orgs.some((o) => o.canManage)) return { home: "/orgs" }
+  if (user.role === "teacher" || user.role === "admin") return { home: "/admin" }
+  return null
 }
 
 /** The main sections of the current mode, in the order people use them. */
 function useSections(): NavItem[] {
   const { data: viewer } = useViewer()
   const { orgs } = useContentScope()
-  const mode = useMode(canTeach(viewer))
+  const mode = useMode(Boolean(useTeachSide()))
   const user = viewer?.user
   const staff = user?.role === "teacher" || user?.role === "admin"
   const items: (NavItem | false | null | undefined)[] =
@@ -54,7 +62,7 @@ function useSections(): NavItem[] {
           orgs.some((o) => o.canManage) &&
             !user?.teaches && { href: "/orgs", label: "Organizations" },
           staff && { href: "/admin", label: "Dashboard" },
-          { href: "/playground", label: "Playground" },
+          // The playground is for trying code: it belongs to Learn, not Teach.
         ]
       : [
           user && { href: "/home", label: "Home" },
@@ -92,20 +100,12 @@ function useSections(): NavItem[] {
 export function ModeToggle() {
   const { data: viewer } = useViewer()
   const router = useRouter()
-  const show = canTeach(viewer)
-  const mode = useMode(show)
-  if (!show) return null
+  const teach = useTeachSide()
+  const mode = useMode(Boolean(teach))
+  if (!teach) return null
   const go = (next: Mode) => {
     writeMode(next)
-    router.push(
-      next === "teach"
-        ? viewer?.user?.teaches
-          ? "/teach"
-          : "/admin"
-        : viewer?.features.practice
-          ? "/problems"
-          : "/contests"
-    )
+    router.push(next === "teach" ? teach.home : viewer?.features.practice ? "/problems" : "/contests")
   }
   return (
     <div
@@ -167,8 +167,8 @@ export function MobileNav() {
   const { data: viewer } = useViewer()
   const pathname = usePathname()
   const items = useSections()
-  const teacher = canTeach(viewer)
-  const mode = useMode(teacher)
+  const teach = useTeachSide()
+  const mode = useMode(Boolean(teach))
 
   return (
     <div className="md:hidden">
@@ -189,7 +189,7 @@ export function MobileNav() {
               {item.label}
             </DropdownMenuItem>
           ))}
-          {teacher && (
+          {teach && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -199,10 +199,10 @@ export function MobileNav() {
                   <Link
                     href={
                       mode === "teach"
-                        ? "/problems"
-                        : viewer?.user?.teaches
-                          ? "/teach"
-                          : "/admin"
+                        ? viewer?.features.practice
+                          ? "/problems"
+                          : "/contests"
+                        : teach.home
                     }
                   />
                 }
