@@ -602,7 +602,7 @@ function MemberRow({
 
 /* ---------- roles ---------- */
 
-function PermissionChips({ permissions }: { permissions: string[] }) {
+export function PermissionChips({ permissions }: { permissions: string[] }) {
   if (permissions.length === 0) {
     return <span className="text-xs text-body">No management access</span>
   }
@@ -670,7 +670,7 @@ export function ManageRoles({ slug }: { slug: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-title-sm text-ink">{role.name}</span>
               <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-body">
-                {role.systemKey ? "Built in" : "Custom"}
+                {role.systemKey ? "Built in" : role.templateKey ? "Suggested" : "Custom"}
               </span>
               <span className="text-xs text-body">
                 {role.assigned} {role.assigned === 1 ? "person" : "people"}
@@ -699,7 +699,83 @@ export function ManageRoles({ slug }: { slug: string }) {
           </Card>
         ))}
       </div>
+      {canEdit && <SuggestedRoles slug={slug} onMessage={setMessage} />}
     </>
+  )
+}
+
+interface Suggested {
+  kind: string
+  suggestions: {
+    key: string
+    name: string
+    description: string
+    permissions: string[]
+    scope: "organization" | "group"
+    nameTaken: boolean
+    allowed: boolean
+  }[]
+}
+
+/** The kind's suggested roles this organization doesn't have yet, each one click to add. */
+function SuggestedRoles({ slug, onMessage }: { slug: string; onMessage: (m: Message) => void }) {
+  const queryClient = useQueryClient()
+  const { data } = useQuery({
+    queryKey: ["org", slug, "roles", "suggested"],
+    queryFn: () => api<Suggested>(`/orgs/${slug}/roles/suggested`),
+  })
+  const add = useMutation({
+    mutationFn: (key: string) => api(`/orgs/${slug}/roles/suggested`, { body: { key } }),
+    onSuccess: () => {
+      onMessage(null)
+      void queryClient.invalidateQueries({ queryKey: ["org", slug] })
+    },
+    onError: (e) => onMessage({ text: e.message, kind: "err" }),
+  })
+  if (!data || data.suggestions.length === 0) return null
+  return (
+    <section className="mt-6 grid gap-3" data-testid="suggested-roles">
+      <div>
+        <h2 className="text-title-md text-ink">Suggested for a {data.kind.toLowerCase()}</h2>
+        <p className="text-caption text-body">
+          Roles such places usually have. Add one and change it as you like.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {data.suggestions.map((s) => (
+          <Card key={s.key} className="grid content-between gap-2" data-testid="suggested-role">
+            <div className="grid gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-title-sm text-ink">{s.name}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-body">
+                  {s.scope === "group" ? "Given within a group" : "Organization-wide"}
+                </span>
+              </div>
+              <p className="text-caption text-body">{s.description}</p>
+              <PermissionChips permissions={s.permissions} />
+            </div>
+            <div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={add.isPending || s.nameTaken || !s.allowed}
+                title={
+                  s.nameTaken
+                    ? `There's already a role called ${s.name}`
+                    : !s.allowed
+                      ? "It holds permissions you don't have"
+                      : undefined
+                }
+                aria-label={`Add ${s.name}`}
+                onClick={() => add.mutate(s.key)}
+              >
+                Add role
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </section>
   )
 }
 

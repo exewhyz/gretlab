@@ -59,7 +59,7 @@ import { notify } from "@/features/notifications/server"
 import { platformCan } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
 import { getSettings } from "@/features/settings/server"
-import { kindPolicies, moduleOptions } from "./kinds"
+import { kindPolicies, kindRoleTemplates, moduleOptions } from "./kinds"
 
 import { rolePermissions } from "./access"
 
@@ -398,6 +398,19 @@ async function createOrgInTx(
       permissions: [...role.permissions],
     }))
   )
+  // And the kind's suggested roles (a school's Principal, Class teacher…), as ordinary roles.
+  const suggested = (await kindRoleTemplates())[input.type]
+  if (suggested.length)
+    await tx.insert(orgRoles).values(
+      suggested.map((r) => ({
+        orgId: org!.id,
+        systemKey: null,
+        templateKey: r.key,
+        name: r.name,
+        description: r.description,
+        permissions: [...r.permissions],
+      }))
+    ).onConflictDoNothing()
   await admitMember(tx, org!, ownerId, "created", false)
   await giveRole(tx, org!.id, ownerId, "owner", null)
   return org!
@@ -1980,8 +1993,67 @@ export async function listRoles(slug: string, user: User) {
       description: role.description,
       permissions: rolePermissions(role),
       systemKey: role.systemKey,
+      templateKey: role.templateKey,
       assigned: counts.find((c) => c.roleId === role.id)?.total ?? 0,
     }))
+}
+
+/** The kind's suggested roles this organization doesn't have yet, for the Roles page. */
+export async function suggestedRoles(slug: string, user: User) {
+  const ctx = await context(slug, user)
+  need(ctx, "org.roles.manage")
+  const [templates, roles] = await Promise.all([
+    kindRoleTemplates(),
+    getDb()
+      .select({ name: orgRoles.name, templateKey: orgRoles.templateKey })
+      .from(orgRoles)
+      .where(eq(orgRoles.orgId, ctx.org.id)),
+  ])
+  const have = new Set(roles.map((r) => r.templateKey).filter(Boolean))
+  const names = new Set(roles.map((r) => r.name.toLowerCase()))
+  const kind = KINDS[ctx.org.type]
+  return {
+    kind: kind.label,
+    suggestions: templates[ctx.org.type]
+      .filter((t) => !have.has(t.key))
+      .map((t) => ({
+        ...t,
+        /** A role of this name exists already (made by hand): adding needs a rename first. */
+        nameTaken: names.has(t.name.toLowerCase()),
+        /** Whether this person may give everything it holds. */
+        allowed: ctx.platformAdmin || isOwner(ctx) || t.permissions.every((p) => grantsPermission([...heldFor(ctx, null)], p)),
+      })),
+  }
+}
+
+/** Adds one of the kind's suggested roles; it's an ordinary role after that. */
+export async function addSuggestedRole(slug: string, user: User, key: string) {
+  const ctx = await context(slug, user)
+  need(ctx, "org.roles.manage")
+  const template = (await kindRoleTemplates())[ctx.org.type].find((t) => t.key === key)
+  if (!template) throw notFound("No such suggested role")
+  needSubset(ctx, template.permissions, null)
+  return getDb().transaction(async (tx) => {
+    const [taken] = await tx
+      .select({ id: orgRoles.id })
+      .from(orgRoles)
+      .where(and(eq(orgRoles.orgId, ctx.org.id), sql.sql`lower(${orgRoles.name}) = ${template.name.toLowerCase()}`))
+    if (taken)
+      throw new ApiError(409, "name_taken", `There's already a role called ${template.name}. Rename it first.`)
+    const [role] = await tx
+      .insert(orgRoles)
+      .values({
+        orgId: ctx.org.id,
+        systemKey: null,
+        templateKey: template.key,
+        name: template.name,
+        description: template.description,
+        permissions: [...template.permissions],
+      })
+      .returning()
+    await audit(tx, ctx, "role.create", `Added the suggested role ${template.name}`, { permissions: template.permissions })
+    return role!
+  })
 }
 
 export async function createRole(

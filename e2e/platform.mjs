@@ -107,7 +107,7 @@ check("owners see Staff and roles", (await ownerPage.getByTestId("staff-row").co
 await ownerPage.screenshot({ path: SHOTS + "staff.png", fullPage: true })
 await ownerPage.getByRole("tab", { name: /Roles/ }).click()
 await ownerPage.getByTestId("role-row").first().waitFor({ timeout: 15000 })
-check("and the roles, built in and custom", (await ownerPage.getByTestId("role-row").filter({ hasText: "Built in" }).count()) === 4 && (await ownerPage.getByTestId("role-row").filter({ hasText: "plat Library helper" }).count()) === 1)
+check("and the roles, built in and custom", (await ownerPage.getByTestId("role-row").filter({ hasText: "Built in" }).count()) === 8 && (await ownerPage.getByTestId("role-row").filter({ hasText: "plat Library helper" }).count()) === 1)
 await ownerPage.screenshot({ path: SHOTS + "roles.png", fullPage: true })
 await browser.close()
 

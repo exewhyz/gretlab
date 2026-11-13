@@ -22,7 +22,11 @@ import {
 } from "@workspace/ui/components/table"
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 
-import { FormMessage, SelectInput } from "@/components/form"
+import { Button } from "@workspace/ui/components/button"
+import { PERMISSIONS } from "@workspace/judge"
+
+import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
+import { PermissionPicker } from "@/features/orgs/components/permission-picker"
 import { api } from "@/lib/api/client"
 
 import { Loading, PageTitle } from "./shell"
@@ -41,7 +45,17 @@ interface Overview {
     groupLevels: string[]
     organizations: number
     levels: Record<string, Level | null>
+    roles: RoleTemplate[]
+    rolesChanged: boolean
   }[]
+}
+
+interface RoleTemplate {
+  key: string
+  name: string
+  description: string
+  permissions: string[]
+  scope: "organization" | "group"
 }
 
 const LEVELS: { value: Level; label: string }[] = [
@@ -213,6 +227,189 @@ export function AdminKinds() {
           </Table>
         </Card>
       </div>
+      <KindRoles
+        kind={kind.key}
+        label={kind.label}
+        roles={kind.roles}
+        changed={kind.rolesChanged}
+        onSaved={(next) => client.setQueryData(["admin", "kinds"], next)}
+      />
     </div>
+  )
+}
+
+/**
+ * A kind's suggested roles: new organizations of the kind start with them, and existing
+ * ones are offered those they don't have. Add, edit, delete, or go back to the default.
+ */
+function KindRoles({
+  kind,
+  label,
+  roles,
+  changed,
+  onSaved,
+}: {
+  kind: string
+  label: string
+  roles: RoleTemplate[]
+  changed: boolean
+  onSaved: (next: Overview) => void
+}) {
+  const [editing, setEditing] = useState<RoleTemplate | "new" | null>(null)
+  const save = useMutation({
+    mutationFn: (next: RoleTemplate[] | null) =>
+      api<Overview>(`/admin/kinds/${kind}/roles`, { method: "PUT", body: { roles: next } }),
+    onSuccess: (next) => {
+      onSaved(next)
+      setEditing(null)
+    },
+  })
+  const lower = label.toLowerCase()
+  return (
+    <Card className="pb-0" data-testid="kind-roles">
+      <CardHeader>
+        <CardTitle className="text-title-md">Suggested roles</CardTitle>
+        <CardDescription>
+          A new {lower} starts with these, beside the built-in ones; existing ones are offered
+          those they don&apos;t have. Each {lower} can change or delete its own copies.
+        </CardDescription>
+        <CardAction className="flex gap-2">
+          {changed && (
+            <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => save.mutate(null)}>
+              Use the default list
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setEditing("new")}>
+            Add role
+          </Button>
+        </CardAction>
+      </CardHeader>
+      {save.error && (
+        <div className="px-6">
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        </div>
+      )}
+      {editing && (
+        <div className="border-t border-hairline px-6 py-4">
+          <TemplateEditor
+            role={editing === "new" ? null : editing}
+            busy={save.isPending}
+            onCancel={() => setEditing(null)}
+            onSave={(r) =>
+              save.mutate(
+                editing === "new" ? [...roles, r] : roles.map((x) => (x.key === editing.key ? r : x))
+              )
+            }
+          />
+        </div>
+      )}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="pl-6">Role</TableHead>
+            <TableHead>Given</TableHead>
+            <TableHead>Permissions</TableHead>
+            <TableHead className="pr-6" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {roles.map((r) => (
+            <TableRow key={r.key} data-testid="kind-role">
+              <TableCell className="pl-6 whitespace-normal">
+                <div className="font-medium text-ink">{r.name}</div>
+                <div className="max-w-md text-caption text-muted-foreground">{r.description}</div>
+              </TableCell>
+              <TableCell>{r.scope === "group" ? "Within a group" : "Organization-wide"}</TableCell>
+              <TableCell>{r.permissions.length}</TableCell>
+              <TableCell className="pr-6 text-right">
+                <Button size="xs" variant="ghost" onClick={() => setEditing(r)} aria-label={`Edit ${r.name}`}>
+                  Edit
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  disabled={save.isPending}
+                  aria-label={`Remove ${r.name}`}
+                  onClick={() => save.mutate(roles.filter((x) => x.key !== r.key))}
+                >
+                  Remove
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+          {roles.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="pl-6 text-muted-foreground">
+                None: a new {lower} starts with the built-in roles only.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Card>
+  )
+}
+
+function TemplateEditor({
+  role,
+  busy,
+  onCancel,
+  onSave,
+}: {
+  role: RoleTemplate | null
+  busy: boolean
+  onCancel: () => void
+  onSave: (r: RoleTemplate) => void
+}) {
+  const [name, setName] = useState(role?.name ?? "")
+  const [description, setDescription] = useState(role?.description ?? "")
+  const [scope, setScope] = useState<RoleTemplate["scope"]>(role?.scope ?? "organization")
+  const [permissions, setPermissions] = useState<string[]>(role?.permissions ?? [])
+  const key =
+    role?.key ??
+    (name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 40) || "role")
+  return (
+    <form
+      className="grid gap-3"
+      data-testid="template-editor"
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSave({ key: key.length < 2 ? `${key}_role` : key, name, description, scope, permissions })
+      }}
+    >
+      <div className="grid gap-3 md:grid-cols-[1fr_14rem]">
+        <Field label="Role name">
+          <TextInput value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Given">
+          <SelectInput value={scope} onChange={(e) => setScope(e.target.value as RoleTemplate["scope"])}>
+            <option value="organization">Organization-wide</option>
+            <option value="group">Within a group</option>
+          </SelectInput>
+        </Field>
+      </div>
+      <Field label="What it's for">
+        <TextInput value={description} maxLength={300} onChange={(e) => setDescription(e.target.value)} />
+      </Field>
+      <PermissionPicker
+        catalog={PERMISSIONS}
+        order={Object.keys(PERMISSIONS)}
+        held={null}
+        value={permissions}
+        onChange={setPermissions}
+      />
+      <div className="flex gap-2">
+        <Button type="submit" disabled={busy || !name.trim()}>
+          {role ? "Save role" : "Add role"}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   )
 }

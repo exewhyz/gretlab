@@ -590,6 +590,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Wording markup: `{{placeholder}}`, `**bold**`, `[words](url)`, `[button: words](url)` on its own line, `- ` list lines, blank lines for paragraphs. Placeholders are filled after the markup is read, so what people wrote is never markup, and it's always escaped; links must be http(s) or mailto. Saving refuses unknown placeholders and wording missing a required one (the link or code an email exists to deliver).
 - Tests that change templates put them back through the API, so the server's cache is cleared.
 
+## Roles by kind
+
+- Beside the four built-in roles (owner, admin, the kind's instructor, member), each kind has **suggested roles** (`packages/judge/src/role-templates.ts`): a school's Principal, Vice principal, Class teacher, Subject teacher, Exam coordinator, Admissions officer, Office staff, Librarian, Transport manager, Hostel warden, Counselor; a college's Dean, Head of department, Faculty advisor, Lab assistant, Exam cell, Admissions office, Librarian, Hostel warden; coaching, cohort, company, community and other have their own. Each has a scope hint (organization-wide, or within a group like a department). None includes settings or roles.
+- A new organization starts with its kind's suggested roles (`org_roles.template_key`); they're ordinary roles to rename, change or delete. Manage › Roles offers those it doesn't have ("Suggested for a school", `GET/POST /orgs/<slug>/roles/suggested`), only if the person may hand out every permission in it and no role has its name.
+- Platform staff with "Manage organization kinds" set each kind's list (Dashboard › Organization kinds › Suggested roles: add, edit, remove, back to default), stored in `org_kind_policies.role_templates` (null: the default), cached 30 seconds and cleared on save, logged (`platform.kind_roles`). Refused: two roles of one name or key, a built-in role's name, unknown permissions. Existing organizations' roles never change with it.
+- Built-in platform roles: Owner, Content admin, Reviewer, Support, Organizations manager, Communications (emails and notifications), Content editor (write library content, not publish or delete), Auditor (read-only).
+
 ## Calendar
 
 - `/calendar` (account menu) lists everything with a date for the viewer, by day (`features/calendar/server.ts`, `eventsFor`): published assignments' due times with their own extension, exam windows, peer reviews still to write that have a due time, and contests they registered for or their organizations run (the platform's open contests don't fill everyone's calendar).

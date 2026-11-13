@@ -70,6 +70,8 @@ export interface Role {
   description: string
   permissions: string[]
   systemKey: string | null
+  /** Made from one of the kind's suggested roles. */
+  templateKey?: string | null
   assigned: number
 }
 

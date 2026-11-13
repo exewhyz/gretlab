@@ -230,6 +230,44 @@ export const PLATFORM_ROLES = {
       "platform.submissions.view",
     ] as PlatformPermission[],
   },
+  orgs_manager: {
+    name: "Organizations manager",
+    description:
+      "Onboards and runs organizations: creates, suspends and approves them, and decides what each kind of organization gets.",
+    permissions: [
+      "platform.orgs.manage",
+      "platform.kinds.manage",
+      "platform.audit.view",
+    ] as PlatformPermission[],
+  },
+  communications: {
+    name: "Communications",
+    description:
+      "What the site says to people: email wording and which notifications go out.",
+    permissions: [
+      "platform.emails.manage",
+      "platform.notifications.manage",
+    ] as PlatformPermission[],
+  },
+  content_editor: {
+    name: "Content editor",
+    description:
+      "Writes and edits the library's problems and questions, without publishing or deleting them, or sharing.",
+    permissions: [
+      "platform.library.create",
+      "platform.library.edit",
+    ] as PlatformPermission[],
+  },
+  auditor: {
+    name: "Auditor",
+    description:
+      "Looks, never changes: the activity log, submissions and grades, for reviews and compliance.",
+    permissions: [
+      "platform.audit.view",
+      "platform.submissions.view",
+      "platform.gradebook.view",
+    ] as PlatformPermission[],
+  },
   support: {
     name: "Support",
     description:

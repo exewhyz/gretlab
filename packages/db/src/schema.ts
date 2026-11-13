@@ -704,6 +704,8 @@ export const organizations = pgTable("organizations", {
 export const orgKindPolicies = pgTable("org_kind_policies", {
   kind: orgType("kind").primaryKey(),
   modules: jsonb("modules").$type<Record<string, string>>().notNull().default({}),
+  /** The kind's suggested roles as the platform set them; null: the default list in code. */
+  roleTemplates: jsonb("role_templates").$type<unknown[]>(),
   updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 })
@@ -782,6 +784,8 @@ export const orgRoles = pgTable(
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
     permissions: jsonb("permissions").$type<string[]>().notNull().default([]),
+    /** The suggested role it was made from (packages/judge/src/role-templates.ts), if any. */
+    templateKey: text("template_key"),
     createdAt: createdAt(),
   },
   (table) => [uniqueIndex("org_roles_name").on(table.orgId, table.name)]
