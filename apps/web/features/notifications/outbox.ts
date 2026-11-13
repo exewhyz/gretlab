@@ -44,6 +44,8 @@ export interface QueuedEmail {
   to: string
   subject: string
   text: string
+  /** The branded version (features/emails); the text goes with it for plain-text readers. */
+  html?: string
 }
 
 export interface QueueOptions {
@@ -70,6 +72,7 @@ export async function queueEmails(
       to: e.to,
       subject: e.subject.slice(0, 300),
       text: e.text.slice(0, 10_000),
+      html: e.html ? e.html.slice(0, 200_000) : null,
       urgent: options.urgent ?? false,
       expiresAt,
     }))
@@ -81,6 +84,7 @@ type Claimed = {
   to_address: string
   subject: string
   body: string
+  html: string | null
   attempts: number
 } & Record<string, unknown>
 
@@ -99,7 +103,7 @@ function claim(limit: number, onlyUrgent = false) {
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
     )
-    RETURNING id, to_address, subject, body, attempts
+    RETURNING id, to_address, subject, body, html, attempts
   `)
 }
 
@@ -188,6 +192,7 @@ async function sendBatch(
     to: row.to_address,
     subject: row.subject,
     text: row.body,
+    ...(row.html ? { html: row.html } : {}),
   }))
   await record(rows, await provider.send(mailFrom(), mails), done)
   return true

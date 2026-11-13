@@ -148,6 +148,13 @@ export const PLATFORM_PERMISSIONS = {
     module: "Platform",
     parent: "platform.settings.manage",
   },
+  "platform.emails.manage": {
+    label: "Manage email templates",
+    description:
+      "Edit the wording of every email the site sends (sign-up, password reset, codes, notifications, summaries) and their shared footer, preview them and send tests.",
+    module: "Platform",
+    parent: "platform.settings.manage",
+  },
 } as const
 
 export type PlatformPermission = keyof typeof PLATFORM_PERMISSIONS

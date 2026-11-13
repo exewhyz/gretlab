@@ -8,6 +8,7 @@ import {
   ChalkboardIcon,
   ClipboardTextIcon,
   CodeIcon,
+  EnvelopeSimpleIcon,
   FileCodeIcon,
   GearSixIcon,
   HouseIcon,
@@ -185,6 +186,12 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         icon: BellRingingIcon,
         label: "Notifications",
         needs: ["platform.notifications.manage"],
+      },
+      {
+        href: "/admin/emails",
+        icon: EnvelopeSimpleIcon,
+        label: "Emails",
+        needs: ["platform.emails.manage"],
       },
       {
         href: "/admin/settings",

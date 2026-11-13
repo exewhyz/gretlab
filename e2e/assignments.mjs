@@ -220,7 +220,8 @@ check("nor with a wrong secret", (await start({ "x-proxy-secret": "guessed-secre
 const started = await start(LAB)
 check("starts from the lab's network", started.status === 200 && started.json.status === "in_progress", JSON.stringify(started.json))
 const endsIn = new Date(started.json.endsAt).getTime() - Date.now()
-check("with its own 30 minutes", endsIn > 29 * 60_000 && endsIn <= 30 * 60_000, endsIn)
+// The test's clock and the server's may differ by a few milliseconds.
+check("with its own 30 minutes", endsIn > 29 * 60_000 && endsIn <= 30 * 60_000 + 2_000, endsIn)
 check("starting again gives the same sitting", (await start(LAB)).json.endsAt === started.json.endsAt)
 check("its problems show once started", (await a("/assignments/asg-exam")).json.problems.length === 2)
 check("editorials are closed during the exam", (await a("/problems/p1/solution")).json?.error?.code === "exam_running")

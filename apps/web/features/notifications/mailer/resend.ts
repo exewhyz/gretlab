@@ -55,6 +55,7 @@ export function resendMailer(apiKey: string, baseUrl: string): Mailer {
     to: [mail.to],
     subject: mail.subject,
     text: mail.text,
+    ...(mail.html ? { html: mail.html } : {}),
   })
 
   const result = (answer: Answer): SendResult =>

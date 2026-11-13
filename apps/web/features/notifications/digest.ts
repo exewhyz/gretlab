@@ -7,6 +7,7 @@ import {
   weeklyDigestKey,
 } from "@workspace/judge"
 
+import { composeEmail } from "@/features/emails/server"
 import { membersWhoCan } from "@/features/orgs/server"
 import { getSettings } from "@/features/settings/server"
 
@@ -168,19 +169,14 @@ export async function runDueDigests(limit = 25) {
         }).email
     )
     if (recipients.length === 0) continue
-    const text = [
-      `${org.name}: the last 7 days`,
-      lines.map((line) => `- ${line}`).join("\n"),
-      `Reports: ${site}/orgs/${org.slug}/manage/reports`,
-      `You get this as someone who runs ${org.name}. Change it in your notification settings: ${site}/notifications`,
-    ].join("\n\n")
+    const email = await composeEmail("digest.weekly", {
+      org: org.name,
+      lines: lines.map((line) => `- ${line}`).join("\n"),
+      reportsLink: `${site}/orgs/${org.slug}/manage/reports`,
+    })
     await queueEmails(
       db,
-      recipients.map(({ email }) => ({
-        to: email,
-        subject: `${org.name}: your weekly summary`,
-        text,
-      }))
+      recipients.map((r) => ({ to: r.email, ...email }))
     )
     done.organizations++
     done.emails += recipients.length

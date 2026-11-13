@@ -470,6 +470,13 @@
       "when": 1794573847795,
       "tag": "0066_password_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1794575782218,
+      "tag": "0067_email_templates",
+      "breakpoints": true
     }
   ]
 }

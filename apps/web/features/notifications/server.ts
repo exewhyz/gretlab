@@ -19,6 +19,8 @@ import {
 } from "@workspace/judge"
 import { after } from "next/server"
 
+import { composeEmail } from "@/features/emails/server"
+
 import { listAssignments } from "@/features/assignments/server"
 import { dueLoans } from "@/features/books/server"
 import { listContests } from "@/features/contests/server"
@@ -67,6 +69,14 @@ function afterResponse(task: () => Promise<unknown>) {
   }
 }
 
+async function orgName(orgId: string) {
+  const [org] = await getDb()
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+  return org?.name ?? ""
+}
+
 /** A kind this code doesn't list as an event: shown in the bell, emailed to who wants email. */
 const UNLISTED: EventPolicy = { inApp: true, email: true, userChoice: true }
 
@@ -87,9 +97,15 @@ export async function notify(userIds: string[], n: NewNotification) {
     const emailing = policy.email && mailEnabled()
     if (!policy.inApp && !emailing) return told
     const site = process.env.NEXTAUTH_URL ?? ""
-    const text = [n.body, n.href ? `${site}${n.href}` : ""]
-      .filter(Boolean)
-      .join("\n\n")
+    // One email for everyone told: the Notification template, branded (features/emails).
+    const email = emailing
+      ? await composeEmail("notification", {
+          title: n.title,
+          body: n.body ?? "",
+          link: n.href ? `${site}${n.href}` : site,
+          org: n.orgId ? await orgName(n.orgId) : "",
+        })
+      : null
     await getDb().transaction(async (tx) => {
       if (policy.inApp) {
         await tx.insert(notifications).values(
@@ -103,7 +119,7 @@ export async function notify(userIds: string[], n: NewNotification) {
         )
         told.inApp = ids.length
       }
-      if (!emailing) return
+      if (!emailing || !email) return
       const people = await tx
         .select({
           email: users.email,
@@ -123,7 +139,7 @@ export async function notify(userIds: string[], n: NewNotification) {
       })
       await queueEmails(
         tx,
-        recipients.map(({ email }) => ({ to: email, subject: n.title, text }))
+        recipients.map((r) => ({ to: r.email, ...email }))
       )
       told.email = recipients.length
     })

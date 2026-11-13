@@ -5,6 +5,8 @@ export interface Mail {
   to: string
   subject: string
   text: string
+  /** Sent alongside the text when there is one. */
+  html?: string
 }
 
 export type SendResult =

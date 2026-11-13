@@ -33,6 +33,7 @@ import QRCode from "qrcode"
 
 import { writeEntry } from "@/features/audit/server"
 import { mailEnabled } from "@/features/notifications/mailer"
+import { composeEmail } from "@/features/emails/server"
 import { queueEmails, sendUrgent } from "@/features/notifications/outbox"
 import { rolePermissions } from "@/features/orgs/access"
 import { platformAccess } from "@/features/platform/access"
@@ -143,8 +144,8 @@ const log = (actor: User, action: string, summary: string) =>
  * A security notice: urgent in the outbox (ahead of any backlog), sent right after the
  * response, and retried by the outbox if the provider is down.
  */
-async function notice(to: string, subject: string, text: string) {
-  await queueEmails(getDb(), [{ to, subject, text }], { urgent: true })
+async function notice(to: string, email: { subject: string; text: string; html: string }) {
+  await queueEmails(getDb(), [{ to, ...email }], { urgent: true })
   const send = () =>
     sendUrgent().catch((error) => console.error("[two-factor] notice:", error))
   try {
@@ -155,14 +156,16 @@ async function notice(to: string, subject: string, text: string) {
 }
 
 /** A notice for the account's owner whenever its sign-in changes. */
-function securityNotice(user: User, what: string) {
+async function securityNotice(user: User, what: string) {
   const site = process.env.NEXTAUTH_URL ?? ""
   return notice(
     user.email,
-    `Security: ${what}`,
-    `${what} for your account (${user.email}) on ${new Date().toUTCString()}.\n\n` +
-      `If this was you, there's nothing to do. If it wasn't, sign in and check Security, or ` +
-      `contact your administrator straight away.\n\n${site}/account/security`
+    await composeEmail("account.security", {
+      what,
+      email: user.email,
+      when: new Date().toUTCString(),
+      link: `${site}/account/security`,
+    })
   )
 }
 
@@ -300,15 +303,7 @@ async function emailCode(
   // and a code that couldn't go out within its 10 minutes is dropped, not sent late.
   await queueEmails(
     db,
-    [
-      {
-        to: user.email,
-        subject: `Your ${ISSUER} code: ${code}`,
-        text:
-          `Your code to ${why} is ${code}. It works once, for 10 minutes.\n\n` +
-          `If you didn't ask for it, someone may know your Google password: change it, and ignore this email.`,
-      },
-    ],
+    [{ to: user.email, ...(await composeEmail("auth.code", { code, purpose: why })) }],
     { urgent: true, expiresInMs: EMAIL_CODE.ttlMs }
   )
   const sent = await sendUrgent()

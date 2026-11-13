@@ -44,8 +44,8 @@ const provider = createServer((req, res) => {
 })
 await new Promise((r) => provider.listen(3198, "127.0.0.1", r))
 
-/** The latest code emailed to someone (the outbox keeps the subject: "Your Gretlab code: 123456"). */
-const mailedCode = (h) => psql(`select subject from email_outbox where to_address='${h}@example.com' and subject like 'Your Gretlab code:%' order by created_at desc limit 1`).split(": ")[1] ?? ""
+/** The latest code emailed to someone (the outbox keeps the subject: "Your <site> code: 123456"). */
+const mailedCode = (h) => psql(`select subject from email_outbox where to_address='${h}@example.com' and subject like 'Your % code:%' order by created_at desc limit 1`).split(": ")[1] ?? ""
 const notices = (h) => psql(`select subject from email_outbox where to_address='${h}@example.com' and subject like 'Security:%' order by created_at`).split("\n").filter(Boolean)
 const setRule = async (rule) => {
   psql(`insert into settings(key, value) values ('security.require_2fa', '"${rule}"') on conflict (key) do update set value = excluded.value`)
@@ -143,7 +143,7 @@ check("using a backup code is emailed", notices("tfa-u").some((n) => n.includes(
 const emailSetup = (await u.api("/me/security/email", { method: "POST" })).json
 check("adding email sends a code, and no new backup codes", emailSetup?.sentTo === "t•••u@example.com" && emailSetup.backupCodes === null && /^\d{6}$/.test(mailedCode("tfa-u")), JSON.stringify(emailSetup))
 check("asking again within a minute waits", (await u.api("/me/security/email", { method: "POST" })).json?.error?.code === "wait")
-check("the code was really handed to the email service, not just queued", delivered.some((m) => m.to === "tfa-u@example.com" && m.subject.startsWith("Your Gretlab code:")))
+check("the code was really handed to the email service, not just queued", delivered.some((m) => m.to === "tfa-u@example.com" && /^Your .+ code: \d{6}$/.test(m.subject)))
 check("the emailed code turns email on", (await u.step({ confirmEmail: mailedCode("tfa-u") })) === null && (await u.api("/me/security")).json?.methods.email === true)
 psql(`update two_factor set email_sent_at = now() - interval '2 minutes' where user_id='${uid("tfa-u")}'`)
 const viaMail = await session("tfa-u@example.com")
@@ -157,7 +157,7 @@ psql(`update two_factor set email_sent_at = now() - interval '2 minutes' where u
 const behind = await session("tfa-u@example.com")
 const t0 = Date.now()
 const fast = await behind.api("/auth/two-factor/email", { method: "POST" })
-const latest = psql(`select status from email_outbox where to_address='tfa-u@example.com' and subject like 'Your Gretlab code:%' order by created_at desc limit 1`)
+const latest = psql(`select status from email_outbox where to_address='tfa-u@example.com' and subject like 'Your % code:%' order by created_at desc limit 1`)
 check("a code goes ahead of a backlog of notices, at once", fast.status === 200 && latest === "sent" && Date.now() - t0 < 5000, JSON.stringify([fast.status, latest, Date.now() - t0]))
 check("...and the backlog is left to the queue", Number(psql(`select count(*) from email_outbox where to_address like 'tfa-bulk-%' and status = 'queued'`)) >= 290)
 psql(`delete from email_outbox where to_address like 'tfa-bulk-%'`)

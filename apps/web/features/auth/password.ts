@@ -1,11 +1,19 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from "node:crypto"
 
-import { authTokens, getDb, sql, users, type User } from "@workspace/db"
-import { AUTH_LINK_MINUTES, emailDomainAllowed, PASSWORD, PASSWORD_LOCK, passwordProblem } from "@workspace/judge"
+import { authTokens, emailOutbox, getDb, sql, users, type User } from "@workspace/db"
+import {
+  AUTH_LINK_MINUTES,
+  emailDomainAllowed,
+  PASSWORD,
+  PASSWORD_LOCK,
+  passwordProblem,
+  type EmailTemplateKey,
+} from "@workspace/judge"
 import { after } from "next/server"
 import { z } from "zod"
 
 import { writeEntry } from "@/features/audit/server"
+import { composeEmail } from "@/features/emails/server"
 import { freeHandle } from "@/features/catalog/server"
 import { queueEmails, sendUrgent } from "@/features/notifications/outbox"
 import { getSettings } from "@/features/settings/server"
@@ -103,6 +111,16 @@ async function sentRecently(userId: string, kind: "verify" | "reset") {
   return Boolean(row)
 }
 
+/** Whether any account email went to this address in the last few minutes. */
+async function mailedRecently(to: string, minutes: number) {
+  const [row] = await getDb()
+    .select({ id: emailOutbox.id })
+    .from(emailOutbox)
+    .where(and(eq(emailOutbox.to, to), gt(emailOutbox.createdAt, new Date(Date.now() - minutes * 60_000))))
+    .limit(1)
+  return Boolean(row)
+}
+
 /** Uses up a link: its person, or null when it's unknown, used or expired. */
 async function useLink(token: string, kind: "verify" | "reset") {
   const [row] = await getDb()
@@ -140,11 +158,9 @@ export async function linkValid(token: string, kind: "verify" | "reset") {
 
 /* ---------- email ---------- */
 
-export type AuthMail = "verify" | "reset" | "exists" | "changed"
-
 /** An account email: urgent (ahead of any backlog) and sent right after the response. */
-async function mail(to: string, subject: string, text: string) {
-  await queueEmails(getDb(), [{ to, subject, text }], { urgent: true })
+async function mail(to: string, key: EmailTemplateKey, values: Record<string, string>) {
+  await queueEmails(getDb(), [{ to, ...(await composeEmail(key, values)) }], { urgent: true })
   const send = () => sendUrgent().catch((error) => console.error("[password] mail:", error))
   try {
     after(send)
@@ -193,16 +209,15 @@ export async function signUp(input: z.infer<typeof signUpSchema>) {
           .where(eq(users.id, existing.id))
         if (!(await sentRecently(existing.id, "verify"))) {
           const link = await newLink(existing.id, "verify")
-          await mail(input.email, "Confirm your email", confirmText(input.name, link))
+          await mail(input.email, "account.confirm", { name: input.name, link })
         }
       } else {
-        await mail(
-          input.email,
-          "You already have an account",
-          `Hi,\n\nSomeone (probably you) tried to make an account with ${input.email}, but there's already one.\n\n` +
-            `Sign in at ${site()}/sign-in, with Google or your password. If you've forgotten your password, ` +
-            `reset it at ${site()}/forgot-password.\n\nIf this wasn't you, you can ignore this email.`
-        )
+        if (!(await mailedRecently(input.email, 10)))
+          await mail(input.email, "account.exists", {
+            email: input.email,
+            signInLink: `${site()}/sign-in`,
+            resetLink: `${site()}/forgot-password`,
+          })
       }
     }
     return { sent: true }
@@ -220,15 +235,11 @@ export async function signUp(input: z.infer<typeof signUpSchema>) {
     .returning()
   if (user) {
     const link = await newLink(user.id, "verify")
-    await mail(input.email, "Confirm your email", confirmText(input.name, link))
+    await mail(input.email, "account.confirm", { name: input.name, link })
     await log(user, "account.sign_up", `Signed up with email and password (${input.email})`)
   }
   return { sent: true }
 }
-
-const confirmText = (name: string | null, link: string) =>
-  `Hi ${name ?? "there"},\n\nConfirm this is your email address to finish making your account:\n\n${link}\n\n` +
-  `The link works once, for 24 hours. If you didn't sign up, ignore this email and no account will be made.`
 
 /** Confirms an address from its emailed link. */
 export const tokenSchema = z.object({ token: z.string().min(10).max(200) })
@@ -252,7 +263,7 @@ export const emailSchema = z.object({
 export async function resendConfirmation(email: string) {
   const [user] = await getDb().select().from(users).where(eq(users.email, email))
   if (user && !user.disabled && !user.emailVerifiedAt && user.passwordHash && !(await sentRecently(user.id, "verify"))) {
-    await mail(email, "Confirm your email", confirmText(user.name, await newLink(user.id, "verify")))
+    await mail(email, "account.confirm", { name: user.name ?? "there", link: await newLink(user.id, "verify") })
   }
   return { sent: true }
 }
@@ -264,12 +275,7 @@ export async function forgotPassword(email: string) {
   const [user] = await getDb().select().from(users).where(eq(users.email, email))
   if (user && !user.disabled && !(await sentRecently(user.id, "reset"))) {
     const link = await newLink(user.id, "reset")
-    await mail(
-      email,
-      "Reset your password",
-      `Hi ${user.name ?? "there"},\n\nChoose a new password for ${email}:\n\n${link}\n\n` +
-        `The link works once, for an hour. If you didn't ask for this, ignore this email: your password stays as it is.`
-    )
+    await mail(email, "account.reset", { name: user.name ?? "there", email, link })
   }
   return { sent: true }
 }
@@ -308,13 +314,12 @@ export async function resetPassword(input: z.infer<typeof resetSchema>) {
 }
 
 function changedNotice(user: User, what: string) {
-  return mail(
-    user.email,
-    `Security: ${what}`,
-    `${what} for your account (${user.email}) on ${new Date().toUTCString()}.\n\n` +
-      `If this was you, there's nothing to do. If it wasn't, reset your password at ${site()}/forgot-password ` +
-      `and contact your administrator straight away.`
-  )
+  return mail(user.email, "account.security", {
+    what,
+    email: user.email,
+    when: new Date().toUTCString(),
+    link: `${site()}/account/security`,
+  })
 }
 
 /* ---------- signed in: setting or changing it ---------- */

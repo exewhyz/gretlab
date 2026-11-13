@@ -2014,6 +2014,8 @@ export const emailOutbox = pgTable(
     to: text("to_address").notNull(),
     subject: text("subject").notNull(),
     text: text("body").notNull(),
+    /** The branded HTML version (features/emails); null for plain-text-only email. */
+    html: text("html"),
     status: emailStatus("status").notNull().default("queued"),
     attempts: integer("attempts").notNull().default(0),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
@@ -2613,3 +2615,15 @@ export const eventRsvps = pgTable(
 )
 
 export type OrgEvent = typeof orgEvents.$inferSelect
+
+/**
+ * Email wording changed from its default (Dashboard › Emails): one row per template key
+ * (packages/judge/src/emails.ts), plus "layout" for the shared footer. No row: the default.
+ */
+export const emailTemplates = pgTable("email_templates", {
+  key: text("key").primaryKey(),
+  subject: text("subject").notNull().default(""),
+  body: text("body").notNull(),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: updatedAt(),
+})
