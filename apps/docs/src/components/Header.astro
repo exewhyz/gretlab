@@ -1,0 +1,106 @@
+---
+/*
+ * The header (replacing Starlight's): the wordmark, the site's sections as tabs (each
+ * opening its first page, the current one marked), search, the GitHub link and the theme.
+ * Sections are the sidebar's top-level groups, so adding one there adds a tab here.
+ */
+import Search from "@astrojs/starlight/components/Search.astro"
+import SiteTitle from "@astrojs/starlight/components/SiteTitle.astro"
+import SocialIcons from "@astrojs/starlight/components/SocialIcons.astro"
+import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro"
+
+type Entry = {
+  type: "link" | "group"
+  label: string
+  href?: string
+  isCurrent?: boolean
+  entries?: Entry[]
+}
+const route = Astro.locals.starlightRoute
+const firstLink = (e: Entry): string | undefined =>
+  e.type === "link" ? e.href : e.entries?.map(firstLink).find(Boolean)
+const holdsCurrent = (e: Entry): boolean =>
+  e.type === "link" ? Boolean(e.isCurrent) : (e.entries ?? []).some(holdsCurrent)
+const sections = (route.sidebar as Entry[])
+  .filter((e) => e.type === "group")
+  .map((e) => ({ label: e.label, href: firstLink(e), current: holdsCurrent(e) }))
+  .filter((s) => s.href)
+---
+
+<div class="header">
+  <div class="title-wrapper sl-flex"><SiteTitle /></div>
+  <nav aria-label="Sections" class="sections">
+    {
+      sections.map((s) => (
+        <a href={s.href} aria-current={s.current ? "true" : undefined}>
+          {s.label}
+        </a>
+      ))
+    }
+  </nav>
+  <div class="sl-flex print:hidden search"><Search /></div>
+  <div class="sl-hidden md:sl-flex print:hidden right-group">
+    <div class="sl-flex social-icons"><SocialIcons /></div>
+    <ThemeSelect />
+  </div>
+</div>
+
+<style>
+  .header {
+    display: flex;
+    gap: var(--sl-nav-gap);
+    justify-content: space-between;
+    align-items: center;
+    height: 100%;
+  }
+  .title-wrapper {
+    overflow: clip;
+    padding: 0.25rem;
+    margin: -0.25rem;
+    min-width: 0;
+    flex: none;
+  }
+  .sections {
+    display: none;
+  }
+  .right-group,
+  .social-icons {
+    gap: 1rem;
+    align-items: center;
+  }
+  .social-icons::after {
+    content: "";
+    height: 2rem;
+    border-inline-end: 1px solid var(--sl-color-gray-5);
+  }
+  /* The section tabs need a laptop's width; below it, the sidebar menu has them. */
+  @media (min-width: 72rem) {
+    .sections {
+      display: flex;
+      gap: 0.25rem;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .sections a {
+      padding: 0.375rem 0.625rem;
+      border-radius: 8px;
+      color: var(--sl-color-gray-2);
+      font-size: var(--sl-text-sm);
+      font-weight: 500;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .sections a:hover {
+      color: var(--sl-color-white);
+      background: var(--sl-color-gray-6);
+    }
+    .sections a[aria-current="true"] {
+      color: var(--sl-color-white);
+      background: var(--sl-color-gray-6);
+    }
+    .search {
+      margin-inline-start: auto;
+    }
+  }
+</style>

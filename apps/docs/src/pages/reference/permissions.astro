@@ -1,0 +1,141 @@
+---
+/*
+ * Every permission, generated from the app's own lists (packages/judge/src/permissions.ts
+ * and platform.ts), so it can't drift. Finer actions sit under their parent: holding the
+ * parent grants all of them.
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro"
+import { PERMISSIONS, PLATFORM_PERMISSIONS } from "../../data/catalog"
+
+type Info = { label: string; description: string; module: string; parent?: string }
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+
+function byArea(catalog: Record<string, Info>) {
+  const keys = Object.keys(catalog)
+  const areas = [...new Set(keys.map((k) => catalog[k]!.module))]
+  return areas.map((area) => ({
+    area,
+    top: keys
+      .filter((k) => catalog[k]!.module === area && !catalog[k]!.parent)
+      .map((k) => ({
+        key: k,
+        ...catalog[k]!,
+        children: keys.filter((c) => catalog[c]!.parent === k).map((c) => ({ key: c, ...catalog[c]! })),
+      })),
+  }))
+}
+const org = byArea(PERMISSIONS as Record<string, Info>)
+const platform = byArea(PLATFORM_PERMISSIONS as Record<string, Info>)
+const headings = [
+  { depth: 2, slug: "organization-permissions", text: "Organization permissions" },
+  ...org.map((a) => ({ depth: 3, slug: `org-${slug(a.area)}`, text: a.area })),
+  { depth: 2, slug: "platform-permissions", text: "Platform permissions" },
+  ...platform.map((a) => ({ depth: 3, slug: `platform-${slug(a.area)}`, text: a.area })),
+]
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Permissions",
+    description:
+      "Every permission an organization role or a platform role can hold, by area, read from the app itself.",
+  }}
+  headings={headings}
+>
+  <p>
+    A role is a bundle of these. Some permissions are a parent with finer actions under it: holding the
+    parent grants every action beneath it, and a role can instead hold only some of the actions. Nobody can
+    give out a permission they don't hold. This page is generated from <code>packages/judge</code>, so it's
+    always the app's current list.
+  </p>
+
+  <h2 id="organization-permissions">Organization permissions</h2>
+  <p>Given across an organization or within one group (and every group inside it).</p>
+  {
+    org.map((a) => (
+      <>
+        <h3 id={`org-${slug(a.area)}`}>{a.area}</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Permission</th>
+              <th>What it allows</th>
+            </tr>
+          </thead>
+          <tbody>
+            {a.top.flatMap((p) => [
+              <tr>
+                <td>
+                  <strong>{p.label}</strong>
+                  <br />
+                  <code>{p.key}</code>
+                </td>
+                <td>{p.description}</td>
+              </tr>,
+              ...p.children.map((c) => (
+                <tr class="child">
+                  <td>
+                    {c.label}
+                    <br />
+                    <code>{c.key}</code>
+                  </td>
+                  <td>{c.description}</td>
+                </tr>
+              )),
+            ])}
+          </tbody>
+        </table>
+      </>
+    ))
+  }
+
+  <h2 id="platform-permissions">Platform permissions</h2>
+  <p>Held by platform staff, for the platform's own dashboard and, with two of them, inside organizations.</p>
+  {
+    platform.map((a) => (
+      <>
+        <h3 id={`platform-${slug(a.area)}`}>{a.area}</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Permission</th>
+              <th>What it allows</th>
+            </tr>
+          </thead>
+          <tbody>
+            {a.top.flatMap((p) => [
+              <tr>
+                <td>
+                  <strong>{p.label}</strong>
+                  <br />
+                  <code>{p.key}</code>
+                </td>
+                <td>{p.description}</td>
+              </tr>,
+              ...p.children.map((c) => (
+                <tr class="child">
+                  <td>
+                    {c.label}
+                    <br />
+                    <code>{c.key}</code>
+                  </td>
+                  <td>{c.description}</td>
+                </tr>
+              )),
+            ])}
+          </tbody>
+        </table>
+      </>
+    ))
+  }
+</StarlightPage>
+
+<style>
+  td code {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+  }
+  tr.child td:first-child {
+    padding-inline-start: 1.5rem;
+  }
+</style>

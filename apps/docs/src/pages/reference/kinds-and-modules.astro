@@ -1,0 +1,123 @@
+---
+/*
+ * The kinds of organization and the modules each can use, generated from the app
+ * (packages/judge/src/kinds and org-types.ts). The platform's per-kind policy and each
+ * organization's own choices narrow this further; neither can add a module a kind lacks.
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro"
+import { MODULES, kinds } from "../../data/catalog"
+
+type Mod = { label: string; description: string; ready: boolean }
+const modules = Object.entries(MODULES as Record<string, Mod>).filter(([, m]) => m.ready)
+const grading = { marks: "Marks and a percentage scale", credits: "Credits, grade points, SGPA and CGPA", none: "Not graded" }
+const headings = [
+  { depth: 2, slug: "the-kinds", text: "The kinds" },
+  ...kinds.map((k) => ({ depth: 3, slug: `kind-${k.key}`, text: k.label })),
+  { depth: 2, slug: "modules-by-kind", text: "Modules by kind" },
+  { depth: 2, slug: "the-modules", text: "The modules" },
+]
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Kinds and modules",
+    description:
+      "Each kind of organization: its words, its group levels, how it grades, and which modules it can use, read from the app itself.",
+  }}
+  headings={headings}
+>
+  <p>
+    Every organization is one kind, chosen when it's created and never changed. The kind decides its words, its
+    group levels, how it grades and which modules it can use. Within that, the platform decides per kind whether
+    a module is off, optional or on from the start, and each organization switches the optional ones in Settings ›
+    Modules. See <a href="/start-here/kinds-of-organization/">Kinds of organization</a> for how to choose.
+  </p>
+
+  <h2 id="the-kinds">The kinds</h2>
+  {
+    kinds.map((k) => (
+      <>
+        <h3 id={`kind-${k.key}`}>{k.label}</h3>
+        <p>{k.description} <em>For example: {k.examples}</em></p>
+        <table>
+          <tbody>
+            <tr><th scope="row">Its people</th><td>{k.terms.learners}, {k.terms.instructors}{k.terms.guardians ? `, ${k.terms.guardians}` : ""}</td></tr>
+            <tr><th scope="row">Groups</th><td>{k.terms.groups}, in levels {k.groupLevels.join(" › ")}; each led by a {k.terms.groupLead.toLowerCase()}</td></tr>
+            <tr><th scope="row">Time</th><td>{k.terms.periods} in {k.terms.parts.toLowerCase()}{k.groupDates ? "; groups run between dates (week 3 of 12)" : ""}</td></tr>
+            <tr><th scope="row">Grading</th><td>{grading[k.grading]}</td></tr>
+            <tr><th scope="row">Choosing it decides</th><td><ul>{k.decides.map((d) => <li>{d}</li>)}</ul></td></tr>
+          </tbody>
+        </table>
+      </>
+    ))
+  }
+
+  <h2 id="modules-by-kind">Modules by kind</h2>
+  <p><strong>On</strong>: on from the start. <strong>Can</strong>: available to switch on. A dash: not for this kind.</p>
+  <div class="wide">
+    <table>
+      <thead>
+        <tr>
+          <th>Module</th>
+          {kinds.map((k) => <th>{k.label}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {
+          modules.map(([key, m]) => (
+            <tr>
+              <td><strong>{m.label}</strong></td>
+              {kinds.map((k) => (
+                <td class="cell">
+                  {(k.defaults as readonly string[]).includes(key)
+                    ? "On"
+                    : (k.capabilities as readonly string[]).includes(key)
+                      ? "Can"
+                      : "–"}
+                </td>
+              ))}
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <h2 id="the-modules">The modules</h2>
+  <table>
+    <thead>
+      <tr><th>Module</th><th>What it adds</th></tr>
+    </thead>
+    <tbody>
+      {modules.map(([key, m]) => (
+        <tr>
+          <td><strong>{m.label}</strong><br /><code>{key}</code></td>
+          <td>{m.description}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</StarlightPage>
+
+<style>
+  .wide {
+    overflow-x: auto;
+  }
+  .cell {
+    text-align: center;
+    white-space: nowrap;
+  }
+  td code {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+  }
+  th[scope="row"] {
+    white-space: nowrap;
+    color: var(--sl-color-gray-2);
+    font-weight: 500;
+  }
+  td ul {
+    margin: 0;
+    padding-inline-start: 1rem;
+  }
+</style>

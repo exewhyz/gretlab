@@ -25,6 +25,8 @@
   --sl-color-black: #171612;
   --sl-color-hairline: #2f2e28;
   --sl-color-hairline-light: #292822;
+  /* A sheet on the page: cards, the copy button. */
+  --gl-card: #201f1a;
 }
 
 /* Light: cream, white sheets, warm ink. */
@@ -44,6 +46,7 @@
   --sl-color-hairline: #e6e5e0;
   --sl-color-hairline-light: #efeee8;
   --sl-color-hairline-shade: #cfcdc4;
+  --gl-card: #ffffff;
 }
 
 /* Code shows != and == as typed, as in the app. */

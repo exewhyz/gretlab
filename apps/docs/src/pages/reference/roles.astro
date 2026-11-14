@@ -1,0 +1,133 @@
+---
+/*
+ * The built-in roles, generated from the app (packages/judge): an organization's four, what
+ * each kind calls them, and the platform's staff roles. Suggested roles per kind are
+ * ordinary roles an organization can change, so they're described, not listed.
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro"
+import {
+  PERMISSIONS,
+  PLATFORM_PERMISSIONS,
+  PLATFORM_ROLES,
+  SYSTEM_ROLES,
+  kinds,
+} from "../../data/catalog"
+
+type Role = { name: string; description: string; permissions: readonly string[] }
+const orgLabel = (k: string) => (PERMISSIONS as Record<string, { label: string }>)[k]?.label ?? k
+const platLabel = (k: string) =>
+  (PLATFORM_PERMISSIONS as Record<string, { label: string }>)[k]?.label ?? k
+const orgRoles = Object.entries(SYSTEM_ROLES as Record<string, Role>)
+const platformRoles = Object.entries(PLATFORM_ROLES as Record<string, Role>)
+const allOrg = Object.keys(PERMISSIONS).length
+const allPlatform = Object.keys(PLATFORM_PERMISSIONS).length
+const headings = [
+  { depth: 2, slug: "organization-roles", text: "Organization roles" },
+  { depth: 3, slug: "what-each-kind-calls-them", text: "What each kind calls them" },
+  { depth: 3, slug: "suggested-roles", text: "Suggested roles" },
+  { depth: 2, slug: "platform-roles", text: "Platform roles" },
+]
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Roles",
+    description:
+      "The built-in roles of an organization and of the platform, and what each holds, read from the app itself.",
+  }}
+  headings={headings}
+>
+  <p>
+    People get what they can do from roles. An organization's roles are given across the whole organization or
+    within one group, and are read from the database on every request, so taking a role away works at once.
+    Platform roles are for the people who run the site. See <a href="/reference/permissions/">Permissions</a> for
+    what each permission allows.
+  </p>
+
+  <h2 id="organization-roles">Organization roles</h2>
+  <p>
+    Every organization has these four. They can't be edited or deleted; an organization adds its own beside them.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Role</th><th>What it's for</th><th>Permissions</th></tr>
+    </thead>
+    <tbody>
+      {
+        orgRoles.map(([key, r]) => (
+          <tr>
+            <td><strong>{r.name}</strong><br /><code>{key}</code></td>
+            <td>{r.description}</td>
+            <td>
+              {r.permissions.length === allOrg
+                ? "All of them"
+                : r.permissions.length === 0
+                  ? "None (a member, no management)"
+                  : r.permissions.map(orgLabel).join(", ")}
+            </td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+
+  <h3 id="what-each-kind-calls-them">What each kind calls them</h3>
+  <p>The permissions are the same; the names follow the organization's kind.</p>
+  <table>
+    <thead>
+      <tr><th>Kind</th><th>Owner</th><th>Admin</th><th>Teacher</th><th>Member</th></tr>
+    </thead>
+    <tbody>
+      {
+        kinds.map((k) => (
+          <tr>
+            <td><strong>{k.label}</strong></td>
+            <td>{k.roleNames.owner}</td>
+            <td>{k.roleNames.admin}</td>
+            <td>{k.roleNames.teacher}</td>
+            <td>{k.roleNames.member}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+
+  <h3 id="suggested-roles">Suggested roles</h3>
+  <p>
+    A new organization also starts with roles suggested for its kind: a school's Principal, Class teacher, Exam
+    coordinator or Librarian, a college's Dean or Head of department, and so on. They're ordinary roles to rename,
+    change or delete. Manage › Roles offers the ones an organization doesn't have yet, and platform staff decide
+    each kind's list under Dashboard › Organization kinds.
+  </p>
+
+  <h2 id="platform-roles">Platform roles</h2>
+  <p>
+    For the people who run the site, given on Dashboard › Staff and roles. The built-in ones can't be changed;
+    custom roles can be added. People listed in <code>ADMIN_EMAILS</code> are always owners.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Role</th><th>What it's for</th><th>Permissions</th></tr>
+    </thead>
+    <tbody>
+      {
+        platformRoles.map(([key, r]) => (
+          <tr>
+            <td><strong>{r.name}</strong><br /><code>{key}</code></td>
+            <td>{r.description}</td>
+            <td>
+              {r.permissions.length === allPlatform ? "All of them" : r.permissions.map(platLabel).join(", ")}
+            </td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</StarlightPage>
+
+<style>
+  td code {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+  }
+</style>

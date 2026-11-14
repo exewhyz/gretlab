@@ -1,0 +1,225 @@
+---
+/*
+ * The docs' home: what Gretlab is, the docs' figures (counted, never typed), the life of an
+ * organization from creation to reports, and the features as tiles. An Astro page rather
+ * than Markdown because its figures come from the content and the app's own lists.
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro"
+import { getCollection } from "astro:content"
+
+import Icon from "../components/Icon.astro"
+import { KINDS, MODULES, PLATFORM_ROLES, SYSTEM_ROLES } from "../data/catalog"
+
+const pages = (await getCollection("docs")).length + 3 // the generated reference pages
+const ready = Object.values(MODULES as Record<string, { ready: boolean }>).filter((m) => m.ready)
+const figures = [
+  { value: pages, label: "Pages of docs" },
+  { value: Object.keys(KINDS).length, label: "Kinds of organization" },
+  { value: ready.length, label: "Modules" },
+  {
+    value: Object.keys(SYSTEM_ROLES).length + Object.keys(PLATFORM_ROLES).length,
+    label: "Built-in roles",
+  },
+]
+
+const life = [
+  { icon: "buildings", title: "Create", text: "An organization of its kind", href: "/start-here/kinds-of-organization/" },
+  { icon: "tree-structure", title: "Shape", text: "Groups, roles and modules", href: "/features/people/members-groups-roles/" },
+  { icon: "user-plus", title: "Add people", text: "Invites, imports, records", href: "/features/people/student-records/" },
+  { icon: "calendar-check", title: "Run the day", text: "Registers, timetable, leave", href: "/features/daily/attendance/" },
+  { icon: "code", title: "Teach", text: "Problems, assignments, exams", href: "/features/coding/assignments/" },
+  { icon: "exam", title: "Assess", text: "Gradebook and report cards", href: "/features/assessment/exams-and-report-cards/" },
+  { icon: "chart-bar", title: "Follow up", text: "Reports and early warnings", href: "/features/overview/" },
+]
+
+const tour = [
+  { icon: "code", title: "Coding lab", text: "Problems judged in a sandbox, Run and Submit, assignments, lab exams and contests.", href: "/features/coding/problems-and-practice/" },
+  { icon: "check-square", title: "Attendance", text: "A register per class and period, by course for colleges, with the 75% rule.", href: "/features/daily/attendance/" },
+  { icon: "calendar", title: "Timetable", text: "Periods and school days, each class's week, and teachers who can't be in two places.", href: "/features/daily/timetable/" },
+  { icon: "airplane-takeoff", title: "Leave", text: "Students, parents and staff ask; class teachers and the office decide.", href: "/features/daily/leave/" },
+  { icon: "users-three", title: "Members, groups and roles", text: "Groups in the organization's own words, and roles given across it or within a group.", href: "/features/people/members-groups-roles/" },
+  { icon: "identification-card", title: "Student records", text: "Academic years, admission numbers, enrolments and promotion.", href: "/features/people/student-records/" },
+  { icon: "exam", title: "Exams and report cards", text: "Marks by paper, grades on the school's scale or SGPA, and printable report cards.", href: "/features/assessment/exams-and-report-cards/" },
+  { icon: "plugs-connected", title: "The organization API", text: "Keys for other systems, and signed webhooks for what changed.", href: "/api/" },
+]
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "Gretlab documentation",
+    description:
+      "How Gretlab works, every feature role by role, and how to set it up and run it.",
+    template: "splash",
+    hero: {
+      title: "The lab and the day, explained end to end.",
+      tagline:
+        "Gretlab runs a learning organization's day (registers, timetables, leave, records, exams and report cards) with a coding lab built in. These docs cover every feature, role by role, and how to set it up and run it.",
+      actions: [
+        { text: "Start reading", link: "/start-here/introduction/", icon: "right-arrow" },
+        { text: "Features overview", link: "/features/overview/", variant: "minimal" },
+      ],
+    },
+  }}
+>
+  <dl class="figures not-content" aria-label="The docs in figures">
+    {
+      figures.map((f) => (
+        <div>
+          <dt>{f.label}</dt>
+          <dd>{f.value}</dd>
+        </div>
+      ))
+    }
+  </dl>
+
+  <h2 id="the-life-of-an-organization">The life of an organization on Gretlab</h2>
+  <ol class="life not-content">
+    {
+      life.map((step, i) => (
+        <li>
+          <a href={step.href}>
+            <span class="step-mark">
+              <Icon name={step.icon} size={20} />
+              <span class="step-n">{i + 1}</span>
+            </span>
+            <span class="step-title">{step.title}</span>
+            <span class="step-text">{step.text}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ol>
+
+  <h2 id="the-product-tour">The product tour</h2>
+  <ul class="tour not-content">
+    {
+      tour.map((t) => (
+        <li>
+          <a href={t.href}>
+            <span class="tile-icon">
+              <Icon name={t.icon} size={20} />
+            </span>
+            <span class="tile-title">{t.title}</span>
+            <span class="tile-text">{t.text}</span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</StarlightPage>
+
+<style>
+  .figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    margin: 0 0 3rem;
+    overflow: hidden;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 12px;
+    background: var(--sl-color-hairline);
+  }
+  .figures div {
+    flex: 1 1 9rem;
+    display: grid;
+    gap: 0.25rem;
+    padding: 1rem 1.25rem;
+    background: var(--gl-card);
+  }
+  .figures dt {
+    order: 2;
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+  }
+  .figures dd {
+    order: 1;
+    margin: 0;
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--sl-color-white);
+    font-variant-numeric: tabular-nums;
+  }
+  .life {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 0.75rem;
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 3rem;
+    counter-reset: none;
+  }
+  .life a,
+  .tour a {
+    display: grid;
+    gap: 0.25rem;
+    height: 100%;
+    padding: 1rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 12px;
+    background: var(--gl-card);
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 0.15s;
+  }
+  .life a:hover,
+  .tour a:hover {
+    border-color: var(--sl-color-gray-5);
+  }
+  .step-mark {
+    position: relative;
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    border-radius: 9999px;
+    background: var(--sl-color-gray-6);
+    color: var(--sl-color-accent);
+  }
+  .step-n {
+    position: absolute;
+    top: -0.25rem;
+    right: -0.375rem;
+    min-width: 1.125rem;
+    height: 1.125rem;
+    padding: 0 0.25rem;
+    border-radius: 9999px;
+    background: var(--sl-color-white);
+    color: var(--sl-color-black);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.125rem;
+    text-align: center;
+  }
+  .step-title,
+  .tile-title {
+    font-weight: 600;
+    color: var(--sl-color-white);
+  }
+  .step-text,
+  .tile-text {
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+    line-height: 1.45;
+  }
+  .tour {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 0.75rem;
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 0;
+  }
+  .tile-icon {
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    background: var(--sl-color-gray-6);
+    color: var(--sl-color-accent);
+  }
+</style>
