@@ -11,12 +11,14 @@
         ".env*"
       ],
       "outputs": [
+        "dist/**",
         ".next/**",
         "!.next/cache/**",
         "!.next/dev/**"
       ],
       "env": [
-        "NEXT_PUBLIC_*"
+        "NEXT_PUBLIC_*",
+        "DOCS_SITE_URL"
       ],
       "passThroughEnv": [
         "DATABASE_*",

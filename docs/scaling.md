@@ -1,4 +1,7 @@
-# Scaling and operations
+---
+title: Scaling and operations
+description: How Gretlab handles a class or a whole college, what was measured, and how to size and run a deployment.
+---
 
 How Gretlab handles a class or a whole college, what was measured, and how to size a deployment.
 

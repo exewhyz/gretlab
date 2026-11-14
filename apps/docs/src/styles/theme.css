@@ -1,0 +1,103 @@
+/*
+ * Gretlab's look on Starlight (apps/web/DESIGN.md, "The Lab Notebook"): a warm cream page,
+ * warm ink, hairlines instead of shadows, and one orange for links and the current page.
+ * Starlight's grays run from --sl-color-white (text) to --sl-color-black (page).
+ */
+
+:root {
+  --sl-font: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --sl-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --sl-content-width: 46rem;
+}
+
+/* Dark: the light palette's warm hues inverted (apps/web .dark). */
+:root {
+  --sl-color-accent-low: #3a1d0c;
+  --sl-color-accent: #f54e00;
+  --sl-color-accent-high: #ffb58f;
+  --sl-color-white: #edece4;
+  --sl-color-gray-1: #e2e0d7;
+  --sl-color-gray-2: #b8b5ab;
+  --sl-color-gray-3: #96938a;
+  --sl-color-gray-4: #6f6c62;
+  --sl-color-gray-5: #45433b;
+  --sl-color-gray-6: #201f1a;
+  --sl-color-black: #171612;
+  --sl-color-hairline: #2f2e28;
+  --sl-color-hairline-light: #292822;
+}
+
+/* Light: cream, white sheets, warm ink. */
+:root[data-theme="light"] {
+  --sl-color-accent-low: #fde3d4;
+  --sl-color-accent: #d04200;
+  --sl-color-accent-high: #8f2d00;
+  --sl-color-white: #26251e;
+  --sl-color-gray-1: #3a3830;
+  --sl-color-gray-2: #5a5852;
+  --sl-color-gray-3: #807d72;
+  --sl-color-gray-4: #a09c92;
+  --sl-color-gray-5: #cfcdc4;
+  --sl-color-gray-6: #efeee8;
+  --sl-color-gray-7: #fafaf7;
+  --sl-color-black: #f7f7f4;
+  --sl-color-hairline: #e6e5e0;
+  --sl-color-hairline-light: #efeee8;
+  --sl-color-hairline-shade: #cfcdc4;
+}
+
+/* Code shows != and == as typed, as in the app. */
+code,
+pre,
+kbd,
+samp {
+  font-variant-ligatures: none;
+}
+
+/* Tables are data: numbers line up. */
+.sl-markdown-content table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The wordmark: only the >>> is orange; the name is ink, as in the app's header. */
+.site-title {
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+/* The current page: a soft fill and medium weight, not orange (orange is for actions). */
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background-color: var(--sl-color-gray-6);
+  color: var(--sl-color-white);
+  font-weight: 500;
+}
+:root:not([data-theme="light"]) .sidebar-content a[aria-current="page"] {
+  background-color: #292822;
+}
+
+/* Display titles are regular weight with slightly tight tracking (DESIGN.md › Typography). */
+.sl-markdown-content h1,
+h1#_top,
+.hero h1 {
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* Buttons and links styled as buttons have the app's gently rounded corners (8px). */
+.sl-link-button,
+.action {
+  border-radius: 8px;
+}
+
+/* The main action is the same Signal Orange in both themes, with white text. */
+.sl-link-button.primary {
+  background-color: #f54e00;
+  border-color: #f54e00;
+  color: #ffffff;
+}
+.sl-link-button.primary:hover {
+  background-color: #d04200;
+  border-color: #d04200;
+}

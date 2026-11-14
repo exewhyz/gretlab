@@ -1,4 +1,7 @@
-# Problem file format
+---
+title: Problem file format
+description: The JSON file that imports problems into the library and into assignments, exams and contests.
+---
 
 One JSON format imports problems everywhere: the problem library (Dashboard › Problems › Import), and the problem picker of the assignment, exam and contest forms ("Import problems"). A template to copy is served at `/problem-template.json`.
 

@@ -1,4 +1,7 @@
-# The organization API
+---
+title: The organization API
+description: API keys for an organization's own API, the endpoints to start with, paged lists, and signed webhooks.
+---
 
 Gretlab's web app and other systems use the same API, at `/api/v1`. This guide covers what another system needs:
 

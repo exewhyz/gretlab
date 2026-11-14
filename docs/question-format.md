@@ -1,4 +1,7 @@
-# Question file format
+---
+title: Question file format
+description: The JSON file that imports quiz questions into the question bank and into assignments, exams and contests.
+---
 
 One JSON format imports quiz questions everywhere: the question bank (Dashboard › Questions › Import) and the question picker in the assignment, exam and contest forms ("Import questions"). A template to copy is served at `/question-template.json`. Imported questions go into the bank, so they can be reused.
 

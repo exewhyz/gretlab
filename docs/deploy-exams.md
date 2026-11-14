@@ -1,4 +1,7 @@
-# Lab exams on your deployment
+---
+title: Lab exams on your deployment
+description: Limiting an exam to the lab's network on Vercel, behind Caddy or on another host, and what to do when the runner fails.
+---
 
 ## Limiting an exam to the lab's network
 

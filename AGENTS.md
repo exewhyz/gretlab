@@ -39,12 +39,13 @@ Full diagram, measurements and sizing: `docs/scaling.md`.
 | --- | --- |
 | `apps/web` | UI and the versioned REST API under `app/api/v1` |
 | `apps/runner` | Claims queued submissions, compiles and runs them, records verdicts |
+| `apps/docs` | The documentation site (Astro Starlight). Its pages are `docs/`; README there |
 | `packages/db` | Drizzle schema, migrations, seed. The only place that defines tables |
 | `packages/judge` | Language registry, verdicts, file validation, output compare, feature list. No I/O |
 | `packages/ui` | Design tokens and shared components |
 | `docker/sandbox` | One image per language |
 | `e2e` | Whole-system tests (`run.sh` runs them all), plus load and failure tests |
-| `docs` | Problem and question import formats, exam deployment, scaling |
+| `docs` | The guides, published by `apps/docs`: import formats, the API, exam deployment, scaling. Each needs a `title` in its frontmatter and an entry in the sidebar (`apps/docs/astro.config.mjs`); plain Markdown only |
 | `deploy`, `docker-compose.*.yml` | Production: Caddy, web replicas, PgBouncer (`prod`), runner machines (`runner`), local Postgres (plain) |
 
 Where each feature lives (`apps/web/features/<name>`: UI in `components/`, rules in `server.ts`, browser-safe form schemas in `schemas.ts`; pure, unit-tested rules in `packages/judge/src/<name>.ts`):
