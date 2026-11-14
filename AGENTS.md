@@ -650,7 +650,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 
 ## Demo data
 
-- `pnpm --filter @workspace/db demo` (`packages/db/src/demo.ts`) shows which database it would wipe and changes nothing; `--wipe=<database name>` (typed exactly) empties every table except configuration (settings, language settings, runners, LTI keys, kind decisions, email wording), re-imports the problem library, and makes one organization of each kind with a few months of realistic activity (`src/demo/*.ts`, seeded randomness: the same data each run, dates relative to today). Re-running replaces it all.
+- `pnpm --filter @workspace/db demo` (`packages/db/src/demo.ts`) shows which database it would wipe and changes nothing; `--wipe=<database name>` (typed exactly), with the accounts' password in `DEMO_PASSWORD` (it must pass the app's password rules; checked before anything is wiped), empties every table except configuration (settings, language settings, runners, LTI keys, kind decisions, email wording), re-imports the problem library, and makes one organization of each kind with a few months of realistic activity (`src/demo/*.ts`, seeded randomness: the same data each run, dates relative to today). Re-running replaces it all.
 - **What else it makes:**
   - The school has a Grade 10 contest from ten days ago, with results.
   - The platform has an open contest next week.
@@ -918,7 +918,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - Design: `/impeccable doctor` reports the skill's setup gaps.
 - About 230 hand-written client types remain where screens shape data on purpose; convert others as they're touched.
 - The problem library isn't paged on the server; it sends compact rows and pages in the browser. Revisit if a library grows past a few thousand items.
-- Production demo data: the owner resets it with `cd packages/db && DATABASE_URL='<Neon URL>' pnpm exec tsx src/demo.ts`, a dry run first, then with `--wipe=<database name>`.
+- Production demo data: the owner resets it with `cd packages/db && DATABASE_URL='<Neon URL>' pnpm exec tsx src/demo.ts`, a dry run first, then `DEMO_PASSWORD='<new password>'` and `--wipe=<database name>`. Choose a new password each reset and keep it out of docs and commits.
 
 Decided not to build for now: the AI tutor (it needs an Anthropic API key and a usage policy).
 

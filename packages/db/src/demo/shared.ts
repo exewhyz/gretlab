@@ -22,16 +22,26 @@ import {
 
 export const db = getDb()
 
-/** Sign-in for every demo account; printed at the end. */
-export const DEMO_PASSWORD = "Gretlab demo 2026"
+/**
+ * The password every demo account shares, from the DEMO_PASSWORD setting. It's never
+ * written in the code, docs or commits: whoever builds the demo chooses it, and demo.ts
+ * refuses to wipe without a valid one.
+ */
+export const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? ""
 
 /** Demo addresses can never receive mail (.invalid), so nothing is ever sent to them. */
 export const DOMAIN = "demo.invalid"
 
-// scrypt like apps/web/features/auth/password.ts, once: every demo account shares it.
-const salt = randomBytes(16)
-const key = scryptSync(DEMO_PASSWORD.normalize("NFKC"), salt, 32, { N: 2 ** 15, r: 8, p: 1, maxmem: 128 * 2 ** 15 * 8 * 2 })
-export const PASSWORD_HASH = ["scrypt", 2 ** 15, 8, 1, salt.toString("base64url"), key.toString("base64url")].join("$")
+// scrypt like apps/web/features/auth/password.ts, worked out once (when the first account is
+// made, after demo.ts has checked the password): every demo account shares it.
+let hash: string | null = null
+function passwordHash() {
+  if (hash) return hash
+  const salt = randomBytes(16)
+  const key = scryptSync(DEMO_PASSWORD.normalize("NFKC"), salt, 32, { N: 2 ** 15, r: 8, p: 1, maxmem: 128 * 2 ** 15 * 8 * 2 })
+  hash = ["scrypt", 2 ** 15, 8, 1, salt.toString("base64url"), key.toString("base64url")].join("$")
+  return hash
+}
 
 /* ---------- randomness that's the same every run ---------- */
 
@@ -156,7 +166,7 @@ export async function makeUsers(list: { name: string; email: string }[]): Promis
           email: u.email,
           handle: handleFor(u.email),
           role: "student" as const,
-          passwordHash: PASSWORD_HASH,
+          passwordHash: passwordHash(),
           emailVerifiedAt: new Date(),
           createdAt: at(-int(60, 200)),
         }))

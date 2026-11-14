@@ -1,11 +1,13 @@
 /**
  * Wipes a database and fills it with demo data: the problem library, and one organization
  * of each kind with realistic people and a few months of activity. Every demo account
- * signs in with the same password, and is on the .invalid domain, so no email ever goes
+ * signs in with the same password, chosen by whoever builds it (DEMO_PASSWORD, never
+ * written down in the code or docs), and is on the .invalid domain, so no email ever goes
  * out to it.
  *
  *   pnpm --filter @workspace/db demo                    shows what it would wipe; changes nothing
- *   pnpm --filter @workspace/db demo --wipe=<database>  wipes that database and fills it
+ *   DEMO_PASSWORD='<new password>' pnpm --filter @workspace/db demo --wipe=<database>
+ *                                                       wipes that database and fills it
  *
  * The database's name must be typed exactly, so it can't run against the wrong one by
  * accident. Kept (configuration, not data): settings, language settings, judge runners,
@@ -18,6 +20,8 @@ import { execFileSync } from "node:child_process"
 import { sql } from "drizzle-orm"
 
 import { emailTemplates, orgKindPolicies, problems } from "./index.ts"
+import { passwordProblem } from "@workspace/judge"
+
 import { ACCOUNTS, DEMO_PASSWORD, db } from "./demo/shared.ts"
 
 const KEEP = new Set([
@@ -47,6 +51,18 @@ if (wipe !== name) {
       `  --wipe=${name}\n`
   )
   process.exit(0)
+}
+
+// The demo accounts' password comes from the person running this, and must pass the app's
+// own rules (it's signed in with through the normal form). Checked before anything is wiped.
+const problem = DEMO_PASSWORD ? passwordProblem(DEMO_PASSWORD) : "There's none."
+if (problem) {
+  console.error(
+    `\nNothing changed. Choose the demo accounts' password and pass it as DEMO_PASSWORD:\n\n` +
+      `  DEMO_PASSWORD='<new password>' pnpm --filter @workspace/db demo --wipe=${name}\n\n` +
+      `${problem}\n`
+  )
+  process.exit(1)
 }
 
 // ---------- wipe
@@ -102,7 +118,8 @@ await buildCompany()
 await buildCommunity()
 await buildHolidays()
 
-console.log(`\nDone in ${Math.round((Date.now() - t0) / 1000)} s. Sign in with email and password; every demo account's password is:\n\n  ${DEMO_PASSWORD}\n`)
+// The password isn't printed: whoever ran this chose it, and terminal output gets pasted around.
+console.log(`\nDone in ${Math.round((Date.now() - t0) / 1000)} s. Every account below signs in with its email and the DEMO_PASSWORD you chose.`)
 let last = ""
 for (const a of ACCOUNTS) {
   if (a.org !== last) console.log(`\n${a.org}`)

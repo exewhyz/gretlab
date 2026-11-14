@@ -15,13 +15,16 @@ every time.
 pnpm --filter @workspace/db demo
 ```
 
-On its own, this only shows which database it would empty, and changes nothing. To build the demo:
+On its own, this only shows which database it would empty, and changes nothing. To build the demo,
+choose the password the demo accounts will share and pass it as `DEMO_PASSWORD`:
 
 ```bash
-pnpm --filter @workspace/db demo --wipe=<database name>
+DEMO_PASSWORD='<a password you choose>' pnpm --filter @workspace/db demo --wipe=<database name>
 ```
 
-The database name must be typed exactly. It empties every table except configuration (settings,
+The password must pass the app's own password rules (at least 10 characters, not a common one); it's
+checked before anything is wiped, and it isn't printed afterwards. The database name must be typed
+exactly. It empties every table except configuration (settings,
 language settings, runners, LTI keys, kind decisions and email wording), re-imports the problem
 library and builds the organizations. Running it again replaces everything.
 
