@@ -25,7 +25,7 @@ A coding lab a teacher or institution can run for their students: practice probl
 - **Production database.** The owner runs Neon migrations and other production commands themselves. Never push code that needs a migration until they confirm it's applied. Never paste database URLs or secrets.
 - **Vercel.** Don't poll it after a push.
 - **The owner's own dev server** (`next dev` on port 3000, `tsx watch`): never kill it.
-- **Product brief.** For design work, `apps/web/PRODUCT.md` is the brief the Impeccable design skill reads (`.claude/skills/impeccable`, hooks off). The look is decided: keep the existing identity, improve layout, hierarchy and data presentation.
+- **Product brief.** For design work, `apps/web/PRODUCT.md` is the brief the Impeccable design skill reads (`.claude/skills/impeccable`, hooks off), and `apps/web/DESIGN.md` (with `apps/web/.impeccable/design.json`) records the visual system: "The Lab Notebook". The look is decided: keep the existing identity, improve layout, hierarchy and data presentation. When tokens or core components change, update DESIGN.md in the same change.
 
 ## Architecture
 
@@ -900,7 +900,7 @@ Status is updated as items ship; anything not ticked has not been built.
 
 **Open follow-ups:**
 - A flaky check in `e2e/assignments.mjs`: "locked: drafts from before the exam don't come back". It fails now and then and passes when rerun alone; the cause isn't found yet (the clocks of the app and the database agreed).
-- Design: there's no `DESIGN.md` yet; `/impeccable document` would record the existing visual system, and `/impeccable doctor` reports the skill's setup gaps.
+- Design: `/impeccable doctor` reports the skill's setup gaps.
 - About 230 hand-written client types remain where screens shape data on purpose; convert others as they're touched.
 - The problem library isn't paged on the server; it sends compact rows and pages in the browser. Revisit if a library grows past a few thousand items.
 - Production demo data: the owner resets it with `cd packages/db && DATABASE_URL='<Neon URL>' pnpm exec tsx src/demo.ts`, a dry run first, then with `--wipe=<database name>`.

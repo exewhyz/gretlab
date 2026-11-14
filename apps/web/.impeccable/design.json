@@ -1,0 +1,477 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-14T12:15:59.912881+00:00",
+  "title": "Design System: Gretlab",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Signal Orange",
+        "canonical": "#f54e00",
+        "tonalRamp": [
+          "oklch(15% 0.101 38)",
+          "oklch(26% 0.130 38)",
+          "oklch(38% 0.158 38)",
+          "oklch(49% 0.187 38)",
+          "oklch(61% 0.212 38)",
+          "oklch(72% 0.183 38)",
+          "oklch(84% 0.155 38)",
+          "oklch(95% 0.126 38)"
+        ]
+      },
+      "primary-active": {
+        "role": "primary",
+        "displayName": "Pressed Orange",
+        "canonical": "#d04200",
+        "tonalRamp": [
+          "oklch(15% 0.089 38)",
+          "oklch(26% 0.114 38)",
+          "oklch(38% 0.139 38)",
+          "oklch(49% 0.164 38)",
+          "oklch(61% 0.186 38)",
+          "oklch(72% 0.161 38)",
+          "oklch(84% 0.136 38)",
+          "oklch(95% 0.111 38)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Lab Cream",
+        "canonical": "#f7f7f4",
+        "tonalRamp": [
+          "oklch(15% 0.002 106)",
+          "oklch(26% 0.002 106)",
+          "oklch(38% 0.003 106)",
+          "oklch(49% 0.003 106)",
+          "oklch(61% 0.004 106)",
+          "oklch(72% 0.003 106)",
+          "oklch(84% 0.003 106)",
+          "oklch(95% 0.002 106)"
+        ],
+        "dark": "#171612"
+      },
+      "canvas-soft": {
+        "role": "neutral",
+        "displayName": "Margin Cream",
+        "canonical": "#fafaf7",
+        "tonalRamp": [
+          "oklch(15% 0.002 106)",
+          "oklch(26% 0.002 106)",
+          "oklch(38% 0.003 106)",
+          "oklch(49% 0.003 106)",
+          "oklch(61% 0.004 106)",
+          "oklch(72% 0.003 106)",
+          "oklch(84% 0.003 106)",
+          "oklch(95% 0.002 106)"
+        ],
+        "dark": "#1e1d18"
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Sheet White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0.000 90)",
+          "oklch(26% 0.000 90)",
+          "oklch(38% 0.000 90)",
+          "oklch(49% 0.000 90)",
+          "oklch(61% 0.000 90)",
+          "oklch(72% 0.000 90)",
+          "oklch(84% 0.000 90)",
+          "oklch(95% 0.000 90)"
+        ],
+        "dark": "#201f1a"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "canonical": "#26251e",
+        "tonalRamp": [
+          "oklch(15% 0.006 101)",
+          "oklch(26% 0.008 101)",
+          "oklch(38% 0.009 101)",
+          "oklch(49% 0.011 101)",
+          "oklch(61% 0.013 101)",
+          "oklch(72% 0.011 101)",
+          "oklch(84% 0.009 101)",
+          "oklch(95% 0.008 101)"
+        ],
+        "dark": "#edece4"
+      },
+      "body": {
+        "role": "neutral",
+        "displayName": "Pencil",
+        "canonical": "#5a5852",
+        "tonalRamp": [
+          "oklch(15% 0.005 92)",
+          "oklch(26% 0.006 92)",
+          "oklch(38% 0.007 92)",
+          "oklch(49% 0.009 92)",
+          "oklch(61% 0.010 92)",
+          "oklch(72% 0.008 92)",
+          "oklch(84% 0.007 92)",
+          "oklch(95% 0.006 92)"
+        ],
+        "dark": "#b8b5ab"
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Faded Pencil",
+        "canonical": "#807d72",
+        "tonalRamp": [
+          "oklch(15% 0.008 94)",
+          "oklch(26% 0.010 94)",
+          "oklch(38% 0.012 94)",
+          "oklch(49% 0.015 94)",
+          "oklch(61% 0.017 94)",
+          "oklch(72% 0.014 94)",
+          "oklch(84% 0.012 94)",
+          "oklch(95% 0.010 94)"
+        ],
+        "dark": "#96938a"
+      },
+      "muted-soft": {
+        "role": "neutral",
+        "displayName": "Erased",
+        "canonical": "#a09c92",
+        "tonalRamp": [
+          "oklch(15% 0.007 89)",
+          "oklch(26% 0.009 89)",
+          "oklch(38% 0.011 89)",
+          "oklch(49% 0.013 89)",
+          "oklch(61% 0.015 89)",
+          "oklch(72% 0.013 89)",
+          "oklch(84% 0.011 89)",
+          "oklch(95% 0.009 89)"
+        ],
+        "dark": "#6f6c62"
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "#e6e5e0",
+        "tonalRamp": [
+          "oklch(15% 0.003 97)",
+          "oklch(26% 0.004 97)",
+          "oklch(38% 0.005 97)",
+          "oklch(49% 0.006 97)",
+          "oklch(61% 0.007 97)",
+          "oklch(72% 0.006 97)",
+          "oklch(84% 0.005 97)",
+          "oklch(95% 0.004 97)"
+        ],
+        "dark": "#2f2e28"
+      },
+      "hairline-soft": {
+        "role": "neutral",
+        "displayName": "Soft Rule",
+        "canonical": "#efeee8",
+        "tonalRamp": [
+          "oklch(15% 0.004 99)",
+          "oklch(26% 0.005 99)",
+          "oklch(38% 0.006 99)",
+          "oklch(49% 0.007 99)",
+          "oklch(61% 0.008 99)",
+          "oklch(72% 0.007 99)",
+          "oklch(84% 0.006 99)",
+          "oklch(95% 0.005 99)"
+        ],
+        "dark": "#292822"
+      },
+      "hairline-strong": {
+        "role": "neutral",
+        "displayName": "Strong Rule",
+        "canonical": "#cfcdc4",
+        "tonalRamp": [
+          "oklch(15% 0.006 96)",
+          "oklch(26% 0.008 96)",
+          "oklch(38% 0.009 96)",
+          "oklch(49% 0.011 96)",
+          "oklch(61% 0.012 96)",
+          "oklch(72% 0.011 96)",
+          "oklch(84% 0.009 96)",
+          "oklch(95% 0.007 96)"
+        ],
+        "dark": "#45433b"
+      },
+      "success": {
+        "role": "status",
+        "displayName": "Ledger Green",
+        "canonical": "#1f8a65",
+        "tonalRamp": [
+          "oklch(15% 0.052 164)",
+          "oklch(26% 0.067 164)",
+          "oklch(38% 0.082 164)",
+          "oklch(49% 0.096 164)",
+          "oklch(61% 0.109 164)",
+          "oklch(72% 0.095 164)",
+          "oklch(84% 0.080 164)",
+          "oklch(95% 0.065 164)"
+        ],
+        "dark": "#4cc29a"
+      },
+      "destructive": {
+        "role": "status",
+        "displayName": "Correction Red",
+        "canonical": "#cf2d56",
+        "tonalRamp": [
+          "oklch(15% 0.093 12)",
+          "oklch(26% 0.120 12)",
+          "oklch(38% 0.146 12)",
+          "oklch(49% 0.172 12)",
+          "oklch(61% 0.195 12)",
+          "oklch(72% 0.169 12)",
+          "oklch(84% 0.143 12)",
+          "oklch(95% 0.116 12)"
+        ],
+        "dark": "#f0708f"
+      },
+      "amber": {
+        "role": "status",
+        "displayName": "Ochre",
+        "canonical": "#c98a1b",
+        "tonalRamp": [
+          "oklch(15% 0.065 75)",
+          "oklch(26% 0.083 75)",
+          "oklch(38% 0.101 75)",
+          "oklch(49% 0.120 75)",
+          "oklch(61% 0.135 75)",
+          "oklch(72% 0.117 75)",
+          "oklch(84% 0.099 75)",
+          "oklch(95% 0.081 75)"
+        ],
+        "dark": "#e3b25a"
+      }
+    },
+    "typographyMeta": {
+      "display-lg": {
+        "displayName": "Display large",
+        "purpose": "Main heading of a home or landing view."
+      },
+      "display-sm": {
+        "displayName": "Display small",
+        "purpose": "Most page titles."
+      },
+      "title-md": {
+        "displayName": "Title",
+        "purpose": "Section headings and Stats figures."
+      },
+      "title-sm": {
+        "displayName": "Card title",
+        "purpose": "Headings inside cards."
+      },
+      "body-sm": {
+        "displayName": "Working body",
+        "purpose": "The app's working size: tables, forms, cards."
+      },
+      "body-md": {
+        "displayName": "Reading body",
+        "purpose": "Problem statements and longer prose."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Labels, table headers, hints."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Code, outputs and the wordmark prompt."
+      }
+    },
+    "shadows": [
+      {
+        "name": "rest",
+        "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "purpose": "shadow-xs: cards, tables and inputs, always with a ring or border."
+      },
+      {
+        "name": "ring",
+        "value": "0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent)",
+        "purpose": "The 1px ring that actually defines a resting surface."
+      },
+      {
+        "name": "float",
+        "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+        "purpose": "shadow-md: popovers, menus, dialogs, sheets."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state",
+        "value": "150ms ease (transition-colors)",
+        "purpose": "Hover and pressed colour changes."
+      },
+      {
+        "name": "quick",
+        "value": "100ms",
+        "purpose": "Small reveals such as menus and tooltips."
+      },
+      {
+        "name": "panel",
+        "value": "200ms linear",
+        "purpose": "Sidebar collapse and width changes."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "390px"
+      },
+      {
+        "name": "md",
+        "value": "768px",
+        "note": "sidebar becomes an icon rail"
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "note": "full sidebar"
+      },
+      {
+        "name": "desktop",
+        "value": "1440px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one main action of a view.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Save register</button>",
+      "css": ".ds-btn{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 18px;border-radius:var(--radius-md,8px);border:1px solid transparent;font-size:14px;font-weight:500;line-height:1;cursor:pointer;transition:background-color .15s,color .15s}.ds-btn:focus-visible{outline:2px solid var(--ring,#26251e);outline-offset:2px}.ds-btn-primary{background:var(--primary,#f54e00);color:#fff}.ds-btn-primary:hover,.ds-btn-primary:active{background:var(--primary-active,#d04200)}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The default for most actions.",
+      "html": "<button class=\"ds-btn ds-btn-outline\">Export CSV</button>",
+      "css": ".ds-btn{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 18px;border-radius:var(--radius-md,8px);border:1px solid transparent;font-size:14px;font-weight:500;line-height:1;cursor:pointer;transition:background-color .15s,color .15s}.ds-btn:focus-visible{outline:2px solid var(--ring,#26251e);outline-offset:2px}.ds-btn-outline{background:var(--card,#fff);color:var(--ink,#26251e);border-color:var(--hairline-strong,#cfcdc4)}.ds-btn-outline:hover{background:var(--hairline-soft,#efeee8)}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A strong action that isn't the main one: ink with cream text.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Publish</button>",
+      "css": ".ds-btn{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 18px;border-radius:var(--radius-md,8px);border:1px solid transparent;font-size:14px;font-weight:500;line-height:1;cursor:pointer;transition:background-color .15s,color .15s}.ds-btn:focus-visible{outline:2px solid var(--ring,#26251e);outline-offset:2px}.ds-btn-secondary{background:var(--ink,#26251e);color:var(--canvas,#f7f7f4)}.ds-btn-secondary:hover{opacity:.9}"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Delete, remove, revoke; always confirmed in an AlertDialog.",
+      "html": "<button class=\"ds-btn ds-btn-destructive\">Remove student</button>",
+      "css": ".ds-btn{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 18px;border-radius:var(--radius-md,8px);border:1px solid transparent;font-size:14px;font-weight:500;line-height:1;cursor:pointer;transition:background-color .15s,color .15s}.ds-btn:focus-visible{outline:2px solid var(--ring,#26251e);outline-offset:2px}.ds-btn-destructive{background:var(--card,#fff);color:var(--destructive,#cf2d56);border-color:color-mix(in srgb,var(--destructive,#cf2d56) 40%,transparent)}.ds-btn-destructive:hover{background:color-mix(in srgb,var(--destructive,#cf2d56) 10%,var(--card,#fff))}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "36px field with a strong hairline; ink border and soft ring on focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"Search by name or email\">",
+      "css": ".ds-input{font-family: Inter, ui-sans-serif, system-ui, sans-serif;height:36px;width:260px;padding:4px 10px;border:1px solid var(--hairline-strong,#cfcdc4);border-radius:var(--radius-md,8px);background:var(--card,#fff);color:var(--ink,#26251e);font-size:14px;outline:none;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:border-color .15s,box-shadow .15s}.ds-input::placeholder{color:var(--muted-soft,#a09c92)}.ds-input:focus-visible{border-color:var(--ink,#26251e);box-shadow:0 0 0 3px color-mix(in srgb,var(--ink,#26251e) 50%,transparent)}"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Short neutral states and counts.",
+      "html": "<span class=\"ds-badge\">Draft</span> <span class=\"ds-badge ds-badge-bad\">Late</span>",
+      "css": ".ds-badge{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:inline-flex;align-items:center;height:20px;padding:2px 8px;border-radius:9999px;background:var(--hairline,#e6e5e0);color:var(--ink,#26251e);font-size:12px;font-weight:500}.ds-badge-bad{background:color-mix(in srgb,var(--destructive,#cf2d56) 10%,transparent);color:var(--destructive,#cf2d56)}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White sheet on cream, defined by a ring, not a shadow.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Attendance today</div><p>Grade 10 · 3 registers still to take.</p></div>",
+      "css": ".ds-card{font-family: Inter, ui-sans-serif, system-ui, sans-serif;width:300px;padding:20px;border-radius:12px;background:var(--card,#fff);color:var(--body,#5a5852);font-size:14px;line-height:1.5;box-shadow:0 0 0 1px rgba(38,37,30,.1),0 1px 2px rgba(0,0,0,.05)}.ds-card-title{color:var(--ink,#26251e);font-size:16px;font-weight:600;margin-bottom:4px}.ds-card p{margin:0}"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Margin-cream sidebar; hover and the current page fill Soft Rule.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" aria-current=\"page\" href=\"#\">Students</a><a class=\"ds-nav-item\" href=\"#\">Attendance</a><a class=\"ds-nav-item\" href=\"#\">Exams</a></nav>",
+      "css": ".ds-nav{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:grid;gap:2px;width:220px;padding:8px;background:var(--canvas-soft,#fafaf7);border-right:1px solid var(--hairline,#e6e5e0)}.ds-nav-item{padding:8px;border-radius:8px;color:var(--ink,#26251e);font-size:14px;text-decoration:none}.ds-nav-item:hover{background:var(--hairline-soft,#efeee8)}.ds-nav-item[aria-current=page]{background:var(--hairline-soft,#efeee8);font-weight:500}.ds-nav-item:focus-visible{outline:2px solid var(--ring,#26251e);outline-offset:2px}"
+    },
+    {
+      "name": "Wordmark",
+      "kind": "custom",
+      "description": "Orange mono prompt, then the site name in ink.",
+      "html": "<span class=\"ds-brand\"><span class=\"ds-brand-mark\">&gt;&gt;&gt;</span>GretLab</span>",
+      "css": ".ds-brand{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:inline-flex;align-items:center;gap:10px;color:var(--ink,#26251e);font-size:16px;font-weight:600}.ds-brand-mark{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;color:var(--primary,#f54e00)}"
+    },
+    {
+      "name": "Stats Line",
+      "kind": "custom",
+      "description": "A list's figures in one hairline-ruled line, not tiles.",
+      "html": "<dl class=\"ds-stats\"><div><dt>Students</dt><dd>412</dd></div><div><dt>Present today</dt><dd class=\"good\">96%</dd></div><div><dt>Below 75%</dt><dd class=\"bad\">7</dd></div></dl>",
+      "css": ".ds-stats{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:flex;flex-wrap:wrap;gap:12px 32px;margin:0;padding:12px 0;border-top:1px solid var(--hairline,#e6e5e0);border-bottom:1px solid var(--hairline,#e6e5e0)}.ds-stats div{display:grid;gap:2px}.ds-stats dt{font-size:13px;color:var(--muted-foreground,#807d72)}.ds-stats dd{margin:0;font-size:18px;font-weight:600;color:var(--ink,#26251e);font-variant-numeric:tabular-nums}.ds-stats .good{color:var(--success,#1f8a65)}.ds-stats .bad{color:var(--destructive,#cf2d56)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lab Notebook",
+    "overview": "Gretlab looks like a well-kept notebook. The page is cream paper, ruled with hairlines rather than raised in layers. Writing is in warm ink. One orange marks the place to act: the primary button, the wordmark's `>>>` prompt, the first chart series. The same pages serve a principal reading the day's registers on a laptop and a parent checking attendance on a phone, so the system relies on clear rules and steady density, not decoration.\n\nIt's an Operate product almost everywhere: registers, gradebooks, marks entry, timetables, an editor. The design shows in exact things: tabular numbers that line up, a type scale with few steps used consistently, hairline tables, and status colours that mean one thing each. Expression stays small: the cream and ink warmth, the orange, and the mono prompt in the mark. Anything louder would compete with the data.\n\nThe look is decided. New work keeps this identity and improves layout, hierarchy and how data is shown inside it.",
+    "keyCharacteristics": [
+      "Warm cream canvas, white cards, warm near-black ink; never cool grey.",
+      "One orange accent, kept for the action and the brand mark.",
+      "Hairlines and rings define surfaces. Shadows are only for things that float.",
+      "Light-weight display type, semibold titles, small captions; tabular numbers in data.",
+      "Gently rounded (8px controls, 12px cards); pills only for badges and progress.",
+      "Light and dark themes from the same tokens: the warm hues inverted, the same orange."
+    ],
+    "rules": [
+      {
+        "name": "The One Orange Rule",
+        "body": "Orange marks where to act or who we are. A view has at most one orange button. Orange is never a status colour: it doesn't mean \"warning\" or \"late\".",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm Neutral Rule",
+        "body": "Every neutral comes from the cream–ink family. Don't bring in Tailwind's cool `gray`, `slate` or `zinc`, or pure black.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tokens Only Rule",
+        "body": "Colour comes from the tokens (`bg-canvas`, `text-body`, `border-hairline`), never from fixed values, so both themes work without extra code.",
+        "section": "colors"
+      },
+      {
+        "name": "The Scale Only Rule",
+        "body": "Sizes come from the named scale (`text-display-sm`, `text-body-sm`, `text-caption`), not Tailwind's `text-sm` or arbitrary pixels. A new size is a new token in `globals.css` and in `cn()`'s font-size list.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Any number that's compared with another (marks, percentages, counts, times) is set with `tabular-nums` so columns line up.",
+        "section": "typography"
+      },
+      {
+        "name": "The Only Floats Cast Shadows Rule",
+        "body": "If it stays in the page's flow, a hairline defines it. A shadow larger than `shadow-xs` means the element floats over the page and can be dismissed.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use the tokens (`bg-canvas`, `bg-card`, `text-ink`, `text-body`, `border-hairline`) so light and dark both work.",
+      "Do keep orange to one primary action per view and the brand mark.",
+      "Do separate surfaces with hairlines and a 1px ring; leave shadows to popovers, menus and dialogs.",
+      "Do set numbers that are compared with `tabular-nums`, and show percentages in tables as `PercentBar`s.",
+      "Do put a list's figures in one `Stats` line above it, each leading to the detail behind it.",
+      "Do use the named type scale and keep `text-body-sm` (14px) as the working size of app screens.",
+      "Do check new shadcn registry components in both themes; they sometimes arrive with forced colours."
+    ],
+    "donts": [
+      "Don't use Tailwind's cool greys (`gray`, `slate`, `zinc`) or pure black; neutrals are warm.",
+      "Don't use orange for warnings, lateness or any status; status is green, red or ochre.",
+      "Don't put a row of figure tiles above a list where one `Stats` line will do.",
+      "Don't give in-page surfaces shadows heavier than `shadow-xs`.",
+      "Don't use native `<button>`, `<input>`, `<select>`, `<textarea>` or hand-made popups; use the `packages/ui` components.",
+      "Don't use Tailwind's `text-sm`/`text-lg` or arbitrary pixel sizes where a named token exists.",
+      "Don't show the `>>>` prompt anywhere but the wordmark."
+    ]
+  }
+}
