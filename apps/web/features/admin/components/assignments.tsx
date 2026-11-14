@@ -69,20 +69,13 @@ import { FieldError, ProblemPicker, toLocalInput } from "./contests"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle, Stats, Table } from "./shell"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgAssignments, orgGradebook } from "@/features/orgs/content"
+import type { orgCourseOutcomes } from "@/features/outcomes/server"
+import type { orgRejudgeSystemErrors } from "@/features/orgs/content"
+import type { orgTemplateFromAssignment } from "@/features/templates/org"
 
-interface AssignmentRow {
-  id: string
-  slug: string
-  title: string
-  opensAt: string
-  dueAt: string
-  published: boolean
-  phase: AssignmentPhase
-  problemCount: number
-  totalPoints: number
-  /** Whether its editor opens for them; otherwise its title leads to the gradebook. */
-  canEdit: boolean
-}
+type AssignmentRow = ApiResult<typeof orgAssignments>[number]
 
 export function AdminAssignments() {
   const owner = useOwner()
@@ -580,9 +573,12 @@ function AssignmentEditor({
   })
   const asTemplate = useMutation({
     mutationFn: () =>
-      api<{ id: string }>(owner.api("/templates/from-assignment"), {
-        body: { assignmentId: id },
-      }),
+      api<ApiResult<typeof orgTemplateFromAssignment>>(
+        owner.api("/templates/from-assignment"),
+        {
+          body: { assignmentId: id },
+        }
+      ),
     onSuccess: (row) => router.push(owner.page(`/templates/${row.id}`)),
     onError: (error) => setMessage({ text: error.message, kind: "err" }),
   })
@@ -1036,67 +1032,8 @@ function AssignmentEditor({
   )
 }
 
-interface Gradebook {
-  /** What this person may do from here (each button only where it would be allowed). */
-  can: {
-    edit: boolean
-    rejudge: boolean
-    release: boolean
-    forgetAddresses: boolean
-    export: boolean
-    peer: boolean
-    sendGrades: boolean
-  }
-  assignment: {
-    id: string
-    slug: string
-    title: string
-    dueAt: string
-    phase: AssignmentPhase
-    holdFeedback: boolean
-    exam: ExamSettings | null
-    quiz: { questions: number; points: number } | null
-    projects: { id: string; title: string; points: number }[] | null
-  }
-  /** `points` is tests plus rubric. */
-  problems: {
-    problemId: string
-    slug: string
-    title: string
-    points: number
-    tests: number
-    rubric: RubricCriterion[]
-  }[]
-  total: number
-  summary: {
-    students: number
-    started: number
-    average: number
-    fullMarks: number
-  }
-  rows: {
-    name: string | null
-    email: string
-    handle: string | null
-    cells: { problemId: string; earned: number; status: GradeStatus }[]
-    earned: number
-    late: number
-    exam: (SittingView & { warnings: number }) | null
-    extension: { dueAt: string; problemIds: string[]; reason: string } | null
-    quiz: {
-      earned: number
-      max: number
-      answered: boolean
-      needsMarking: number
-    } | null
-    projects: {
-      earned: number
-      max: number
-      submitted: number
-      needsMarking: number
-    } | null
-  }[]
-}
+/** The JSON form of the gradebook (the same route also answers CSV). */
+type Gradebook = Exclude<ApiResult<typeof orgGradebook>, { filename: string }>
 
 export function AssignmentGradebook({ id }: { id: string }) {
   const owner = useOwner()
@@ -1112,9 +1049,12 @@ export function AssignmentGradebook({ id }: { id: string }) {
   const [rejudged, setRejudged] = useState<string | null>(null)
   const rejudge = useMutation({
     mutationFn: () =>
-      api<{ queued: number }>(owner.api(`/assignments/${id}/rejudge`), {
-        method: "POST",
-      }),
+      api<ApiResult<typeof orgRejudgeSystemErrors>>(
+        owner.api(`/assignments/${id}/rejudge`),
+        {
+          method: "POST",
+        }
+      ),
     onSuccess: ({ queued }) => {
       setRejudged(
         queued
@@ -1147,7 +1087,9 @@ export function AssignmentGradebook({ id }: { id: string }) {
   )
   const { students, started, fullMarks, average } = data.summary
   const notStarted = students - started
-  const averagePercent = data.total ? Math.round((100 * average) / data.total) : null
+  const averagePercent = data.total
+    ? Math.round((100 * average) / data.total)
+    : null
 
   return (
     <>
@@ -1238,7 +1180,9 @@ export function AssignmentGradebook({ id }: { id: string }) {
           {
             label: "Started",
             value: started,
-            hint: students ? `${Math.round((100 * started) / students)}%` : undefined,
+            hint: students
+              ? `${Math.round((100 * started) / students)}%`
+              : undefined,
           },
           {
             label: "Not started",
@@ -1925,13 +1869,7 @@ function RubricEditor({
   )
 }
 
-interface CourseOutcomeOption {
-  id: string
-  code: string
-  title: string
-  groupId: string
-  course: string
-}
+type CourseOutcomeOption = ApiResult<typeof orgCourseOutcomes>[number]
 
 /** Which course outcomes a problem assesses, chosen from every course in the organization. */
 function OutcomeTagger({
@@ -2053,7 +1991,11 @@ function ExtensionControl({
   name: string
   dueAt: string
   problems: { problemId: string; title: string }[]
-  extension: { dueAt: string; problemIds: string[]; reason: string } | null
+  extension: {
+    dueAt: string
+    problemIds: readonly string[]
+    reason: string
+  } | null
 }) {
   const owner = useOwner()
   const client = useQueryClient()
@@ -2064,7 +2006,9 @@ function ExtensionControl({
   const [until, setUntil] = useState(
     toLocalInput(extension?.dueAt ?? suggested.toISOString())
   )
-  const [chosen, setChosen] = useState<string[]>(extension?.problemIds ?? [])
+  const [chosen, setChosen] = useState<string[]>([
+    ...(extension?.problemIds ?? []),
+  ])
   const [reason, setReason] = useState(extension?.reason ?? "")
   const [message, setMessage] = useState<string | null>(null)
   const path = owner.api(`/assignments/${assignmentId}/extensions`)

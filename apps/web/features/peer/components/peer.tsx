@@ -20,6 +20,10 @@ import { useOwner } from "@/features/admin/owner"
 import { CommentedCode } from "@/features/feedback/components/commented-code"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import type { ApiResult } from "@/lib/api/types"
+import type { myPeerReview } from "@/features/peer/server"
+import type { getReviewTask } from "@/features/peer/server"
+import type { orgPeerOverview, orgStartPeerReview } from "@/features/peer/org"
 
 /*
  * Peer review: the teacher's panel in the gradebook (hand out reviews, read them, hide
@@ -51,28 +55,13 @@ export function PeerReviewPanel({ id }: { id: string }) {
   const { data, error } = useQuery({
     queryKey: key,
     queryFn: () =>
-      api<{
-        settings: Settings | null
-        started: boolean
-        canStart: boolean
-        dueAt: string
-        reviews: {
-          id: string
-          problem: string
-          reviewer: string
-          author: string
-          submitted: boolean
-          score: number | null
-          outOf: number
-          comment: string
-          lineComments: number
-          hidden: boolean
-        }[]
-      }>(owner.api(`/assignments/${id}/peer`)),
+      api<ApiResult<typeof orgPeerOverview>>(
+        owner.api(`/assignments/${id}/peer`)
+      ),
   })
   const start = useMutation({
     mutationFn: () =>
-      api<{ reviews: number; reviewers: number }>(
+      api<ApiResult<typeof orgStartPeerReview>>(
         owner.api(`/assignments/${id}/peer`),
         { body: {} }
       ),
@@ -202,20 +191,7 @@ export function PeerReviewPanel({ id }: { id: string }) {
   )
 }
 
-interface Mine {
-  settings: Settings | null
-  open: boolean
-  toDo: { id: string; problem: string; label: string; submitted: boolean }[]
-  received: {
-    id: string
-    problem: string
-    reviewer: string
-    criteria: Criterion[]
-    scores: Record<string, number>
-    comment: string
-    lineComments: LineNote[]
-  }[]
-}
+type Mine = ApiResult<typeof myPeerReview>
 
 export function StudentPeerReview({ slug }: { slug: string }) {
   const { data } = useQuery({
@@ -327,18 +303,9 @@ function ReviewDialog({
   const { data, error } = useQuery({
     queryKey: ["assignment", slug, "peer", reviewId],
     queryFn: () =>
-      api<{
-        problem: { title: string }
-        author: string
-        language: string | null
-        files: { path: string; content: string }[]
-        criteria: Criterion[]
-        scores: Record<string, number>
-        comment: string
-        lineComments: LineNote[]
-        submittedAt: string | null
-        open: boolean
-      }>(`/assignments/${slug}/peer/${reviewId}`),
+      api<ApiResult<typeof getReviewTask>>(
+        `/assignments/${slug}/peer/${reviewId}`
+      ),
   })
   return (
     <Dialog open onOpenChange={(o) => !o && onDone()}>

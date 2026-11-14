@@ -13,22 +13,10 @@ import { useOwner } from "@/features/admin/owner"
 
 import { ImportProblemsDialog } from "./problem-import"
 import { Loading, PageTitle, Table } from "./shell"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgProblems } from "@/features/orgs/content"
 
-export interface StaffProblemList {
-  units: { id: string; name: string; position: number }[]
-  problems: {
-    id: string
-    slug: string
-    title: string
-    level: string
-    position: number
-    unitId: string | null
-    published: boolean
-    /** false: written for assignments, exams or contests, not in the library. */
-    listed: boolean
-    testCount: number
-  }[]
-}
+export type StaffProblemList = ApiResult<typeof orgProblems>
 
 export function AdminProblems() {
   const owner = useOwner()
@@ -77,7 +65,11 @@ export function AdminProblems() {
       <PageTitle
         action={
           <span className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setImporting(true)}
+            >
               Import
             </Button>
             <Link

@@ -20,26 +20,22 @@ import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import type { attendanceOverview } from "@/features/attendance/server"
+import type {
+  attendanceGroups,
+  attendanceMonth,
+} from "@/features/attendance/server"
+import type {
+  courseAttendance,
+  getRegister,
+} from "@/features/attendance/server"
+import type {
+  attendanceSettings,
+  myCourseAttendance,
+} from "@/features/attendance/server"
 
-interface Groups {
-  levels: string[]
-  choosable: string[]
-  groups: { id: string; name: string; parentId: string | null }[]
-  today: string
-}
+type Groups = ApiResult<typeof attendanceGroups>
 
-interface Register {
-  courses?: { id: string; name: string; code: string }[]
-  canMark: boolean
-  taken: boolean
-  takenBy: string | null
-  students: {
-    id: string
-    name: string
-    status: AttendanceStatus | null
-    onLeave?: string | null
-  }[]
-}
+type Register = ApiResult<typeof getRegister>
 
 const STATUSES: { value: AttendanceStatus; label: string; short: string }[] = [
   { value: "present", label: "Present", short: "P" },
@@ -324,21 +320,7 @@ function RegisterSheet({
   )
 }
 
-interface Month {
-  columns: { id: string; day: string; period: string; kind: string }[]
-  students: {
-    id: string
-    name: string
-    marks: Record<string, AttendanceStatus>
-    summary: {
-      present: number
-      late: number
-      absent: number
-      excused: number
-      percent: number | null
-    }
-  }[]
-}
+type Month = ApiResult<typeof attendanceMonth>
 
 const SHORT: Record<AttendanceStatus, string> = {
   present: "P",
@@ -364,14 +346,18 @@ function MonthOverview({
 }) {
   const { data, error } = useQuery({
     queryKey: ["org", slug, "attendance", "overview", month],
-    queryFn: () => api<Overview>(`/orgs/${slug}/attendance/overview?month=${month}`),
+    queryFn: () =>
+      api<Overview>(`/orgs/${slug}/attendance/overview?month=${month}`),
   })
   if (!data) return <Loading error={error} />
   const taken = data.rows.filter((r) => r.days > 0)
   if (data.rows.length === 0)
-    return <p className="text-body-sm text-body">No classes to report on yet.</p>
+    return (
+      <p className="text-body-sm text-body">No classes to report on yet.</p>
+    )
   const rows = [...data.rows].sort(
-    (a, b) => (a.percent ?? 101) - (b.percent ?? 101) || a.path.localeCompare(b.path)
+    (a, b) =>
+      (a.percent ?? 101) - (b.percent ?? 101) || a.path.localeCompare(b.path)
   )
   const below = taken.reduce((n, r) => n + r.below, 0)
   const all = taken.filter((r) => r.percent !== null)
@@ -382,8 +368,15 @@ function MonthOverview({
     <div data-testid="attendance-overview">
       <Stats
         items={[
-          { label: "Classes with registers", value: taken.length, hint: `of ${data.rows.length}` },
-          { label: "Average attendance", value: average === null ? "—" : `${average}%` },
+          {
+            label: "Classes with registers",
+            value: taken.length,
+            hint: `of ${data.rows.length}`,
+          },
+          {
+            label: "Average attendance",
+            value: average === null ? "—" : `${average}%`,
+          },
           {
             label: `Students below ${data.minimum}%`,
             value: below,
@@ -391,7 +384,15 @@ function MonthOverview({
           },
         ]}
       />
-      <Table headers={["Class", "Days taken", "Present", `Below ${data.minimum}%`, ""]}>
+      <Table
+        headers={[
+          "Class",
+          "Days taken",
+          "Present",
+          `Below ${data.minimum}%`,
+          "",
+        ]}
+      >
         {rows.map((r) => (
           <tr key={r.id} data-testid="overview-row">
             <td className="text-ink">{r.path}</td>
@@ -399,7 +400,9 @@ function MonthOverview({
             <td>
               <PercentBar value={r.percent} low={data.minimum} />
             </td>
-            <td className={cn("tabular-nums", r.below > 0 && "text-destructive")}>
+            <td
+              className={cn("tabular-nums", r.below > 0 && "text-destructive")}
+            >
               {r.days ? r.below : "—"}
             </td>
             <td className="text-right">
@@ -539,27 +542,7 @@ export function AttendanceReport({ slug }: { slug: string }) {
 
 /* ---------- course-wise attendance ---------- */
 
-interface CourseData {
-  minPercent: number
-  span: { from: string; to: string; label: string }
-  courses: { id: string; name: string; code: string }[]
-  students: {
-    id: string
-    name: string
-    courses: Record<
-      string,
-      {
-        percent: number | null
-        attended: number
-        held: number
-        status: "eligible" | "at_risk" | "short" | "none"
-        toReach: number | null
-      }
-    >
-    short: number
-  }[]
-  shortStudents: number
-}
+type CourseData = ApiResult<typeof courseAttendance>
 
 const STATUS_TONE = {
   eligible: "",
@@ -579,7 +562,7 @@ function CourseReport({ slug, groupId }: { slug: string; groupId: string }) {
   const settings = useQuery({
     queryKey: ["org", slug, "attendance", "settings"],
     queryFn: () =>
-      api<{ minPercent: number; canEdit: boolean }>(
+      api<ApiResult<typeof attendanceSettings>>(
         `/orgs/${slug}/attendance/settings`
       ),
   })
@@ -697,19 +680,7 @@ export function MyCourseAttendance({ slug }: { slug: string }) {
   const { data } = useQuery({
     queryKey: ["org", slug, "attendance", "me"],
     queryFn: () =>
-      api<{
-        minPercent: number
-        span: { label: string }
-        courses: {
-          course: string
-          code: string
-          percent: number | null
-          attended: number
-          held: number
-          status: "eligible" | "at_risk" | "short" | "none"
-          toReach: number | null
-        }[]
-      }>(`/orgs/${slug}/attendance/me`),
+      api<ApiResult<typeof myCourseAttendance>>(`/orgs/${slug}/attendance/me`),
     retry: false,
   })
   if (!data || data.courses.length === 0) return null

@@ -1,6 +1,10 @@
 "use client"
 
-import { CalendarBlankIcon, MapPinIcon, VideoCameraIcon } from "@phosphor-icons/react"
+import {
+  CalendarBlankIcon,
+  MapPinIcon,
+  VideoCameraIcon,
+} from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { KindTerms } from "@workspace/judge"
 import Link from "next/link"
@@ -18,10 +22,23 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 import { ConfirmButton } from "@/components/confirm"
-import { Field, FormMessage, SelectInput, TextArea, TextInput } from "@/components/form"
-import { Card, Loading, PageTitle, Table } from "@/features/admin/components/shell"
+import {
+  Field,
+  FormMessage,
+  SelectInput,
+  TextArea,
+  TextInput,
+} from "@/components/form"
+import {
+  Card,
+  Loading,
+  PageTitle,
+  Table,
+} from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { listEvents } from "@/features/events/server"
 
 /*
  * Events: the organization's meetups, workshops and talks. Members say they're going (or
@@ -48,20 +65,19 @@ export interface EventView {
   canManage: boolean
 }
 
-interface List {
-  terms: KindTerms
-  noun: string
-  events: EventView[]
-  canCreate: boolean
-  audiences: { id: string | null; name: string }[]
-}
+type List = ApiResult<typeof listEvents>
 
 /** "Sat 21 Nov, 6:00 – 8:00 PM" in the viewer's own timezone. */
 export function eventWhen(e: { startsAt: string; endsAt: string }) {
   const s = new Date(e.startsAt)
   const end = new Date(e.endsAt)
-  const day = s.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })
-  const time = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  const day = s.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  })
+  const time = (d: Date) =>
+    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
   return s.toDateString() === end.toDateString()
     ? `${day}, ${time(s)} – ${time(end)}`
     : `${day}, ${time(s)} – ${end.toLocaleDateString(undefined, { day: "numeric", month: "short" })}, ${time(end)}`
@@ -77,13 +93,19 @@ function places(e: EventView) {
 export function MyAnswer({ e }: { e: EventView }) {
   if (e.mine === "going")
     return (
-      <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success" data-testid="my-rsvp">
+      <span
+        className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success"
+        data-testid="my-rsvp"
+      >
         Going
       </span>
     )
   if (e.mine === "waitlist")
     return (
-      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary-active" data-testid="my-rsvp">
+      <span
+        className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary-active"
+        data-testid="my-rsvp"
+      >
         Waitlist
       </span>
     )
@@ -102,9 +124,18 @@ export function EventCard({ slug, e }: { slug: string; e: EventView }) {
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className={cn("font-semibold text-ink", e.cancelled && "line-through")}>{e.title}</span>
+        <span
+          className={cn(
+            "font-semibold text-ink",
+            e.cancelled && "line-through"
+          )}
+        >
+          {e.title}
+        </span>
         {e.cancelled ? (
-          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">Cancelled</span>
+          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
+            Cancelled
+          </span>
         ) : (
           <MyAnswer e={e} />
         )}
@@ -139,7 +170,13 @@ export function EventsPage({ slug }: { slug: string }) {
   if (!data) return <Loading error={error} />
   return (
     <>
-      <PageTitle action={data.canCreate && <Button onClick={() => setCreating(true)}>New event</Button>}>
+      <PageTitle
+        action={
+          data.canCreate && (
+            <Button onClick={() => setCreating(true)}>New event</Button>
+          )
+        }
+      >
         Events
       </PageTitle>
       <div className="mb-4 flex gap-1" role="tablist" aria-label="Events">
@@ -160,17 +197,28 @@ export function EventsPage({ slug }: { slug: string }) {
         <Card>
           <p data-testid="no-events">
             {when === "upcoming" ? "Nothing coming up." : "No past events."}
-            {when === "upcoming" && data.canCreate && " Make the first one with New event."}
+            {when === "upcoming" &&
+              data.canCreate &&
+              " Make the first one with New event."}
           </p>
         </Card>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="events">
+        <div
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+          data-testid="events"
+        >
           {data.events.map((e) => (
             <EventCard key={e.id} slug={slug} e={e} />
           ))}
         </div>
       )}
-      {creating && <EventDialog slug={slug} audiences={data.audiences} onClose={() => setCreating(false)} />}
+      {creating && (
+        <EventDialog
+          slug={slug}
+          audiences={data.audiences}
+          onClose={() => setCreating(false)}
+        />
+      )}
     </>
   )
 }
@@ -178,7 +226,9 @@ export function EventsPage({ slug }: { slug: string }) {
 /** A Date as a datetime-local input's value, in the viewer's timezone. */
 const local = (iso: string) => {
   const d = new Date(iso)
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16)
 }
 
 function EventDialog({
@@ -201,24 +251,28 @@ function EventDialog({
     location: event?.location ?? "",
     link: event?.link ?? "",
     capacity: event?.capacity ? String(event.capacity) : "",
-    groupId: event?.group?.id ?? (audiences[0]?.id ?? ""),
+    groupId: event?.group?.id ?? audiences[0]?.id ?? "",
   })
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [k]: e.target.value }))
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) =>
+    setF((x) => ({ ...x, [k]: e.target.value }))
   const save = useMutation({
     mutationFn: () =>
-      api<EventView>(event ? `/orgs/${slug}/events/${event.id}` : `/orgs/${slug}/events`, {
-        method: event ? "PUT" : "POST",
-        body: {
-          title: f.title,
-          description: f.description,
-          startsAt: f.startsAt ? new Date(f.startsAt).toISOString() : "",
-          endsAt: f.endsAt ? new Date(f.endsAt).toISOString() : "",
-          location: f.location,
-          link: f.link,
-          capacity: f.capacity ? Number(f.capacity) : null,
-          groupId: f.groupId || null,
-        },
-      }),
+      api<EventView>(
+        event ? `/orgs/${slug}/events/${event.id}` : `/orgs/${slug}/events`,
+        {
+          method: event ? "PUT" : "POST",
+          body: {
+            title: f.title,
+            description: f.description,
+            startsAt: f.startsAt ? new Date(f.startsAt).toISOString() : "",
+            endsAt: f.endsAt ? new Date(f.endsAt).toISOString() : "",
+            location: f.location,
+            link: f.link,
+            capacity: f.capacity ? Number(f.capacity) : null,
+            groupId: f.groupId || null,
+          },
+        }
+      ),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["org", slug, "events"] })
       void client.invalidateQueries({ queryKey: ["org", slug, "event"] })
@@ -245,25 +299,51 @@ function EventDialog({
           }}
         >
           <Field label="Title">
-            <TextInput value={f.title} onChange={set("title")} placeholder="Intro to Rust: hands-on evening" />
+            <TextInput
+              value={f.title}
+              onChange={set("title")}
+              placeholder="Intro to Rust: hands-on evening"
+            />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Starts">
-              <TextInput type="datetime-local" value={f.startsAt} onChange={set("startsAt")} />
+              <TextInput
+                type="datetime-local"
+                value={f.startsAt}
+                onChange={set("startsAt")}
+              />
             </Field>
             <Field label="Ends">
-              <TextInput type="datetime-local" value={f.endsAt} onChange={set("endsAt")} />
+              <TextInput
+                type="datetime-local"
+                value={f.endsAt}
+                onChange={set("endsAt")}
+              />
             </Field>
           </div>
           <Field label="Place" help="Leave empty for online only.">
-            <TextInput value={f.location} onChange={set("location")} placeholder="Room 204, Main building" />
+            <TextInput
+              value={f.location}
+              onChange={set("location")}
+              placeholder="Room 204, Main building"
+            />
           </Field>
           <Field label="Online link" help="Only people going see it.">
-            <TextInput type="url" value={f.link} onChange={set("link")} placeholder="https://meet.example.com/…" />
+            <TextInput
+              type="url"
+              value={f.link}
+              onChange={set("link")}
+              placeholder="https://meet.example.com/…"
+            />
           </Field>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Places" help="Empty for no limit.">
-              <TextInput type="number" min={1} value={f.capacity} onChange={set("capacity")} />
+              <TextInput
+                type="number"
+                min={1}
+                value={f.capacity}
+                onChange={set("capacity")}
+              />
             </Field>
             {!event && (
               <Field label="For">
@@ -278,15 +358,25 @@ function EventDialog({
             )}
           </div>
           <Field label="About it">
-            <TextArea rows={3} value={f.description} onChange={set("description")} />
+            <TextArea
+              rows={3}
+              value={f.description}
+              onChange={set("description")}
+            />
           </Field>
         </form>
-        {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form="event-form" disabled={!f.title.trim() || save.isPending}>
+          <Button
+            type="submit"
+            form="event-form"
+            disabled={!f.title.trim() || save.isPending}
+          >
             {event ? "Save" : "Create event"}
           </Button>
         </DialogFooter>
@@ -295,15 +385,24 @@ function EventDialog({
   )
 }
 
-type Detail = EventView & { people: { name: string; email: string; status: "going" | "waitlist" }[] | null }
+type Detail = EventView & {
+  people: { name: string; email: string; status: "going" | "waitlist" }[] | null
+}
 
 export function EventPage({ slug, id }: { slug: string; id: string }) {
   const client = useQueryClient()
   const key = ["org", slug, "event", id]
-  const { data, error } = useQuery({ queryKey: key, queryFn: () => api<Detail>(`/orgs/${slug}/events/${id}`) })
+  const { data, error } = useQuery({
+    queryKey: key,
+    queryFn: () => api<Detail>(`/orgs/${slug}/events/${id}`),
+  })
   const [editing, setEditing] = useState(false)
   const answer = useMutation({
-    mutationFn: (going: boolean) => api<Detail>(`/orgs/${slug}/events/${id}/rsvp`, { method: "PUT", body: { going } }),
+    mutationFn: (going: boolean) =>
+      api<Detail>(`/orgs/${slug}/events/${id}/rsvp`, {
+        method: "PUT",
+        body: { going },
+      }),
     onSuccess: (next) => {
       client.setQueryData(key, next)
       void client.invalidateQueries({ queryKey: ["org", slug, "events"] })
@@ -320,13 +419,26 @@ export function EventPage({ slug, id }: { slug: string; id: string }) {
   return (
     <div className="grid max-w-3xl gap-4" data-testid="event-page">
       <div>
-        <Link href={orgPages(slug).events} className="text-body-sm text-primary hover:underline">
+        <Link
+          href={orgPages(slug).events}
+          className="text-body-sm text-primary hover:underline"
+        >
           All events
         </Link>
-        <h1 className={cn("mt-1 text-display-sm text-ink", data.cancelled && "line-through")}>{data.title}</h1>
+        <h1
+          className={cn(
+            "mt-1 text-display-sm text-ink",
+            data.cancelled && "line-through"
+          )}
+        >
+          {data.title}
+        </h1>
       </div>
       {data.cancelled && (
-        <p role="alert" className="rounded-md bg-destructive/10 p-3 text-body-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-md bg-destructive/10 p-3 text-body-sm text-destructive"
+        >
           This event was cancelled.
         </p>
       )}
@@ -342,14 +454,24 @@ export function EventPage({ slug, id }: { slug: string; id: string }) {
           </span>
         )}
         {data.online && (
-          <span className="flex items-center gap-2 text-ink" data-testid="event-link">
+          <span
+            className="flex items-center gap-2 text-ink"
+            data-testid="event-link"
+          >
             <VideoCameraIcon className="size-4" aria-hidden />
             {data.link ? (
-              <a href={data.link} target="_blank" rel="noreferrer" className="text-primary underline">
+              <a
+                href={data.link}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline"
+              >
                 Join online
               </a>
             ) : (
-              <span className="text-body">Online: the link shows once you&apos;re going</span>
+              <span className="text-body">
+                Online: the link shows once you&apos;re going
+              </span>
             )}
           </span>
         )}
@@ -357,7 +479,11 @@ export function EventPage({ slug, id }: { slug: string; id: string }) {
           {places(data)}
           {data.group && ` · For ${data.group.name}`}
         </span>
-        {data.description && <p className="whitespace-pre-wrap text-body-sm text-body">{data.description}</p>}
+        {data.description && (
+          <p className="text-body-sm whitespace-pre-wrap text-body">
+            {data.description}
+          </p>
+        )}
       </Card>
       {!data.cancelled && !over && (
         <div className="flex flex-wrap items-center gap-3">
@@ -369,27 +495,45 @@ export function EventPage({ slug, id }: { slug: string; id: string }) {
                   ? "You're on the waitlist: you'll be told if a place comes free."
                   : "You're going."}
               </span>
-              <Button variant="outline" disabled={answer.isPending} onClick={() => answer.mutate(false)}>
+              <Button
+                variant="outline"
+                disabled={answer.isPending}
+                onClick={() => answer.mutate(false)}
+              >
                 {data.mine === "waitlist" ? "Leave the waitlist" : "I can't go"}
               </Button>
             </>
           ) : (
-            <Button disabled={answer.isPending} onClick={() => answer.mutate(true)}>
+            <Button
+              disabled={answer.isPending}
+              onClick={() => answer.mutate(true)}
+            >
               {data.full ? "Join the waitlist" : "I'm going"}
             </Button>
           )}
         </div>
       )}
       {(answer.error ?? cancel.error) && (
-        <FormMessage message={{ text: (answer.error ?? cancel.error)!.message, kind: "err" }} />
+        <FormMessage
+          message={{
+            text: (answer.error ?? cancel.error)!.message,
+            kind: "err",
+          }}
+        />
       )}
       {data.canManage && (
         <section className="grid gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-title-md font-semibold text-ink">Who&apos;s coming</h2>
+            <h2 className="text-title-md font-semibold text-ink">
+              Who&apos;s coming
+            </h2>
             {!data.cancelled && !over && (
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditing(true)}
+                >
                   Change
                 </Button>
                 <ConfirmButton
@@ -421,7 +565,12 @@ export function EventPage({ slug, id }: { slug: string; id: string }) {
         </section>
       )}
       {editing && (
-        <EventDialog slug={slug} audiences={[]} event={data} onClose={() => setEditing(false)} />
+        <EventDialog
+          slug={slug}
+          audiences={[]}
+          event={data}
+          onClose={() => setEditing(false)}
+        />
       )}
     </div>
   )

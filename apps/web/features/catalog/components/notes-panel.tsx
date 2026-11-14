@@ -8,6 +8,8 @@ import { useEffect, useRef, useState } from "react"
 
 import { useQuestionSession } from "@/features/lab/hooks/use-question-session"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { getNote } from "@/features/catalog/server"
 
 const SAVE_DELAY_MS = 800
 
@@ -17,7 +19,8 @@ export function NotesPanel() {
   const pathname = usePathname()
   const { data } = useQuery({
     queryKey: ["note", question.id],
-    queryFn: () => api<{ text: string }>(`/problems/${question.id}/note`),
+    queryFn: () =>
+      api<ApiResult<typeof getNote>>(`/problems/${question.id}/note`),
     enabled: Boolean(viewer?.user),
   })
   const [text, setText] = useState<string | null>(null)

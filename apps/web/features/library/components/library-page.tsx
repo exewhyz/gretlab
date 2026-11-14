@@ -34,6 +34,9 @@ import { Loading, PageTitle, Table } from "@/features/admin/components/shell"
 import { useOwner } from "@/features/admin/owner"
 import { KIND_LABEL } from "@/features/questions/components/question-editor"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgLibrary } from "@/features/library/org"
+import type { orgCopyToLibrary } from "@/features/library/org"
 
 type Kind = "problem" | "question"
 type Source = "ours" | "platform" | "shared"
@@ -64,11 +67,7 @@ interface LibraryQuestion extends Base {
   tags: string[]
   marksItself: boolean
 }
-interface Library {
-  collections: { id: string; name: string; description: string; size: number }[]
-  problems: LibraryProblem[]
-  questions: LibraryQuestion[]
-}
+type Library = ApiResult<typeof orgLibrary>
 
 const SOURCE_LABEL: Record<Source, string> = {
   ours: "Ours",
@@ -160,7 +159,7 @@ export function LibraryPage() {
   })
   const copy = useMutation({
     mutationFn: () =>
-      api<{ created: { title: string }[] }>(owner.api("/library/copy"), {
+      api<ApiResult<typeof orgCopyToLibrary>>(owner.api("/library/copy"), {
         body: { items: refs },
       }),
     onSuccess: (r) => {

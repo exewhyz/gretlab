@@ -195,7 +195,7 @@ export async function buildDetail(
     constraints: problem.constraints,
     samples: tests
       .filter((test) => test.isSample)
-      .map((test) => [test.input, test.expected]),
+      .map((test): [string, string] => [test.input, test.expected]),
     hiddenTestCount: tests.filter((test) => !test.isSample).length,
     allowedLanguages: problem.allowedLanguages,
     hasSolution:
@@ -278,7 +278,9 @@ export async function listProblemsForStaff(
     db
       .select()
       .from(problems)
-      .where(picker ? usableBy(problems, "problem", orgId, userId) : ownedBy(orgId))
+      .where(
+        picker ? usableBy(problems, "problem", orgId, userId) : ownedBy(orgId)
+      )
       .orderBy(asc(problems.position), asc(problems.slug)),
     db.select().from(units).orderBy(asc(units.position)),
     db
@@ -347,7 +349,9 @@ export async function saveProblem(
         }
       : id
         ? {}
-        : { sharing: fields.listed ? ("everyone" as const) : ("owner" as const) }),
+        : {
+            sharing: fields.listed ? ("everyone" as const) : ("owner" as const),
+          }),
   }
   const saved = await getDb().transaction(async (tx) => {
     const [row] = id
@@ -490,11 +494,18 @@ export async function setUnitProblems(
         .where(and(inArray(problems.id, wanted), isNull(problems.orgId)))
     : []
   if (platform.length !== wanted.length) {
-    throw new ApiError(400, "unknown_problem", "Only the platform's problems go in units.")
+    throw new ApiError(
+      400,
+      "unknown_problem",
+      "Only the platform's problems go in units."
+    )
   }
-  const targets = [...new Set(Object.values(moves).filter((u): u is string => Boolean(u)))]
+  const targets = [
+    ...new Set(Object.values(moves).filter((u): u is string => Boolean(u))),
+  ]
   for (const target of targets) {
-    if (target === id) throw new ApiError(400, "bad_target", "Pick a different unit.")
+    if (target === id)
+      throw new ApiError(400, "bad_target", "Pick a different unit.")
     await unitOrThrow(target)
   }
   const current = await db
@@ -533,10 +544,14 @@ export async function setUnitProblems(
 /** Deletes a unit; its problems move to another unit, or to none. */
 export async function deleteUnit(id: string, moveTo: string | null) {
   await unitOrThrow(id)
-  if (moveTo === id) throw new ApiError(400, "bad_target", "Pick a different unit.")
+  if (moveTo === id)
+    throw new ApiError(400, "bad_target", "Pick a different unit.")
   if (moveTo) await unitOrThrow(moveTo)
   await getDb().transaction(async (tx) => {
-    await tx.update(problems).set({ unitId: moveTo }).where(eq(problems.unitId, id))
+    await tx
+      .update(problems)
+      .set({ unitId: moveTo })
+      .where(eq(problems.unitId, id))
     await tx.delete(units).where(eq(units.id, id))
   })
   refreshCatalog()
@@ -604,9 +619,7 @@ export async function importProblems(
       await getDb()
         .select({ slug: problems.slug })
         .from(problems)
-        .where(
-          or(...wanted.map((s) => sql.like(problems.slug, `${s}%`)))
-        )
+        .where(or(...wanted.map((s) => sql.like(problems.slug, `${s}%`))))
     ).map((r) => r.slug)
   )
   const inputs = found.map((p, index) => {
@@ -618,7 +631,11 @@ export async function importProblems(
       return toProblemInput(p, slug, options)
     } catch (error) {
       const issue = error instanceof Error ? error.message : "invalid"
-      throw new ApiError(400, "invalid_file", `Problem ${index + 1} (${p.title}): ${issue}`)
+      throw new ApiError(
+        400,
+        "invalid_file",
+        `Problem ${index + 1} (${p.title}): ${issue}`
+      )
     }
   })
   const created: { id: string; title: string; slug: string }[] = []

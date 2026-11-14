@@ -18,6 +18,8 @@ import { Input } from "@workspace/ui/components/input"
 import { FormMessage } from "@/components/form"
 import { useOwner } from "@/features/admin/owner"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgImportQuestions } from "@/features/orgs/content"
 
 export interface ImportedQuestion {
   id: string
@@ -40,7 +42,10 @@ export function ImportQuestionsDialog({
   const [file, setFile] = useState<File | null>(null)
   const [published, setPublished] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<{ text: string; kind: "ok" | "err" } | null>(null)
+  const [message, setMessage] = useState<{
+    text: string
+    kind: "ok" | "err"
+  } | null>(null)
 
   async function upload() {
     if (!file) return
@@ -53,7 +58,7 @@ export function ImportQuestionsDialog({
       } catch {
         throw new Error("That file isn't valid JSON. Start from the template.")
       }
-      const { created } = await api<{ created: ImportedQuestion[] }>(
+      const { created } = await api<ApiResult<typeof orgImportQuestions>>(
         owner.api("/questions/import"),
         { body: { file: parsed, published } }
       )
@@ -64,7 +69,10 @@ export function ImportQuestionsDialog({
       })
       onImported?.(created)
     } catch (e) {
-      setMessage({ text: e instanceof Error ? e.message : "Import failed.", kind: "err" })
+      setMessage({
+        text: e instanceof Error ? e.message : "Import failed.",
+        kind: "err",
+      })
     } finally {
       setBusy(false)
     }
@@ -76,8 +84,9 @@ export function ImportQuestionsDialog({
         <DialogHeader>
           <DialogTitle>Import questions</DialogTitle>
           <DialogDescription>
-            A JSON file of questions: choice, short and written answers, with their right
-            answers and explanations. They go into your question bank.{" "}
+            A JSON file of questions: choice, short and written answers, with
+            their right answers and explanations. They go into your question
+            bank.{" "}
             <a href="/question-template.json" download className="underline">
               Download the template
             </a>

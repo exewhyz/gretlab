@@ -20,6 +20,15 @@ import { SignupLink } from "@/features/orgs/components/signup"
 import { api } from "@/lib/api/client"
 import { formatDate, formatDateTime } from "@/lib/format"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type {
+  getInvite,
+  getOrganization,
+  listDirectory,
+  myOrganizations,
+} from "@/features/orgs/server"
+import type { orgFeed } from "@/features/orgs/content"
+import type { classesToRate } from "@/features/teaching/server"
 
 export type { OrgType } from "@workspace/judge"
 
@@ -28,42 +37,11 @@ export const ORG_TYPE = Object.fromEntries(
   ORG_TYPES.map((t) => [t, ORG_TYPE_CONFIG[t].label])
 ) as Record<OrgType, string>
 
-interface MyOrg {
-  slug: string
-  name: string
-  type: OrgType
-  status: "active" | "pending"
-  roles: string[]
-  canManage: boolean
-}
+type MyOrg = ApiResult<typeof myOrganizations>[number]
 
-interface DirectoryOrg {
-  slug: string
-  name: string
-  type: OrgType
-  description: string
-  joinPolicy: "open" | "approval" | "invite"
-  members: number
-}
+type DirectoryOrg = ApiResult<typeof listDirectory>[number]
 
-interface OrgProfile {
-  slug: string
-  name: string
-  type: OrgType
-  description: string
-  website: string | null
-  groupLevels: string[]
-  members: number
-  joinOption: "join" | "request" | "invite_only" | "closed"
-  membership: {
-    status: "active" | "pending"
-    shareProgress: boolean
-    roles: string[]
-  } | null
-  canManage: boolean
-  admissionsOpen?: boolean
-  pendingApproval?: boolean
-}
+type OrgProfile = ApiResult<typeof getOrganization>
 
 function TypeBadge({ type }: { type: OrgType }) {
   return (
@@ -425,8 +403,8 @@ export function OrgProfileView({ slug }: { slug: string }) {
           className="mt-4 rounded-xl border border-hairline bg-card p-4 text-body-sm text-ink"
           data-testid="pending-approval"
         >
-          {data.name} is waiting for the platform&apos;s approval. You&apos;ll get a
-          notification when it&apos;s ready to use.
+          {data.name} is waiting for the platform&apos;s approval. You&apos;ll
+          get a notification when it&apos;s ready to use.
         </p>
       )}
       {data.admissionsOpen && member?.status !== "active" && (
@@ -448,18 +426,7 @@ export function OrgProfileView({ slug }: { slug: string }) {
   )
 }
 
-interface Feed {
-  notices: { id: string; text: string; createdAt: string }[]
-  assignments: {
-    slug: string
-    title: string
-    dueAt: string
-    phase: string
-    earned: number
-    total: number
-  }[]
-  contests: { slug: string; title: string; phase: string; startsAt: string }[]
-}
+type Feed = ApiResult<typeof orgFeed>
 
 /** What a member has from this organization: notices, assignments and contests. */
 function OrgFeed({ slug }: { slug: string }) {
@@ -565,13 +532,7 @@ function OrgFeed({ slug }: { slug: string }) {
   )
 }
 
-interface InviteView {
-  org: { slug: string; name: string; type: OrgType; description: string }
-  role: string
-  group: string | null
-  forEmail: string | null
-  problem: string | null
-}
+type InviteView = ApiResult<typeof getInvite>
 
 export function JoinInvite({ token }: { token: string }) {
   const router = useRouter()
@@ -654,13 +615,7 @@ export function JoinInvite({ token }: { token: string }) {
   )
 }
 
-interface ClassToRate {
-  id: string
-  day: string
-  group: string
-  teacher: string
-  minutes: number
-}
+type ClassToRate = ApiResult<typeof classesToRate>[number]
 
 /** Students rate their recent classes: 1 to 5 stars and an optional comment, once each. */
 function RateClasses({ slug }: { slug: string }) {

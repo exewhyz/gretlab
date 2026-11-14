@@ -27,6 +27,9 @@ import type { ApiResult } from "@/lib/api/types"
 import type { orgReport } from "@/features/teaching/server"
 import { formatDate, formatDateTime } from "@/lib/format"
 import { orgPages } from "@/lib/paths"
+import type { getGroupTeaching } from "@/features/teaching/server"
+import type { teacherHome } from "@/features/teaching/server"
+import type { classAttendance } from "@/features/classes/server"
 
 interface Progress {
   total: number
@@ -70,33 +73,7 @@ function ProgressBar({ progress }: { progress: Progress }) {
 
 /* ---------- teacher home ---------- */
 
-interface Home {
-  today: string
-  orgs: {
-    slug: string
-    name: string
-    type: string
-    myClassesThisWeek: number
-    can: {
-      assignments: boolean
-      contests: boolean
-      grades: boolean
-      reports: boolean
-    }
-    dueSoon: { id: string; slug: string; title: string; dueAt: string }[]
-    groups: {
-      id: string
-      name: string
-      parentId: string | null
-      level: string | null
-      path: string
-      members: number
-      progress: Progress
-      classesThisWeek: number
-      canLog: boolean
-    }[]
-  }[]
-}
+type Home = ApiResult<typeof teacherHome>
 
 export function TeacherHome() {
   const { data, error } = useQuery({
@@ -142,7 +119,9 @@ export function TeacherHome() {
             {dueSoon.slice(0, 6).map((a) => (
               <Link
                 key={a.id}
-                href={orgPages(a.org.slug).manage(`/assignments/${a.id}/grades`)}
+                href={orgPages(a.org.slug).manage(
+                  `/assignments/${a.id}/grades`
+                )}
                 className="flex items-baseline justify-between gap-3 text-body-sm hover:underline"
               >
                 <span className="truncate text-ink">{a.title}</span>
@@ -347,23 +326,7 @@ function ClassTree({
 
 /* ---------- one group: syllabus and classes ---------- */
 
-interface GroupTeaching {
-  group: string
-  canEdit: boolean
-  today: string
-  topics: { id: string; title: string; plannedFor: string | null }[]
-  progress: Progress
-  sessions: {
-    id: string
-    day: string
-    minutes: number
-    topics: string[]
-    note: string
-    teacher: string
-    mine: boolean
-    rating: { average: number; count: number; comments: string[] } | null
-  }[]
-}
+type GroupTeaching = ApiResult<typeof getGroupTeaching>
 
 const newId = () => Math.random().toString(36).slice(2, 10)
 
@@ -572,7 +535,7 @@ function LogClass({
   const roster = useQuery({
     queryKey: ["org", slug, "class", groupId, "attendance"],
     queryFn: () =>
-      api<{ students: { id: string; name: string; email: string }[] }>(
+      api<ApiResult<typeof classAttendance>>(
         `/orgs/${slug}/classes/${groupId}/attendance`
       ),
   })
@@ -981,7 +944,10 @@ export function OrgReports({
               aria-pressed={!onlyInactive}
               onClick={() => setOnlyInactive(false)}
             >
-              Everyone <span className="tabular-nums opacity-70">{data.students.length}</span>
+              Everyone{" "}
+              <span className="tabular-nums opacity-70">
+                {data.students.length}
+              </span>
             </Button>
             <Button
               size="sm"
@@ -989,7 +955,8 @@ export function OrgReports({
               aria-pressed={onlyInactive}
               onClick={() => setOnlyInactive(true)}
             >
-              No work this week <span className="tabular-nums opacity-70">{inactive}</span>
+              No work this week{" "}
+              <span className="tabular-nums opacity-70">{inactive}</span>
             </Button>
           </div>
         )}

@@ -15,13 +15,10 @@ import {
 
 import { useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { getMembership } from "@/features/catalog/server"
 
-interface Membership {
-  slug: string
-  title: string
-  kind: "favorites" | "custom" | "study_plan"
-  contains: boolean
-}
+type Membership = ApiResult<typeof getMembership>[number]
 
 /** Save to favorites or any of the student's lists, as on the problem pages of LeetCode. */
 export function SaveMenu({ problemSlug }: { problemSlug: string }) {

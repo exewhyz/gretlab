@@ -18,20 +18,19 @@ import { cn } from "@workspace/ui/lib/utils"
 import { Field, FormMessage, TextArea } from "@/components/form"
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { classWarnings } from "@/features/classes/warnings"
 
-interface Warnings {
-  total: number
-  students: {
-    id: string
-    name: string
-    email: string
-    level: "risk" | "watch"
-    reasons: string[]
-  }[]
-}
+type Warnings = ApiResult<typeof classWarnings>
 
 /** Early warnings: students who need attention in this class, and a note to them. */
-export function NeedsAttention({ slug, groupId }: { slug: string; groupId: string }) {
+export function NeedsAttention({
+  slug,
+  groupId,
+}: {
+  slug: string
+  groupId: string
+}) {
   const base = `/orgs/${slug}/classes/${groupId}`
   const { data, error } = useQuery({
     queryKey: ["org", slug, "class", groupId, "warnings"],
@@ -43,7 +42,10 @@ export function NeedsAttention({ slug, groupId }: { slug: string; groupId: strin
   if (!data) return <Loading error={error} />
   const risk = data.students.filter((s) => s.level === "risk").length
   return (
-    <section className="grid gap-2 rounded-lg border border-hairline bg-card p-3" data-testid="needs-attention">
+    <section
+      className="grid gap-2 rounded-lg border border-hairline bg-card p-3"
+      data-testid="needs-attention"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-ink">Needs attention</h2>
@@ -54,7 +56,12 @@ export function NeedsAttention({ slug, groupId }: { slug: string; groupId: strin
           </p>
         </div>
         {data.students.length > 0 && (
-          <Button size="sm" variant="outline" disabled={picked.size === 0} onClick={() => setWriting(true)}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={picked.size === 0}
+            onClick={() => setWriting(true)}
+          >
             Send a note{picked.size > 0 && ` (${picked.size})`}
           </Button>
         )}
@@ -83,13 +90,17 @@ export function NeedsAttention({ slug, groupId }: { slug: string; groupId: strin
               <span
                 className={cn(
                   "rounded-full px-2 py-0.5 text-xs font-medium",
-                  s.level === "risk" ? "bg-destructive/10 text-destructive" : "bg-muted text-ink"
+                  s.level === "risk"
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-muted text-ink"
                 )}
               >
                 {s.level === "risk" ? "At risk" : "Watch"}
               </span>
               <span className="min-w-40 text-body-sm text-ink">{s.name}</span>
-              <span className="flex-1 text-caption">{s.reasons.join(" · ")}</span>
+              <span className="flex-1 text-caption">
+                {s.reasons.join(" · ")}
+              </span>
             </li>
           ))}
         </ul>
@@ -97,7 +108,9 @@ export function NeedsAttention({ slug, groupId }: { slug: string; groupId: strin
       {writing && (
         <NoteDialog
           base={base}
-          names={data.students.filter((s) => picked.has(s.id)).map((s) => s.name)}
+          names={data.students
+            .filter((s) => picked.has(s.id))
+            .map((s) => s.name)}
           userIds={[...picked]}
           onDone={(message) => {
             setWriting(false)
@@ -125,17 +138,24 @@ function NoteDialog({
 }) {
   const [message, setMessage] = useState("")
   const send = useMutation({
-    mutationFn: () => api<{ sent: number }>(`${base}/notes`, { body: { userIds, message } }),
-    onSuccess: (r) => onDone(`Note sent to ${r.sent} ${r.sent === 1 ? "student" : "students"}.`),
+    mutationFn: () =>
+      api<{ sent: number }>(`${base}/notes`, { body: { userIds, message } }),
+    onSuccess: (r) =>
+      onDone(
+        `Note sent to ${r.sent} ${r.sent === 1 ? "student" : "students"}.`
+      ),
   })
   return (
     <Dialog open onOpenChange={(open) => !open && onDone()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>A note to {names.length === 1 ? names[0] : `${names.length} students`}</DialogTitle>
+          <DialogTitle>
+            A note to{" "}
+            {names.length === 1 ? names[0] : `${names.length} students`}
+          </DialogTitle>
           <DialogDescription>
-            It goes to their notifications (and email, if they get it), from you. Each sees only
-            their own copy.
+            It goes to their notifications (and email, if they get it), from
+            you. Each sees only their own copy.
           </DialogDescription>
         </DialogHeader>
         <Field label="Note">
@@ -147,12 +167,17 @@ function NoteDialog({
             onChange={(e) => setMessage(e.target.value)}
           />
         </Field>
-        {send.error && <FormMessage message={{ text: send.error.message, kind: "err" }} />}
+        {send.error && (
+          <FormMessage message={{ text: send.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onDone()}>
             Cancel
           </Button>
-          <Button disabled={!message.trim() || send.isPending} onClick={() => send.mutate()}>
+          <Button
+            disabled={!message.trim() || send.isPending}
+            onClick={() => send.mutate()}
+          >
             Send note
           </Button>
         </DialogFooter>

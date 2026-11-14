@@ -4,13 +4,18 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
 import { Checkbox } from "@workspace/ui/components/checkbox"
-import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group"
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@workspace/ui/components/radio-group"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { ConfirmButton } from "@/components/confirm"
 import { TextInput } from "@/components/form"
 import { Markdown } from "@/components/markdown"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { answerContestQuestion } from "@/features/contests/server"
 
 export interface ContestQuestion {
   id: string
@@ -21,7 +26,11 @@ export interface ContestQuestion {
   options: { id: string; text: string }[]
   points: number
   answer: { value: string[] | string; correct: boolean } | null
-  solution: { correct: string[]; accepted: string[]; explanation: string } | null
+  solution: {
+    correct: string[]
+    accepted: string[]
+    explanation: string
+  } | null
 }
 
 /** A contest's questions: one answer each, marked at once; right answers after it ends. */
@@ -39,7 +48,8 @@ export function ContestQuestions({
     <section className="mt-6 grid gap-3" data-testid="contest-questions">
       <h2 className="text-title-sm text-ink">Questions</h2>
       <p className="text-caption">
-        One answer each, marked at once. A right answer counts like a solved problem.
+        One answer each, marked at once. A right answer counts like a solved
+        problem.
       </p>
       {questions.map((q) => (
         <QuestionCard key={q.id} slug={slug} q={q} canAnswer={canAnswer} />
@@ -64,9 +74,12 @@ function QuestionCard({
   const [error, setError] = useState<string | null>(null)
   const answer = useMutation({
     mutationFn: () =>
-      api<{ correct: boolean }>(`/contests/${slug}/questions/${q.id}`, {
-        body: { answer: value },
-      }),
+      api<ApiResult<typeof answerContestQuestion>>(
+        `/contests/${slug}/questions/${q.id}`,
+        {
+          body: { answer: value },
+        }
+      ),
     onSuccess: () =>
       client.invalidateQueries({
         predicate: (query) => query.queryKey.includes(slug),
@@ -91,11 +104,15 @@ function QuestionCard({
           {q.label}. {q.title}
         </span>
         <span className="text-caption">
-          {q.answer
-            ? q.answer.correct
-              ? <span className="text-success">Right · {q.points} pts</span>
-              : <span className="text-destructive">Wrong</span>
-            : `${q.points} pts`}
+          {q.answer ? (
+            q.answer.correct ? (
+              <span className="text-success">Right · {q.points} pts</span>
+            ) : (
+              <span className="text-destructive">Wrong</span>
+            )
+          ) : (
+            `${q.points} pts`
+          )}
         </span>
       </div>
       <Markdown text={q.prompt} />
@@ -122,7 +139,11 @@ function QuestionCard({
                 checked={chosen.includes(o.id)}
                 disabled={locked}
                 onCheckedChange={(checked) =>
-                  setValue(checked ? [...chosen, o.id] : chosen.filter((x) => x !== o.id))
+                  setValue(
+                    checked
+                      ? [...chosen, o.id]
+                      : chosen.filter((x) => x !== o.id)
+                  )
                 }
               />
               {o.text}
@@ -154,7 +175,9 @@ function QuestionCard({
       )}
       {error && <p className="text-caption text-destructive">{error}</p>}
       {q.solution?.accepted.length ? (
-        <p className="text-caption">Accepted: {q.solution.accepted.join(" · ")}</p>
+        <p className="text-caption">
+          Accepted: {q.solution.accepted.join(" · ")}
+        </p>
       ) : null}
       {q.solution?.explanation && (
         <div className="rounded-md bg-canvas-soft p-2 text-body-sm">
@@ -164,4 +187,3 @@ function QuestionCard({
     </div>
   )
 }
-

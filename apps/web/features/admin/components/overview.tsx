@@ -44,37 +44,10 @@ import { useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
 
 import { Loading, PageTitle } from "./shell"
+import type { ApiResult } from "@/lib/api/types"
+import type { getOverview } from "@/features/admin/server"
 
-interface Overview {
-  users: number
-  problems: number
-  contests: number
-  newUsers7d: number
-  organizations: {
-    total: number
-    active: number
-    pending: {
-      id: string
-      name: string
-      slug: string
-      type: string
-      createdAt: string
-    }[]
-  }
-  submissionsByDay: { day: string; total: number }[]
-  queue: {
-    queued: number
-    running: number
-    oldestQueuedSeconds: number
-    finishedLast5Min: number
-    waitP50Seconds: number
-    waitP95Seconds: number
-    runners: { id: string; host: string; slots: number; busy: number }[]
-    slots: number
-    busySlots: number
-  }
-  verdictsLast24h: { verdict: string; total: number }[]
-}
+type Overview = ApiResult<typeof getOverview>
 
 const STUCK_AFTER_SECONDS = 60
 
@@ -154,11 +127,31 @@ export function AdminOverview() {
   const manageOrgs = held.includes("platform.orgs.manage")
   // Each shortcut only for those whose role opens its page.
   const actions = [
-    { href: "/admin/problems/new", label: "New problem", needs: "platform.library.create" },
-    { href: "/admin/assignments/new", label: "New assignment", needs: "platform.work.create" },
-    { href: "/admin/contests/new", label: "New contest", needs: "platform.work.create" },
-    { href: "/admin/daily", label: "Schedule daily challenge", needs: "platform.library.manage" },
-    { href: "/admin/notes", label: "Post a notice", needs: "platform.library.manage" },
+    {
+      href: "/admin/problems/new",
+      label: "New problem",
+      needs: "platform.library.create",
+    },
+    {
+      href: "/admin/assignments/new",
+      label: "New assignment",
+      needs: "platform.work.create",
+    },
+    {
+      href: "/admin/contests/new",
+      label: "New contest",
+      needs: "platform.work.create",
+    },
+    {
+      href: "/admin/daily",
+      label: "Schedule daily challenge",
+      needs: "platform.library.manage",
+    },
+    {
+      href: "/admin/notes",
+      label: "Post a notice",
+      needs: "platform.library.manage",
+    },
   ].filter((a) => held.includes(a.needs))
   const alerts: {
     tone: "bad" | "plain"
@@ -275,13 +268,17 @@ export function AdminOverview() {
         <Tile
           label="Problems"
           value={data.problems}
-          href={held.includes("platform.library.edit") ? "/admin/problems" : null}
+          href={
+            held.includes("platform.library.edit") ? "/admin/problems" : null
+          }
           icon={CodeIcon}
         />
         <Tile
           label="Contests"
           value={data.contests}
-          href={held.includes("platform.work.manage") ? "/admin/contests" : null}
+          href={
+            held.includes("platform.work.manage") ? "/admin/contests" : null
+          }
           icon={TrophyIcon}
         />
       </div>

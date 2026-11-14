@@ -11,25 +11,17 @@ import { api } from "@/lib/api/client"
 
 import { ImportQuestionsDialog } from "./question-import"
 import { KIND_LABEL, NewQuestionDialog } from "./question-editor"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgQuestions } from "@/features/orgs/content"
 
-export interface BankQuestion {
-  id: string
-  title: string
-  kind: "single" | "multiple" | "short" | "written"
-  points: number
-  tags: string[]
-  published: boolean
-  orgId: string | null
-  marksItself: boolean
-}
+export type BankQuestion = ApiResult<typeof orgQuestions>[number]
 
 /** The bank's questions an assignment or contest of this owner may use. */
 export function useQuestionBank() {
   const owner = useOwner()
   return useQuery({
     queryKey: owner.key("questions", "picker"),
-    queryFn: () =>
-      api<BankQuestion[]>(`${owner.api("/questions")}?for=picker`),
+    queryFn: () => api<BankQuestion[]>(`${owner.api("/questions")}?for=picker`),
   })
 }
 
@@ -63,7 +55,10 @@ export function QuestionPicker({
   const [kind, setKind] = useState("")
   const [writing, setWriting] = useState(false)
   const [importing, setImporting] = useState(false)
-  const byId = useMemo(() => new Map((bank ?? []).map((q) => [q.id, q])), [bank])
+  const byId = useMemo(
+    () => new Map((bank ?? []).map((q) => [q.id, q])),
+    [bank]
+  )
   const chosen = new Set(selected.map((s) => s.questionId))
   const query = search.trim().toLowerCase()
   const available = (bank ?? []).filter(
@@ -103,10 +98,20 @@ export function QuestionPicker({
           {label} ({selected.length})
         </div>
         <span className="flex gap-2">
-          <Button type="button" variant="outline" size="xs" onClick={() => setWriting(true)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => setWriting(true)}
+          >
             Write a question
           </Button>
-          <Button type="button" variant="outline" size="xs" onClick={() => setImporting(true)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => setImporting(true)}
+          >
             Import questions
           </Button>
         </span>
@@ -121,7 +126,9 @@ export function QuestionPicker({
         onOpenChange={setImporting}
         onImported={(qs) => {
           setImporting(false)
-          void api<BankQuestion[]>(`${owner.api("/questions")}?for=picker`).then((all) =>
+          void api<BankQuestion[]>(
+            `${owner.api("/questions")}?for=picker`
+          ).then((all) =>
             add(
               qs.map((q) => ({
                 id: q.id,
@@ -186,10 +193,14 @@ export function QuestionPicker({
         <div className="rounded-md border border-hairline p-2.5">
           <div className="mb-2 text-caption">
             In this order
-            {showPoints ? ` · ${total} points` : ` · ${selected.length} of ${max}`}
+            {showPoints
+              ? ` · ${total} points`
+              : ` · ${selected.length} of ${max}`}
           </div>
           {selected.length === 0 && (
-            <p className="px-2 py-1 text-caption">Optional. Add questions from the list.</p>
+            <p className="px-2 py-1 text-caption">
+              Optional. Add questions from the list.
+            </p>
           )}
           <ol className="grid gap-0.5">
             {selected.map((s, index) => {
@@ -205,25 +216,25 @@ export function QuestionPicker({
                     {q?.title ?? "…"}
                   </span>
                   {showPoints && (
-                  <label className="flex items-center gap-1 text-xs">
-                    <TextInput
-                      type="number"
-                      min={1}
-                      aria-label={`Points for ${q?.title ?? "question"}`}
-                      className="w-16 py-0.5"
-                      value={s.points}
-                      onChange={(event) =>
-                        onChange(
-                          selected.map((x) =>
-                            x.questionId === s.questionId
-                              ? { ...x, points: event.target.value }
-                              : x
+                    <label className="flex items-center gap-1 text-xs">
+                      <TextInput
+                        type="number"
+                        min={1}
+                        aria-label={`Points for ${q?.title ?? "question"}`}
+                        className="w-16 py-0.5"
+                        value={s.points}
+                        onChange={(event) =>
+                          onChange(
+                            selected.map((x) =>
+                              x.questionId === s.questionId
+                                ? { ...x, points: event.target.value }
+                                : x
+                            )
                           )
-                        )
-                      }
-                    />
-                    pts
-                  </label>
+                        }
+                      />
+                      pts
+                    </label>
                   )}
                   <Button
                     type="button"
@@ -251,7 +262,9 @@ export function QuestionPicker({
                     size="icon-xs"
                     aria-label={`Remove ${q?.title ?? "question"}`}
                     onClick={() =>
-                      onChange(selected.filter((x) => x.questionId !== s.questionId))
+                      onChange(
+                        selected.filter((x) => x.questionId !== s.questionId)
+                      )
                     }
                   >
                     ✕

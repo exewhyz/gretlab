@@ -39,6 +39,10 @@ import { cn } from "@workspace/ui/lib/utils"
 import { Check, Field, FormMessage, TextInput } from "@/components/form"
 import { Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { myAttendance } from "@/features/staff-attendance/server"
+import type { staffMonth } from "@/features/staff-attendance/server"
+import type { staffRegister } from "@/features/staff-attendance/server"
 
 type Status = "present" | "late" | "half_day" | "absent" | "on_leave"
 
@@ -49,8 +53,12 @@ const STATUSES: { value: Status; label: string; short: string }[] = [
   { value: "absent", label: "Absent", short: "A" },
   { value: "on_leave", label: "On leave", short: "OL" },
 ]
-const SHORT = Object.fromEntries(STATUSES.map((s) => [s.value, s.short])) as Record<Status, string>
-const LABEL = Object.fromEntries(STATUSES.map((s) => [s.value, s.label])) as Record<Status, string>
+const SHORT = Object.fromEntries(
+  STATUSES.map((s) => [s.value, s.short])
+) as Record<Status, string>
+const LABEL = Object.fromEntries(
+  STATUSES.map((s) => [s.value, s.label])
+) as Record<Status, string>
 const TONE: Record<Status, string> = {
   present: "text-success",
   late: "text-primary-active",
@@ -69,25 +77,7 @@ interface Counts {
   percent: number | null
 }
 
-interface Register {
-  day: string
-  today: string
-  canMark: boolean
-  schoolDay: boolean
-  settings: { lateAfter: string; selfCheckIn: boolean }
-  staff: {
-    id: string
-    name: string
-    roles: string[]
-    status: Status | null
-    checkIn: string | null
-    note: string
-    selfCheckIn: boolean
-    markedBy: string | null
-    onLeave: string | null
-  }[]
-  counts: Counts
-}
+type Register = ApiResult<typeof staffRegister>
 
 /** Manage › Staff attendance: a day's register and the month. */
 export function StaffAttendance({ slug }: { slug: string }) {
@@ -116,9 +106,14 @@ function DayRegister({ slug }: { slug: string }) {
   const key = ["org", slug, "staff-attendance", day]
   const { data, error } = useQuery({
     queryKey: key,
-    queryFn: () => api<Register>(`/orgs/${slug}/staff-attendance${day ? `?day=${day}` : ""}`),
+    queryFn: () =>
+      api<Register>(
+        `/orgs/${slug}/staff-attendance${day ? `?day=${day}` : ""}`
+      ),
   })
-  const [draft, setDraft] = useState<Record<string, { status: Status; checkIn: string; note: string }>>({})
+  const [draft, setDraft] = useState<
+    Record<string, { status: Status; checkIn: string; note: string }>
+  >({})
   const [settingsOpen, setSettingsOpen] = useState(false)
   useEffect(() => {
     if (!data) return
@@ -129,7 +124,8 @@ function DayRegister({ slug }: { slug: string }) {
         data.staff.map((s) => [
           s.id,
           {
-            status: s.status ?? (s.onLeave === "On leave" ? "on_leave" : "present"),
+            status:
+              s.status ?? (s.onLeave === "On leave" ? "on_leave" : "present"),
             checkIn: s.checkIn ?? "",
             note: s.note,
           },
@@ -141,7 +137,10 @@ function DayRegister({ slug }: { slug: string }) {
     mutationFn: () =>
       api<Register>(`/orgs/${slug}/staff-attendance`, {
         method: "PUT",
-        body: { day: data!.day, marks: Object.entries(draft).map(([userId, m]) => ({ userId, ...m })) },
+        body: {
+          day: data!.day,
+          marks: Object.entries(draft).map(([userId, m]) => ({ userId, ...m })),
+        },
       }),
     onSuccess: (next) => {
       client.setQueryData(key, next)
@@ -159,30 +158,47 @@ function DayRegister({ slug }: { slug: string }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="w-44">
           <Field label="Day">
-            <TextInput type="date" value={day} max={data.today} onChange={(e) => setDay(e.target.value)} />
+            <TextInput
+              type="date"
+              value={day}
+              max={data.today}
+              onChange={(e) => setDay(e.target.value)}
+            />
           </Field>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-caption text-muted-foreground" data-testid="staff-counts">
-            {data.counts.present} present · {data.counts.late} late · {data.counts.half} half day · {data.counts.absent} absent ·{" "}
+          <span
+            className="text-caption text-muted-foreground"
+            data-testid="staff-counts"
+          >
+            {data.counts.present} present · {data.counts.late} late ·{" "}
+            {data.counts.half} half day · {data.counts.absent} absent ·{" "}
             {data.counts.leave} on leave
             {unmarked > 0 && ` · ${unmarked} not marked`}
           </span>
           {data.canMark && (
-            <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSettingsOpen(true)}
+            >
               Late time
             </Button>
           )}
         </div>
       </div>
       {!data.schoolDay && (
-        <p className="text-body-sm text-muted-foreground">{data.day} isn&apos;t a school day.</p>
+        <p className="text-body-sm text-muted-foreground">
+          {data.day} isn&apos;t a school day.
+        </p>
       )}
       {data.staff.length === 0 ? (
         <Empty className="border border-dashed border-hairline">
           <EmptyHeader>
             <EmptyTitle>No staff yet</EmptyTitle>
-            <EmptyDescription>Staff are members with a role, like Teacher.</EmptyDescription>
+            <EmptyDescription>
+              Staff are members with a role, like Teacher.
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
@@ -205,10 +221,16 @@ function DayRegister({ slug }: { slug: string }) {
                         {s.onLeave}
                       </Badge>
                     )}
-                    {s.selfCheckIn && <Badge variant="outline">Checked in</Badge>}
+                    {s.selfCheckIn && (
+                      <Badge variant="outline">Checked in</Badge>
+                    )}
                   </div>
                 </div>
-                <span className="flex flex-wrap gap-1" role="group" aria-label={`${s.name}'s attendance`}>
+                <span
+                  className="flex flex-wrap gap-1"
+                  role="group"
+                  aria-label={`${s.name}'s attendance`}
+                >
                   {STATUSES.map((st) => {
                     const on = d.status === st.value
                     return (
@@ -231,7 +253,11 @@ function DayRegister({ slug }: { slug: string }) {
                 <TextInput
                   type="time"
                   aria-label={`${s.name} came in at`}
-                  disabled={!data.canMark || d.status === "absent" || d.status === "on_leave"}
+                  disabled={
+                    !data.canMark ||
+                    d.status === "absent" ||
+                    d.status === "on_leave"
+                  }
                   value={d.checkIn}
                   onChange={(e) => set(s.id, { checkIn: e.target.value })}
                 />
@@ -250,8 +276,12 @@ function DayRegister({ slug }: { slug: string }) {
       )}
       {data.canMark && data.staff.length > 0 && (
         <div className="flex flex-wrap items-center justify-end gap-3">
-          {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
-          {save.isSuccess && <FormMessage message={{ text: "Saved.", kind: "ok" }} />}
+          {save.error && (
+            <FormMessage message={{ text: save.error.message, kind: "err" }} />
+          )}
+          {save.isSuccess && (
+            <FormMessage message={{ text: "Saved.", kind: "ok" }} />
+          )}
           <Button
             variant="outline"
             onClick={() =>
@@ -259,7 +289,13 @@ function DayRegister({ slug }: { slug: string }) {
                 Object.fromEntries(
                   Object.entries(draft).map(([id, m]) => [
                     id,
-                    { ...m, status: m.status === "on_leave" ? m.status : ("present" as Status) },
+                    {
+                      ...m,
+                      status:
+                        m.status === "on_leave"
+                          ? m.status
+                          : ("present" as Status),
+                    },
                   ])
                 )
               )
@@ -273,7 +309,11 @@ function DayRegister({ slug }: { slug: string }) {
         </div>
       )}
       {settingsOpen && (
-        <SettingsDialog slug={slug} settings={data.settings} onDone={() => setSettingsOpen(false)} />
+        <SettingsDialog
+          slug={slug}
+          settings={data.settings}
+          onDone={() => setSettingsOpen(false)}
+        />
       )}
     </div>
   )
@@ -291,7 +331,11 @@ function SettingsDialog({
   const client = useQueryClient()
   const [form, setForm] = useState(settings)
   const save = useMutation({
-    mutationFn: () => api(`/orgs/${slug}/staff-attendance/settings`, { method: "PUT", body: form }),
+    mutationFn: () =>
+      api(`/orgs/${slug}/staff-attendance/settings`, {
+        method: "PUT",
+        body: form,
+      }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["org", slug] })
       onDone()
@@ -302,17 +346,25 @@ function SettingsDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Late time and check-in</DialogTitle>
-          <DialogDescription>Staff checking in after this time are marked late.</DialogDescription>
+          <DialogDescription>
+            Staff checking in after this time are marked late.
+          </DialogDescription>
         </DialogHeader>
         <Field label="Late after">
-          <TextInput type="time" value={form.lateAfter} onChange={(e) => setForm({ ...form, lateAfter: e.target.value })} />
+          <TextInput
+            type="time"
+            value={form.lateAfter}
+            onChange={(e) => setForm({ ...form, lateAfter: e.target.value })}
+          />
         </Field>
         <Check
           label="Staff can check themselves in"
           checked={form.selfCheckIn}
           onCheckedChange={(v) => setForm({ ...form, selfCheckIn: v })}
         />
-        {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button onClick={() => save.mutate()} disabled={save.isPending}>
             Save
@@ -323,34 +375,45 @@ function SettingsDialog({
   )
 }
 
-interface Month {
-  month: string
-  today: string
-  days: { day: string; school: boolean }[]
-  staff: ({ id: string; name: string; roles: string[]; cells: Record<string, Status> } & Counts)[]
-}
+type Month = ApiResult<typeof staffMonth>
 
 function MonthReport({ slug }: { slug: string }) {
   const [month, setMonth] = useState("")
   const { data, error } = useQuery({
     queryKey: ["org", slug, "staff-month", month],
-    queryFn: () => api<Month>(`/orgs/${slug}/staff-attendance/month${month ? `?month=${month}` : ""}`),
+    queryFn: () =>
+      api<Month>(
+        `/orgs/${slug}/staff-attendance/month${month ? `?month=${month}` : ""}`
+      ),
   })
   if (!data) return <Loading error={error} />
   return (
     <div className="grid gap-3">
       <div className="w-44">
         <Field label="Month">
-          <TextInput type="month" value={month || data.month} max={data.today.slice(0, 7)} onChange={(e) => setMonth(e.target.value)} />
+          <TextInput
+            type="month"
+            value={month || data.month}
+            max={data.today.slice(0, 7)}
+            onChange={(e) => setMonth(e.target.value)}
+          />
         </Field>
       </div>
       <Card className="overflow-x-auto py-0">
         <Table data-testid="staff-month">
           <TableHeader>
             <TableRow>
-              <TableHead className="sticky left-0 z-10 bg-card">Staff</TableHead>
+              <TableHead className="sticky left-0 z-10 bg-card">
+                Staff
+              </TableHead>
               {data.days.map((d) => (
-                <TableHead key={d.day} className={cn("px-1 text-center tabular-nums", !d.school && "text-muted-foreground/50")}>
+                <TableHead
+                  key={d.day}
+                  className={cn(
+                    "px-1 text-center tabular-nums",
+                    !d.school && "text-muted-foreground/50"
+                  )}
+                >
                   {Number(d.day.slice(8))}
                 </TableHead>
               ))}
@@ -365,50 +428,64 @@ function MonthReport({ slug }: { slug: string }) {
           <TableBody>
             {data.staff.map((s) => (
               <TableRow key={s.id} data-testid="staff-month-row">
-                <TableCell className="sticky left-0 z-10 bg-card font-medium">{s.name}</TableCell>
+                <TableCell className="sticky left-0 z-10 bg-card font-medium">
+                  {s.name}
+                </TableCell>
                 {data.days.map((d) => {
                   const st = s.cells[d.day]
                   return (
                     <TableCell
                       key={d.day}
                       title={st ? LABEL[st] : undefined}
-                      className={cn("px-1 text-center text-caption", st ? TONE[st] : "", !d.school && "bg-muted/40")}
+                      className={cn(
+                        "px-1 text-center text-caption",
+                        st ? TONE[st] : "",
+                        !d.school && "bg-muted/40"
+                      )}
                     >
                       {st ? SHORT[st] : ""}
                     </TableCell>
                   )
                 })}
-                <TableCell className="text-right tabular-nums">{s.present}</TableCell>
-                <TableCell className="text-right tabular-nums">{s.late}</TableCell>
-                <TableCell className="text-right tabular-nums">{s.half}</TableCell>
-                <TableCell className="text-right tabular-nums">{s.absent}</TableCell>
-                <TableCell className="text-right tabular-nums">{s.leave}</TableCell>
-                <TableCell className="text-right tabular-nums">{s.percent == null ? "–" : s.percent}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {s.present}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {s.late}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {s.half}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {s.absent}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {s.leave}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {s.percent == null ? "–" : s.percent}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Card>
       <p className="text-caption text-muted-foreground">
-        P present · L late · H half day · A absent · OL on leave (left out of %). Shaded days are days off.
+        P present · L late · H half day · A absent · OL on leave (left out of
+        %). Shaded days are days off.
       </p>
     </div>
   )
 }
 
-interface Mine {
-  today: string
-  month: string
-  settings: { lateAfter: string; selfCheckIn: boolean }
-  todays: { status: Status; checkIn: string | null } | null
-  onLeave: boolean
-  canCheckIn: boolean
-  days: { day: string; status: Status; checkIn: string | null; note: string }[]
-  summary: Counts
-}
+type Mine = ApiResult<typeof myAttendance>
 
 const fmtDay = (d: string) =>
-  new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })
+  new Date(`${d}T12:00:00Z`).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  })
 
 const myKey = (slug: string) => ["org", slug, "staff-attendance", "me"]
 
@@ -420,21 +497,36 @@ function useMine(slug: string) {
 }
 
 /** Today's status and a Check in button (on the staff member's pages and home). */
-export function CheckInCard({ slug, className }: { slug: string; className?: string }) {
+export function CheckInCard({
+  slug,
+  className,
+}: {
+  slug: string
+  className?: string
+}) {
   const client = useQueryClient()
   const { data, error } = useMine(slug)
   const checkIn = useMutation({
-    mutationFn: () => api<{ time: string; status: Status }>(`/orgs/${slug}/staff-attendance/me/check-in`, { body: {} }),
+    mutationFn: () =>
+      api<{ time: string; status: Status }>(
+        `/orgs/${slug}/staff-attendance/me/check-in`,
+        { body: {} }
+      ),
     onSuccess: () => void client.invalidateQueries({ queryKey: myKey(slug) }),
   })
   if (!data) return error ? null : <Card className={cn("h-20", className)} />
   return (
     <Card
-      className={cn("flex-row flex-wrap items-center justify-between gap-3 px-4", className)}
+      className={cn(
+        "flex-row flex-wrap items-center justify-between gap-3 px-4",
+        className
+      )}
       data-testid="check-in"
     >
       <div>
-        <div className="text-caption text-muted-foreground">Today, {fmtDay(data.today)}</div>
+        <div className="text-caption text-muted-foreground">
+          Today, {fmtDay(data.today)}
+        </div>
         <div className="text-title-md text-ink" data-testid="today-status">
           {data.todays
             ? `${LABEL[data.todays.status]}${data.todays.checkIn ? ` · in at ${data.todays.checkIn}` : ""}`
@@ -443,15 +535,23 @@ export function CheckInCard({ slug, className }: { slug: string; className?: str
               : "Not checked in"}
         </div>
         {data.settings.selfCheckIn && !data.todays && !data.onLeave && (
-          <div className="text-caption text-muted-foreground">Late after {data.settings.lateAfter}</div>
+          <div className="text-caption text-muted-foreground">
+            Late after {data.settings.lateAfter}
+          </div>
         )}
       </div>
       {data.canCheckIn && (
-        <Button size="lg" onClick={() => checkIn.mutate()} disabled={checkIn.isPending}>
+        <Button
+          size="lg"
+          onClick={() => checkIn.mutate()}
+          disabled={checkIn.isPending}
+        >
           Check in
         </Button>
       )}
-      {checkIn.error && <FormMessage message={{ text: checkIn.error.message, kind: "err" }} />}
+      {checkIn.error && (
+        <FormMessage message={{ text: checkIn.error.message, kind: "err" }} />
+      )}
     </Card>
   )
 }
@@ -464,23 +564,34 @@ export function MyAttendance({ slug }: { slug: string }) {
     <>
       <PageTitle>My attendance</PageTitle>
       <CheckInCard slug={slug} className="mb-4" />
-      <div className="mb-3 grid grid-cols-3 gap-3 sm:grid-cols-6" data-testid="my-summary">
+      <div
+        className="mb-3 grid grid-cols-3 gap-3 sm:grid-cols-6"
+        data-testid="my-summary"
+      >
         {[
           ["Present", data.summary.present],
           ["Late", data.summary.late],
           ["Half day", data.summary.half],
           ["Absent", data.summary.absent],
           ["On leave", data.summary.leave],
-          ["Attendance", data.summary.percent == null ? "–" : `${data.summary.percent}%`],
+          [
+            "Attendance",
+            data.summary.percent == null ? "–" : `${data.summary.percent}%`,
+          ],
         ].map(([label, value]) => (
-          <div key={String(label)} className="rounded-lg border border-hairline bg-card p-3">
+          <div
+            key={String(label)}
+            className="rounded-lg border border-hairline bg-card p-3"
+          >
             <div className="text-caption text-muted-foreground">{label}</div>
-            <div className="text-title-md tabular-nums text-ink">{value}</div>
+            <div className="text-title-md text-ink tabular-nums">{value}</div>
           </div>
         ))}
       </div>
       {data.days.length === 0 ? (
-        <p className="text-body-sm text-muted-foreground">Nothing marked this month yet.</p>
+        <p className="text-body-sm text-muted-foreground">
+          Nothing marked this month yet.
+        </p>
       ) : (
         <Card className="py-0">
           <Table>
@@ -496,9 +607,15 @@ export function MyAttendance({ slug }: { slug: string }) {
               {data.days.map((d) => (
                 <TableRow key={d.day}>
                   <TableCell>{fmtDay(d.day)}</TableCell>
-                  <TableCell className={TONE[d.status]}>{LABEL[d.status]}</TableCell>
-                  <TableCell className="tabular-nums">{d.checkIn ?? "–"}</TableCell>
-                  <TableCell className="hidden text-muted-foreground sm:table-cell">{d.note}</TableCell>
+                  <TableCell className={TONE[d.status]}>
+                    {LABEL[d.status]}
+                  </TableCell>
+                  <TableCell className="tabular-nums">
+                    {d.checkIn ?? "–"}
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground sm:table-cell">
+                    {d.note}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

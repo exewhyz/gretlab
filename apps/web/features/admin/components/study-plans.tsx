@@ -12,13 +12,11 @@ import { api } from "@/lib/api/client"
 import { ProblemPicker } from "./contests"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle, Table } from "./shell"
+import type { ApiResult } from "@/lib/api/types"
+import type { listStudyPlans } from "@/features/catalog/server"
+import type { createList } from "@/features/catalog/server"
 
-interface Plan {
-  slug: string
-  title: string
-  description: string
-  published: boolean
-}
+type Plan = ApiResult<typeof listStudyPlans>[number]
 
 export function AdminStudyPlans() {
   const queryClient = useQueryClient()
@@ -30,7 +28,9 @@ export function AdminStudyPlans() {
   })
   const create = useMutation({
     mutationFn: () =>
-      api<{ slug: string }>("/lists", { body: { title, kind: "study_plan" } }),
+      api<ApiResult<typeof createList>>("/lists", {
+        body: { title, kind: "study_plan" },
+      }),
     onSuccess: (plan) => {
       setTitle("")
       void queryClient.invalidateQueries({ queryKey: ["admin", "study-plans"] })

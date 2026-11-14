@@ -21,6 +21,12 @@ import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
 import { Loading, PageTitle } from "@/features/admin/components/shell"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type {
+  classTimetable,
+  timetableSetup,
+} from "@/features/timetable/server"
+import type { myTeachingWeek } from "@/features/timetable/server"
 
 interface Period {
   id: string
@@ -113,9 +119,13 @@ function DayList({
                   "Break"
                 ) : cell ? (
                   <>
-                    <span className="block font-medium text-ink">{cell.subject}</span>
+                    <span className="block font-medium text-ink">
+                      {cell.subject}
+                    </span>
                     {show(cell) && (
-                      <span className="block text-xs text-body">{show(cell)}</span>
+                      <span className="block text-xs text-body">
+                        {show(cell)}
+                      </span>
                     )}
                   </>
                 ) : (
@@ -253,23 +263,9 @@ export function WeekGrid({
   )
 }
 
-interface Setup {
-  can: { periods: boolean; edit: boolean }
-  days: number[]
-  periods: Period[]
-  levels: string[]
-  choosable: string[]
-  groups: { id: string; name: string; parentId: string | null }[]
-}
+type Setup = ApiResult<typeof timetableSetup>
 
-interface ClassWeek {
-  group: string
-  canEdit: boolean
-  days: number[]
-  periods: Period[]
-  slots: Cell[]
-  subjects: { id: string; name: string; code: string; teacher: string | null }[]
-}
+type ClassWeek = ApiResult<typeof classTimetable>
 
 /** Manage › Timetable: set periods and days, then fill in each class's week. */
 export function ManageTimetable({ slug }: { slug: string }) {
@@ -564,9 +560,7 @@ export function MyTimetable({ slug }: { slug: string }) {
   const { data, error } = useQuery({
     queryKey: ["org", slug, "timetable", "mine"],
     queryFn: () =>
-      api<{ days: number[]; periods: Period[]; slots: Cell[] }>(
-        `/orgs/${slug}/timetable/mine`
-      ),
+      api<ApiResult<typeof myTeachingWeek>>(`/orgs/${slug}/timetable/mine`),
   })
   if (!data) return <Loading error={error} />
   return (

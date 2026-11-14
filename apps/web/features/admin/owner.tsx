@@ -11,6 +11,8 @@ import {
 
 import { useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgShell } from "@/features/home/server"
 
 /**
  * Who the dashboard screens are working for: the platform (/admin) or one organization
@@ -36,7 +38,7 @@ export function useOwner() {
   // The organization's shell (already loaded by its frame): what this person holds there.
   const { data: shell } = useQuery({
     queryKey: ["org", orgSlug, "shell"],
-    queryFn: () => api<{ permissions: string[] }>(`/orgs/${orgSlug}/shell`),
+    queryFn: () => api<ApiResult<typeof orgShell>>(`/orgs/${orgSlug}/shell`),
     enabled: orgSlug !== null,
   })
   return {

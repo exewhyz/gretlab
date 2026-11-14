@@ -8,15 +8,16 @@ import { buttonVariants } from "@workspace/ui/components/button"
 import { useContentScope } from "@/features/account/scope"
 import { ScopeNote } from "@/features/account/scope-switcher"
 import { Loading } from "@/features/admin/components/shell"
-import { CampusSummary, type CampusData } from "@/features/campus/components/campus"
+import {
+  CampusSummary,
+  type CampusData,
+} from "@/features/campus/components/campus"
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { myClasses } from "@/features/classes/server"
 
-interface MyOrgClasses {
-  slug: string
-  name: string
-  classes: { id: string; name: string; path: string; level: string | null }[]
-}
+type MyOrgClasses = ApiResult<typeof myClasses>[number]
 
 /** A student's classes in every organization, each opening its class page. */
 export function MyClasses() {
@@ -26,7 +27,8 @@ export function MyClasses() {
   })
   const campus = useQuery({
     queryKey: ["me", "campus"],
-    queryFn: () => api<(CampusData & { slug: string; name: string })[]>("/me/campus"),
+    queryFn: () =>
+      api<(CampusData & { slug: string; name: string })[]>("/me/campus"),
   })
   const { shows } = useContentScope()
   if (!data) return <Loading error={error} />

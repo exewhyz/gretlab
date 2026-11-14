@@ -17,20 +17,10 @@ import type {
 import { api } from "@/lib/api/client"
 
 import { Countdown } from "./countdown"
+import type { ApiResult } from "@/lib/api/types"
+import type { getContestProblem } from "@/features/contests/server"
 
-interface ContestProblem {
-  contest: {
-    title: string
-    phase: "upcoming" | "live" | "ended"
-    slug: string
-    endsAt: string
-  }
-  summaries: ProblemSummary[]
-  problem: ProblemDetail
-  published: boolean
-  status: Record<string, QuestionStatus>
-  registered: boolean
-}
+type ContestProblem = ApiResult<typeof getContestProblem>
 
 export function ContestWorkbench({
   slug,

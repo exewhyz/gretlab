@@ -6,6 +6,8 @@ import { Checkbox } from "@workspace/ui/components/checkbox"
 
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { myPreferences } from "@/features/notifications/policy-admin"
 
 interface Row {
   event: string
@@ -18,11 +20,7 @@ interface Row {
   offIn: string[]
 }
 
-interface Data {
-  mail: boolean
-  emailOn: boolean
-  events: Row[]
-}
+type Data = ApiResult<typeof myPreferences>
 
 const KEY = ["me", "notifications", "settings"]
 

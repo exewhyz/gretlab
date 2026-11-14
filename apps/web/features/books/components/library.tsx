@@ -32,39 +32,20 @@ import {
 import { Card, Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type {
+  librarySetup,
+  listBooks,
+  listLoans,
+  searchBorrowers,
+} from "@/features/books/server"
+import type { importBooks, myLibrary } from "@/features/books/server"
 
-interface Book {
-  id: string
-  title: string
-  author: string
-  isbn: string
-  category: string
-  shelf: string
-  copies: number
-  out: number
-  available: number
-}
+type Book = ApiResult<typeof listBooks>[number]
 
-interface Loan {
-  id: string
-  bookId: string
-  title: string
-  author: string
-  userId: string
-  name: string
-  email: string
-  issuedOn: string
-  dueOn: string
-  returnedOn: string | null
-  status: "out" | "overdue" | "returned" | "lost"
-}
+type Loan = ApiResult<typeof listLoans>[number]
 
-interface Setup {
-  can: { catalog: boolean; lend: boolean }
-  today: string
-  settings: { loanDays: number; maxLoans: number }
-  counts: { titles: number; copies: number; out: number; overdue: number }
-}
+type Setup = ApiResult<typeof librarySetup>
 
 const bookCount = (n: number) => `${n} book${n === 1 ? "" : "s"}`
 
@@ -298,12 +279,7 @@ function Loans({
   )
 }
 
-interface Borrower {
-  id: string
-  name: string
-  email: string
-  holding: number
-}
+type Borrower = ApiResult<typeof searchBorrowers>[number]
 
 function LendDialog({
   slug,
@@ -734,11 +710,9 @@ function ImportBooks({
     )
   const save = useMutation({
     mutationFn: () =>
-      api<{
-        added: number
-        failed: number
-        report: { line: number; note: string }[]
-      }>(`/orgs/${slug}/books/import`, { body: { rows } }),
+      api<ApiResult<typeof importBooks>>(`/orgs/${slug}/books/import`, {
+        body: { rows },
+      }),
   })
   const result = save.data
   return (
@@ -868,12 +842,7 @@ function RulesDialog({
 export function MemberLibrary({ slug }: { slug: string }) {
   const mine = useQuery({
     queryKey: ["org", slug, "books-mine"],
-    queryFn: () =>
-      api<{
-        org: { name: string }
-        settings: Setup["settings"]
-        loans: (Loan & { status: Loan["status"] })[]
-      }>(`/orgs/${slug}/books/mine`),
+    queryFn: () => api<ApiResult<typeof myLibrary>>(`/orgs/${slug}/books/mine`),
   })
   const [q, setQ] = useState("")
   const books = useBooks(slug, q)
@@ -889,7 +858,8 @@ export function MemberLibrary({ slug }: { slug: string }) {
         </Link>
         <h1 className="text-display-sm text-ink">Library</h1>
         <p className="text-body-sm text-body">
-          Borrow at the library desk: up to {bookCount(mine.data.settings.maxLoans)}
+          Borrow at the library desk: up to{" "}
+          {bookCount(mine.data.settings.maxLoans)}
           for {mine.data.settings.loanDays} days.
         </p>
       </header>

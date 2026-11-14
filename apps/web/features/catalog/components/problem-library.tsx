@@ -22,11 +22,11 @@ import { api } from "@/lib/api/client"
 import type { CatalogProblem } from "../server"
 import { DailyQuestion, type DailyQuestionData } from "./daily-question"
 import { Difficulty, TagChip } from "./difficulty"
+import type { ApiResult } from "@/lib/api/types"
+import type { getLists } from "@/features/catalog/server"
+import type { getCatalog } from "@/features/catalog/server"
 
-interface Catalog {
-  problems: CatalogProblem[]
-  tags: { slug: string; name: string; count: number }[]
-}
+type Catalog = ApiResult<typeof getCatalog>
 
 interface Daily {
   day: string
@@ -36,13 +36,7 @@ interface Daily {
   questions: DailyQuestionData[]
 }
 
-interface ListSummary {
-  slug: string
-  title: string
-  kind: "favorites" | "custom" | "study_plan"
-  size: number
-  description: string
-}
+type ListSummary = ApiResult<typeof getLists>[number]
 
 const PAGE = 50
 const LEVEL_ORDER = { easy: 0, medium: 1, hard: 2 } as const
@@ -87,13 +81,19 @@ function DailyCard({ daily, signedIn }: { daily: Daily; signedIn: boolean }) {
           data-testid="daily-questions"
         >
           <CollapsibleTrigger className="justify-self-start text-caption text-body hover:text-ink">
-            {daily.questions.length} {daily.questions.length === 1 ? "question" : "questions"} today ·{" "}
+            {daily.questions.length}{" "}
+            {daily.questions.length === 1 ? "question" : "questions"} today ·{" "}
             {daily.questions.filter((q) => q.answer?.correct).length} right of{" "}
             {daily.questions.filter((q) => q.answer).length} answered
           </CollapsibleTrigger>
           <CollapsibleContent className="grid gap-2">
             {daily.questions.map((q, index) => (
-              <DailyQuestion key={q.id} q={q} number={index + 1} signedIn={signedIn} />
+              <DailyQuestion
+                key={q.id}
+                q={q}
+                number={index + 1}
+                signedIn={signedIn}
+              />
             ))}
           </CollapsibleContent>
         </Collapsible>

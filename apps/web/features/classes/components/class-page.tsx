@@ -42,6 +42,9 @@ import {
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { classAttendance, classwork } from "@/features/classes/server"
+import type { classGrades, classPeople } from "@/features/classes/server"
 
 /*
  * A class: one group someone teaches, with everything about it in tabs. Teachers see
@@ -77,34 +80,7 @@ interface Overview {
   }
 }
 
-interface Work {
-  topics: { id: string; title: string; plannedFor: string | null }[]
-  assignments: {
-    id: string
-    slug: string
-    title: string
-    dueAt: string
-    phase: "upcoming" | "open" | "late" | "closed"
-    published: boolean
-    problemCount: number
-    solved: number
-    earned: number
-    total: number
-    reach: Reach
-    canManage: boolean
-  }[]
-  contests: {
-    id: string
-    slug: string
-    title: string
-    phase: string
-    published: boolean
-    startsAt: string
-    endsAt: string
-    reach: Reach
-    canManage: boolean
-  }[]
-}
+type Work = ApiResult<typeof classwork>
 
 type StreamItem =
   | {
@@ -242,7 +218,9 @@ export function ClassPage({
             <div className="flex flex-wrap gap-2">
               {data.can.assignments && (
                 <Link
-                  href={orgPages(slug).manage(`/assignments/new?for=${groupId}`)}
+                  href={orgPages(slug).manage(
+                    `/assignments/new?for=${groupId}`
+                  )}
                   className={buttonVariants({ size: "sm" })}
                 >
                   New assignment
@@ -314,7 +292,11 @@ export function ClassPage({
           <ClassCourses slug={slug} groupId={groupId} />
         </TabsContent>
         <TabsContent value="discussion" className="pt-3">
-          <Discussion slug={slug} groupId={groupId} initialThread={thread ?? null} />
+          <Discussion
+            slug={slug}
+            groupId={groupId}
+            initialThread={thread ?? null}
+          />
         </TabsContent>
         <TabsContent value="people" className="pt-3">
           {teacher && data.can.people ? (
@@ -812,10 +794,9 @@ function StudentPeople({ slug, groupId }: { slug: string; groupId: string }) {
   const { data, error } = useQuery({
     queryKey: ["org", slug, "class", groupId, "people"],
     queryFn: () =>
-      api<{
-        teachers: Overview["teachers"]
-        students: { name: string; handle: string | null; me: boolean }[]
-      }>(`/orgs/${slug}/classes/${groupId}/people`),
+      api<ApiResult<typeof classPeople>>(
+        `/orgs/${slug}/classes/${groupId}/people`
+      ),
   })
   if (!data) return <Loading error={error} />
   return (
@@ -855,21 +836,9 @@ function ClassGrades({ slug, groupId }: { slug: string; groupId: string }) {
   const { data, error } = useQuery({
     queryKey: ["org", slug, "class", groupId, "grades"],
     queryFn: () =>
-      api<{
-        assignments: {
-          id: string
-          title: string
-          dueAt: string
-          total: number
-          average: number | null
-        }[]
-        students: {
-          name: string
-          email: string
-          marks: (number | null)[]
-          percent: number | null
-        }[]
-      }>(`/orgs/${slug}/classes/${groupId}/grades`),
+      api<ApiResult<typeof classGrades>>(
+        `/orgs/${slug}/classes/${groupId}/grades`
+      ),
   })
   if (!data) return <Loading error={error} />
   if (data.assignments.length === 0) {
@@ -976,16 +945,7 @@ function MyGrades({ slug, groupId }: { slug: string; groupId: string }) {
 
 /* ---------- syllabus and attendance ---------- */
 
-interface AttendanceData {
-  mine: { marked: number; present: number; percent: number | null } | null
-  students: {
-    name: string
-    email: string
-    marked: number
-    present: number
-    percent: number | null
-  }[]
-}
+type AttendanceData = ApiResult<typeof classAttendance>
 
 function useAttendance(slug: string, groupId: string) {
   return useQuery({

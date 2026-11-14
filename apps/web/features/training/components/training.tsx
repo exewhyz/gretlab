@@ -19,11 +19,19 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { ConfirmButton } from "@/components/confirm"
 import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
-import { Card, Loading, PageTitle, Table } from "@/features/admin/components/shell"
+import {
+  Card,
+  Loading,
+  PageTitle,
+  Table,
+} from "@/features/admin/components/shell"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { api } from "@/lib/api/client"
 import { formatDay } from "@/lib/format"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { listTraining } from "@/features/training/server"
+import type { issueCertificates } from "@/features/certificates/server"
 
 /*
  * Training (the "training" module): courses assigned to departments and teams with due
@@ -34,26 +42,7 @@ import { orgPages } from "@/lib/paths"
 
 type Counts = Record<TrainingStatus, number>
 
-interface List {
-  day: string
-  terms: KindTerms
-  levels: string[]
-  trainings: {
-    courseId: string
-    groupId: string
-    course: string
-    group: string
-    dueOn: string | null
-    renewMonths: number | null
-    people: number
-    counts: Counts
-    whole: boolean
-    canManage: boolean
-  }[]
-  canAssign: boolean
-  courses: { id: string; title: string }[]
-  groups: { id: string; name: string; parentId: string | null }[]
-}
+type List = ApiResult<typeof listTraining>
 
 interface Detail {
   day: string
@@ -83,7 +72,10 @@ interface Detail {
   canManage: boolean
 }
 
-export const STATUS: Record<TrainingStatus, { label: string; tone: "bad" | "warn" | "ok" | "plain" }> = {
+export const STATUS: Record<
+  TrainingStatus,
+  { label: string; tone: "bad" | "warn" | "ok" | "plain" }
+> = {
   overdue: { label: "Overdue", tone: "bad" },
   expired: { label: "Expired", tone: "bad" },
   due: { label: "Due soon", tone: "warn" },
@@ -111,7 +103,13 @@ export function StatusBadge({ status }: { status: TrainingStatus }) {
 }
 
 const renewText = (m: number | null) =>
-  m == null ? "Once" : m === 12 ? "Every year" : m % 12 === 0 ? `Every ${m / 12} years` : `Every ${m} months`
+  m == null
+    ? "Once"
+    : m === 12
+      ? "Every year"
+      : m % 12 === 0
+        ? `Every ${m / 12} years`
+        : `Every ${m} months`
 
 /** How many are done of everyone it reaches, as a bar with its numbers. */
 function Compliance({ counts, people }: { counts: Counts; people: number }) {
@@ -126,7 +124,10 @@ function Compliance({ counts, people }: { counts: Counts; people: number }) {
         <span className="tabular-nums">{pct}%</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
-        <div className="h-full rounded-full bg-success" style={{ width: `${pct}%` }} />
+        <div
+          className="h-full rounded-full bg-success"
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   )
@@ -139,14 +140,18 @@ export function TrainingList({ slug }: { slug: string }) {
   })
   const [assigning, setAssigning] = useState(false)
   if (!data) return <Loading error={error} />
-  const total = (k: TrainingStatus) => data.trainings.reduce((n, t) => n + t.counts[k], 0)
+  const total = (k: TrainingStatus) =>
+    data.trainings.reduce((n, t) => n + t.counts[k], 0)
   const people = data.trainings.reduce((n, t) => n + t.people, 0)
   return (
     <>
       <PageTitle
         action={
           data.canAssign && (
-            <Button onClick={() => setAssigning(true)} disabled={!data.courses.length}>
+            <Button
+              onClick={() => setAssigning(true)}
+              disabled={!data.courses.length}
+            >
               Assign training
             </Button>
           )
@@ -155,10 +160,13 @@ export function TrainingList({ slug }: { slug: string }) {
         Training
       </PageTitle>
       <p className="-mt-2 mb-4 max-w-3xl text-body-sm text-body">
-        Courses assigned to {data.levels.map((l) => l.toLowerCase() + "s").join(" and ")}, with due dates
-        and, for compliance, renewal. People take them on their{" "}
+        Courses assigned to{" "}
+        {data.levels.map((l) => l.toLowerCase() + "s").join(" and ")}, with due
+        dates and, for compliance, renewal. People take them on their{" "}
         {data.terms.group.toLowerCase()}&apos;s page.
-        {data.canAssign && !data.courses.length && " Make a course ready under Courses to assign it."}
+        {data.canAssign &&
+          !data.courses.length &&
+          " Make a course ready under Courses to assign it."}
       </p>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(
@@ -169,12 +177,18 @@ export function TrainingList({ slug }: { slug: string }) {
             ["Due or renew soon", total("due") + total("expiring"), "soon"],
           ] as const
         ).map(([label, n, id]) => (
-          <Card key={id} className="grid gap-0.5 p-4" data-testid={`training-tile-${id}`}>
+          <Card
+            key={id}
+            className="grid gap-0.5 p-4"
+            data-testid={`training-tile-${id}`}
+          >
             <div className="text-caption">{label}</div>
             <div
               className={cn(
                 "text-title-md font-semibold",
-                (id === "overdue" || id === "expired") && n ? "text-destructive" : "text-ink"
+                (id === "overdue" || id === "expired") && n
+                  ? "text-destructive"
+                  : "text-ink"
               )}
             >
               {n}
@@ -187,7 +201,16 @@ export function TrainingList({ slug }: { slug: string }) {
           <p data-testid="no-training">No training assigned yet.</p>
         </Card>
       ) : (
-        <Table headers={["Training", "For", "Due", "Renewal", "Done", "Needs attention"]}>
+        <Table
+          headers={[
+            "Training",
+            "For",
+            "Due",
+            "Renewal",
+            "Done",
+            "Needs attention",
+          ]}
+        >
           {data.trainings.map((t) => {
             const late = t.counts.overdue + t.counts.expired
             const soon = t.counts.due + t.counts.expiring
@@ -196,24 +219,41 @@ export function TrainingList({ slug }: { slug: string }) {
                 <td>
                   <Link
                     className="font-medium text-ink hover:underline"
-                    href={orgPages(slug).manage(`/training/${t.groupId}/${t.courseId}`)}
+                    href={orgPages(slug).manage(
+                      `/training/${t.groupId}/${t.courseId}`
+                    )}
                   >
                     {t.course}
                   </Link>
                 </td>
                 <td className="whitespace-nowrap">
                   {t.group}
-                  {!t.whole && <span className="ml-1 text-caption">(your teams)</span>}
+                  {!t.whole && (
+                    <span className="ml-1 text-caption">(your teams)</span>
+                  )}
                 </td>
-                <td className="whitespace-nowrap">{t.dueOn ? formatDay(t.dueOn) : "—"}</td>
-                <td className="whitespace-nowrap">{renewText(t.renewMonths)}</td>
+                <td className="whitespace-nowrap">
+                  {t.dueOn ? formatDay(t.dueOn) : "—"}
+                </td>
+                <td className="whitespace-nowrap">
+                  {renewText(t.renewMonths)}
+                </td>
                 <td>
                   <Compliance counts={t.counts} people={t.people} />
                 </td>
-                <td className="whitespace-nowrap" data-testid="training-attention">
-                  {late > 0 && <span className="font-medium text-destructive">{late} late</span>}
+                <td
+                  className="whitespace-nowrap"
+                  data-testid="training-attention"
+                >
+                  {late > 0 && (
+                    <span className="font-medium text-destructive">
+                      {late} late
+                    </span>
+                  )}
                   {late > 0 && soon > 0 && " · "}
-                  {soon > 0 && <span className="text-primary-active">{soon} soon</span>}
+                  {soon > 0 && (
+                    <span className="text-primary-active">{soon} soon</span>
+                  )}
                   {late + soon === 0 && <span className="text-caption">—</span>}
                 </td>
               </tr>
@@ -221,7 +261,13 @@ export function TrainingList({ slug }: { slug: string }) {
           })}
         </Table>
       )}
-      {assigning && <AssignDialog slug={slug} data={data} onClose={() => setAssigning(false)} />}
+      {assigning && (
+        <AssignDialog
+          slug={slug}
+          data={data}
+          onClose={() => setAssigning(false)}
+        />
+      )}
     </>
   )
 }
@@ -235,33 +281,49 @@ function AssignDialog({
   slug: string
   data: Pick<List, "courses" | "groups" | "levels" | "day">
   onClose: () => void
-  initial?: { courseId: string; groupId: string; dueOn: string | null; renewMonths: number | null }
+  initial?: {
+    courseId: string
+    groupId: string
+    dueOn: string | null
+    renewMonths: number | null
+  }
 }) {
   const client = useQueryClient()
   const router = useRouter()
   const [courseId, setCourseId] = useState(initial?.courseId ?? "")
   const [groupId, setGroupId] = useState(initial?.groupId ?? "")
   const [dueOn, setDueOn] = useState(initial?.dueOn ?? "")
-  const [renew, setRenew] = useState(initial?.renewMonths ? String(initial.renewMonths) : "")
+  const [renew, setRenew] = useState(
+    initial?.renewMonths ? String(initial.renewMonths) : ""
+  )
   const save = useMutation({
     mutationFn: () =>
       api(`/orgs/${slug}/training`, {
-        body: { courseId, groupId, dueOn: dueOn || null, renewMonths: renew ? Number(renew) : null },
+        body: {
+          courseId,
+          groupId,
+          dueOn: dueOn || null,
+          renewMonths: renew ? Number(renew) : null,
+        },
       }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["org", slug, "training"] })
       onClose()
-      if (!initial) router.push(orgPages(slug).manage(`/training/${groupId}/${courseId}`))
+      if (!initial)
+        router.push(orgPages(slug).manage(`/training/${groupId}/${courseId}`))
     },
   })
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{initial ? "Change training" : "Assign training"}</DialogTitle>
+          <DialogTitle>
+            {initial ? "Change training" : "Assign training"}
+          </DialogTitle>
           <DialogDescription>
-            Everyone in the group, and the groups inside it, gets the course. With renewal, it
-            has to be done again before it expires, and certificates expire with it.
+            Everyone in the group, and the groups inside it, gets the course.
+            With renewal, it has to be done again before it expires, and
+            certificates expire with it.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -275,7 +337,10 @@ function AssignDialog({
           {!initial && (
             <>
               <Field label="Course">
-                <SelectInput value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+                <SelectInput
+                  value={courseId}
+                  onChange={(e) => setCourseId(e.target.value)}
+                >
                   <option value="">Choose a course</option>
                   {data.courses.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -298,10 +363,18 @@ function AssignDialog({
             </>
           )}
           <Field label="Due" help="Leave empty for no due date.">
-            <TextInput type="date" min={data.day} value={dueOn} onChange={(e) => setDueOn(e.target.value)} />
+            <TextInput
+              type="date"
+              min={data.day}
+              value={dueOn}
+              onChange={(e) => setDueOn(e.target.value)}
+            />
           </Field>
           <Field label="Renewal">
-            <SelectInput value={renew} onChange={(e) => setRenew(e.target.value)}>
+            <SelectInput
+              value={renew}
+              onChange={(e) => setRenew(e.target.value)}
+            >
               <option value="">Once: no renewal</option>
               <option value="3">Every 3 months</option>
               <option value="6">Every 6 months</option>
@@ -311,12 +384,18 @@ function AssignDialog({
             </SelectInput>
           </Field>
         </form>
-        {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form="assign-form" disabled={!courseId || !groupId || save.isPending}>
+          <Button
+            type="submit"
+            form="assign-form"
+            disabled={!courseId || !groupId || save.isPending}
+          >
             {initial ? "Save" : "Assign"}
           </Button>
         </DialogFooter>
@@ -325,28 +404,50 @@ function AssignDialog({
   )
 }
 
-export function TrainingDetail({ slug, groupId, courseId }: { slug: string; groupId: string; courseId: string }) {
+export function TrainingDetail({
+  slug,
+  groupId,
+  courseId,
+}: {
+  slug: string
+  groupId: string
+  courseId: string
+}) {
   const client = useQueryClient()
   const router = useRouter()
   const key = ["org", slug, "training", groupId, courseId]
   const base = `/orgs/${slug}/training/${groupId}/${courseId}`
-  const { data, error } = useQuery({ queryKey: key, queryFn: () => api<Detail>(base) })
+  const { data, error } = useQuery({
+    queryKey: key,
+    queryFn: () => api<Detail>(base),
+  })
   const [filter, setFilter] = useState<"" | "attention" | TrainingStatus>("")
   const [editing, setEditing] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  const refresh = () => void client.invalidateQueries({ queryKey: ["org", slug, "training"] })
+  const refresh = () =>
+    void client.invalidateQueries({ queryKey: ["org", slug, "training"] })
   const remind = useMutation({
     mutationFn: () => api<{ reminded: number }>(`${base}/remind`, { body: {} }),
-    onSuccess: (r) => setMessage(r.reminded ? `Reminded ${r.reminded}.` : "Everyone's done: nobody to remind."),
+    onSuccess: (r) =>
+      setMessage(
+        r.reminded
+          ? `Reminded ${r.reminded}.`
+          : "Everyone's done: nobody to remind."
+      ),
   })
   const certify = useMutation({
     mutationFn: () =>
-      api<{ issued: number }>(`/orgs/${slug}/classes/${groupId}/certificates`, {
-        body: { kind: "course", courseId },
-      }),
+      api<ApiResult<typeof issueCertificates>>(
+        `/orgs/${slug}/classes/${groupId}/certificates`,
+        {
+          body: { kind: "course", courseId },
+        }
+      ),
     onSuccess: (r) => {
       setMessage(
-        r.issued ? `Issued ${r.issued} certificate${r.issued === 1 ? "" : "s"}.` : "Everyone who finished has a valid one."
+        r.issued
+          ? `Issued ${r.issued} certificate${r.issued === 1 ? "" : "s"}.`
+          : "Everyone who finished has a valid one."
       )
       refresh()
     },
@@ -368,22 +469,32 @@ export function TrainingDetail({ slug, groupId, courseId }: { slug: string; grou
         : p.status === filter
   )
   const pending = data.people.filter((p) => p.status !== "done").length
-  const uncertified = data.people.filter((p) => (p.status === "done" || p.status === "expiring") && !p.certificate).length
+  const uncertified = data.people.filter(
+    (p) => (p.status === "done" || p.status === "expiring") && !p.certificate
+  ).length
   return (
     <div data-testid="training-detail">
       <PageTitle>{t.course}</PageTitle>
       <p className="-mt-2 mb-4 text-body-sm text-body">
         For {t.group}
-        {!t.whole && " (the teams you see)"} · {t.dueOn ? `due ${formatDay(t.dueOn)}` : "no due date"} ·{" "}
+        {!t.whole && " (the teams you see)"} ·{" "}
+        {t.dueOn ? `due ${formatDay(t.dueOn)}` : "no due date"} ·{" "}
         {renewText(t.renewMonths).toLowerCase()}
       </p>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <Field label="Show">
-          <SelectInput value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}>
+          <SelectInput
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as typeof filter)}
+          >
             <option value="">Everyone ({data.people.length})</option>
             <option value="attention">
               Needs attention (
-              {data.counts.overdue + data.counts.expired + data.counts.due + data.counts.expiring})
+              {data.counts.overdue +
+                data.counts.expired +
+                data.counts.due +
+                data.counts.expiring}
+              )
             </option>
             {(Object.keys(STATUS) as TrainingStatus[]).map((s) => (
               <option key={s} value={s}>
@@ -393,12 +504,20 @@ export function TrainingDetail({ slug, groupId, courseId }: { slug: string; grou
           </SelectInput>
         </Field>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={!pending || remind.isPending} onClick={() => remind.mutate()}>
+          <Button
+            variant="outline"
+            disabled={!pending || remind.isPending}
+            onClick={() => remind.mutate()}
+          >
             Remind {pending ? pending : ""} not done
           </Button>
           {data.canManage && (
             <>
-              <Button variant="outline" disabled={!uncertified || certify.isPending} onClick={() => certify.mutate()}>
+              <Button
+                variant="outline"
+                disabled={!uncertified || certify.isPending}
+                onClick={() => certify.mutate()}
+              >
                 Certify {uncertified ? uncertified : ""} finished
               </Button>
               <Button variant="outline" onClick={() => setEditing(true)}>
@@ -419,12 +538,27 @@ export function TrainingDetail({ slug, groupId, courseId }: { slug: string; grou
       </div>
       {message && <FormMessage message={{ text: message, kind: "ok" }} />}
       {(remind.error ?? certify.error ?? remove.error) && (
-        <FormMessage message={{ text: (remind.error ?? certify.error ?? remove.error)!.message, kind: "err" }} />
+        <FormMessage
+          message={{
+            text: (remind.error ?? certify.error ?? remove.error)!.message,
+            kind: "err",
+          }}
+        />
       )}
       {rows.length === 0 ? (
         <Card>Nobody here.</Card>
       ) : (
-        <Table headers={[data.terms.learner, "Team", "Progress", "Status", "Needed by", "Done on", "Certificate"]}>
+        <Table
+          headers={[
+            data.terms.learner,
+            "Team",
+            "Progress",
+            "Status",
+            "Needed by",
+            "Done on",
+            "Certificate",
+          ]}
+        >
           {rows.map((p) => (
             <tr key={p.id} data-testid="training-person">
               <td>
@@ -438,16 +572,23 @@ export function TrainingDetail({ slug, groupId, courseId }: { slug: string; grou
               <td>
                 <StatusBadge status={p.status} />
               </td>
-              <td className="whitespace-nowrap">{p.needBy ? formatDay(p.needBy) : "—"}</td>
+              <td className="whitespace-nowrap">
+                {p.needBy ? formatDay(p.needBy) : "—"}
+              </td>
               <td className="whitespace-nowrap">
                 {p.completedOn ? formatDay(p.completedOn) : "—"}
                 {p.validUntil && (
-                  <div className="text-caption">valid until {formatDay(p.validUntil)}</div>
+                  <div className="text-caption">
+                    valid until {formatDay(p.validUntil)}
+                  </div>
                 )}
               </td>
               <td className="whitespace-nowrap">
                 {p.certificate ? (
-                  <Link className="font-mono text-xs text-primary hover:underline" href={`/certificates/${p.certificate}`}>
+                  <Link
+                    className="font-mono text-xs text-primary hover:underline"
+                    href={`/certificates/${p.certificate}`}
+                  >
                     {p.certificate}
                   </Link>
                 ) : (
@@ -462,7 +603,12 @@ export function TrainingDetail({ slug, groupId, courseId }: { slug: string; grou
         <AssignDialog
           slug={slug}
           data={{ courses: [], groups: [], levels: [], day: data.day }}
-          initial={{ courseId, groupId, dueOn: t.dueOn, renewMonths: t.renewMonths }}
+          initial={{
+            courseId,
+            groupId,
+            dueOn: t.dueOn,
+            renewMonths: t.renewMonths,
+          }}
           onClose={() => {
             setEditing(false)
             void client.invalidateQueries({ queryKey: key })

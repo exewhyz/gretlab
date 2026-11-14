@@ -133,7 +133,11 @@ async function viewsOf(ctx: OrgContext, user: User): Promise<HomeView[]> {
   )
     views.push("staff")
   // In a community, members have a home before joining any group: its groups and events.
-  if (ctx.membership?.status === "active" && held.length === 0 && KINDS[ctx.org.type].openGroups) {
+  if (
+    ctx.membership?.status === "active" &&
+    held.length === 0 &&
+    KINDS[ctx.org.type].openGroups
+  ) {
     views.push("student")
   } else if (ctx.membership?.status === "active" && held.length === 0) {
     const [seat] = await db
@@ -266,10 +270,17 @@ function managedNav(ctx: OrgContext) {
  * their sidebar has it (so no card leads to a refusal or a switched-off module); a full
  * address (their own leave, a class) always.
  */
-function reachable<T extends { href: string }>(ctx: OrgContext, items: T[]): T[] {
-  const paths = new Set(managedNav(ctx).flatMap((g) => g.items.map((i) => i.path)))
+function reachable<T extends { href: string }>(
+  ctx: OrgContext,
+  items: T[]
+): T[] {
+  const paths = new Set(
+    managedNav(ctx).flatMap((g) => g.items.map((i) => i.path))
+  )
   return items.filter(
-    (i) => i.href.startsWith("/orgs/") || paths.has(i.href.match(/^\/[^/?#]*/)?.[0] ?? "")
+    (i) =>
+      i.href.startsWith("/orgs/") ||
+      paths.has(i.href.match(/^\/[^/?#]*/)?.[0] ?? "")
   )
 }
 
@@ -700,7 +711,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             kind: "Admissions",
-            tone: "plain",
+            tone: "plain" as const,
             text: `${newApps} new application${newApps === 1 ? "" : "s"}`,
             action: "Review",
             href: "/admissions",
@@ -711,7 +722,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             kind: "Leave",
-            tone: "plain",
+            tone: "plain" as const,
             text: `${leaveWaiting} leave request${leaveWaiting === 1 ? "" : "s"} to decide`,
             action: "Decide",
             href: orgPages(ctx.org.slug).leave,
@@ -722,7 +733,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             kind: "Register",
-            tone: "bad",
+            tone: "bad" as const,
             text:
               notTaken.length === 1
                 ? `${notTaken[0]!.name} not taken today`
@@ -736,7 +747,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             kind: "Attendance",
-            tone: "plain",
+            tone: "plain" as const,
             text: `${low.length} student${low.length === 1 ? "" : "s"} below 75%`,
             action: "View",
             href: "/attendance-report",
@@ -747,7 +758,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             kind: "Library",
-            tone: "plain",
+            tone: "plain" as const,
             text: `${overdue} book${overdue === 1 ? "" : "s"} overdue`,
             action: "Open",
             href: "/books",
@@ -758,7 +769,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             kind: "Parents",
-            tone: "plain",
+            tone: "plain" as const,
             text: `${students.size - linkedStudents} ${terms.learners.toLowerCase()} with no ${(terms.guardian ?? "parent").toLowerCase()} linked`,
             action: "Link",
             href: "/parents",
@@ -769,7 +780,7 @@ async function adminHome(ctx: OrgContext) {
       ? [
           {
             kind: "Joining",
-            tone: "plain",
+            tone: "plain" as const,
             text: `${pendingCount!.n} asking to join`,
             action: "Review",
             href: "/members",
@@ -933,7 +944,7 @@ async function teacherHome(ctx: OrgContext, user: User) {
     todo: reachable(ctx, [
       ...toTake.map((c) => ({
         kind: "Register",
-        tone: "bad",
+        tone: "bad" as const,
         text: `${c.name} not taken today`,
         action: "Take",
         href: `/attendance?groupId=${c.id}`,
@@ -942,7 +953,7 @@ async function teacherHome(ctx: OrgContext, user: User) {
         ? [
             {
               kind: "Leave",
-              tone: "plain",
+              tone: "plain" as const,
               text: `${leaveWaiting} leave request${leaveWaiting === 1 ? "" : "s"} to decide`,
               action: "Decide",
               href: orgPages(ctx.org.slug).leave,
@@ -951,14 +962,14 @@ async function teacherHome(ctx: OrgContext, user: User) {
         : []),
       ...toMark.map((p) => ({
         kind: "Marks",
-        tone: "plain",
+        tone: "plain" as const,
         text: `${p.subject}, ${p.class}: ${p.entered} of ${p.students} in (${p.exam})`,
         action: "Enter",
         href: `/exams/${p.examId}/papers/${p.id}`,
       })),
       ...low.slice(0, 5).map((s) => ({
         kind: "Attendance",
-        tone: "plain",
+        tone: "plain" as const,
         text: `${s.name} (${s.group}) at ${s.percent}%`,
         action: "View",
         href: "/attendance-report",
@@ -1262,7 +1273,9 @@ export async function orgHome(slug: string, user: User) {
   ])
   const [mine, team, events] = await Promise.all([
     views.includes("student") ? myTraining(ctx, user) : null,
-    views.includes("teacher") && ctx.modules.has("training") ? teamTraining(slug, user) : null,
+    views.includes("teacher") && ctx.modules.has("training")
+      ? teamTraining(slug, user)
+      : null,
     homeEvents(ctx, user),
   ])
   return {
@@ -1292,7 +1305,14 @@ async function teamTraining(slug: string, user: User) {
     late: sum("overdue") + sum("expired"),
     soon: sum("due") + sum("expiring"),
     trainings: list.trainings
-      .filter((t) => t.counts.overdue + t.counts.expired + t.counts.due + t.counts.expiring > 0)
+      .filter(
+        (t) =>
+          t.counts.overdue +
+            t.counts.expired +
+            t.counts.due +
+            t.counts.expiring >
+          0
+      )
       .slice(0, 5)
       .map((t) => ({
         courseId: t.courseId,

@@ -17,21 +17,10 @@ import { cn } from "@workspace/ui/lib/utils"
 import { useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import type { ApiResult } from "@/lib/api/types"
+import type { myNotifications } from "@/features/notifications/server"
 
-interface Notices {
-  reminders: { id: string; kind: string; title: string; body: string; href: string }[]
-  notifications: {
-    id: string
-    kind: string
-    title: string
-    body: string
-    href: string
-    readAt: string | null
-    createdAt: string
-  }[]
-  unread: number
-  email: { on: boolean; available: boolean }
-}
+type Notices = ApiResult<typeof myNotifications>
 
 const KEY = ["me", "notifications"]
 
@@ -79,7 +68,9 @@ export function NotificationBell() {
         data-testid="notifications"
       >
         <div className="flex items-center justify-between border-b border-hairline px-3 py-2">
-          <span className="text-body-sm font-semibold text-ink">Notifications</span>
+          <span className="text-body-sm font-semibold text-ink">
+            Notifications
+          </span>
           {(data?.unread ?? 0) > 0 && (
             <Button
               variant="link"
@@ -126,7 +117,9 @@ export function NotificationBell() {
               >
                 {n.title}
               </div>
-              {n.body && <div className="line-clamp-2 text-caption">{n.body}</div>}
+              {n.body && (
+                <div className="line-clamp-2 text-caption">{n.body}</div>
+              )}
               <div className="text-xs text-muted-foreground">
                 {formatDateTime(n.createdAt)}
               </div>

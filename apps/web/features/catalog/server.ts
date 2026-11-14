@@ -253,7 +253,10 @@ async function dailyQuestionsOf(day: string) {
 export async function getDaily(viewer: User | null) {
   await requireFeature("daily.enabled")
   const day = await today()
-  const [problemId, qs] = await Promise.all([dailyProblemId(day), dailyQuestionsOf(day)])
+  const [problemId, qs] = await Promise.all([
+    dailyProblemId(day),
+    dailyQuestionsOf(day),
+  ])
   if (!problemId && qs.length === 0) return null
   const [problem] = problemId
     ? await getDb()
@@ -276,7 +279,9 @@ export async function getDaily(viewer: User | null) {
       answers = await getDb()
         .select()
         .from(dailyAnswers)
-        .where(and(eq(dailyAnswers.day, day), eq(dailyAnswers.userId, viewer.id)))
+        .where(
+          and(eq(dailyAnswers.day, day), eq(dailyAnswers.userId, viewer.id))
+        )
     }
   }
   return {
@@ -294,10 +299,16 @@ export async function getDaily(viewer: User | null) {
         kind: q.kind,
         prompt: q.prompt,
         options: q.options,
-        answer: answered ? { value: answered.answer, correct: answered.correct } : null,
+        answer: answered
+          ? { value: answered.answer, correct: answered.correct }
+          : null,
         // Once answered, the right answer and why.
         solution: answered
-          ? { correct: q.correct, accepted: q.accepted, explanation: q.explanation }
+          ? {
+              correct: q.correct,
+              accepted: q.accepted,
+              explanation: q.explanation,
+            }
           : null,
       }
     }),
@@ -321,9 +332,20 @@ export async function answerDaily(
     .onConflictDoNothing()
     .returning()
   if (!saved) {
-    throw new ApiError(409, "already_answered", "You've already answered this question today.")
+    throw new ApiError(
+      409,
+      "already_answered",
+      "You've already answered this question today."
+    )
   }
-  return { correct, solution: { correct: q.correct, accepted: q.accepted, explanation: q.explanation } }
+  return {
+    correct,
+    solution: {
+      correct: q.correct,
+      accepted: q.accepted,
+      explanation: q.explanation,
+    },
+  }
 }
 
 /**
@@ -338,7 +360,11 @@ export async function scheduleDaily(
   const db = getDb()
   const ids = [...new Set(questionIds)]
   if (ids.length > MAX_DAILY_QUESTIONS) {
-    throw new ApiError(400, "too_many", `At most ${MAX_DAILY_QUESTIONS} questions a day.`)
+    throw new ApiError(
+      400,
+      "too_many",
+      `At most ${MAX_DAILY_QUESTIONS} questions a day.`
+    )
   }
   if (!problemSlug && ids.length === 0) {
     await db.delete(dailyChallenges).where(eq(dailyChallenges.day, day))
@@ -356,7 +382,11 @@ export async function scheduleDaily(
   }
   const usable = await usableQuestions(ids, null, true)
   if (usable.some((q) => q.orgId !== null)) {
-    throw new ApiError(400, "private_question", "The daily challenge uses the platform's questions.")
+    throw new ApiError(
+      400,
+      "private_question",
+      "The daily challenge uses the platform's questions."
+    )
   }
   await db.transaction(async (tx) => {
     await tx
@@ -367,7 +397,9 @@ export async function scheduleDaily(
     if (ids.length) {
       await tx
         .insert(dailyQuestions)
-        .values(ids.map((questionId, position) => ({ day, questionId, position })))
+        .values(
+          ids.map((questionId, position) => ({ day, questionId, position }))
+        )
     }
   })
 }
@@ -835,7 +867,8 @@ export async function createList(
       slug: `${base}-${suffix}`,
     })
     .returning()
-  return list
+  // An insert returns its row.
+  return list!
 }
 
 export async function updateList(

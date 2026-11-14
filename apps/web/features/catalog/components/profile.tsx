@@ -12,22 +12,11 @@ import { formatDate } from "@/lib/format"
 
 import { Difficulty } from "./difficulty"
 import { Heatmap } from "./heatmap"
+import type { ApiResult } from "@/lib/api/types"
+import type { getProfile } from "@/features/catalog/server"
+import type { getLeaderboard } from "@/features/catalog/server"
 
-interface Profile {
-  handle: string
-  name: string
-  role: string
-  joinedAt: string
-  solved: number
-  solvedBy: Record<"easy" | "medium" | "hard", number>
-  totalBy: Record<"easy" | "medium" | "hard", number>
-  streak: { current: number; longest: number }
-  heatmap: Record<string, number>
-  today: string
-  badges: { id: string; name: string; description: string }[]
-  contests: { slug: string; title: string; startsAt: string }[]
-  recent: { slug: string; title: string; at: string }[]
-}
+type Profile = ApiResult<typeof getProfile>
 
 function Bar({ value, total }: { value: number; total: number }) {
   return (
@@ -175,10 +164,7 @@ export function GlobalLeaderboard() {
   const { data: viewer } = useViewer()
   const { data, error } = useQuery({
     queryKey: ["leaderboard", "global"],
-    queryFn: () =>
-      api<{ rank: number; handle: string; name: string; solved: number }[]>(
-        "/leaderboard"
-      ),
+    queryFn: () => api<ApiResult<typeof getLeaderboard>>("/leaderboard"),
   })
   if (!data) return <Loading error={error} />
   const me = viewer?.user?.handle
@@ -196,9 +182,7 @@ export function GlobalLeaderboard() {
             {
               label: "Your rank",
               value: mine ? `#${mine.rank}` : "—",
-              hint: mine
-                ? `${mine.solved} solved`
-                : "Solve a problem to join",
+              hint: mine ? `${mine.solved} solved` : "Solve a problem to join",
             },
             { label: "Most solved", value: data[0]!.solved },
           ]}

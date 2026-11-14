@@ -20,52 +20,12 @@ import { formatDateTime } from "@/lib/format"
 import { ContestQuestions, type ContestQuestion } from "./contest-questions"
 import { Countdown } from "./countdown"
 import { PhaseBadge } from "./contest-list"
+import type { ApiResult } from "@/lib/api/types"
+import type { getContestView, getLeaderboard } from "@/features/contests/server"
 
-interface ContestView {
-  classes: { name: string; href: string }[]
-  id: string
-  title: string
-  description: string
-  startsAt: string
-  endsAt: string
-  scoring: "icpc" | "ioi"
-  penaltyMinutes: number
-  freezeMinutes: number
-  phase: "upcoming" | "live" | "ended"
-  published: boolean
-  participants: number
-  registered: boolean
-  registrationOpen: boolean
-  problems: {
-    id: string
-    label: string
-    title: string
-    level: string
-    status: "solved" | "tried" | null
-  }[]
-  questions: ContestQuestion[]
-}
+type ContestView = ApiResult<typeof getContestView>
 
-interface Leaderboard {
-  scoring: "icpc" | "ioi"
-  problemLabels: string[]
-  frozen: boolean
-  rows: {
-    rank: number
-    user: { id: string; name: string }
-    solved: number
-    penalty: number
-    score: number
-    problems: {
-      label: string
-      solved: boolean
-      attempts: number
-      solvedAtMinutes: number | null
-      score: number
-      pending: number
-    }[]
-  }[]
-}
+type Leaderboard = ApiResult<typeof getLeaderboard>
 
 const REFRESH_MS = 15_000
 const TABS = ["Problems", "Leaderboard", "My submissions", "Rules"] as const
@@ -259,38 +219,38 @@ function ProblemsTab({
   }
   return (
     <>
-    {contest.problems.length > 0 && (
-    <Table headers={["", "Problem", "Level", "Your result"]}>
-      {contest.problems.map((problem) => (
-        <tr key={problem.label}>
-          <td className="w-8 font-semibold">{problem.label}</td>
-          <td>
-            <Link
-              className="underline-offset-2 hover:underline"
-              href={`/contests/${slug}/problems/${problem.label}`}
-            >
-              {problem.title}
-            </Link>
-          </td>
-          <td className="capitalize">{problem.level}</td>
-          <td>
-            {problem.status === "solved" && (
-              <span className="text-success">Solved</span>
-            )}
-            {problem.status === "tried" && (
-              <span className="text-destructive">Attempted</span>
-            )}
-            {!problem.status && <span className="text-body">—</span>}
-          </td>
-        </tr>
-      ))}
-    </Table>
-    )}
-    <ContestQuestions
-      slug={slug}
-      questions={contest.questions}
-      canAnswer={contest.phase === "live" && contest.registered}
-    />
+      {contest.problems.length > 0 && (
+        <Table headers={["", "Problem", "Level", "Your result"]}>
+          {contest.problems.map((problem) => (
+            <tr key={problem.label}>
+              <td className="w-8 font-semibold">{problem.label}</td>
+              <td>
+                <Link
+                  className="underline-offset-2 hover:underline"
+                  href={`/contests/${slug}/problems/${problem.label}`}
+                >
+                  {problem.title}
+                </Link>
+              </td>
+              <td className="capitalize">{problem.level}</td>
+              <td>
+                {problem.status === "solved" && (
+                  <span className="text-success">Solved</span>
+                )}
+                {problem.status === "tried" && (
+                  <span className="text-destructive">Attempted</span>
+                )}
+                {!problem.status && <span className="text-body">—</span>}
+              </td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      <ContestQuestions
+        slug={slug}
+        questions={contest.questions}
+        canAnswer={contest.phase === "live" && contest.registered}
+      />
     </>
   )
 }

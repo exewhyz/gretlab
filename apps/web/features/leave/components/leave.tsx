@@ -45,51 +45,23 @@ import {
 } from "@/components/form"
 import { Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { leaveHome } from "@/features/leave/server"
+import type { leaveTypes, listRequests } from "@/features/leave/server"
 
-interface Request {
-  id: string
-  kind: "student" | "staff"
-  userId: string
-  name: string
-  class: string | null
-  type: string
-  typeName: string
-  startsOn: string
-  endsOn: string
-  halfDay: boolean
-  days: number
-  reason: string
-  status: "pending" | "approved" | "rejected" | "cancelled"
-  requestedBy: string | null
-  decidedBy: string | null
-  note: string
-}
+type Request = ApiResult<typeof listRequests>["requests"][number]
 
-interface LeaveType {
-  key: string
-  name: string
-  days: number | null
-}
+type LeaveType = ApiResult<typeof leaveTypes>["types"][number]
 
-interface Home {
-  today: string
-  schoolDays: number[]
-  students: { id: string; name: string; self: boolean }[]
-  staff: boolean
-  studentTypes: { key: string; name: string }[]
-  staffTypes: LeaveType[]
-  balances: {
-    year: string
-    types: (LeaveType & { used: number; left: number | null })[]
-  } | null
-  mine: Request[]
-  waiting: Request[]
-  canDecideStaff: boolean
-  canDecide: boolean
-  canSeeAll?: boolean
-}
+type Home = ApiResult<typeof leaveHome>
 
-const STATUS: Record<Request["status"], { label: string; variant: "default" | "outline" | "secondary" | "destructive" }> = {
+const STATUS: Record<
+  Request["status"],
+  {
+    label: string
+    variant: "default" | "outline" | "secondary" | "destructive"
+  }
+> = {
   pending: { label: "Waiting", variant: "outline" },
   approved: { label: "Approved", variant: "default" },
   rejected: { label: "Refused", variant: "destructive" },
@@ -114,7 +86,11 @@ const plural = (n: number) => `${n} ${n === 1 ? "day" : "days"}`
 function countDays(from: string, to: string, half: boolean, days: number[]) {
   if (!from || !to || to < from) return 0
   let n = 0
-  for (let t = Date.parse(`${from}T00:00:00Z`); t <= Date.parse(`${to}T00:00:00Z`); t += 86_400_000) {
+  for (
+    let t = Date.parse(`${from}T00:00:00Z`);
+    t <= Date.parse(`${to}T00:00:00Z`);
+    t += 86_400_000
+  ) {
     if (days.includes(((new Date(t).getUTCDay() + 6) % 7) + 1)) n++
   }
   return half ? Math.min(n, 1) / 2 : n
@@ -129,10 +105,14 @@ export function LeavePage({ slug }: { slug: string }) {
   })
   const [asking, setAsking] = useState(false)
   const [types, setTypes] = useState(false)
-  const [deciding, setDeciding] = useState<{ r: Request; status: "approved" | "rejected" } | null>(null)
+  const [deciding, setDeciding] = useState<{
+    r: Request
+    status: "approved" | "rejected"
+  } | null>(null)
   const refresh = () => client.invalidateQueries({ queryKey: ["org", slug] })
   const cancel = useMutation({
-    mutationFn: (id: string) => api(`/orgs/${slug}/leave/${id}/cancel`, { body: {} }),
+    mutationFn: (id: string) =>
+      api(`/orgs/${slug}/leave/${id}/cancel`, { body: {} }),
     onSuccess: () => void refresh(),
   })
   if (!data) return <Loading error={error} />
@@ -158,11 +138,17 @@ export function LeavePage({ slug }: { slug: string }) {
         Leave
       </PageTitle>
       {data.balances && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="leave-balances">
+        <div
+          className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4"
+          data-testid="leave-balances"
+        >
           {data.balances.types.map((t) => (
-            <div key={t.key} className="rounded-lg border border-hairline bg-card p-3">
+            <div
+              key={t.key}
+              className="rounded-lg border border-hairline bg-card p-3"
+            >
               <div className="text-caption text-muted-foreground">{t.name}</div>
-              <div className="text-title-md tabular-nums text-ink">
+              <div className="text-title-md text-ink tabular-nums">
                 {t.left == null ? `${t.used} used` : `${t.left} left`}
               </div>
               {t.days != null && (
@@ -174,7 +160,9 @@ export function LeavePage({ slug }: { slug: string }) {
           ))}
         </div>
       )}
-      {cancel.error && <FormMessage message={{ text: cancel.error.message, kind: "err" }} />}
+      {cancel.error && (
+        <FormMessage message={{ text: cancel.error.message, kind: "err" }} />
+      )}
       <Tabs defaultValue={data.waiting.length ? "waiting" : "mine"}>
         <TabsList>
           {data.canDecide && (
@@ -189,7 +177,9 @@ export function LeavePage({ slug }: { slug: string }) {
           )}
           <TabsTrigger value="mine">Mine</TabsTrigger>
           {data.canDecide && <TabsTrigger value="decided">Decided</TabsTrigger>}
-          {!data.canDecide && data.canSeeAll && <TabsTrigger value="all">All requests</TabsTrigger>}
+          {!data.canDecide && data.canSeeAll && (
+            <TabsTrigger value="all">All requests</TabsTrigger>
+          )}
         </TabsList>
         {data.canDecide && (
           <TabsContent value="waiting" className="mt-3">
@@ -199,10 +189,17 @@ export function LeavePage({ slug }: { slug: string }) {
               testId="waiting"
               actions={(r) => (
                 <>
-                  <Button size="sm" variant="outline" onClick={() => setDeciding({ r, status: "rejected" })}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDeciding({ r, status: "rejected" })}
+                  >
                     Refuse
                   </Button>
-                  <Button size="sm" onClick={() => setDeciding({ r, status: "approved" })}>
+                  <Button
+                    size="sm"
+                    onClick={() => setDeciding({ r, status: "approved" })}
+                  >
                     Approve
                   </Button>
                 </>
@@ -213,10 +210,13 @@ export function LeavePage({ slug }: { slug: string }) {
         <TabsContent value="mine" className="mt-3">
           <RequestList
             rows={data.mine}
-            empty={canAsk ? "You haven't asked for leave yet." : "Nothing here."}
+            empty={
+              canAsk ? "You haven't asked for leave yet." : "Nothing here."
+            }
             testId="mine"
             actions={(r) =>
-              r.status === "pending" || (r.status === "approved" && r.startsOn > data.today) ? (
+              r.status === "pending" ||
+              (r.status === "approved" && r.startsOn > data.today) ? (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -241,7 +241,11 @@ export function LeavePage({ slug }: { slug: string }) {
         )}
       </Tabs>
       {asking && (
-        <AskDialog slug={slug} home={data} onDone={(changed) => (setAsking(false), changed && void refresh())} />
+        <AskDialog
+          slug={slug}
+          home={data}
+          onDone={(changed) => (setAsking(false), changed && void refresh())}
+        />
       )}
       {deciding && (
         <DecideDialog
@@ -251,7 +255,12 @@ export function LeavePage({ slug }: { slug: string }) {
           onDone={(changed) => (setDeciding(null), changed && void refresh())}
         />
       )}
-      {types && <TypesDialog slug={slug} onDone={(changed) => (setTypes(false), changed && void refresh())} />}
+      {types && (
+        <TypesDialog
+          slug={slug}
+          onDone={(changed) => (setTypes(false), changed && void refresh())}
+        />
+      )}
     </>
   )
 }
@@ -282,7 +291,9 @@ function RequestList({
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center gap-2">
               {r.name}
-              <Badge variant={STATUS[r.status].variant}>{STATUS[r.status].label}</Badge>
+              <Badge variant={STATUS[r.status].variant}>
+                {STATUS[r.status].label}
+              </Badge>
             </CardTitle>
             <CardDescription className="grid gap-0.5">
               <span>
@@ -294,14 +305,20 @@ function RequestList({
               {r.requestedBy && <span>Asked by {r.requestedBy}</span>}
               {r.decidedBy && (
                 <span>
-                  {r.status === "approved" ? "Approved" : r.status === "rejected" ? "Refused" : "Decided"} by{" "}
-                  {r.decidedBy}
+                  {r.status === "approved"
+                    ? "Approved"
+                    : r.status === "rejected"
+                      ? "Refused"
+                      : "Decided"}{" "}
+                  by {r.decidedBy}
                   {r.note && `: ${r.note}`}
                 </span>
               )}
             </CardDescription>
             {actions && (
-              <CardAction className="flex flex-wrap justify-end gap-2">{actions(r)}</CardAction>
+              <CardAction className="flex flex-wrap justify-end gap-2">
+                {actions(r)}
+              </CardAction>
             )}
           </CardHeader>
         </Card>
@@ -316,7 +333,7 @@ function Decided({ slug }: { slug: string }) {
   const { data, error } = useQuery({
     queryKey: ["org", slug, "leave", "requests", status, kind],
     queryFn: () =>
-      api<{ total: number; requests: Request[] }>(
+      api<ApiResult<typeof listRequests>>(
         `/orgs/${slug}/leave/requests?${new URLSearchParams({ status, kind })}`
       ),
   })
@@ -325,7 +342,10 @@ function Decided({ slug }: { slug: string }) {
       <div className="flex flex-wrap gap-3">
         <div className="w-40">
           <Field label="Status">
-            <SelectInput value={status} onChange={(e) => setStatus(e.target.value)}>
+            <SelectInput
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
               <option value="approved">Approved</option>
               <option value="rejected">Refused</option>
               <option value="cancelled">Taken back</option>
@@ -363,7 +383,10 @@ function AskDialog({
 }) {
   const options = [
     ...(home.staff ? [{ id: "", name: "Myself (staff leave)" }] : []),
-    ...home.students.map((s) => ({ id: s.id, name: s.self ? "Myself" : s.name })),
+    ...home.students.map((s) => ({
+      id: s.id,
+      name: s.self ? "Myself" : s.name,
+    })),
   ]
   const [form, setForm] = useState({
     studentId: options[0]?.id ?? "",
@@ -377,10 +400,18 @@ function AskDialog({
   const types = staffLeave ? home.staffTypes : home.studentTypes
   const type = form.type || types[0]?.key || ""
   const days = useMemo(
-    () => countDays(form.startsOn, form.endsOn, form.halfDay && form.startsOn === form.endsOn, home.schoolDays),
+    () =>
+      countDays(
+        form.startsOn,
+        form.endsOn,
+        form.halfDay && form.startsOn === form.endsOn,
+        home.schoolDays
+      ),
     [form, home.schoolDays]
   )
-  const balance = staffLeave ? home.balances?.types.find((t) => t.key === type) : null
+  const balance = staffLeave
+    ? home.balances?.types.find((t) => t.key === type)
+    : null
   const save = useMutation({
     mutationFn: () =>
       api(`/orgs/${slug}/leave`, {
@@ -406,12 +437,17 @@ function AskDialog({
               : "It goes to the class teacher."}
           </DialogDescription>
         </DialogHeader>
-        <form className="grid gap-3" onSubmit={(e) => (e.preventDefault(), save.mutate())}>
+        <form
+          className="grid gap-3"
+          onSubmit={(e) => (e.preventDefault(), save.mutate())}
+        >
           {options.length > 1 && (
             <Field label="For">
               <SelectInput
                 value={form.studentId}
-                onChange={(e) => setForm({ ...form, studentId: e.target.value, type: "" })}
+                onChange={(e) =>
+                  setForm({ ...form, studentId: e.target.value, type: "" })
+                }
               >
                 {options.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -422,7 +458,10 @@ function AskDialog({
             </Field>
           )}
           <Field label={staffLeave ? "Kind of leave" : "Reason"}>
-            <SelectInput value={type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+            <SelectInput
+              value={type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+            >
               {types.map((t) => (
                 <option key={t.key} value={t.key}>
                   {t.name}
@@ -439,7 +478,10 @@ function AskDialog({
                   setForm({
                     ...form,
                     startsOn: e.target.value,
-                    endsOn: form.endsOn < e.target.value ? e.target.value : form.endsOn,
+                    endsOn:
+                      form.endsOn < e.target.value
+                        ? e.target.value
+                        : form.endsOn,
                   })
                 }
               />
@@ -465,15 +507,27 @@ function AskDialog({
               maxLength={500}
               value={form.reason}
               onChange={(e) => setForm({ ...form, reason: e.target.value })}
-              placeholder={staffLeave ? "Anything the office should know" : "Fever since last night"}
+              placeholder={
+                staffLeave
+                  ? "Anything the office should know"
+                  : "Fever since last night"
+              }
             />
           </Field>
-          <p className={cn("text-body-sm", days === 0 ? "text-destructive" : "text-muted-foreground")} data-testid="leave-days">
+          <p
+            className={cn(
+              "text-body-sm",
+              days === 0 ? "text-destructive" : "text-muted-foreground"
+            )}
+            data-testid="leave-days"
+          >
             {days === 0
               ? "Those are all days off."
               : `${plural(days)} of school${balance && balance.left != null ? `; ${balance.left} left` : ""}.`}
           </p>
-          {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+          {save.error && (
+            <FormMessage message={{ text: save.error.message, kind: "err" }} />
+          )}
           <DialogFooter>
             <Button type="submit" disabled={days === 0 || save.isPending}>
               Ask for leave
@@ -498,7 +552,10 @@ function DecideDialog({
 }) {
   const [note, setNote] = useState("")
   const save = useMutation({
-    mutationFn: () => api(`/orgs/${slug}/leave/${request.id}/decision`, { body: { status, note } }),
+    mutationFn: () =>
+      api(`/orgs/${slug}/leave/${request.id}/decision`, {
+        body: { status, note },
+      }),
     onSuccess: () => onDone(true),
   })
   const approve = status === "approved"
@@ -511,13 +568,21 @@ function DecideDialog({
           </DialogTitle>
           <DialogDescription>
             {when(request)} · {plural(request.days)} · {request.typeName}
-            {approve && request.kind === "student" && ". Any absences on those days become excused."}
+            {approve &&
+              request.kind === "student" &&
+              ". Any absences on those days become excused."}
           </DialogDescription>
         </DialogHeader>
         <Field label={approve ? "Note (optional)" : "Why (optional)"}>
-          <TextArea maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />
+          <TextArea
+            maxLength={300}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
         </Field>
-        {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button
             variant={approve ? "default" : "destructive"}
@@ -532,14 +597,29 @@ function DecideDialog({
   )
 }
 
-function TypesDialog({ slug, onDone }: { slug: string; onDone: (changed: boolean) => void }) {
+function TypesDialog({
+  slug,
+  onDone,
+}: {
+  slug: string
+  onDone: (changed: boolean) => void
+}) {
   const { data, error } = useQuery({
     queryKey: ["org", slug, "leave", "types"],
-    queryFn: () => api<{ types: LeaveType[] }>(`/orgs/${slug}/leave/types`),
+    queryFn: () =>
+      api<ApiResult<typeof leaveTypes>>(`/orgs/${slug}/leave/types`),
   })
-  const [rows, setRows] = useState<{ key?: string; name: string; days: string }[] | null>(null)
+  const [rows, setRows] = useState<
+    { key?: string; name: string; days: string }[] | null
+  >(null)
   const list =
-    rows ?? data?.types.map((t) => ({ key: t.key, name: t.name, days: t.days == null ? "" : String(t.days) })) ?? []
+    rows ??
+    data?.types.map((t) => ({
+      key: t.key,
+      name: t.name,
+      days: t.days == null ? "" : String(t.days),
+    })) ??
+    []
   const set = (i: number, patch: Partial<(typeof list)[number]>) =>
     setRows(list.map((r, j) => (j === i ? { ...r, ...patch } : r)))
   const save = useMutation({
@@ -561,7 +641,9 @@ function TypesDialog({ slug, onDone }: { slug: string; onDone: (changed: boolean
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Kinds of staff leave</DialogTitle>
-          <DialogDescription>Days a year for each; leave it blank for no limit.</DialogDescription>
+          <DialogDescription>
+            Days a year for each; leave it blank for no limit.
+          </DialogDescription>
         </DialogHeader>
         {!data ? (
           <Loading error={error} />
@@ -569,7 +651,11 @@ function TypesDialog({ slug, onDone }: { slug: string; onDone: (changed: boolean
           <div className="grid gap-2">
             {list.map((r, i) => (
               <div key={i} className="grid grid-cols-[1fr_6rem_auto] gap-2">
-                <TextInput aria-label={`Leave ${i + 1} name`} value={r.name} onChange={(e) => set(i, { name: e.target.value })} />
+                <TextInput
+                  aria-label={`Leave ${i + 1} name`}
+                  value={r.name}
+                  onChange={(e) => set(i, { name: e.target.value })}
+                />
                 <TextInput
                   aria-label={`Leave ${i + 1} days`}
                   type="number"
@@ -598,9 +684,14 @@ function TypesDialog({ slug, onDone }: { slug: string; onDone: (changed: boolean
             </Button>
           </div>
         )}
-        {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
-          <Button onClick={() => save.mutate()} disabled={!rows || save.isPending}>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={!rows || save.isPending}
+          >
             Save
           </Button>
         </DialogFooter>

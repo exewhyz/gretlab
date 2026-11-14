@@ -39,6 +39,8 @@ import { useLocalStore } from "../lib/local-store"
 import { progressStore, saveLayout, saveQuestionStatus } from "../lib/stores"
 import type { ProblemDetail, ProblemSummary } from "../types"
 import { usePythonEngine } from "./use-python-engine"
+import type { ApiResult } from "@/lib/api/types"
+import type { getSubmissionStatus } from "@/features/submissions/server"
 
 export type OutputTab = "cases" | "result"
 
@@ -86,11 +88,7 @@ const POLL_TIMEOUT_MS = 180_000
 /** Most programs print something on the first run; ten is more than anyone needs by hand. */
 export const MAX_RUN_CASES = 10
 
-interface SubmissionStatus {
-  status: SubmissionResponse["status"]
-  position: number | null
-  nextPollMs: number
-}
+type SubmissionStatus = ApiResult<typeof getSubmissionStatus>
 
 const BACKOFF_ON_ERROR_MS = 2000
 

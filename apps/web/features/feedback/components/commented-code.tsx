@@ -10,6 +10,8 @@ import { ConfirmButton } from "@/components/confirm"
 import { SelectInput, TextArea } from "@/components/form"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import type { ApiResult } from "@/lib/api/types"
+import type { mySnippets } from "@/features/feedback/server"
 
 export interface LineComment {
   id: string
@@ -132,7 +134,7 @@ function CommentBox({
   const [saving, setSaving] = useState(false)
   const snippets = useQuery({
     queryKey: ["snippets"],
-    queryFn: () => api<{ id: string; body: string }[]>("/me/snippets"),
+    queryFn: () => api<ApiResult<typeof mySnippets>>("/me/snippets"),
   })
   async function save() {
     if (!body.trim()) return setError("Write the comment first.")

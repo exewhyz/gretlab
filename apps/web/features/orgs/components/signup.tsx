@@ -20,6 +20,8 @@ import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { KindPicker } from "@/features/orgs/components/kind-picker"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { signUpOrganization } from "@/features/orgs/server"
 
 const toSlug = (name: string) =>
   name
@@ -63,7 +65,7 @@ export function SchoolSignup() {
     .filter(Boolean)
   const send = useMutation({
     mutationFn: () =>
-      api<{ slug: string; name: string; pending: boolean }>("/schools", {
+      api<ApiResult<typeof signUpOrganization>>("/schools", {
         body: {
           ...form,
           year: withYear ? yearForm : null,

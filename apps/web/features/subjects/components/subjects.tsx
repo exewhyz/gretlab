@@ -25,6 +25,9 @@ import {
 import { Loading, PageTitle, Table } from "@/features/admin/components/shell"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { listSubjects } from "@/features/subjects/server"
+import type { subjectTeachers } from "@/features/subjects/server"
 
 interface Subject {
   id: string
@@ -41,14 +44,7 @@ interface Subject {
   }[]
 }
 
-interface Data {
-  can: { create: boolean; edit: boolean; delete: boolean; assign: boolean }
-  usesCredits?: boolean
-  levels: string[]
-  choosable: string[]
-  groups: { id: string; name: string; parentId: string | null }[]
-  subjects: Subject[]
-}
+type Data = ApiResult<typeof listSubjects>
 
 /** Manage › Subjects: the subjects taught, and which classes take each and who teaches it. */
 export function ManageSubjects({ slug }: { slug: string }) {
@@ -331,7 +327,7 @@ function AssignDialog({
   const teachers = useQuery({
     queryKey: ["org", slug, "subjects", "teachers", groupId],
     queryFn: () =>
-      api<{ id: string; name: string }[]>(
+      api<ApiResult<typeof subjectTeachers>>(
         `/orgs/${slug}/subjects/teachers?groupId=${groupId}`
       ),
     enabled: Boolean(groupId),

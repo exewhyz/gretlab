@@ -17,6 +17,8 @@ import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
 import { api } from "@/lib/api/client"
 
 import { Loading, PageTitle, Table } from "./shell"
+import type { ApiResult } from "@/lib/api/types"
+import type { listUnitsForStaff } from "@/features/problems/server"
 
 interface Unit {
   id: string
@@ -25,11 +27,7 @@ interface Unit {
   problems: { id: string; slug: string; title: string; published: boolean }[]
 }
 
-interface Units {
-  units: Unit[]
-  unplaced: number
-  problems: (Unit["problems"][number] & { unitId: string | null })[]
-}
+type Units = ApiResult<typeof listUnitsForStaff>
 
 const KEY = ["admin", "units"]
 
@@ -39,7 +37,10 @@ const KEY = ["admin", "units"]
  */
 export function AdminUnits() {
   const client = useQueryClient()
-  const { data, error } = useQuery({ queryKey: KEY, queryFn: () => api<Units>("/admin/units") })
+  const { data, error } = useQuery({
+    queryKey: KEY,
+    queryFn: () => api<Units>("/admin/units"),
+  })
   const [name, setName] = useState("")
   const [editing, setEditing] = useState<Unit | null>(null)
   const [deleting, setDeleting] = useState<Unit | null>(null)
@@ -55,7 +56,8 @@ export function AdminUnits() {
     },
   })
   const reorder = useMutation({
-    mutationFn: (ids: string[]) => api("/admin/units", { method: "PUT", body: { ids } }),
+    mutationFn: (ids: string[]) =>
+      api("/admin/units", { method: "PUT", body: { ids } }),
     onSuccess: refresh,
   })
   if (!data) return <Loading error={error} />
@@ -69,10 +71,10 @@ export function AdminUnits() {
     <>
       <PageTitle>Units</PageTitle>
       <p className="mb-3 max-w-3xl text-body-sm text-body">
-        The course outline of the problem library: units in order, and the problems inside
-        each.
-        {data.unplaced > 0 && ` ${data.unplaced} problems are in no unit.`} Add, remove and
-        move problems from a unit's Edit.
+        The course outline of the problem library: units in order, and the
+        problems inside each.
+        {data.unplaced > 0 && ` ${data.unplaced} problems are in no unit.`} Add,
+        remove and move problems from a unit's Edit.
       </p>
       <form
         className="mb-4 flex max-w-md gap-2"
@@ -92,15 +94,20 @@ export function AdminUnits() {
         </Button>
       </form>
       {(add.error || reorder.error) && (
-        <FormMessage message={{ text: (add.error ?? reorder.error)!.message, kind: "err" }} />
+        <FormMessage
+          message={{ text: (add.error ?? reorder.error)!.message, kind: "err" }}
+        />
       )}
       <Table headers={["", "Unit", "Problems", ""]}>
         {data.units.map((unit, index) => (
           <tr key={unit.id} data-testid="unit-row">
-            <td className="w-12 tabular-nums text-body">{index + 1}</td>
+            <td className="w-12 text-body tabular-nums">{index + 1}</td>
             <td className="text-ink">{unit.name}</td>
             <td className="max-w-96">
-              <span className="block truncate" title={unit.problems.map((p) => p.title).join("\n")}>
+              <span
+                className="block truncate"
+                title={unit.problems.map((p) => p.title).join("\n")}
+              >
                 {unit.problems.length}{" "}
                 <span className="text-body">
                   {unit.problems.length
@@ -220,7 +227,8 @@ function UnitDialog({
   const sendAway = (id: string, to: string | null) => {
     setOrder((o) => o.filter((x) => x !== id))
     // Only problems that were here need a destination; one added and removed again just isn't added.
-    if (unit.problems.some((p) => p.id === id)) setMoves((m) => ({ ...m, [id]: to }))
+    if (unit.problems.some((p) => p.id === id))
+      setMoves((m) => ({ ...m, [id]: to }))
   }
   const bring = (id: string) => {
     setOrder((o) => [...o, id])
@@ -234,28 +242,43 @@ function UnitDialog({
     (p) =>
       !order.includes(p.id) &&
       !(p.id in moves) &&
-      (!query || p.title.toLowerCase().includes(query) || p.slug.includes(query))
+      (!query ||
+        p.title.toLowerCase().includes(query) ||
+        p.slug.includes(query))
   )
   const leaving = Object.entries(moves)
   return (
     <Dialog open onOpenChange={(open) => !open && onDone()}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-4xl" data-testid="unit-dialog">
+      <DialogContent
+        className="max-h-[92dvh] overflow-y-auto sm:max-w-4xl"
+        data-testid="unit-dialog"
+      >
         <DialogHeader>
           <DialogTitle>Edit unit</DialogTitle>
           <DialogDescription>
-            Its name, which problems are in it, and the order the library shows them.
-            Moving a problem here takes it out of its old unit. Nothing changes until you save.
+            Its name, which problems are in it, and the order the library shows
+            them. Moving a problem here takes it out of its old unit. Nothing
+            changes until you save.
           </DialogDescription>
         </DialogHeader>
         <Field label="Name">
-          <TextInput aria-label="Unit name" value={name} onChange={(e) => setName(e.target.value)} />
+          <TextInput
+            aria-label="Unit name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </Field>
         <div className="grid gap-3 min-[901px]:grid-cols-2">
-          <div className="grid content-start gap-1 rounded-md border border-hairline p-2.5" data-testid="unit-problems">
+          <div
+            className="grid content-start gap-1 rounded-md border border-hairline p-2.5"
+            data-testid="unit-problems"
+          >
             <div className="text-caption font-medium text-ink">
               In this unit, in order ({order.length})
             </div>
-            {order.length === 0 && <p className="text-caption">None. Add some from the right.</p>}
+            {order.length === 0 && (
+              <p className="text-caption">None. Add some from the right.</p>
+            )}
             <ol className="grid max-h-80 gap-0.5 overflow-y-auto">
               {order.map((id, index) => {
                 const p = byId.get(id)
@@ -265,11 +288,15 @@ function UnitDialog({
                     data-testid="unit-problem"
                     className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 hover:bg-muted"
                   >
-                    <span className="w-6 text-caption tabular-nums">{index + 1}</span>
+                    <span className="w-6 text-caption tabular-nums">
+                      {index + 1}
+                    </span>
                     <span className="min-w-0 flex-1 truncate text-body-sm text-ink">
                       {p?.title ?? "?"}
                     </span>
-                    {p && !p.published && <span className="text-xs text-body">Draft</span>}
+                    {p && !p.published && (
+                      <span className="text-xs text-body">Draft</span>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon-xs"
@@ -294,7 +321,10 @@ function UnitDialog({
                       value=""
                       onChange={(e) =>
                         e.target.value &&
-                        sendAway(id, e.target.value === "none" ? null : e.target.value)
+                        sendAway(
+                          id,
+                          e.target.value === "none" ? null : e.target.value
+                        )
                       }
                     >
                       <option value="">Move to…</option>
@@ -320,14 +350,28 @@ function UnitDialog({
               })}
             </ol>
             {leaving.length > 0 && (
-              <div className="mt-2 grid gap-0.5 border-t border-hairline pt-2" data-testid="unit-leaving">
-                <div className="text-caption font-medium text-ink">Leaving this unit</div>
+              <div
+                className="mt-2 grid gap-0.5 border-t border-hairline pt-2"
+                data-testid="unit-leaving"
+              >
+                <div className="text-caption font-medium text-ink">
+                  Leaving this unit
+                </div>
                 {leaving.map(([id, to]) => (
-                  <div key={id} className="flex items-center gap-2 px-1.5 text-body-sm">
+                  <div
+                    key={id}
+                    className="flex items-center gap-2 px-1.5 text-body-sm"
+                  >
                     <span className="min-w-0 flex-1 truncate">
-                      {byId.get(id)?.title} → <span className="text-body">{unitName(to)}</span>
+                      {byId.get(id)?.title} →{" "}
+                      <span className="text-body">{unitName(to)}</span>
                     </span>
-                    <Button variant="link" size="xs" className="h-auto p-0" onClick={() => bring(id)}>
+                    <Button
+                      variant="link"
+                      size="xs"
+                      className="h-auto p-0"
+                      onClick={() => bring(id)}
+                    >
                       Undo
                     </Button>
                   </div>
@@ -336,7 +380,9 @@ function UnitDialog({
             )}
           </div>
           <div className="grid content-start gap-1.5 rounded-md border border-hairline p-2.5">
-            <div className="text-caption font-medium text-ink">Add problems</div>
+            <div className="text-caption font-medium text-ink">
+              Add problems
+            </div>
             <TextInput
               aria-label="Search problems to add"
               placeholder="Search problems"
@@ -356,20 +402,29 @@ function UnitDialog({
                   >
                     <span className="flex-none text-muted-foreground">+</span>
                     <span className="min-w-0 flex-1 text-ink">{p.title}</span>
-                    <span className="text-xs text-body">{unitName(p.unitId)}</span>
+                    <span className="text-xs text-body">
+                      {unitName(p.unitId)}
+                    </span>
                   </Button>
                 </li>
               ))}
-              {addable.length === 0 && <li className="px-2 py-1 text-caption">Nothing matches.</li>}
+              {addable.length === 0 && (
+                <li className="px-2 py-1 text-caption">Nothing matches.</li>
+              )}
             </ul>
           </div>
         </div>
-        {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={onDone}>
             Cancel
           </Button>
-          <Button disabled={!name.trim() || save.isPending} onClick={() => save.mutate()}>
+          <Button
+            disabled={!name.trim() || save.isPending}
+            onClick={() => save.mutate()}
+          >
             Save unit
           </Button>
         </DialogFooter>
@@ -391,7 +446,9 @@ function DeleteUnitDialog({
   const [moveTo, setMoveTo] = useState("")
   const remove = useMutation({
     mutationFn: () =>
-      api(`/admin/units/${unit.id}${moveTo ? `?moveTo=${moveTo}` : ""}`, { method: "DELETE" }),
+      api(`/admin/units/${unit.id}${moveTo ? `?moveTo=${moveTo}` : ""}`, {
+        method: "DELETE",
+      }),
     onSuccess: onDone,
   })
   return (
@@ -422,12 +479,18 @@ function DeleteUnitDialog({
             </SelectInput>
           </Field>
         )}
-        {remove.error && <FormMessage message={{ text: remove.error.message, kind: "err" }} />}
+        {remove.error && (
+          <FormMessage message={{ text: remove.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={onDone}>
             Cancel
           </Button>
-          <Button variant="destructive" disabled={remove.isPending} onClick={() => remove.mutate()}>
+          <Button
+            variant="destructive"
+            disabled={remove.isPending}
+            onClick={() => remove.mutate()}
+          >
             Delete unit
           </Button>
         </DialogFooter>

@@ -12,13 +12,10 @@ import { useOwner } from "@/features/admin/owner"
 
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle } from "./shell"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgNotices } from "@/features/orgs/content"
 
-interface Note {
-  id: string
-  text: string
-  problemId: string | null
-  createdAt: string
-}
+type Note = ApiResult<typeof orgNotices>[number]
 
 export function AdminNotes() {
   const owner = useOwner()

@@ -9,6 +9,8 @@ import { Field, FormMessage, TextInput } from "@/components/form"
 import { api } from "@/lib/api/client"
 
 import { sendSecondStep, STEP_MESSAGES } from "../session-step"
+import type { ApiResult } from "@/lib/api/types"
+import type { emailSignInCode } from "@/features/auth/two-factor"
 
 type Mode = "app" | "email" | "backup"
 
@@ -46,7 +48,7 @@ export function SecondStep({
   const emailMe = async () => {
     setMessage(null)
     try {
-      const r = await api<{ sentTo: string; resendIn: number }>(
+      const r = await api<ApiResult<typeof emailSignInCode>>(
         "/auth/two-factor/email",
         { method: "POST" }
       )

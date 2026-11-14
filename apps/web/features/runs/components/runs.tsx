@@ -10,10 +10,19 @@ import { Checkbox } from "@workspace/ui/components/checkbox"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { Field, FormMessage, SelectInput } from "@/components/form"
-import { Card, Loading, PageTitle, Table } from "@/features/admin/components/shell"
+import {
+  Card,
+  Loading,
+  PageTitle,
+  Table,
+} from "@/features/admin/components/shell"
 import { runLabel, runPercent, runStatus } from "@/features/runs/format"
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { runProgress } from "@/features/runs/server"
+import type { listRuns } from "@/features/runs/server"
+import type { issueCertificates } from "@/features/certificates/server"
 
 /*
  * Progress: a program's runs (cohorts, batches with dates) and, for one, each learner's
@@ -21,57 +30,18 @@ import { orgPages } from "@/lib/paths"
  * managers graduate learners from here, which issues their certificates.
  */
 
-interface Runs {
-  terms: KindTerms
-  day: string
-  canEdit: boolean
-  runs: {
-    id: string
-    name: string
-    startsOn: string
-    endsOn: string
-    state: RunState
-    people: number
-    lead: string | null
-    podLevel: string
-    pods: { id: string; name: string; people: number; lead: string | null; mine: boolean }[]
-  }[]
-}
+type Runs = ApiResult<typeof listRuns>
 
-interface Progress {
-  terms: KindTerms
-  run: {
-    id: string
-    name: string
-    startsOn: string
-    endsOn: string
-    state: RunState
-    lead: string | null
-    podLevel: string
-  }
-  pods: { id: string; name: string; lead: string | null; mine: boolean }[]
-  learners: {
-    id: string
-    name: string
-    email: string
-    level: "risk" | "watch" | null
-    reasons: string[]
-    done: number
-    due: number
-    attendance: { present: number; total: number } | null
-    lastActive: string | null
-    pod: string | null
-    graduated: string | null
-  }[]
-  whole: boolean
-  canGraduate: boolean
-}
+type Progress = ApiResult<typeof runProgress>
 
 function RunBar({ state }: { state: RunState }) {
   const pct = runPercent(state)
   return (
     <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
-      <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+      <div
+        className="h-full rounded-full bg-primary"
+        style={{ width: `${pct}%` }}
+      />
     </div>
   )
 }
@@ -86,8 +56,9 @@ export function RunsList({ slug }: { slug: string }) {
     <>
       <PageTitle>Progress</PageTitle>
       <p className="-mt-2 mb-4 max-w-3xl text-body-sm text-body">
-        Each {data.terms.group.toLowerCase()} with dates and where it is, with who leads its
-        groups. Open one for each {data.terms.learner.toLowerCase()}&apos;s progress.
+        Each {data.terms.group.toLowerCase()} with dates and where it is, with
+        who leads its groups. Open one for each{" "}
+        {data.terms.learner.toLowerCase()}&apos;s progress.
       </p>
       {data.runs.length === 0 ? (
         <Card>
@@ -97,7 +68,10 @@ export function RunsList({ slug }: { slug: string }) {
               <>
                 {" "}
                 Give one its dates under{" "}
-                <Link className="text-primary underline" href={orgPages(slug).manage(`/groups`)}>
+                <Link
+                  className="text-primary underline"
+                  href={orgPages(slug).manage(`/groups`)}
+                >
                   {data.terms.groups}
                 </Link>
                 .
@@ -117,12 +91,16 @@ export function RunsList({ slug }: { slug: string }) {
                   >
                     {r.name}
                   </Link>
-                  <div className="text-caption">{runLabel(r.startsOn, r.endsOn)}</div>
+                  <div className="text-caption">
+                    {runLabel(r.startsOn, r.endsOn)}
+                  </div>
                 </div>
                 <span
                   className={cn(
                     "rounded-full px-2 py-0.5 text-xs font-medium",
-                    r.state.status === "running" ? "bg-primary/10 text-primary" : "bg-muted text-ink"
+                    r.state.status === "running"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted text-ink"
                   )}
                   data-testid="run-status"
                 >
@@ -131,19 +109,31 @@ export function RunsList({ slug }: { slug: string }) {
               </div>
               <RunBar state={r.state} />
               <div className="text-caption">
-                {r.people} {r.people === 1 ? data.terms.learner.toLowerCase() : data.terms.learners.toLowerCase()}
+                {r.people}{" "}
+                {r.people === 1
+                  ? data.terms.learner.toLowerCase()
+                  : data.terms.learners.toLowerCase()}
                 {r.lead && ` · ${data.terms.groupLead}: ${r.lead}`}
               </div>
               {r.pods.length > 0 && (
                 <ul className="grid gap-1 text-body-sm">
                   {r.pods.map((p) => (
-                    <li key={p.id} className="flex justify-between gap-2" data-testid="run-pod">
+                    <li
+                      key={p.id}
+                      className="flex justify-between gap-2"
+                      data-testid="run-pod"
+                    >
                       <span className="text-ink">
                         {p.name}
-                        {p.mine && <span className="ml-1.5 text-xs text-primary">yours</span>}
+                        {p.mine && (
+                          <span className="ml-1.5 text-xs text-primary">
+                            yours
+                          </span>
+                        )}
                       </span>
                       <span className="text-caption">
-                        {p.people} · {p.lead ?? `no ${data.terms.groupLead.toLowerCase()}`}
+                        {p.people} ·{" "}
+                        {p.lead ?? `no ${data.terms.groupLead.toLowerCase()}`}
                       </span>
                     </li>
                   ))}
@@ -180,9 +170,12 @@ export function RunProgress({ slug, runId }: { slug: string; runId: string }) {
   const [done, setDone] = useState<string | null>(null)
   const graduate = useMutation({
     mutationFn: () =>
-      api<{ issued: number }>(`/orgs/${slug}/classes/${runId}/certificates`, {
-        body: { kind: "graduation", userIds: [...picked] },
-      }),
+      api<ApiResult<typeof issueCertificates>>(
+        `/orgs/${slug}/classes/${runId}/certificates`,
+        {
+          body: { kind: "graduation", userIds: [...picked] },
+        }
+      ),
     onSuccess: (r) => {
       setDone(
         r.issued
@@ -196,7 +189,8 @@ export function RunProgress({ slug, runId }: { slug: string; runId: string }) {
   if (!data) return <Loading error={error} />
   const t = data.terms
   const rows = data.learners.filter((l) => !pod || l.pod === pod)
-  const podName = (id: string | null) => data.pods.find((p) => p.id === id)?.name ?? "—"
+  const podName = (id: string | null) =>
+    data.pods.find((p) => p.id === id)?.name ?? "—"
   const risk = rows.filter((l) => !l.graduated && l.level === "risk").length
   const watch = rows.filter((l) => !l.graduated && l.level === "watch").length
   const graduated = rows.filter((l) => l.graduated).length
@@ -227,7 +221,11 @@ export function RunProgress({ slug, runId }: { slug: string; runId: string }) {
             ["Graduated", graduated, "graduated"],
           ] as const
         ).map(([label, n, id]) => (
-          <Card key={id} className="grid gap-0.5 p-4" data-testid={`tile-${id}`}>
+          <Card
+            key={id}
+            className="grid gap-0.5 p-4"
+            data-testid={`tile-${id}`}
+          >
             <div className="text-caption">{label}</div>
             <div className="text-title-md font-semibold text-ink">{n}</div>
           </Card>
@@ -237,7 +235,9 @@ export function RunProgress({ slug, runId }: { slug: string; runId: string }) {
         {data.pods.length > 1 ? (
           <Field label={data.run.podLevel}>
             <SelectInput value={pod} onChange={(e) => setPod(e.target.value)}>
-              <option value="">{data.whole ? `All of ${data.run.name}` : "All of yours"}</option>
+              <option value="">
+                {data.whole ? `All of ${data.run.name}` : "All of yours"}
+              </option>
               {data.pods.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -250,13 +250,18 @@ export function RunProgress({ slug, runId }: { slug: string; runId: string }) {
           <span />
         )}
         {data.canGraduate && data.run.state.status !== "upcoming" && (
-          <Button disabled={picked.size === 0 || graduate.isPending} onClick={() => graduate.mutate()}>
+          <Button
+            disabled={picked.size === 0 || graduate.isPending}
+            onClick={() => graduate.mutate()}
+          >
             Graduate{picked.size > 0 && ` ${picked.size}`}
           </Button>
         )}
       </div>
       {done && <FormMessage message={{ text: done, kind: "ok" }} />}
-      {graduate.error && <FormMessage message={{ text: graduate.error.message, kind: "err" }} />}
+      {graduate.error && (
+        <FormMessage message={{ text: graduate.error.message, kind: "err" }} />
+      )}
       {rows.length === 0 ? (
         <Card>No {t.learners.toLowerCase()} here yet.</Card>
       ) : (
@@ -317,13 +322,17 @@ export function RunProgress({ slug, runId }: { slug: string; runId: string }) {
                     <span
                       className={cn(
                         "rounded-full px-2 py-0.5 text-xs font-medium",
-                        l.level === "risk" ? "bg-destructive/10 text-destructive" : "bg-muted text-ink"
+                        l.level === "risk"
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-muted text-ink"
                       )}
                       data-testid="level"
                     >
                       {l.level === "risk" ? "At risk" : "Watch"}
                     </span>
-                    <div className="mt-1 text-caption">{l.reasons.join(" · ")}</div>
+                    <div className="mt-1 text-caption">
+                      {l.reasons.join(" · ")}
+                    </div>
                   </>
                 ) : (
                   <span className="text-caption">On track</span>
@@ -335,7 +344,11 @@ export function RunProgress({ slug, runId }: { slug: string; runId: string }) {
       )}
       {data.canGraduate && choosable.length > 0 && picked.size === 0 && (
         <div className="mt-2 flex gap-2">
-          <Button size="xs" variant="ghost" onClick={() => setPicked(new Set(choosable.map((l) => l.id)))}>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => setPicked(new Set(choosable.map((l) => l.id)))}
+          >
             Choose everyone not yet graduated
           </Button>
         </div>

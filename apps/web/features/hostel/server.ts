@@ -202,7 +202,8 @@ export async function addHostel(
     .values({ ...input, orgId: ctx.org.id })
     .returning()
   await writeAudit(ctx, "hostel.add", `Added the ${input.name} hostel`)
-  return h
+  // An insert returns its row.
+  return h!
 }
 
 export async function updateHostel(

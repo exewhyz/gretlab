@@ -14,19 +14,10 @@ import type {
   QuestionStatus,
 } from "@/features/lab/types"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { getAssignmentProblem } from "@/features/assignments/server"
 
-interface AssignmentProblem {
-  assignment: {
-    slug: string
-    title: string
-    dueAt: string
-    phase: "upcoming" | "open" | "late" | "closed"
-    exam: { fullscreen: boolean; sitting: SittingView; now: string } | null
-  }
-  summaries: ProblemSummary[]
-  problem: ProblemDetail
-  status: Record<string, QuestionStatus>
-}
+type AssignmentProblem = ApiResult<typeof getAssignmentProblem>
 
 /**
  * Solving an assignment's problems on its own pages: numbered Q1, Q2 by the assignment,
@@ -50,7 +41,10 @@ export function AssignmentWorkbench({
       <div className="p-6">
         <Loading error={error} />
         {error && (
-          <Link href={`/assignments/${slug}`} className="text-caption underline">
+          <Link
+            href={`/assignments/${slug}`}
+            className="text-caption underline"
+          >
             Back to the assignment
           </Link>
         )}
@@ -81,7 +75,8 @@ export function AssignmentWorkbench({
         <div className="flex flex-none flex-wrap items-center gap-x-3 bg-ink px-4 py-2 text-caption text-canvas">
           <span className="font-semibold">{assignment.title}</span>
           {examMode && "Only submissions made during your exam count."}
-          {exam && sitting === "finished" &&
+          {exam &&
+            sitting === "finished" &&
             "Your exam is over: new submissions here don't count."}
           <Link
             href={`/assignments/${slug}`}

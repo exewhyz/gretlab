@@ -13,21 +13,12 @@ import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 
 import { Countdown } from "./countdown"
+import type { ApiResult } from "@/lib/api/types"
+import type { listContests } from "@/features/contests/server"
 
 type Phase = "upcoming" | "live" | "ended"
 
-interface ContestRow {
-  org: { name: string; slug: string | null } | null
-  id: string
-  slug: string
-  title: string
-  startsAt: string
-  endsAt: string
-  scoring: string
-  published: boolean
-  phase: Phase
-  participants: number
-}
+type ContestRow = ApiResult<typeof listContests>[number]
 
 const SECTIONS: [Phase, string][] = [
   ["live", "Live now"],

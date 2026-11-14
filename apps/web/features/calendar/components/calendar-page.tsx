@@ -12,28 +12,10 @@ import { ConfirmButton } from "@/components/confirm"
 import { Check, FormMessage, TextInput } from "@/components/form"
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { myCalendar } from "@/features/calendar/server"
 
-interface Event {
-  id: string
-  kind:
-    | "due"
-    | "exam"
-    | "contest"
-    | "peer_review"
-    | "event"
-    | "holiday"
-    | "paper"
-    | "leave"
-    | "training"
-    | "run"
-  title: string
-  start: string
-  end: string | null
-  href: string
-  detail: string
-  done: boolean
-  allDay?: boolean
-}
+type Event = ApiResult<typeof myCalendar>["events"][number]
 
 const KIND: Record<Event["kind"], { label: string; tone: string }> = {
   due: { label: "Due", tone: "bg-primary/10 text-primary" },
@@ -67,8 +49,7 @@ const time = (iso: string) =>
 export function CalendarPage() {
   const { data, error } = useQuery({
     queryKey: ["me", "calendar"],
-    queryFn: () =>
-      api<{ events: Event[]; feed: string | null }>("/me/calendar"),
+    queryFn: () => api<ApiResult<typeof myCalendar>>("/me/calendar"),
   })
   const [past, setPast] = useState(false)
   const days = useMemo(() => {
@@ -154,7 +135,7 @@ export function CalendarPage() {
                         {KIND[e.kind].label}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block line-clamp-2 text-body-sm text-ink">
+                        <span className="line-clamp-2 block text-body-sm text-ink">
                           {e.title}
                         </span>
                         <span className="block truncate text-caption">

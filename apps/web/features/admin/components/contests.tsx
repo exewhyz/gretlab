@@ -31,18 +31,11 @@ import { ImportProblemsDialog } from "./problem-import"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle, Table } from "./shell"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgContest, orgContests } from "@/features/orgs/content"
+import type { saveOrgContest } from "@/features/orgs/content"
 
-interface ContestRow {
-  id: string
-  slug: string
-  title: string
-  startsAt: string
-  endsAt: string
-  scoring: string
-  published: boolean
-  phase: "upcoming" | "live" | "ended"
-  participants: number
-}
+type ContestRow = ApiResult<typeof orgContests>[number]
 
 export function AdminContests() {
   const owner = useOwner()
@@ -149,15 +142,7 @@ interface ContestForm {
   audience: string[][]
 }
 
-interface StoredContest extends Omit<
-  ContestForm,
-  "penaltyMinutes" | "freezeMinutes" | "questions"
-> {
-  questions: { questionId: string; points: number }[]
-  updatedAt: string
-  penaltyMinutes: number
-  freezeMinutes: number
-}
+type StoredContest = ApiResult<typeof orgContest>
 
 /** A new one; made from a class page, it's for that class. */
 function blankForm(forClass: string | null): ContestForm {
@@ -532,11 +517,13 @@ function ContestEditor({
       const expectedUpdatedAt = overwrite.current ? undefined : version
       overwrite.current = false
       return id
-        ? api<{ id: string; updatedAt: string }>(owner.api(`/contests/${id}`), {
+        ? api<ApiResult<typeof saveOrgContest>>(owner.api(`/contests/${id}`), {
             method: "PUT",
             body: { ...body, expectedUpdatedAt },
           })
-        : api<{ id: string; updatedAt: string }>(owner.api("/contests"), { body })
+        : api<ApiResult<typeof saveOrgContest>>(owner.api("/contests"), {
+            body,
+          })
     },
     onSuccess: (saved, body) => {
       setVersion(saved.updatedAt)
@@ -555,7 +542,10 @@ function ContestEditor({
       else if (!id) router.push(owner.page(`/contests/${saved.id}`))
     },
     onError: (error) => {
-      if (error instanceof ApiRequestError && error.code === "edited_elsewhere") {
+      if (
+        error instanceof ApiRequestError &&
+        error.code === "edited_elsewhere"
+      ) {
         setConflict(true)
       }
       if (error instanceof ApiRequestError && error.code === "conflict") {

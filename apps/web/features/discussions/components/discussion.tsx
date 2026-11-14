@@ -1,6 +1,12 @@
 "use client"
 
-import { ArrowUpIcon, ChatCircleIcon, CheckCircleIcon, LockSimpleIcon, PushPinIcon } from "@phosphor-icons/react"
+import {
+  ArrowUpIcon,
+  ChatCircleIcon,
+  CheckCircleIcon,
+  LockSimpleIcon,
+  PushPinIcon,
+} from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useMemo, useState } from "react"
 
@@ -16,11 +22,20 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 import { ConfirmButton } from "@/components/confirm"
-import { Check, Field, FormMessage, SelectInput, TextArea, TextInput } from "@/components/form"
+import {
+  Check,
+  Field,
+  FormMessage,
+  SelectInput,
+  TextArea,
+  TextInput,
+} from "@/components/form"
 import { Markdown } from "@/components/markdown"
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import type { ApiResult } from "@/lib/api/types"
+import type { getThread } from "@/features/discussions/server"
 
 /*
  * A class's discussion: threads and replies. Students and teachers post; teachers pin,
@@ -52,11 +67,7 @@ interface Board {
   threads: (Post & { replies: number })[]
 }
 
-interface Thread {
-  teacher: boolean
-  thread: Post
-  replies: Post[]
-}
+type Thread = ApiResult<typeof getThread>
 
 export function Discussion({
   slug,
@@ -77,7 +88,12 @@ export function Discussion({
     window.history.replaceState(null, "", url)
   }
   return open ? (
-    <ThreadView slug={slug} groupId={groupId} id={open} onBack={() => choose(null)} />
+    <ThreadView
+      slug={slug}
+      groupId={groupId}
+      id={open}
+      onBack={() => choose(null)}
+    />
   ) : (
     <ThreadList slug={slug} groupId={groupId} onOpen={choose} />
   )
@@ -104,7 +120,9 @@ function ThreadList({
     const q = search.trim().toLowerCase()
     return (data?.threads ?? []).filter(
       (t) =>
-        (!q || t.title.toLowerCase().includes(q) || t.body.toLowerCase().includes(q)) &&
+        (!q ||
+          t.title.toLowerCase().includes(q) ||
+          t.body.toLowerCase().includes(q)) &&
         (show !== "unanswered" || (!t.answerId && !t.locked)) &&
         (show !== "mine" || t.own)
     )
@@ -123,7 +141,12 @@ function ThreadList({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <SelectInput aria-label="Show" className="w-40" value={show} onChange={(e) => setShow(e.target.value)}>
+        <SelectInput
+          aria-label="Show"
+          className="w-40"
+          value={show}
+          onChange={(e) => setShow(e.target.value)}
+        >
           <option value="">All posts</option>
           <option value="unanswered">Not answered</option>
           <option value="mine">Mine</option>
@@ -131,8 +154,8 @@ function ThreadList({
       </div>
       {data.threads.length === 0 ? (
         <p className="text-body-sm text-body">
-          Nothing here yet. Ask a question or start a discussion; everyone in this class can
-          see it.
+          Nothing here yet. Ask a question or start a discussion; everyone in
+          this class can see it.
         </p>
       ) : (
         <ul className="grid gap-1.5">
@@ -153,19 +176,36 @@ function ThreadList({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-1.5">
-                    {t.pinned && <PushPinIcon aria-label="Pinned" weight="fill" className="size-3.5 text-primary" />}
-                    <span className="truncate font-medium text-ink">{t.deleted ? "Deleted post" : t.title}</span>
+                    {t.pinned && (
+                      <PushPinIcon
+                        aria-label="Pinned"
+                        weight="fill"
+                        className="size-3.5 text-primary"
+                      />
+                    )}
+                    <span className="truncate font-medium text-ink">
+                      {t.deleted ? "Deleted post" : t.title}
+                    </span>
                     {t.answerId && (
                       <span className="inline-flex items-center gap-0.5 text-xs text-success">
-                        <CheckCircleIcon weight="fill" className="size-3.5" /> Answered
+                        <CheckCircleIcon weight="fill" className="size-3.5" />{" "}
+                        Answered
                       </span>
                     )}
-                    {t.locked && <LockSimpleIcon aria-label="Locked" className="size-3.5 text-body" />}
-                    {t.hidden && <span className="text-xs text-destructive">Hidden</span>}
+                    {t.locked && (
+                      <LockSimpleIcon
+                        aria-label="Locked"
+                        className="size-3.5 text-body"
+                      />
+                    )}
+                    {t.hidden && (
+                      <span className="text-xs text-destructive">Hidden</span>
+                    )}
                   </span>
                   <span className="block truncate text-caption">
                     {t.author ?? "—"}
-                    {t.byTeacher && " (teacher)"} · {formatDateTime(t.activityAt)}
+                    {t.byTeacher && " (teacher)"} ·{" "}
+                    {formatDateTime(t.activityAt)}
                   </span>
                 </span>
                 <span className="inline-flex shrink-0 items-center gap-1 text-caption tabular-nums">
@@ -175,7 +215,9 @@ function ThreadList({
               </Button>
             </li>
           ))}
-          {threads.length === 0 && <li className="text-body-sm text-body">Nothing matches.</li>}
+          {threads.length === 0 && (
+            <li className="text-body-sm text-body">Nothing matches.</li>
+          )}
         </ul>
       )}
       {writing && (
@@ -206,7 +248,8 @@ function NewThreadDialog({
   const [body, setBody] = useState("")
   const [anonymous, setAnonymous] = useState(false)
   const post = useMutation({
-    mutationFn: () => api<{ id: string }>(base, { body: { title, body, anonymous } }),
+    mutationFn: () =>
+      api<{ id: string }>(base, { body: { title, body, anonymous } }),
     onSuccess: (r) => {
       void client.invalidateQueries({ queryKey: ["org"] })
       onDone(r.id)
@@ -217,16 +260,24 @@ function NewThreadDialog({
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>New post</DialogTitle>
-          <DialogDescription>Everyone in this class sees it. Markdown and code blocks work.</DialogDescription>
+          <DialogDescription>
+            Everyone in this class sees it. Markdown and code blocks work.
+          </DialogDescription>
         </DialogHeader>
         <Field label="Title">
-          <TextInput aria-label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <TextInput
+            aria-label="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
         </Field>
         <Field label="Post">
           <TextArea
             rows={6}
             aria-label="Post"
-            placeholder={"What did you try? Paste code in a block:\n```python\nprint('hi')\n```"}
+            placeholder={
+              "What did you try? Paste code in a block:\n```python\nprint('hi')\n```"
+            }
             value={body}
             onChange={(e) => setBody(e.target.value)}
           />
@@ -238,12 +289,17 @@ function NewThreadDialog({
             label="Post anonymously (your teachers still see your name)"
           />
         )}
-        {post.error && <FormMessage message={{ text: post.error.message, kind: "err" }} />}
+        {post.error && (
+          <FormMessage message={{ text: post.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onDone()}>
             Cancel
           </Button>
-          <Button disabled={!title.trim() || !body.trim() || post.isPending} onClick={() => post.mutate()}>
+          <Button
+            disabled={!title.trim() || !body.trim() || post.isPending}
+            onClick={() => post.mutate()}
+          >
             Post
           </Button>
         </DialogFooter>
@@ -266,14 +322,20 @@ function ThreadView({
   const base = `/orgs/${slug}/classes/${groupId}/discussion`
   const key = ["org", slug, "class", groupId, "discussion", id]
   const client = useQueryClient()
-  const { data, error } = useQuery({ queryKey: key, queryFn: () => api<Thread>(`${base}/${id}`) })
+  const { data, error } = useQuery({
+    queryKey: key,
+    queryFn: () => api<Thread>(`${base}/${id}`),
+  })
   const [reply, setReply] = useState("")
   const [anonymous, setAnonymous] = useState(false)
   const refresh = () => {
-    void client.invalidateQueries({ queryKey: ["org", slug, "class", groupId, "discussion"] })
+    void client.invalidateQueries({
+      queryKey: ["org", slug, "class", groupId, "discussion"],
+    })
   }
   const send = useMutation({
-    mutationFn: () => api(`${base}/${id}`, { body: { body: reply, anonymous } }),
+    mutationFn: () =>
+      api(`${base}/${id}`, { body: { body: reply, anonymous } }),
     onSuccess: () => {
       setReply("")
       setAnonymous(false)
@@ -281,12 +343,16 @@ function ThreadView({
     },
   })
   const change = useMutation({
-    mutationFn: ({ postId, ...body }: { postId: string } & Record<string, unknown>) =>
+    mutationFn: ({
+      postId,
+      ...body
+    }: { postId: string } & Record<string, unknown>) =>
       api(`${base}/${postId}`, { method: "PATCH", body }),
     onSuccess: refresh,
   })
   const remove = useMutation({
-    mutationFn: (postId: string) => api(`${base}/${postId}`, { method: "DELETE" }),
+    mutationFn: (postId: string) =>
+      api(`${base}/${postId}`, { method: "DELETE" }),
     onSuccess: (_, postId) => {
       if (postId === id) {
         refresh()
@@ -301,7 +367,11 @@ function ThreadView({
   if (!data) {
     return (
       <div className="grid gap-2">
-        <Button variant="link" className="justify-self-start px-0" onClick={onBack}>
+        <Button
+          variant="link"
+          className="justify-self-start px-0"
+          onClick={onBack}
+        >
           ← All posts
         </Button>
         <Loading error={error} />
@@ -331,23 +401,40 @@ function ThreadView({
         <Button
           variant="ghost"
           size="xs"
-          onClick={() => change.mutate({ postId: id, answerId: t.answerId === p.id ? null : p.id })}
+          onClick={() =>
+            change.mutate({
+              postId: id,
+              answerId: t.answerId === p.id ? null : p.id,
+            })
+          }
         >
           {t.answerId === p.id ? "Not the answer" : "Mark as answer"}
         </Button>
       )}
       {teacher && isThread && (
         <>
-          <Button variant="ghost" size="xs" onClick={() => change.mutate({ postId: id, pinned: !t.pinned })}>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => change.mutate({ postId: id, pinned: !t.pinned })}
+          >
             {t.pinned ? "Unpin" : "Pin"}
           </Button>
-          <Button variant="ghost" size="xs" onClick={() => change.mutate({ postId: id, locked: !t.locked })}>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => change.mutate({ postId: id, locked: !t.locked })}
+          >
             {t.locked ? "Unlock" : "Lock"}
           </Button>
         </>
       )}
       {teacher && !p.deleted && (
-        <Button variant="ghost" size="xs" onClick={() => change.mutate({ postId: p.id, hidden: !p.hidden })}>
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={() => change.mutate({ postId: p.id, hidden: !p.hidden })}
+        >
           {p.hidden ? "Show" : "Hide"}
         </Button>
       )}
@@ -373,25 +460,50 @@ function ThreadView({
   const byline = (p: Post) => (
     <span className="text-caption">
       {p.author ?? "—"}
-      {p.byTeacher && <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-xs text-primary">Teacher</span>}
-      {p.anonymous && (p.own || teacher) && <span className="ml-1 text-xs">(anonymous to classmates)</span>}
+      {p.byTeacher && (
+        <span className="ml-1 rounded-full bg-primary/10 px-1.5 text-xs text-primary">
+          Teacher
+        </span>
+      )}
+      {p.anonymous && (p.own || teacher) && (
+        <span className="ml-1 text-xs">(anonymous to classmates)</span>
+      )}
       {" · "}
       {formatDateTime(p.createdAt)}
       {p.editedAt && " · edited"}
-      {p.hidden && <span className="ml-1 text-destructive">· Hidden from students</span>}
+      {p.hidden && (
+        <span className="ml-1 text-destructive">· Hidden from students</span>
+      )}
     </span>
   )
 
   return (
     <div className="grid gap-3" data-testid="thread">
-      <Button variant="link" className="justify-self-start px-0" onClick={onBack}>
+      <Button
+        variant="link"
+        className="justify-self-start px-0"
+        onClick={onBack}
+      >
         ← All posts
       </Button>
-      <article className={cn("grid gap-2 rounded-lg border border-hairline bg-card p-4", t.hidden && "opacity-70")}>
+      <article
+        className={cn(
+          "grid gap-2 rounded-lg border border-hairline bg-card p-4",
+          t.hidden && "opacity-70"
+        )}
+      >
         <h2 className="flex flex-wrap items-center gap-2 text-display-sm text-ink">
-          {t.pinned && <PushPinIcon aria-label="Pinned" weight="fill" className="size-4 text-primary" />}
+          {t.pinned && (
+            <PushPinIcon
+              aria-label="Pinned"
+              weight="fill"
+              className="size-4 text-primary"
+            />
+          )}
           {t.deleted ? "Deleted post" : t.title}
-          {t.locked && <LockSimpleIcon aria-label="Locked" className="size-4 text-body" />}
+          {t.locked && (
+            <LockSimpleIcon aria-label="Locked" className="size-4 text-body" />
+          )}
         </h2>
         {byline(t)}
         {t.deleted ? (
@@ -426,9 +538,13 @@ function ThreadView({
           </li>
         ))}
       </ol>
-      {failure && <FormMessage message={{ text: failure.message, kind: "err" }} />}
+      {failure && (
+        <FormMessage message={{ text: failure.message, kind: "err" }} />
+      )}
       {t.deleted ? null : t.locked && !teacher ? (
-        <p className="text-body-sm text-body">A teacher locked this thread; no more replies.</p>
+        <p className="text-body-sm text-body">
+          A teacher locked this thread; no more replies.
+        </p>
       ) : (
         <div className="grid gap-2">
           <TextArea
@@ -439,11 +555,19 @@ function ThreadView({
             onChange={(e) => setReply(e.target.value)}
           />
           <div className="flex flex-wrap items-center gap-3">
-            <Button size="sm" disabled={!reply.trim() || send.isPending} onClick={() => send.mutate()}>
+            <Button
+              size="sm"
+              disabled={!reply.trim() || send.isPending}
+              onClick={() => send.mutate()}
+            >
               Reply
             </Button>
             {!teacher && (
-              <Check checked={anonymous} onCheckedChange={setAnonymous} label="Anonymously" />
+              <Check
+                checked={anonymous}
+                onCheckedChange={setAnonymous}
+                label="Anonymously"
+              />
             )}
           </div>
         </div>

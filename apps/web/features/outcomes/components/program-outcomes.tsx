@@ -1,10 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  NBA_PROGRAM_OUTCOMES,
-  type AttainmentRules,
-} from "@workspace/judge"
+import { NBA_PROGRAM_OUTCOMES, type AttainmentRules } from "@workspace/judge"
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
@@ -12,6 +9,8 @@ import { Button } from "@workspace/ui/components/button"
 import { Field, FormMessage, TextInput } from "@/components/form"
 import { Card, Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { getProgramOutcomes } from "@/features/outcomes/server"
 
 export interface ProgramOutcome {
   id: string
@@ -19,11 +18,7 @@ export interface ProgramOutcome {
   title: string
 }
 
-interface ProgramOutcomes {
-  outcomes: ProgramOutcome[]
-  rules: AttainmentRules
-  canEdit: boolean
-}
+type ProgramOutcomes = ApiResult<typeof getProgramOutcomes>
 
 type Row = { id?: string; key: string; code: string; title: string }
 
@@ -85,9 +80,10 @@ function OutcomesForm({
     <>
       <PageTitle>Outcomes</PageTitle>
       <p className="mb-4 max-w-3xl text-body-sm text-body">
-        Program outcomes (POs) say what graduates should be able to do. Each class sets
-        its course outcomes (COs) on its Outcomes tab and maps them to these; problems
-        in assignments are tagged with COs, and attainment comes from the marks.
+        Program outcomes (POs) say what graduates should be able to do. Each
+        class sets its course outcomes (COs) on its Outcomes tab and maps them
+        to these; problems in assignments are tagged with COs, and attainment
+        comes from the marks.
       </p>
       <div className="grid gap-4">
         <Card className="grid gap-3">
@@ -98,7 +94,9 @@ function OutcomesForm({
                 size="sm"
                 variant="outline"
                 onClick={() =>
-                  setRows(NBA_PROGRAM_OUTCOMES.map((o) => ({ ...o, key: keyOf() })))
+                  setRows(
+                    NBA_PROGRAM_OUTCOMES.map((o) => ({ ...o, key: keyOf() }))
+                  )
                 }
               >
                 Start from NBA&apos;s PO1–PO12
@@ -116,14 +114,18 @@ function OutcomesForm({
                   className="w-24"
                   value={row.code}
                   disabled={readOnly}
-                  onChange={(event) => edit(row.key, { code: event.target.value })}
+                  onChange={(event) =>
+                    edit(row.key, { code: event.target.value })
+                  }
                 />
                 <TextInput
                   aria-label="Outcome"
                   className="flex-1"
                   value={row.title}
                   disabled={readOnly}
-                  onChange={(event) => edit(row.key, { title: event.target.value })}
+                  onChange={(event) =>
+                    edit(row.key, { title: event.target.value })
+                  }
                 />
                 {!readOnly && (
                   <Button
@@ -195,8 +197,8 @@ function OutcomesForm({
             ))}
           </div>
           <p className="text-caption">
-            A PO&apos;s attainment is its COs&apos; levels averaged by how strongly each maps to
-            it (1 low, 2 medium, 3 high).
+            A PO&apos;s attainment is its COs&apos; levels averaged by how
+            strongly each maps to it (1 low, 2 medium, 3 high).
           </p>
         </Card>
 

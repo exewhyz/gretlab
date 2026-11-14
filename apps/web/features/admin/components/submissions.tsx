@@ -18,11 +18,10 @@ import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 
 import { Loading, PageTitle, Table } from "./shell"
+import type { ApiResult } from "@/lib/api/types"
+import type { listAllSubmissions } from "@/features/admin/server"
 
-interface Page {
-  rows: SubmissionRow[]
-  next: string | null
-}
+type Page = ApiResult<typeof listAllSubmissions>
 
 export function AdminSubmissions() {
   const [kind, setKind] = useState("submit")

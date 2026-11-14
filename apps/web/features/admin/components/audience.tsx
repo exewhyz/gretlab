@@ -10,6 +10,8 @@ import {
   topmost,
 } from "@/features/orgs/components/group-checklist"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { listGroups, previewAudience } from "@/features/orgs/server"
 
 interface Group {
   id: string
@@ -34,8 +36,7 @@ export function AudiencePicker({
 }) {
   const { data } = useQuery({
     queryKey: ["org", orgSlug, "groups"],
-    queryFn: () =>
-      api<{ levels: string[]; groups: Group[] }>(`/orgs/${orgSlug}/groups`),
+    queryFn: () => api<ApiResult<typeof listGroups>>(`/orgs/${orgSlug}/groups`),
   })
   const groups = data?.groups ?? []
   const name = (id: string) => groups.find((g) => g.id === id)?.name ?? "?"
@@ -50,7 +51,7 @@ export function AudiencePicker({
   const preview = useQuery({
     queryKey: ["org", orgSlug, "audience", conditions],
     queryFn: () =>
-      api<{ count: number; sample: string[] }>(`/orgs/${orgSlug}/audience`, {
+      api<ApiResult<typeof previewAudience>>(`/orgs/${orgSlug}/audience`, {
         body: { audience: conditions },
       }),
   })

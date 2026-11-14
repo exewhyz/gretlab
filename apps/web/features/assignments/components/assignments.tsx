@@ -19,74 +19,19 @@ import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 import { ExamPanel, type SittingView } from "@/features/exams/components/exam"
 import { QuizSection, type QuizQuestionView } from "./quiz"
+import type { ApiResult } from "@/lib/api/types"
+import type {
+  getAssignment,
+  listAssignments,
+} from "@/features/assignments/server"
 
 export type AssignmentPhase = "upcoming" | "open" | "late" | "closed"
 export type GradeStatus =
   "solved" | "late" | "partial" | "attempted" | "missing"
 
-interface AssignmentSummary {
-  exam: boolean
-  questionCount: number
-  slug: string
-  title: string
-  org: { name: string; slug: string } | null
-  opensAt: string
-  dueAt: string
-  allowLate: boolean
-  latePenaltyPercent: number
-  published: boolean
-  phase: AssignmentPhase
-  problemCount: number
-  solved: number
-  earned: number
-  total: number
-}
+type AssignmentSummary = ApiResult<typeof listAssignments>[number]
 
-interface AssignmentDetail {
-  /** Project work handed in as GitHub repositories. */
-  projects: ComponentProps<typeof StudentProjects>["projects"]
-  classes: { name: string; href: string }[]
-  slug: string
-  title: string
-  description: string
-  opensAt: string
-  dueAt: string
-  allowLate: boolean
-  latePenaltyPercent: number
-  phase: AssignmentPhase
-  earned: number
-  total: number
-  solved: number
-  problems: {
-    slug: string
-    href: string
-    title: string
-    level: string
-    /** Test points; `max` adds the rubric. */
-    points: number
-    max: number
-    earned: number
-    tests: number
-    status: GradeStatus
-    rubric: { id: string; label: string; points: number; mark: number | null }[]
-  }[]
-  feedbackHeld: boolean
-  extension: { dueAt: string; problems: string[]; whole: boolean } | null
-  questions: QuizQuestionView[]
-  answersOpen: boolean
-  quizResultsOut: boolean
-  problemCount: number
-  questionCount: number
-  exam: {
-    minutes: number | null
-    fullscreen: boolean
-    restricted: boolean
-    startWithin: number | null
-    opensAt: string
-    sitting: SittingView
-    now: string
-  } | null
-}
+type AssignmentDetail = ApiResult<typeof getAssignment>
 
 const PHASE: Record<AssignmentPhase, { label: string; tone: string }> = {
   upcoming: { label: "Not open yet", tone: "bg-muted text-body" },
@@ -213,7 +158,8 @@ export function AssignmentList() {
           <Progress earned={a.earned} total={a.total} />
           <span className="text-caption text-body">
             {[
-              a.problemCount > 0 && `${a.solved} of ${a.problemCount} problems solved`,
+              a.problemCount > 0 &&
+                `${a.solved} of ${a.problemCount} problems solved`,
               a.questionCount > 0 &&
                 `${a.questionCount} ${a.questionCount === 1 ? "question" : "questions"}`,
             ]
@@ -283,7 +229,9 @@ export function AssignmentView({ slug }: { slug: string }) {
           className="mb-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-body-sm text-ink"
         >
           Your teacher gave you until {formatDateTime(data.extension.dueAt)}
-          {data.extension.whole ? "." : ` for ${data.extension.problems.join(", ")}.`}
+          {data.extension.whole
+            ? "."
+            : ` for ${data.extension.problems.join(", ")}.`}
         </p>
       )}
       <ClassChips classes={data.classes} className="mb-4" />
@@ -315,8 +263,8 @@ export function AssignmentView({ slug }: { slug: string }) {
           phase={data.phase}
         />
       )}
-      {data.exam && data.problems.length === 0 ? null : data.phase === "upcoming" &&
-        data.problems.length === 0 ? (
+      {data.exam && data.problems.length === 0 ? null : data.phase ===
+          "upcoming" && data.problems.length === 0 ? (
         <p className="text-body-sm text-body">
           The problems appear here when it opens.
         </p>
@@ -336,46 +284,46 @@ export function AssignmentView({ slug }: { slug: string }) {
             </span>
           </div>
           {data.problems.length > 0 && (
-          <Table headers={["Problem", "Difficulty", "Status", "Points"]}>
-            {data.problems.map((problem) => (
-              <tr key={problem.slug} data-testid="assignment-problem">
-                <td>
-                  <Link
-                    href={problem.href}
-                    className="font-medium text-ink underline-offset-2 hover:underline"
-                  >
-                    {problem.title}
-                  </Link>
-                </td>
-                <td>
-                  <Difficulty level={problem.level} />
-                </td>
-                <td className={STATUS[problem.status].tone}>
-                  {STATUS[problem.status].label}
-                </td>
-                <td className="tabular-nums">
-                  {problem.earned} / {problem.max}
-                  {problem.rubric.length > 0 && (
-                    <ul
-                      className="mt-1 grid gap-0.5 text-caption text-body"
-                      data-testid="rubric-breakdown"
+            <Table headers={["Problem", "Difficulty", "Status", "Points"]}>
+              {data.problems.map((problem) => (
+                <tr key={problem.slug} data-testid="assignment-problem">
+                  <td>
+                    <Link
+                      href={problem.href}
+                      className="font-medium text-ink underline-offset-2 hover:underline"
                     >
-                      <li>
-                        Tests: {problem.tests} / {problem.points}
-                      </li>
-                      {problem.rubric.map((c) => (
-                        <li key={c.id}>
-                          {c.label}:{" "}
-                          {c.mark === null ? "not marked yet" : c.mark} /{" "}
-                          {c.points}
+                      {problem.title}
+                    </Link>
+                  </td>
+                  <td>
+                    <Difficulty level={problem.level} />
+                  </td>
+                  <td className={STATUS[problem.status].tone}>
+                    {STATUS[problem.status].label}
+                  </td>
+                  <td className="tabular-nums">
+                    {problem.earned} / {problem.max}
+                    {problem.rubric.length > 0 && (
+                      <ul
+                        className="mt-1 grid gap-0.5 text-caption text-body"
+                        data-testid="rubric-breakdown"
+                      >
+                        <li>
+                          Tests: {problem.tests} / {problem.points}
                         </li>
-                      ))}
-                    </ul>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </Table>
+                        {problem.rubric.map((c) => (
+                          <li key={c.id}>
+                            {c.label}:{" "}
+                            {c.mark === null ? "not marked yet" : c.mark} /{" "}
+                            {c.points}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </Table>
           )}
           {data.questions.length > 0 && (
             <QuizSection

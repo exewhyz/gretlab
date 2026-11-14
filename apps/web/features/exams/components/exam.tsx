@@ -12,6 +12,8 @@ import { FormMessage } from "@/components/form"
 import { useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import type { ApiResult } from "@/lib/api/types"
+import type { assignmentsForProblem } from "@/features/assignments/server"
 
 export interface SittingView {
   status: "not_started" | "in_progress" | "finished"
@@ -20,13 +22,7 @@ export interface SittingView {
   finishedEarly: boolean
 }
 
-export interface ProblemAssignment {
-  slug: string
-  title: string
-  dueAt: string
-  phase: "open" | "late"
-  exam: { fullscreen: boolean; sitting: SittingView } | null
-}
+export type ProblemAssignment = ApiResult<typeof assignmentsForProblem>[number]
 
 /** Open assignments using this problem; shared with the chips under its title. */
 export function useProblemAssignments(problemSlug: string) {
@@ -141,10 +137,12 @@ export function ExamGuard({
     }
     let copied = ""
     const onVisibility = () => {
-      if (document.visibilityState === "hidden") report("left_tab", "Switched tab")
+      if (document.visibilityState === "hidden")
+        report("left_tab", "Switched tab")
     }
     const onBlur = () => {
-      if (document.visibilityState === "visible") report("left_tab", "Left the window")
+      if (document.visibilityState === "visible")
+        report("left_tab", "Left the window")
     }
     const onFullscreen = () => {
       const inside = Boolean(document.fullscreenElement)
@@ -207,11 +205,17 @@ export function ExamGuard({
       className="fixed inset-0 z-[100] grid place-items-center bg-canvas p-4"
     >
       <div className="grid max-w-md gap-3 text-center">
-        <h2 className="text-title-sm text-ink">This exam is taken in fullscreen</h2>
+        <h2 className="text-title-sm text-ink">
+          This exam is taken in fullscreen
+        </h2>
         <p className="text-body-sm text-body">
           Leaving fullscreen is noted for your teacher. Your time keeps running.
         </p>
-        <Button autoFocus className="justify-self-center" onClick={enterFullscreen}>
+        <Button
+          autoFocus
+          className="justify-self-center"
+          onClick={enterFullscreen}
+        >
           Return to fullscreen
         </Button>
       </div>
@@ -271,7 +275,8 @@ export function ExamPanel({
 
   const rules = [
     [
-      problemCount > 0 && `${problemCount} ${problemCount === 1 ? "problem" : "problems"}`,
+      problemCount > 0 &&
+        `${problemCount} ${problemCount === 1 ? "problem" : "problems"}`,
       questionCount > 0 &&
         `${questionCount} ${questionCount === 1 ? "question" : "questions"}`,
     ]
@@ -284,7 +289,9 @@ export function ExamPanel({
     ...(exam.startWithin
       ? [
           `start by ${formatDateTime(
-            new Date(new Date(exam.opensAt).getTime() + exam.startWithin * 60_000).toISOString()
+            new Date(
+              new Date(exam.opensAt).getTime() + exam.startWithin * 60_000
+            ).toISOString()
           )}`,
         ]
       : []),
@@ -343,8 +350,9 @@ export function ExamPanel({
             </span>
           </div>
           <p className="text-body-sm text-body">
-            Open a problem, solve it and press Submit; your best submission on each counts.
-            Finish when you&apos;re done, or the exam ends by itself.
+            Open a problem, solve it and press Submit; your best submission on
+            each counts. Finish when you&apos;re done, or the exam ends by
+            itself.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {exam.fullscreen && (

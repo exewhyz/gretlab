@@ -29,6 +29,13 @@ import {
 } from "@/components/form"
 import { Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type {
+  routeRiders,
+  searchRiders,
+  transportSetup,
+} from "@/features/transport/server"
+import type { importRiders } from "@/features/transport/server"
 
 interface Stop {
   id: string
@@ -50,10 +57,7 @@ interface Route {
   stops: Stop[]
 }
 
-interface Setup {
-  can: { routes: boolean; assign: boolean }
-  routes: Route[]
-}
+type Setup = ApiResult<typeof transportSetup>
 
 /** Manage › Transport: routes as cards; riders, edits and lists in dialogs. */
 export function ManageTransport({ slug }: { slug: string }) {
@@ -382,22 +386,9 @@ function RouteDialog({
   )
 }
 
-interface Rider {
-  id: string
-  name: string
-  email: string
-  classes: string[]
-  stopId: string
-  canChange: boolean
-}
+type Rider = ApiResult<typeof routeRiders>[number]
 
-interface Candidate {
-  id: string
-  name: string
-  email: string
-  classes: string[]
-  route: string | null
-}
+type Candidate = ApiResult<typeof searchRiders>[number]
 
 function RidersDialog({
   slug,
@@ -595,13 +586,12 @@ function ImportRiders({
     .map(([email = "", route = "", stop = ""]) => ({ email, route, stop }))
   const save = useMutation({
     mutationFn: () =>
-      api<{
-        placed: number
-        failed: number
-        report: { line: number; note: string }[]
-      }>(`/orgs/${slug}/transport/riders/import`, {
-        body: { rows },
-      }),
+      api<ApiResult<typeof importRiders>>(
+        `/orgs/${slug}/transport/riders/import`,
+        {
+          body: { rows },
+        }
+      ),
   })
   const result = save.data
   return (

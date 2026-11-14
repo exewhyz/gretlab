@@ -33,63 +33,10 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { memberDashboard } from "@/features/me/dashboard"
 
-interface Dashboard {
-  day: string
-  name: string
-  handle: string | null
-  features: {
-    practice: boolean
-    assignments: boolean
-    contests: boolean
-    profiles: boolean
-  }
-  orgs: {
-    slug: string
-    name: string
-    type: OrgType
-    roles: string[]
-    staff: boolean
-  }[]
-  pendingOrgs: { slug: string; name: string }[]
-  children: { id: string; name: string; org: { slug: string; name: string } }[]
-  work: {
-    open: number
-    dueThisWeek: number
-    overdue: number
-    next: {
-      slug: string
-      title: string
-      exam: boolean
-      org: string | null
-      dueAt: string
-      solved: number
-      problemCount: number
-      earned: number
-      total: number
-    }[]
-  }
-  contests: {
-    slug: string
-    title: string
-    phase: "upcoming" | "live" | "ended"
-    startsAt: string
-    org: string | null
-  }[]
-  practice: {
-    solved: number
-    solvedBy: { easy: number; medium: number; hard: number }
-    totalBy: { easy: number; medium: number; hard: number }
-    streak: { current: number; longest: number }
-    activity: { day: string; count: number }[]
-    recent: { slug: string; title: string; at: string }[]
-  } | null
-  daily: {
-    problem: { slug: string; title: string; level: string } | null
-    solvedToday: boolean
-    streak: number
-  } | null
-}
+type Dashboard = ApiResult<typeof memberDashboard>
 
 const greeting = () => {
   const h = new Date().getHours()

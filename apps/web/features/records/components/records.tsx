@@ -78,6 +78,20 @@ import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { parseCsv } from "@/features/orgs/components/manage"
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type {
+  getStudent,
+  importStudents,
+  listStudents,
+} from "@/features/records/server"
+import type { promotionPlan } from "@/features/records/server"
+import type {
+  listYears,
+  nextNumber,
+  promote,
+  recordEveryone,
+  unrecordedCount,
+} from "@/features/records/server"
 
 /* ---------- academic years ---------- */
 
@@ -104,11 +118,7 @@ export function AcademicYears({ slug }: { slug: string }) {
   const { data, error } = useQuery({
     queryKey: key,
     queryFn: () =>
-      api<{
-        can: { years: boolean }
-        years: Year[]
-        terms?: { periods: string; groupLead: string }
-      }>(`/orgs/${slug}/academic-years`),
+      api<ApiResult<typeof listYears>>(`/orgs/${slug}/academic-years`),
   })
   const [editing, setEditing] = useState<Year | "new" | null>(null)
   const [current, setCurrent] = useState<Year | null>(null)
@@ -475,18 +485,7 @@ interface Row {
   status: string | null
 }
 
-interface List {
-  terms?: { learners: string; groupLead: string }
-  can: { view: boolean; edit: boolean; years: boolean }
-  year: { id: string; name: string } | null
-  total: number
-  page: number
-  pages: number
-  students: Row[]
-  groups: { id: string; name: string; parentId: string | null }[]
-  levels: string[]
-  choosable: string[]
-}
+type List = ApiResult<typeof listStudents>
 
 const GENDER: Record<string, string> = {
   female: "Female",
@@ -718,33 +717,7 @@ export function Students({ slug }: { slug: string }) {
   )
 }
 
-interface Profile {
-  id: string
-  name: string
-  email: string | null
-  admissionNo: string
-  gender: string
-  birthDate: string
-  phone: string
-  address: string
-  admittedOn: string
-  current: {
-    year: string
-    group: { id: string; path: string } | null
-    rollNo: number | null
-    status: string | null
-  } | null
-  history: {
-    year: string
-    group: string | null
-    rollNo: number | null
-    status: string
-  }[]
-  parents: { name: string; email: string; relation: string }[]
-  attendance: { marked: number; percent: number } | null
-  campus: CampusData
-  can: { edit: boolean; results?: boolean }
-}
+type Profile = ApiResult<typeof getStudent>
 
 /** Add or edit a student, in a sheet from the side. */
 function StudentSheet({
@@ -762,7 +735,7 @@ function StudentSheet({
   const next = useQuery({
     queryKey: ["org", slug, "students", "next-number"],
     queryFn: () =>
-      api<{ admissionNo: string }>(`/orgs/${slug}/students/next-number`),
+      api<ApiResult<typeof nextNumber>>(`/orgs/${slug}/students/next-number`),
     enabled: !student,
   })
   const [form, setForm] = useState({
@@ -1206,14 +1179,20 @@ function Unrecorded({ slug }: { slug: string }) {
   const client = useQueryClient()
   const { data } = useQuery({
     queryKey: ["org", slug, "students", "unrecorded"],
-    queryFn: () => api<{ count: number }>(`/orgs/${slug}/students/unrecorded`),
+    queryFn: () =>
+      api<ApiResult<typeof unrecordedCount>>(
+        `/orgs/${slug}/students/unrecorded`
+      ),
   })
   const [asking, setAsking] = useState(false)
   const run = useMutation({
     mutationFn: () =>
-      api<{ added: number }>(`/orgs/${slug}/students/unrecorded`, {
-        method: "POST",
-      }),
+      api<ApiResult<typeof recordEveryone>>(
+        `/orgs/${slug}/students/unrecorded`,
+        {
+          method: "POST",
+        }
+      ),
     onSuccess: () => void client.invalidateQueries({ queryKey: ["org", slug] }),
   })
   if (!data?.count)
@@ -1261,11 +1240,7 @@ function Unrecorded({ slug }: { slug: string }) {
 
 /* ---------- import ---------- */
 
-interface ImportReport {
-  committed: boolean
-  summary: { add: number; error: number }
-  rows: { line: number; name: string; result: "add" | "error"; note: string }[]
-}
+type ImportReport = ApiResult<typeof importStudents>
 
 const COLUMNS: Record<string, string> = {
   name: "name",
@@ -1453,22 +1428,7 @@ function ImportStudents({
 
 /* ---------- promotion ---------- */
 
-interface Plan {
-  from: { id: string; name: string; isCurrent: boolean }
-  to: { id: string; name: string; isCurrent: boolean }
-  sections: {
-    groupId: string
-    path: string
-    suggested: string
-    students: {
-      id: string
-      name: string
-      rollNo: number | null
-      already: boolean
-    }[]
-  }[]
-  targets: { id: string; path: string }[]
-}
+type Plan = ApiResult<typeof promotionPlan>
 
 type Counts = {
   moved: number
@@ -1484,9 +1444,7 @@ export function Promotion({ slug }: { slug: string }) {
   const years = useQuery({
     queryKey: ["org", slug, "academic-years"],
     queryFn: () =>
-      api<{ can: { years: boolean }; years: Year[] }>(
-        `/orgs/${slug}/academic-years`
-      ),
+      api<ApiResult<typeof listYears>>(`/orgs/${slug}/academic-years`),
   })
   const list = years.data?.years ?? []
   const current = list.find((y) => y.isCurrent) ?? list[0]
@@ -1528,17 +1486,15 @@ export function Promotion({ slug }: { slug: string }) {
   })
   const preview = useMutation({
     mutationFn: () =>
-      api<{ applied: boolean; counts: Counts }>(
-        `/orgs/${slug}/academic-years/promotion`,
-        { body: body(false) }
-      ),
+      api<ApiResult<typeof promote>>(`/orgs/${slug}/academic-years/promotion`, {
+        body: body(false),
+      }),
   })
   const apply = useMutation({
     mutationFn: () =>
-      api<{ applied: boolean; counts: Counts }>(
-        `/orgs/${slug}/academic-years/promotion`,
-        { body: body(true) }
-      ),
+      api<ApiResult<typeof promote>>(`/orgs/${slug}/academic-years/promotion`, {
+        body: body(true),
+      }),
     onSuccess: () => void client.invalidateQueries({ queryKey: ["org", slug] }),
   })
   if (!years.data) return <Loading error={years.error} />

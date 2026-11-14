@@ -12,13 +12,11 @@ import { WeekGrid } from "@/features/timetable/components/timetable"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { childOverview } from "@/features/parents/server"
+import type { myChildren } from "@/features/parents/server"
 
-interface Child {
-  id: string
-  name: string
-  relation: string
-  org: { slug: string; name: string }
-}
+type Child = ApiResult<typeof myChildren>[number]
 
 /** /children: everyone this person is a parent of. */
 export function MyChildren() {
@@ -62,45 +60,7 @@ interface Period {
   isBreak: boolean
 }
 
-interface Overview {
-  results?: boolean
-  child: { name: string }
-  org: { name: string }
-  active: boolean
-  classes: {
-    id: string
-    name: string
-    attendance: {
-      marked: number
-      present: number
-      percent: number | null
-    } | null
-    timetable: {
-      days: number[]
-      periods: Period[]
-      slots: {
-        day: number
-        periodId: string
-        subject: string
-        code: string
-        teacher?: string | null
-        room: string
-      }[]
-    } | null
-    notices: { id: string; at: string; text: string; by: string | null }[]
-  }[]
-  absences: { day: string; period: string; group: string; status: string }[]
-  campus?: CampusData
-  work: {
-    slug: string
-    title: string
-    exam: boolean
-    dueAt: string
-    phase: string
-    earned: number
-    total: number
-  }[]
-}
+type Overview = ApiResult<typeof childOverview>
 
 /** One child, as their parent sees them. Read only. */
 export function ChildPage({
@@ -176,15 +136,17 @@ export function ChildPage({
               {data.absences.map((a, i) => (
                 <li key={i} className="text-body">
                   <span className="text-ink">
-                    {new Date(`${a.day}T00:00:00Z`).toLocaleDateString(undefined, {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                      timeZone: "UTC",
-                    })}
+                    {new Date(`${a.day}T00:00:00Z`).toLocaleDateString(
+                      undefined,
+                      {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short",
+                        timeZone: "UTC",
+                      }
+                    )}
                   </span>{" "}
-                  ·{" "}
-                  {a.status === "late" ? "Late" : "Absent"} · {a.group}
+                  · {a.status === "late" ? "Late" : "Absent"} · {a.group}
                   {a.period && ` (${a.period})`}
                 </li>
               ))}

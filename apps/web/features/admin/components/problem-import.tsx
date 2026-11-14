@@ -18,6 +18,8 @@ import { Input } from "@workspace/ui/components/input"
 import { FormMessage } from "@/components/form"
 import { useOwner } from "@/features/admin/owner"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgImportProblems } from "@/features/orgs/content"
 
 export interface ImportedProblem {
   id: string
@@ -46,13 +48,15 @@ export function ImportProblemsDialog({
   const [file, setFile] = useState<File | null>(null)
   const [listed, setListed] = useState(true)
   const [published, setPublished] = useState(false)
-  const [message, setMessage] = useState<{ text: string; kind: "ok" | "err" } | null>(
-    null
-  )
+  const [message, setMessage] = useState<{
+    text: string
+    kind: "ok" | "err"
+  } | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function upload() {
-    if (!file) return setMessage({ text: "Choose a .json file first.", kind: "err" })
+    if (!file)
+      return setMessage({ text: "Choose a .json file first.", kind: "err" })
     setBusy(true)
     setMessage(null)
     try {
@@ -62,7 +66,7 @@ export function ImportProblemsDialog({
       } catch {
         throw new Error("That file isn't valid JSON. Start from the template.")
       }
-      const { created } = await api<{ created: ImportedProblem[] }>(
+      const { created } = await api<ApiResult<typeof orgImportProblems>>(
         owner.api("/problems/import"),
         {
           body: {
@@ -80,7 +84,10 @@ export function ImportProblemsDialog({
       onImported?.(created)
       if (forAssessment) onOpenChange(false)
     } catch (e) {
-      setMessage({ text: e instanceof Error ? e.message : "Import failed.", kind: "err" })
+      setMessage({
+        text: e instanceof Error ? e.message : "Import failed.",
+        kind: "err",
+      })
     } finally {
       setBusy(false)
     }
@@ -92,8 +99,8 @@ export function ImportProblemsDialog({
         <DialogHeader>
           <DialogTitle>Import problems</DialogTitle>
           <DialogDescription>
-            A JSON problem file: statement, formats, samples, hidden tests, code per
-            language, hints and editorial.{" "}
+            A JSON problem file: statement, formats, samples, hidden tests, code
+            per language, hints and editorial.{" "}
             <a href="/problem-template.json" download className="underline">
               Download the template
             </a>

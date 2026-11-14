@@ -24,6 +24,9 @@ import {
 } from "@/components/form"
 import { Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { importLinks, searchStudents } from "@/features/parents/server"
+import type { listLinks } from "@/features/parents/server"
 
 interface Link {
   id: string
@@ -33,12 +36,7 @@ interface Link {
   canRemove: boolean
 }
 
-interface Student {
-  id: string
-  name: string
-  email: string
-  classes: string[]
-}
+type Student = ApiResult<typeof searchStudents>[number]
 
 const RELATIONS = ["Mother", "Father", "Guardian", "Grandparent", "Other"]
 
@@ -48,10 +46,7 @@ export function ManageParents({ slug }: { slug: string }) {
   const key = ["org", slug, "parents"]
   const { data, error } = useQuery({
     queryKey: key,
-    queryFn: () =>
-      api<{ can: { view: boolean; link: boolean }; links: Link[] }>(
-        `/orgs/${slug}/parents`
-      ),
+    queryFn: () => api<ApiResult<typeof listLinks>>(`/orgs/${slug}/parents`),
   })
   const [filter, setFilter] = useState("")
   const [dialog, setDialog] = useState<"add" | "import" | null>(null)
@@ -324,11 +319,7 @@ function AddParent({
   )
 }
 
-interface ImportResult {
-  linked: number
-  failed: number
-  report: { line: number; result: "linked" | "error"; note: string }[]
-}
+type ImportResult = ApiResult<typeof importLinks>
 
 function ImportParents({
   slug,

@@ -72,6 +72,16 @@ import {
 import { Loading, PageTitle, Stats } from "@/features/admin/components/shell"
 import { api, ApiRequestError } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { getExam } from "@/features/results/server"
+import type { examResults, reportCard } from "@/features/results/server"
+import type { listExams } from "@/features/results/server"
+import type {
+  addPapers,
+  addTerm,
+  examSettings,
+  setPublished,
+} from "@/features/results/server"
 
 /* ---------- shared ---------- */
 
@@ -121,21 +131,7 @@ interface Term {
   endsOn: string | null
 }
 
-interface ExamList {
-  years: { id: string; name: string; isCurrent: boolean }[]
-  year: { id: string; name: string } | null
-  canSetup: boolean
-  scale: Band[]
-  grading?: "marks" | "credits" | "none"
-  words?: {
-    part: string
-    parts: string
-    assessment: string
-    assessments: string
-  }
-  terms?: Term[]
-  exams: ExamItem[]
-}
+type ExamList = ApiResult<typeof listExams>
 
 export function Exams({ slug }: { slug: string }) {
   const client = useQueryClient()
@@ -479,7 +475,7 @@ function TermsDialog({
   })
   const add = useMutation({
     mutationFn: () =>
-      api<{ id: string }>(`/orgs/${slug}/exams/terms`, {
+      api<ApiResult<typeof addTerm>>(`/orgs/${slug}/exams/terms`, {
         body: { ...form, yearId: year.id },
       }),
     onSuccess: (r) => {
@@ -593,7 +589,8 @@ function TermsDialog({
 function BankDialog({ slug, onDone }: { slug: string; onDone: () => void }) {
   const { data, error } = useQuery({
     queryKey: ["org", slug, "exam-settings"],
-    queryFn: () => api<{ remarks: string[] }>(`/orgs/${slug}/exams/settings`),
+    queryFn: () =>
+      api<ApiResult<typeof examSettings>>(`/orgs/${slug}/exams/settings`),
   })
   const client = useQueryClient()
   const [text, setText] = useState<string | null>(null)
@@ -764,31 +761,7 @@ interface Paper {
   canMark: boolean
 }
 
-interface ExamDetail {
-  exam: {
-    id: string
-    name: string
-    startsOn: string | null
-    endsOn: string | null
-    weight: number
-    published: boolean
-    publishedAt: string | null
-  }
-  year: { id: string; name: string } | null
-  canSetup: boolean
-  classes: {
-    groupId: string
-    name: string
-    students: number
-    canSeeResults: boolean
-    classTeacher: string | null
-    canRemark: boolean
-    remarks: number
-    papers: Paper[]
-  }[]
-  sections: { id: string; name: string }[]
-  grades: { id: string; name: string }[]
-}
+type ExamDetail = ApiResult<typeof getExam>
 
 export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
   const client = useQueryClient()
@@ -808,7 +781,7 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
   const refresh = () => client.invalidateQueries({ queryKey: ["org", slug] })
   const publish = useMutation({
     mutationFn: (v: { published: boolean; force?: boolean }) =>
-      api<{ published: boolean; told: number }>(
+      api<ApiResult<typeof setPublished>>(
         `/orgs/${slug}/exams/${examId}/publish`,
         { body: v }
       ),
@@ -836,7 +809,10 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
   return (
     <>
       <div className="mb-1 text-body-sm text-muted-foreground">
-        <Link href={orgPages(slug).manage(`/exams`)} className="hover:underline">
+        <Link
+          href={orgPages(slug).manage(`/exams`)}
+          className="hover:underline"
+        >
           Exams
         </Link>{" "}
         · {data.year?.name}
@@ -970,7 +946,9 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                       <CardAction>
                         <Link
                           aria-label={`Remarks for ${c.name}`}
-                          href={orgPages(slug).manage(`/exams/${examId}/remarks/${c.groupId}`)}
+                          href={orgPages(slug).manage(
+                            `/exams/${examId}/remarks/${c.groupId}`
+                          )}
                           className={buttonVariants({
                             size: "sm",
                             variant: "outline",
@@ -1002,7 +980,9 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                             {p.canMark || c.canSeeResults ? (
                               <Link
                                 className="hover:underline"
-                                href={orgPages(slug).manage(`/exams/${examId}/papers/${p.id}`)}
+                                href={orgPages(slug).manage(
+                                  `/exams/${examId}/papers/${p.id}`
+                                )}
                               >
                                 {p.subject}
                               </Link>
@@ -1034,7 +1014,9 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                             {p.canMark && !exam.published ? (
                               <Link
                                 aria-label={`Enter marks for ${p.subject}, ${c.name}`}
-                                href={orgPages(slug).manage(`/exams/${examId}/papers/${p.id}`)}
+                                href={orgPages(slug).manage(
+                                  `/exams/${examId}/papers/${p.id}`
+                                )}
                                 className={buttonVariants({
                                   size: "sm",
                                   variant: "ghost",
@@ -1168,16 +1150,13 @@ function PapersDialog({
   const [form, setForm] = useState({ maxMarks: "100", passMarks: "33" })
   const save = useMutation({
     mutationFn: () =>
-      api<{ added: number; skipped: number }>(
-        `/orgs/${slug}/exams/${examId}/papers`,
-        {
-          body: {
-            groupIds: [...chosen],
-            maxMarks: Number(form.maxMarks),
-            passMarks: Number(form.passMarks),
-          },
-        }
-      ),
+      api<ApiResult<typeof addPapers>>(`/orgs/${slug}/exams/${examId}/papers`, {
+        body: {
+          groupIds: [...chosen],
+          maxMarks: Number(form.maxMarks),
+          passMarks: Number(form.passMarks),
+        },
+      }),
   })
   const toggle = (id: string, on: boolean) => {
     const next = new Set(chosen)
@@ -1396,37 +1375,7 @@ function PaperDialog({
 
 /* ---------- a class's results ---------- */
 
-interface ResultsData {
-  exam: { id: string; name: string; published: boolean }
-  class: { id: string; name: string }
-  papers: { id: string; subject: string; maxMarks: number; passMarks: number }[]
-  rows: {
-    id: string
-    name: string
-    rollNo: number | null
-    cells: {
-      paperId: string
-      marks: number | null
-      absent: boolean
-      outcome: string
-      grade: string | null
-    }[]
-    obtained: number
-    maxMarks: number
-    percent: number | null
-    grade: string | null
-    result: string
-    rank: number | null
-  }[]
-  stats: {
-    students: number
-    complete: number
-    passed: number
-    average: number | null
-    highest: number | null
-    subjects: { paperId: string; average: number | null; failed: number }[]
-  }
-}
+type ResultsData = ApiResult<typeof examResults>
 
 function ClassResults({
   slug,
@@ -1740,7 +1689,10 @@ export function MarksSheet({
   return (
     <>
       <div className="mb-1 text-body-sm text-muted-foreground">
-        <Link href={orgPages(slug).manage(`/exams`)} className="hover:underline">
+        <Link
+          href={orgPages(slug).manage(`/exams`)}
+          className="hover:underline"
+        >
           Exams
         </Link>{" "}
         ·{" "}
@@ -1777,11 +1729,18 @@ export function MarksSheet({
       {data.students.length > 0 && (
         <Stats
           items={[
-            { label: "Entered", value: entered, hint: `of ${data.students.length}` },
+            {
+              label: "Entered",
+              value: entered,
+              hint: `of ${data.students.length}`,
+            },
             {
               label: "Average",
               value: mean === null ? "—" : fmt(Math.round(mean * 10) / 10),
-              hint: mean === null ? undefined : `${Math.round((100 * mean) / paper.maxMarks)}%`,
+              hint:
+                mean === null
+                  ? undefined
+                  : `${Math.round((100 * mean) / paper.maxMarks)}%`,
             },
             {
               label: "Highest",
@@ -1923,73 +1882,7 @@ export function MarksSheet({
 
 /* ---------- report card ---------- */
 
-interface ReportCardData {
-  org: { name: string; slug: string }
-  student: { id: string; name: string; admissionNo: string | null }
-  years: { id: string; name: string }[]
-  year: {
-    id: string
-    name: string
-    class: string | null
-    rollNo: number | null
-    status: string
-    classTeacher: string | null
-  }
-  scale: Band[]
-  subjects: {
-    subjectId: string
-    name: string
-    final: number | null
-    grade: string | null
-  }[]
-  exams: {
-    id: string
-    name: string
-    weight: number
-    published: boolean
-    papers: {
-      subjectId: string
-      maxMarks: number
-      marks: number | null
-      absent: boolean
-      outcome: string
-      grade: string | null
-    }[]
-    obtained: number
-    maxMarks: number
-    percent: number | null
-    grade: string | null
-    result: string
-    rank: number | null
-    of: number
-    remark: string | null
-    subjectRemarks: { subject: string; text: string }[]
-  }[]
-  final: { percent: number; grade: string } | null
-  /** Credit-graded kinds: each term's grade card and the CGPA so far. */
-  credits?: {
-    terms: {
-      id: string
-      name: string
-      courses: {
-        subjectId: string
-        code: string
-        name: string
-        credits: number | null
-        percent: number | null
-        grade: string | null
-        points: number | null
-      }[]
-      sgpa: number | null
-      credits: number
-      earned: number
-      backlogs: number
-    }[]
-    cgpa: number | null
-    earned: number
-  } | null
-  viewer: "student" | "parent" | "staff"
-}
+type ReportCardData = ApiResult<typeof reportCard>
 
 export function ReportCard({
   slug,
@@ -2451,7 +2344,10 @@ export function RemarksSheet({
   return (
     <>
       <div className="mb-1 text-body-sm text-muted-foreground">
-        <Link href={orgPages(slug).manage(`/exams`)} className="hover:underline">
+        <Link
+          href={orgPages(slug).manage(`/exams`)}
+          className="hover:underline"
+        >
           Exams
         </Link>{" "}
         ·{" "}

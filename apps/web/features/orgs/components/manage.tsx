@@ -85,6 +85,11 @@ import {
   memberKind,
   type MemberKind,
 } from "./manage-shared"
+import type {
+  importMembers,
+  listInvites,
+  suggestedRoles,
+} from "@/features/orgs/server"
 
 /* ---------- shell ---------- */
 
@@ -751,18 +756,7 @@ export function ManageRoles({ slug }: { slug: string }) {
   )
 }
 
-interface Suggested {
-  kind: string
-  suggestions: {
-    key: string
-    name: string
-    description: string
-    permissions: string[]
-    scope: "organization" | "group"
-    nameTaken: boolean
-    allowed: boolean
-  }[]
-}
+type Suggested = ApiResult<typeof suggestedRoles>
 
 /** The kind's suggested roles this organization doesn't have yet, each one click to add. */
 function SuggestedRoles({
@@ -940,19 +934,7 @@ function RoleEditor({
 
 /* ---------- invites ---------- */
 
-interface Invite {
-  id: string
-  token: string
-  label: string
-  role: string
-  group: string | null
-  email: string | null
-  uses: number
-  maxUses: number | null
-  expiresAt: string | null
-  revoked: boolean
-  createdAt: string
-}
+type Invite = ApiResult<typeof listInvites>[number]
 
 export function ManageInvites({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
@@ -1492,14 +1474,7 @@ interface ImportRow {
   note: string
 }
 
-interface ImportResult {
-  committed: boolean
-  counts: Record<
-    "invite" | "add" | "update" | "unchanged" | "error" | "newGroups",
-    number
-  >
-  rows: ImportRow[]
-}
+type ImportResult = ApiResult<typeof importMembers>
 
 /** A small CSV reader: quoted fields, doubled quotes, commas and newlines inside quotes. */
 export function parseCsv(text: string): string[][] {

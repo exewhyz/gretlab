@@ -36,6 +36,10 @@ import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import type { listIntegrations } from "@/features/integrations/server"
 import { formatDateTime } from "@/lib/format"
+import type {
+  createApiKey,
+  createWebhook,
+} from "@/features/integrations/server"
 
 type Data = ApiResult<typeof listIntegrations>
 
@@ -81,7 +85,9 @@ export function ManageIntegrations({ slug }: { slug: string }) {
   })
   const refresh = () => void client.invalidateQueries({ queryKey: key })
   const [making, setMaking] = useState<"key" | "webhook" | null>(null)
-  const [shown, setShown] = useState<{ label: string; value: string } | null>(null)
+  const [shown, setShown] = useState<{ label: string; value: string } | null>(
+    null
+  )
 
   const revoke = useMutation({
     mutationFn: (id: string) =>
@@ -138,8 +144,8 @@ export function ManageIntegrations({ slug }: { slug: string }) {
             <EmptyHeader>
               <EmptyTitle>No API keys</EmptyTitle>
               <EmptyDescription>
-                Make one for each system that connects, so each can be
-                revoked on its own.
+                Make one for each system that connects, so each can be revoked
+                on its own.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -248,7 +254,9 @@ export function ManageIntegrations({ slug }: { slug: string }) {
                   <Button
                     size="xs"
                     variant="outline"
-                    onClick={() => toggle.mutate({ id: h.id, active: !h.active })}
+                    onClick={() =>
+                      toggle.mutate({ id: h.id, active: !h.active })
+                    }
                   >
                     {h.active ? "Pause" : "Turn on"}
                   </Button>
@@ -265,7 +273,10 @@ export function ManageIntegrations({ slug }: { slug: string }) {
                 </div>
               </div>
               {h.deliveries.length > 0 ? (
-                <ul className="grid gap-1 text-xs" aria-label="Recent deliveries">
+                <ul
+                  className="grid gap-1 text-xs"
+                  aria-label="Recent deliveries"
+                >
                   {h.deliveries.map((d) => (
                     <li
                       key={d.id}
@@ -292,8 +303,11 @@ export function ManageIntegrations({ slug }: { slug: string }) {
                       <span className="font-mono text-ink">{d.event}</span>
                       <span className="text-body">
                         {formatDateTime(d.createdAt)}
-                        {d.responseStatus !== null && ` · HTTP ${d.responseStatus}`}
-                        {d.lastError && d.status !== "sent" && ` · ${d.lastError}`}
+                        {d.responseStatus !== null &&
+                          ` · HTTP ${d.responseStatus}`}
+                        {d.lastError &&
+                          d.status !== "sent" &&
+                          ` · ${d.lastError}`}
                       </span>
                     </li>
                   ))}
@@ -363,7 +377,7 @@ function NewKey({
   const [permissions, setPermissions] = useState<string[]>([])
   const make = useMutation({
     mutationFn: () =>
-      api<{ token: string }>(`/orgs/${slug}/integrations/keys`, {
+      api<ApiResult<typeof createApiKey>>(`/orgs/${slug}/integrations/keys`, {
         body: { name, permissions },
       }),
     onSuccess: (r) => {
@@ -404,7 +418,9 @@ function NewKey({
             Cancel
           </Button>
           <Button
-            disabled={!name.trim() || permissions.length === 0 || make.isPending}
+            disabled={
+              !name.trim() || permissions.length === 0 || make.isPending
+            }
             onClick={() => make.mutate()}
           >
             Make key
@@ -433,9 +449,12 @@ function NewWebhook({
   const [chosen, setChosen] = useState<string[]>([])
   const make = useMutation({
     mutationFn: () =>
-      api<{ secret: string }>(`/orgs/${slug}/integrations/webhooks`, {
-        body: { url, events: all ? ["*"] : chosen.map((a) => `${a}.*`) },
-      }),
+      api<ApiResult<typeof createWebhook>>(
+        `/orgs/${slug}/integrations/webhooks`,
+        {
+          body: { url, events: all ? ["*"] : chosen.map((a) => `${a}.*`) },
+        }
+      ),
     onSuccess: (r) => {
       setUrl("")
       setChosen([])
@@ -473,7 +492,10 @@ function NewWebhook({
           {!all && (
             <div className="grid grid-cols-2 gap-1.5 pl-6 sm:grid-cols-3">
               {areas.map((a) => (
-                <label key={a.key} className="flex items-center gap-2 text-body-sm">
+                <label
+                  key={a.key}
+                  className="flex items-center gap-2 text-body-sm"
+                >
                   <input
                     type="checkbox"
                     checked={chosen.includes(a.key)}
@@ -499,7 +521,9 @@ function NewWebhook({
             Cancel
           </Button>
           <Button
-            disabled={!url.trim() || (!all && chosen.length === 0) || make.isPending}
+            disabled={
+              !url.trim() || (!all && chosen.length === 0) || make.isPending
+            }
             onClick={() => make.mutate()}
           >
             Add webhook

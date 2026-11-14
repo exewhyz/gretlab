@@ -72,114 +72,18 @@ import { api } from "@/lib/api/client"
 
 import { useOrgReach, useShell } from "./org-shell"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgHome } from "@/features/home/server"
 
 type Tone = "bad" | "plain"
 
-interface AdminData {
-  day: string
-  holiday: string | null
-  tiles: {
-    students: number
-    teachers: number
-    classes: number
-    present: { present: number; of: number; open: number } | null
-  }
-  steps: { key: string; label: string; done: boolean; href: string }[]
-  classes: {
-    id: string
-    name: string
-    students: number
-    taken: boolean
-    present: number
-  }[]
-  trend: { day: string; percent: number }[]
-  attention: {
-    kind: string
-    tone: Tone
-    text: string
-    action: string
-    href: string
-  }[]
-  coverage: { label: string; value: number; of: number }[]
-}
+type AdminData = NonNullable<Home["admin"]>
 
-interface TeacherData {
-  day: string
-  holiday: string | null
-  checkIn?: boolean
-  tiles: { lessons: number; toTake: number; students: number; low: number }
-  periods: {
-    time: string
-    title: string
-    detail: string
-    groupId: string | null
-    isBreak: boolean
-    taken: boolean
-  }[]
-  todo: {
-    kind: string
-    tone: Tone
-    text: string
-    action: string
-    href: string
-  }[]
-  classes: {
-    id: string
-    name: string
-    students: number
-    attendance: number | null
-    taken: boolean
-  }[]
-  attendanceOn: boolean
-}
+type TeacherData = NonNullable<Home["teacher"]>
 
-interface StudentData {
-  day: string
-  classes: { id: string; name: string }[]
-  tiles: {
-    attendance: number | null
-    dueThisWeek: number
-    classes: number
-    booksOut: number | null
-  }
-  lessons: {
-    starts: string
-    ends: string
-    subject: string
-    teacher: string
-    isBreak: boolean
-  }[]
-  coming: {
-    kind: string
-    title: string
-    detail: string
-    at: string
-    href: string
-    action: string
-  }[]
-  notices: {
-    id: string
-    at: string
-    text: string
-    by: string | null
-    group: string
-  }[]
-  campus: CampusData & { slug?: string }
-}
+type StudentData = NonNullable<Home["student"]>
 
-interface ParentData {
-  day: string
-  children: {
-    id: string
-    name: string
-    classes: string[]
-    attendance: number | null
-    absentToday: boolean
-    work: number
-    bus: string | null
-    news: { kind: string; tone: Tone; text: string; at: string }[]
-  }[]
-}
+type ParentData = NonNullable<Home["parent"]>
 
 type View = "admin" | "teacher" | "student" | "parent" | "staff"
 
@@ -187,80 +91,13 @@ type View = "admin" | "teacher" | "student" | "parent" | "staff"
 const TermsContext = createContext<KindTerms>(KINDS.school.terms)
 const useTerms = () => useContext(TermsContext)
 
-interface Runs {
-  learning: {
-    id: string
-    name: string
-    startsOn: string
-    endsOn: string
-    state: RunState
-    pod: { id: string; name: string } | null
-    lead: string | null
-  }[]
-  leading: {
-    id: string
-    name: string
-    run: { id: string; name: string; state: RunState }
-  }[]
-}
+type Runs = NonNullable<Home["runs"]>
 
-interface MyTrainingItem {
-  courseId: string
-  course: string
-  href: string
-  status: TrainingStatus
-  needBy: string | null
-  validUntil: string | null
-  progress: { done: number; total: number }
-}
+type MyTrainingItem = NonNullable<Home["training"]["mine"]>[number]
 
-interface TeamTraining {
-  assigned: number
-  done: number
-  late: number
-  soon: number
-  trainings: {
-    courseId: string
-    groupId: string
-    course: string
-    group: string
-    late: number
-    soon: number
-  }[]
-}
+type TeamTraining = NonNullable<Home["training"]["team"]>
 
-interface Home {
-  /** The next few events this person may see (the events module), or null. */
-  events?: EventView[] | null
-  /** Kinds whose members join groups themselves. */
-  openGroups?: boolean
-  /** Assigned training (the training module): their own, and a manager's teams'. */
-  training?: { mine: MyTrainingItem[] | null; team: TeamTraining | null }
-  terms?: KindTerms
-  views: View[]
-  /** Runs (cohorts) for kinds whose groups have dates; null otherwise. */
-  runs?: Runs | null
-  admin: AdminData | null
-  teacher: TeacherData | null
-  student: StudentData | null
-  parent: ParentData | null
-  staff: {
-    day: string
-    links: { key: string; label: string; group: string; href: string }[]
-    checkIn: boolean
-    waiting: { leave: number | null; applications: number | null }
-    staffToday: {
-      total: number
-      unmarked: number
-      present: number
-      late: number
-      half: number
-      absent: number
-      leave: number
-      percent: number | null
-    } | null
-  } | null
-}
+type Home = ApiResult<typeof orgHome>
 
 const LABEL: Record<View, string> = {
   admin: "School",
@@ -1346,7 +1183,9 @@ function StudentHome({
   const work = has("exams") ? "Assignments and exams" : "Assignments"
   // Library, bus or hostel: shown beside the notices only when there's something.
   const hasCampus = Boolean(
-    data.campus.library || data.campus.transport?.ride || data.campus.hostel?.stay
+    data.campus.library ||
+    data.campus.transport?.ride ||
+    data.campus.hostel?.stay
   )
   return (
     <div className="grid gap-5" data-testid="student-home">
@@ -1607,7 +1446,8 @@ function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
                   <div className="min-w-0">
                     <CardTitle className="text-title-md">{c.name}</CardTitle>
                     <CardDescription className="truncate">
-                      {c.classes.join(", ") || `Not in a ${terms.group.toLowerCase()} yet`}
+                      {c.classes.join(", ") ||
+                        `Not in a ${terms.group.toLowerCase()} yet`}
                     </CardDescription>
                   </div>
                 </div>

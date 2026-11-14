@@ -18,6 +18,14 @@ import { ConfirmButton } from "@/components/confirm"
 import { Field, FormMessage, TextArea, TextInput } from "@/components/form"
 import { Card, Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { hostelSetup, searchResidents } from "@/features/hostel/server"
+import type {
+  addHostel,
+  addRooms,
+  hostelRoomsList,
+  importResidents,
+} from "@/features/hostel/server"
 
 interface Hostel {
   id: string
@@ -49,10 +57,7 @@ interface Room {
   beds: Bed[]
 }
 
-interface Setup {
-  can: { rooms: boolean; allot: boolean }
-  hostels: Hostel[]
-}
+type Setup = ApiResult<typeof hostelSetup>
 
 /** Manage › Hostel: pick a hostel, see its rooms and beds; allot, move out, edit in dialogs. */
 export function ManageHostel({ slug }: { slug: string }) {
@@ -179,7 +184,9 @@ function HostelRooms({
   const { data, error } = useQuery({
     queryKey: ["org", slug, "hostel-rooms", hostel.id],
     queryFn: () =>
-      api<{ rooms: Room[] }>(`/orgs/${slug}/hostel/${hostel.id}/rooms`),
+      api<ApiResult<typeof hostelRoomsList>>(
+        `/orgs/${slug}/hostel/${hostel.id}/rooms`
+      ),
   })
   const [find, setFind] = useState("")
   const [bed, setBed] = useState<{ room: Room; bed: Bed } | null>(null)
@@ -347,13 +354,7 @@ function HostelRooms({
   )
 }
 
-interface Candidate {
-  id: string
-  name: string
-  email: string
-  classes: string[]
-  now: string | null
-}
+type Candidate = ApiResult<typeof searchResidents>[number]
 
 function BedDialog({
   slug,
@@ -496,9 +497,9 @@ function HostelDialog({
             method: "PUT",
             body: form,
           }).then(() => hostel.id)
-        : api<{ id: string }>(`/orgs/${slug}/hostel`, { body: form }).then(
-            (h) => h.id
-          ),
+        : api<ApiResult<typeof addHostel>>(`/orgs/${slug}/hostel`, {
+            body: form,
+          }).then((h) => h.id),
     onSuccess: (id) => onDone(id),
   })
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
@@ -566,7 +567,7 @@ function AddRoomsDialog({
   })
   const save = useMutation({
     mutationFn: () =>
-      api<{ added: number; skipped: number }>(
+      api<ApiResult<typeof addRooms>>(
         `/orgs/${slug}/hostel/${hostel.id}/rooms`,
         {
           body: {
@@ -771,13 +772,12 @@ function ImportResidents({
     }))
   const save = useMutation({
     mutationFn: () =>
-      api<{
-        allotted: number
-        failed: number
-        report: { line: number; note: string }[]
-      }>(`/orgs/${slug}/hostel/residents/import`, {
-        body: { rows },
-      }),
+      api<ApiResult<typeof importResidents>>(
+        `/orgs/${slug}/hostel/residents/import`,
+        {
+          body: { rows },
+        }
+      ),
   })
   const result = save.data
   return (

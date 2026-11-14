@@ -21,16 +21,16 @@ import { api } from "@/lib/api/client"
 import { formatDate } from "@/lib/format"
 
 import { sendSecondStep, STEP_MESSAGES } from "../session-step"
+import type { ApiResult } from "@/lib/api/types"
+import type { startAppSetup, twoFactorStatus } from "@/features/auth/two-factor"
+import type { passwordStatus } from "@/features/auth/password"
+import type {
+  emailConfirmCode,
+  renewBackupCodes,
+  startEmailSetup,
+} from "@/features/auth/two-factor"
 
-interface Status {
-  enabled: boolean
-  enabledAt: string | null
-  methods: { app: boolean; email: boolean }
-  emailAvailable: boolean
-  email: string
-  backupCodesLeft: number
-  required: boolean
-}
+type Status = ApiResult<typeof twoFactorStatus>
 
 type Method = "app" | "email"
 
@@ -74,9 +74,9 @@ export function SecuritySettings() {
       <Card data-testid="two-factor">
         <h2 className="mb-1 text-title-sm text-ink">Two-factor sign-in</h2>
         <p className="mb-3 text-body-sm text-body">
-          After your password or Google, you also prove it&apos;s you with a code: from an
-          authenticator app on your phone, or sent to your email. Turn on both,
-          so losing one doesn&apos;t lock you out.
+          After your password or Google, you also prove it&apos;s you with a
+          code: from an authenticator app on your phone, or sent to your email.
+          Turn on both, so losing one doesn&apos;t lock you out.
         </p>
         <p
           className="mb-3 text-body-sm text-ink"
@@ -330,12 +330,7 @@ function Confirm({
   )
 }
 
-interface AppSetupData {
-  secret: string
-  url: string
-  qr: string
-  backupCodes: string[] | null
-}
+type AppSetupData = ApiResult<typeof startAppSetup>
 
 function AppSetup({
   onDone,
@@ -409,10 +404,9 @@ function EmailSetup({
   const [wait, setWait] = useState(0)
   const send = useMutation({
     mutationFn: () =>
-      api<{ sentTo: string; resendIn: number; backupCodes: string[] | null }>(
-        "/me/security/email",
-        { method: "POST" }
-      ),
+      api<ApiResult<typeof startEmailSetup>>("/me/security/email", {
+        method: "POST",
+      }),
     onSuccess: (r) => {
       if (r.backupCodes) setBackupCodes(r.backupCodes)
       setWait(r.resendIn)
@@ -489,7 +483,9 @@ function CodeDialog({
   const [code, setCode] = useState("")
   const mail = useMutation({
     mutationFn: () =>
-      api<{ sentTo: string }>("/me/security/code", { method: "POST" }),
+      api<ApiResult<typeof emailConfirmCode>>("/me/security/code", {
+        method: "POST",
+      }),
   })
   const act = useMutation({
     mutationFn: () =>
@@ -497,7 +493,7 @@ function CodeDialog({
         ? api("/me/security/remove", { body: { method, code } }).then(
             () => undefined
           )
-        : api<{ backupCodes: string[] }>("/me/security/backup-codes", {
+        : api<ApiResult<typeof renewBackupCodes>>("/me/security/backup-codes", {
             body: { code },
           }).then((r) => r.backupCodes),
     onSuccess: (codes) => onDone(codes),
@@ -572,7 +568,7 @@ function PasswordCard() {
   const client = useQueryClient()
   const status = useQuery({
     queryKey: ["me", "password"],
-    queryFn: () => api<{ hasPassword: boolean }>("/me/password"),
+    queryFn: () => api<ApiResult<typeof passwordStatus>>("/me/password"),
   })
   const [open, setOpen] = useState(false)
   const [current, setCurrent] = useState("")
@@ -580,9 +576,16 @@ function PasswordCard() {
   const [done, setDone] = useState<string | null>(null)
   const save = useMutation({
     mutationFn: () =>
-      api("/me/password", { method: "PUT", body: { current: current || undefined, password } }),
+      api("/me/password", {
+        method: "PUT",
+        body: { current: current || undefined, password },
+      }),
     onSuccess: () => {
-      setDone(status.data?.hasPassword ? "Password changed." : "Password added: you can sign in with it now.")
+      setDone(
+        status.data?.hasPassword
+          ? "Password changed."
+          : "Password added: you can sign in with it now."
+      )
       setOpen(false)
       setCurrent("")
       setPassword("")
@@ -611,18 +614,45 @@ function PasswordCard() {
         >
           {has && (
             <Field label="Current password">
-              <TextInput type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+              <TextInput
+                type="password"
+                autoComplete="current-password"
+                value={current}
+                onChange={(e) => setCurrent(e.target.value)}
+              />
             </Field>
           )}
-          <Field label="New password" help={problem ?? `At least ${PASSWORD.min} characters.`}>
-            <TextInput type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Field
+            label="New password"
+            help={problem ?? `At least ${PASSWORD.min} characters.`}
+          >
+            <TextInput
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </Field>
-          {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+          {save.error && (
+            <FormMessage message={{ text: save.error.message, kind: "err" }} />
+          )}
           <div className="flex gap-2">
-            <Button type="submit" disabled={save.isPending || !password || Boolean(problem) || (has && !current)}>
+            <Button
+              type="submit"
+              disabled={
+                save.isPending ||
+                !password ||
+                Boolean(problem) ||
+                (has && !current)
+              }
+            >
               Save password
             </Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
           </div>
@@ -648,10 +678,14 @@ function SessionsCard() {
     <Card data-testid="sessions-card">
       <h2 className="mb-1 text-title-sm text-ink">Signed-in devices</h2>
       <p className="mb-3 text-body-sm text-body">
-        Left yourself signed in somewhere, or lost a device? Sign out everywhere, this browser
-        included.
+        Left yourself signed in somewhere, or lost a device? Sign out
+        everywhere, this browser included.
       </p>
-      <Button variant="outline" disabled={out.isPending} onClick={() => out.mutate()}>
+      <Button
+        variant="outline"
+        disabled={out.isPending}
+        onClick={() => out.mutate()}
+      >
         Sign out everywhere
       </Button>
     </Card>

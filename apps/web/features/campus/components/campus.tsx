@@ -4,6 +4,8 @@ import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { campusOf } from "@/features/campus/server"
 
 export interface CampusLoan {
   id: string
@@ -23,11 +25,7 @@ export interface CampusRide {
   drop: string
 }
 
-export interface CampusData {
-  library: { loans: CampusLoan[] } | null
-  transport?: { ride: CampusRide | null } | null
-  hostel?: { stay: CampusStay | null } | null
-}
+export type CampusData = ApiResult<typeof campusOf>
 
 export interface CampusStay {
   hostel: string

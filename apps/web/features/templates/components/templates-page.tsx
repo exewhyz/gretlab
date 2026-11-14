@@ -20,13 +20,24 @@ import { Check, FormMessage, TextInput } from "@/components/form"
 import { useViewer } from "@/features/account/use-viewer"
 import { AssignmentEditorPage } from "@/features/admin/components/assignments"
 import { toLocalInput } from "@/features/admin/components/contests"
-import { Card, Loading, PageTitle, Table } from "@/features/admin/components/shell"
+import {
+  Card,
+  Loading,
+  PageTitle,
+  Table,
+} from "@/features/admin/components/shell"
 import { useOwner } from "@/features/admin/owner"
 import { ShareDialog } from "@/features/library/components/library-page"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { useGroups } from "@/features/orgs/components/manage-shared"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgTemplate, orgTemplates } from "@/features/templates/org"
+import type {
+  orgApplyTemplate,
+  orgCopyTemplate,
+} from "@/features/templates/org"
 
 /*
  * Templates: assignments and exams written once and used for many classes, each use with
@@ -35,42 +46,9 @@ import { formatDateTime } from "@/lib/format"
 
 type Sharing = "everyone" | "selected" | "owner"
 
-interface TemplateRow {
-  id: string
-  title: string
-  published: boolean
-  sharing: Sharing
-  exam: boolean
-  problems: number
-  questions: number
-  points: number
-  uses: number
-  source: "ours" | "platform" | "shared"
-  owner: string
-  copiedFrom: string | null
-}
+type TemplateRow = ApiResult<typeof orgTemplates>[number]
 
-interface Template {
-  id: string
-  title: string
-  description: string
-  editable: boolean
-  published: boolean
-  sharing: Sharing
-  exam: { minutes: number | null } | null
-  problems: { problemId: string; points: number }[]
-  questions: { questionId: string; points: number }[]
-  uses: {
-    id: string
-    slug: string
-    title: string
-    audience: string[][]
-    opensAt: string
-    dueAt: string
-    published: boolean
-    opened: boolean
-  }[]
-}
+type Template = ApiResult<typeof orgTemplate>
 
 const SHARING_LABEL: Record<Sharing, string> = {
   everyone: "Every college",
@@ -91,7 +69,10 @@ export function TemplatesPage() {
     <>
       <PageTitle
         action={
-          <Link href={owner.page("/templates/new")} className={cn(buttonVariants({ size: "sm" }))}>
+          <Link
+            href={owner.page("/templates/new")}
+            className={cn(buttonVariants({ size: "sm" }))}
+          >
             New template
           </Link>
         }
@@ -107,7 +88,16 @@ export function TemplatesPage() {
         <Card>No templates yet.</Card>
       ) : (
         <Table
-          headers={["Template", "Kind", "Problems", "Questions", "Points", platform ? "Shared with" : "Source", "Uses", ""]}
+          headers={[
+            "Template",
+            "Kind",
+            "Problems",
+            "Questions",
+            "Points",
+            platform ? "Shared with" : "Source",
+            "Uses",
+            "",
+          ]}
         >
           {data.map((t) => (
             <tr key={t.id} data-testid="template-row">
@@ -119,14 +109,20 @@ export function TemplatesPage() {
                   {t.title}
                 </Link>
                 {!t.published && <span className="ml-2 text-xs">Draft</span>}
-                {t.copiedFrom && <span className="ml-1 text-xs text-body">(copy)</span>}
+                {t.copiedFrom && (
+                  <span className="ml-1 text-xs text-body">(copy)</span>
+                )}
               </td>
               <td className="text-caption">{t.exam ? "Exam" : "Assignment"}</td>
               <td className="tabular-nums">{t.problems}</td>
               <td className="tabular-nums">{t.questions}</td>
               <td className="tabular-nums">{t.points}</td>
               <td className="text-caption">
-                {platform ? SHARING_LABEL[t.sharing] : t.source === "ours" ? "Ours" : t.owner}
+                {platform
+                  ? SHARING_LABEL[t.sharing]
+                  : t.source === "ours"
+                    ? "Ours"
+                    : t.owner}
               </td>
               <td className="tabular-nums">{t.uses}</td>
               <td className="text-right">
@@ -156,7 +152,11 @@ export function TemplatePage({ id }: { id: string | null }) {
   const router = useRouter()
   const platform = owner.orgSlug === null
   const { data: viewer } = useViewer()
-  const canShare = platform && (viewer?.user?.platform.permissions ?? []).includes("platform.library.share")
+  const canShare =
+    platform &&
+    (viewer?.user?.platform.permissions ?? []).includes(
+      "platform.library.share"
+    )
   const { data, error } = useQuery({
     queryKey: owner.key("template", id),
     queryFn: () => api<Template>(owner.api(`/templates/${id}`)),
@@ -164,7 +164,11 @@ export function TemplatePage({ id }: { id: string | null }) {
   })
   const [dialog, setDialog] = useState<"use" | "share" | null>(null)
   const copy = useMutation({
-    mutationFn: () => api<{ id: string }>(owner.api(`/templates/${id}/copy`), { body: {} }),
+    mutationFn: () =>
+      api<ApiResult<typeof orgCopyTemplate>>(
+        owner.api(`/templates/${id}/copy`),
+        { body: {} }
+      ),
     onSuccess: (row) => {
       void client.invalidateQueries({ queryKey: owner.key("templates") })
       router.push(owner.page(`/templates/${row.id}`))
@@ -194,7 +198,12 @@ export function TemplatePage({ id }: { id: string | null }) {
           <PageTitle
             action={
               !platform && (
-                <Button size="sm" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={copy.isPending}
+                  onClick={() => copy.mutate()}
+                >
                   Copy to change it
                 </Button>
               )
@@ -205,11 +214,15 @@ export function TemplatePage({ id }: { id: string | null }) {
           <Card className="grid gap-1 text-body-sm">
             {data.description && <p>{data.description}</p>}
             <p>
-              {data.exam ? "Exam" : "Assignment"} · {data.problems.length} problems ·{" "}
-              {data.questions.length} questions · shared with you. Use it as it is, or copy it to
-              change it.
+              {data.exam ? "Exam" : "Assignment"} · {data.problems.length}{" "}
+              problems · {data.questions.length} questions · shared with you.
+              Use it as it is, or copy it to change it.
             </p>
-            {copy.error && <FormMessage message={{ text: copy.error.message, kind: "err" }} />}
+            {copy.error && (
+              <FormMessage
+                message={{ text: copy.error.message, kind: "err" }}
+              />
+            )}
           </Card>
         </>
       )}
@@ -218,18 +231,28 @@ export function TemplatePage({ id }: { id: string | null }) {
           <h2 className="text-display-sm text-ink">Uses</h2>
           <span className="flex gap-2">
             {canShare && data.editable && (
-              <Button size="sm" variant="outline" onClick={() => setDialog("share")}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDialog("share")}
+              >
                 Share…
               </Button>
             )}
-            <Button size="sm" disabled={!data.published} onClick={() => setDialog("use")}>
+            <Button
+              size="sm"
+              disabled={!data.published}
+              onClick={() => setDialog("use")}
+            >
               {platform ? "Use…" : "Use for classes…"}
             </Button>
           </span>
         </div>
         {data.uses.length === 0 ? (
           <p className="text-body-sm text-body">
-            {data.published ? "Not used yet." : "Mark it ready (Save template) to use it."}
+            {data.published
+              ? "Not used yet."
+              : "Mark it ready (Save template) to use it."}
           </p>
         ) : (
           <Table headers={["Assignment", "Opens", "Due", "Template changes"]}>
@@ -246,7 +269,11 @@ export function TemplatePage({ id }: { id: string | null }) {
                 </td>
                 <td>{formatDateTime(u.opensAt)}</td>
                 <td>{formatDateTime(u.dueAt)}</td>
-                <td className="text-caption">{u.opened ? "Opened: kept as it was" : "Gets them until it opens"}</td>
+                <td className="text-caption">
+                  {u.opened
+                    ? "Opened: kept as it was"
+                    : "Gets them until it opens"}
+                </td>
               </tr>
             ))}
           </Table>
@@ -257,7 +284,9 @@ export function TemplatePage({ id }: { id: string | null }) {
           template={row}
           onDone={() => {
             setDialog(null)
-            void client.invalidateQueries({ queryKey: owner.key("template", id) })
+            void client.invalidateQueries({
+              queryKey: owner.key("template", id),
+            })
           }}
         />
       )}
@@ -285,7 +314,12 @@ let nextKey = 0
 const newRow = (): UseRow => {
   const due = new Date(Date.now() + 7 * 24 * 3600_000)
   due.setHours(23, 59, 0, 0)
-  return { key: nextKey++, groupId: "", opensAt: toLocalInput(new Date()), dueAt: toLocalInput(due) }
+  return {
+    key: nextKey++,
+    groupId: "",
+    opensAt: toLocalInput(new Date()),
+    dueAt: toLocalInput(due),
+  }
 }
 
 /** Uses a template: one assignment per class, each with its own dates. */
@@ -304,7 +338,7 @@ function ApplyDialog({
   const [published, setPublished] = useState(false)
   const apply = useMutation({
     mutationFn: () =>
-      api<{ created: { id: string; slug: string; title: string }[] }>(
+      api<ApiResult<typeof orgApplyTemplate>>(
         owner.api(`/templates/${template.id}/use`),
         {
           body: {
@@ -324,18 +358,24 @@ function ApplyDialog({
   })
   const update = (key: number, patch: Partial<UseRow>) =>
     setRows(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)))
-  const ready = rows.every((r) => r.opensAt && r.dueAt && (platform || r.groupId))
+  const ready = rows.every(
+    (r) => r.opensAt && r.dueAt && (platform || r.groupId)
+  )
 
   return (
     <Dialog open onOpenChange={(open) => !open && onDone()}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl" data-testid="apply-dialog">
+      <DialogContent
+        className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl"
+        data-testid="apply-dialog"
+      >
         <DialogHeader>
           <DialogTitle>Use {template.title}</DialogTitle>
           <DialogDescription>
             {platform
               ? "Each use is an assignment for everyone on the platform, with its own dates."
               : "Each class gets its own assignment with its own dates and gradebook."}{" "}
-            {template.exam && "Set each lab's networks on its assignment afterwards."}
+            {template.exam &&
+              "Set each lab's networks on its assignment afterwards."}
           </DialogDescription>
         </DialogHeader>
         {apply.data ? (
@@ -347,7 +387,10 @@ function ApplyDialog({
             <ul className="grid gap-1">
               {apply.data.created.map((c) => (
                 <li key={c.id}>
-                  <Link href={owner.page(`/assignments/${c.id}`)} className="underline underline-offset-2">
+                  <Link
+                    href={owner.page(`/assignments/${c.id}`)}
+                    className="underline underline-offset-2"
+                  >
                     /assignments/{c.slug}
                   </Link>
                 </li>
@@ -365,7 +408,9 @@ function ApplyDialog({
                   className="grid gap-2 rounded-md border border-hairline p-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end"
                 >
                   {platform ? (
-                    <span className="self-center text-caption">Use {index + 1}</span>
+                    <span className="self-center text-caption">
+                      Use {index + 1}
+                    </span>
                   ) : (
                     groups.data && (
                       <label className="grid gap-1 text-caption">
@@ -387,7 +432,9 @@ function ApplyDialog({
                       type="datetime-local"
                       aria-label={`Opens, use ${index + 1}`}
                       value={r.opensAt}
-                      onChange={(e) => update(r.key, { opensAt: e.target.value })}
+                      onChange={(e) =>
+                        update(r.key, { opensAt: e.target.value })
+                      }
                     />
                   </label>
                   <label className="grid gap-1 text-caption">
@@ -416,12 +463,29 @@ function ApplyDialog({
               size="sm"
               className="justify-self-start"
               disabled={rows.length >= 50}
-              onClick={() => setRows([...rows, { ...newRow(), opensAt: rows.at(-1)!.opensAt, dueAt: rows.at(-1)!.dueAt }])}
+              onClick={() =>
+                setRows([
+                  ...rows,
+                  {
+                    ...newRow(),
+                    opensAt: rows.at(-1)!.opensAt,
+                    dueAt: rows.at(-1)!.dueAt,
+                  },
+                ])
+              }
             >
               {platform ? "+ Another use" : "+ Another class"}
             </Button>
-            <Check checked={published} onCheckedChange={setPublished} label="Publish them now (students see them)" />
-            {apply.error && <FormMessage message={{ text: apply.error.message, kind: "err" }} />}
+            <Check
+              checked={published}
+              onCheckedChange={setPublished}
+              label="Publish them now (students see them)"
+            />
+            {apply.error && (
+              <FormMessage
+                message={{ text: apply.error.message, kind: "err" }}
+              />
+            )}
           </>
         )}
         <DialogFooter>
@@ -429,8 +493,13 @@ function ApplyDialog({
             {apply.data ? "Close" : "Cancel"}
           </Button>
           {!apply.data && (
-            <Button disabled={!ready || apply.isPending} onClick={() => apply.mutate()}>
-              {rows.length === 1 ? "Make the assignment" : `Make ${rows.length} assignments`}
+            <Button
+              disabled={!ready || apply.isPending}
+              onClick={() => apply.mutate()}
+            >
+              {rows.length === 1
+                ? "Make the assignment"
+                : `Make ${rows.length} assignments`}
             </Button>
           )}
         </DialogFooter>

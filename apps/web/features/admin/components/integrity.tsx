@@ -12,16 +12,11 @@ import { api } from "@/lib/api/client"
 
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle, Table } from "./shell"
+import type { ApiResult } from "@/lib/api/types"
+import type { findSimilarSubmissions } from "@/features/catalog/server"
+import type { listOwnedContests } from "@/features/contests/server"
 
-interface Result {
-  compared: number
-  pairs: {
-    score: number
-    language: string
-    a: { submissionId: string; email: string }
-    b: { submissionId: string; email: string }
-  }[]
-}
+type Result = ApiResult<typeof findSimilarSubmissions>
 
 export function AdminIntegrity() {
   const problems = useQuery({
@@ -30,7 +25,7 @@ export function AdminIntegrity() {
   })
   const contests = useQuery({
     queryKey: ["admin", "contests"],
-    queryFn: () => api<{ slug: string; title: string }[]>("/admin/contests"),
+    queryFn: () => api<ApiResult<typeof listOwnedContests>>("/admin/contests"),
   })
   const [problemSlug, setProblemSlug] = useState("")
   const [contestSlug, setContestSlug] = useState("")

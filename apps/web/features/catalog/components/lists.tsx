@@ -15,20 +15,13 @@ import { useProgress } from "@/features/lab/hooks/use-progress"
 import { api } from "@/lib/api/client"
 
 import { Difficulty } from "./difficulty"
+import type { ApiResult } from "@/lib/api/types"
+import type { getList, getLists } from "@/features/catalog/server"
+import type { createList } from "@/features/catalog/server"
 
-interface ListSummary {
-  slug: string
-  title: string
-  description: string
-  kind: "favorites" | "custom" | "study_plan"
-  size: number
-  mine: boolean
-  published: boolean
-}
+type ListSummary = ApiResult<typeof getLists>[number]
 
-interface ListDetail extends ListSummary {
-  items: { slug: string; title: string; level: string }[]
-}
+type ListDetail = ApiResult<typeof getList>
 
 export function MyLists() {
   const queryClient = useQueryClient()
@@ -39,7 +32,8 @@ export function MyLists() {
     queryFn: () => api<ListSummary[]>("/lists"),
   })
   const create = useMutation({
-    mutationFn: () => api<{ slug: string }>("/lists", { body: { title } }),
+    mutationFn: () =>
+      api<ApiResult<typeof createList>>("/lists", { body: { title } }),
     onSuccess: (list) => {
       void queryClient.invalidateQueries({ queryKey: ["lists"] })
       router.push(`/lists/${list.slug}`)

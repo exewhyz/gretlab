@@ -46,6 +46,8 @@ import {
 } from "./manage-shared"
 import { runLabel } from "@/features/runs/format"
 import { RunDialog } from "./run-dialog"
+import type { ApiResult } from "@/lib/api/types"
+import type { createGroup } from "@/features/orgs/server"
 
 /*
  * The Groups page: a collapsible tree of an organization's groups (branches, batches,
@@ -106,7 +108,7 @@ export function ManageGroups({ slug }: { slug: string }) {
             event.preventDefault()
             if (!topName.trim()) return
             save.mutate(() =>
-              api<{ id: string }>(`/orgs/${slug}/groups`, {
+              api<ApiResult<typeof createGroup>>(`/orgs/${slug}/groups`, {
                 body: { name: topName, parentId: null },
               }).then((created) => {
                 setTopName("")
@@ -232,7 +234,9 @@ function GroupRow({
   const [text, setText] = useState("")
   const [deleting, setDeleting] = useState(false)
   const [running, setRunning] = useState(false)
-  const runs = Boolean(runInfo && (runInfo.dates || runInfo.lead || runInfo.open))
+  const runs = Boolean(
+    runInfo && (runInfo.dates || runInfo.lead || runInfo.open)
+  )
   return (
     <div
       className="grid gap-1.5 rounded-sm px-2 py-1.5 hover:bg-muted"
@@ -270,12 +274,18 @@ function GroupRow({
           </span>
         )}
         {g.startsOn && g.endsOn && (
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-ink" data-testid="group-run">
+          <span
+            className="rounded-full bg-muted px-2 py-0.5 text-xs text-ink"
+            data-testid="group-run"
+          >
             {runLabel(g.startsOn, g.endsOn)}
           </span>
         )}
         {g.open && runInfo?.open && (
-          <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs text-success" data-testid="group-open">
+          <span
+            className="rounded-full bg-success/10 px-2 py-0.5 text-xs text-success"
+            data-testid="group-open"
+          >
             Open to join
           </span>
         )}
@@ -332,7 +342,12 @@ function GroupRow({
         )}
       </div>
       {running && runInfo && (
-        <RunDialog slug={slug} group={g} info={runInfo} onClose={() => setRunning(false)} />
+        <RunDialog
+          slug={slug}
+          group={g}
+          info={runInfo}
+          onClose={() => setRunning(false)}
+        />
       )}
       <DeleteGroupDialog
         slug={slug}
@@ -352,10 +367,9 @@ function GroupRow({
             if (!text.trim()) return
             run(() =>
               mode === "child"
-                ? api<{ id: string; parentNotPlaced: number }>(
-                    `/orgs/${slug}/groups`,
-                    { body: { name: text, parentId: g.id } }
-                  ).then((created) => {
+                ? api<ApiResult<typeof createGroup>>(`/orgs/${slug}/groups`, {
+                    body: { name: text, parentId: g.id },
+                  }).then((created) => {
                     // Show the new group, and its people (or the parent's, if any wait).
                     onToggle(true)
                     onOpen(created.parentNotPlaced > 0 ? g.id : created.id)

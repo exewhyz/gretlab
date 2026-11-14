@@ -52,23 +52,10 @@ import type { ReactNode } from "react"
 import { AppFrame } from "@/components/app-frame"
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgShell } from "@/features/home/server"
 
-export interface Shell {
-  org: { slug: string; name: string; type: OrgType; active: boolean }
-  views: ("admin" | "teacher" | "student" | "parent" | "staff")[]
-  role: string
-  /** Permissions held anywhere here: across the organization or in some group. */
-  permissions: string[]
-  /** Of those, the ones held across the whole organization. */
-  wholeOrg: string[]
-  modules: string[]
-  pending: number
-  children: { id: string; name: string }[]
-  leavePending?: number
-  terms?: { groups: string }
-  noun?: string
-  admissionsNew?: number
-}
+export type Shell = ApiResult<typeof orgShell>
 
 export function useShell(slug: string) {
   return useQuery({
@@ -101,9 +88,13 @@ export function useOrgReach(slug: string) {
     ready: Boolean(shell),
     /** Holds this permission anywhere here. */
     may: (permission: string) =>
-      shell?.permissions.includes(permission) ?? false,
+      (shell?.permissions as readonly string[] | undefined)?.includes(
+        permission
+      ) ?? false,
     /** This module is switched on. */
-    has: (module: string) => shell?.modules.includes(module) ?? false,
+    has: (module: string) =>
+      (shell?.modules as readonly string[] | undefined)?.includes(module) ??
+      false,
     /** The sidebar opens this management page (an ORG_NAV key). */
     manages: (key: string) => keys.has(key),
   }

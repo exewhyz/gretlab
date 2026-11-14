@@ -34,24 +34,12 @@ import { useViewer } from "@/features/account/use-viewer"
 import { Loading, PageTitle, Table } from "@/features/admin/components/shell"
 import { AuditLog } from "@/features/audit/components/audit-log"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { listRoles, listStaff } from "@/features/platform/staff"
 
-interface Staff {
-  userId: string
-  email: string
-  name: string | null
-  role: { key: string | null; id: string | null; name: string }
-  permissions: PlatformPermission[]
-  source: "role" | "account" | "admin_emails"
-}
+type Staff = ApiResult<typeof listStaff>[number]
 
-interface Role {
-  id: string
-  name: string
-  description: string
-  permissions: PlatformPermission[]
-  builtIn: boolean
-  members: number
-}
+type Role = ApiResult<typeof listRoles>[number]
 
 const SOURCE: Record<Staff["source"], string> = {
   role: "Given here",
