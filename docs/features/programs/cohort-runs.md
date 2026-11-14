@@ -13,10 +13,6 @@ glance:
     path: /orgs/<slug>/manage/progress
     menu: "Academics › Progress"
   permissions: [org.groups.manage, assignments.manage, gradebook.view]
-  demo:
-    as: a mentor
-    email: mentor@launchpad.demo.invalid
-    path: /orgs/launchpad
 ---
 
 For kinds whose groups run between dates (cohort programs, coaching institutes), and kinds where each

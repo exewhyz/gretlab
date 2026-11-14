@@ -14,10 +14,6 @@ glance:
     menu: "Learn › Problems"
   permissions: [problems.manage, platform.library.manage]
   module: coding
-  demo:
-    as: a student
-    email: student@greenwood.demo.invalid
-    path: /problems
 ---
 
 Practice is the open half of the lab: a library of problems anyone can read and anyone signed in can

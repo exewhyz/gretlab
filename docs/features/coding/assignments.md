@@ -12,10 +12,6 @@ glance:
     menu: "Coding lab › Assignments › Gradebook"
   permissions: [assignments.manage, assignments.grade, assignments.extend, gradebook.view, gradebook.export]
   module: coding
-  demo:
-    as: the school's owner
-    email: owner@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/assignments
 ---
 
 An assignment is a set of problems (and, if you like, quiz questions and GitHub projects) with an

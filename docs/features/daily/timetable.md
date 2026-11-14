@@ -14,10 +14,6 @@ glance:
     menu: "Academics › Timetable"
   permissions: [timetable.manage, timetable.periods, timetable.edit]
   module: timetable
-  demo:
-    as: the principal
-    email: principal@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/timetable
 ---
 
 One set of **periods** for the organization, its **school days**, and each class's **week**: cells

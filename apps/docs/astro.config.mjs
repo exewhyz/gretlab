@@ -170,7 +170,6 @@ export default defineConfig({
             { label: "Roles", link: "/reference/roles/" },
             { label: "Permissions", link: "/reference/permissions/" },
             { label: "Kinds and modules", link: "/reference/kinds-and-modules/" },
-            { label: "Demo accounts", slug: "reference/demo-accounts" },
           ],
         },
       ],

@@ -1,12 +1,11 @@
 ---
 /*
  * "At a glance" on a feature page, from its frontmatter `glance`: who uses it, where it is
- * in the app, the permissions and module behind it, and a demo account that shows it.
+ * in the app, and the permissions and module behind it.
  * Permission labels and module details come from the app's own lists (data/catalog).
  */
 import Icon from "./Icon.astro"
 import {
-  DEMO_PASSWORD,
   MODULES,
   listKinds,
   moduleKinds,
@@ -19,7 +18,6 @@ interface Props {
     where?: { path?: string; menu?: string }
     permissions?: string[]
     module?: string
-    demo?: { as: string; email: string; path: string }
   }
 }
 const { glance } = Astro.props
@@ -110,20 +108,6 @@ const mod = glance.module
       )
     }
   </div>
-  {
-    glance.demo && (
-      <div class="demo">
-        <Icon name="play-circle" size={22} />
-        <div>
-          <p class="demo-title">Try it with the demo data: sign in as {glance.demo.as}</p>
-          <p>
-            <code>{glance.demo.email}</code> · password <code>{DEMO_PASSWORD}</code> · then
-            open <code>{glance.demo.path}</code>
-          </p>
-        </div>
-      </div>
-    )
-  }
 </section>
 
 <style>
@@ -206,30 +190,5 @@ const mod = glance.module
     justify-self: start;
     font-size: var(--sl-text-xs);
     color: var(--sl-color-gray-3);
-  }
-  .demo {
-    display: flex;
-    gap: 0.75rem;
-    align-items: flex-start;
-    margin-top: 0.75rem;
-    padding: 0.875rem 1.125rem;
-    border-radius: 12px;
-    border: 1px solid var(--sl-color-hairline);
-    background: var(--sl-color-gray-6);
-    color: var(--sl-color-accent);
-    font-size: var(--sl-text-sm);
-  }
-  .demo p {
-    margin: 0;
-    color: var(--sl-color-gray-2);
-  }
-  .demo .demo-title {
-    color: var(--sl-color-white);
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-  .demo code {
-    font-size: var(--sl-text-xs);
-    overflow-wrap: anywhere;
   }
 </style>

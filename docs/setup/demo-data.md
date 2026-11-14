@@ -32,9 +32,8 @@ with real people in it.
 
 ## Signing in
 
-Every demo account signs in with its email and the password **`Gretlab demo 2026`**. Addresses are on
-`<organization>.demo.invalid`, a domain that can't receive mail, so the demo never emails anyone. The
-command prints the accounts to try, one per role; they're also listed in
-[Demo accounts](/reference/demo-accounts/).
+When it finishes, the command prints the demo accounts to try, one per role, with how to sign in.
+They're printed on your own machine only, and they're deliberately not listed in these docs. Demo
+addresses can't receive mail, so the demo never emails anyone.
 
 Platform owners still come from `ADMIN_EMAILS`.

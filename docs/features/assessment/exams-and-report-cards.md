@@ -16,10 +16,6 @@ glance:
     menu: "Academics › Exams"
   permissions: [exams.manage, exams.setup, exams.marks, exams.remarks, exams.view]
   module: exams
-  demo:
-    as: the exam coordinator
-    email: exams@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/exams
 ---
 
 Term exams for schools and colleges (the lab's timed exams are [Lab exams](/features/coding/lab-exams/),

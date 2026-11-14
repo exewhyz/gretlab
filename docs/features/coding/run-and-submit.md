@@ -9,10 +9,6 @@ glance:
     path: /problems/<problem>
     menu: "A problem's editor › Run / Submit"
   module: coding
-  demo:
-    as: a student
-    email: student@greenwood.demo.invalid
-    path: /problems
 ---
 
 Gretlab keeps two buttons, the same model as LeetCode and HackerRank, and keeps them distinct

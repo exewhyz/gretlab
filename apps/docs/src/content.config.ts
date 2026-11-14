@@ -11,10 +11,10 @@ import { isModuleKey, isPermissionKey } from "./data/catalog"
  * Pages are plain Markdown: files there can't import this app's packages, and Markdown
  * reads on GitHub. Each needs a `title` (and a one-line `description`) in its frontmatter.
  *
- * A feature page can also say, in `glance`, who uses it, where it is in the app, the
- * permissions and module behind it, and which demo account shows it. The page's top turns
- * that into the "At a glance" cards. Permission and module keys are checked against the
- * app's own lists, so a renamed one fails the build instead of going stale.
+ * A feature page can also say, in `glance`, who uses it, where it is in the app, and the
+ * permissions and module behind it; the page's top turns that into the "At a glance" cards.
+ * Permission and module keys are checked against the app's own lists, so a renamed one
+ * fails the build instead of going stale.
  */
 const glance = z
   .object({
@@ -39,11 +39,10 @@ const glance = z
       .string()
       .refine(isModuleKey, { message: "Not a module in packages/judge/src/org-types.ts" })
       .optional(),
-    /** A demo account that shows it: who to sign in as, and where to go. */
-    demo: z
-      .object({ as: z.string(), email: z.string(), path: z.string() })
-      .optional(),
   })
+  // Strict: an unknown field fails the build. There is deliberately no field for demo
+  // accounts or passwords; sign-in details never go in the public docs.
+  .strict()
   .optional()
 
 export const collections = {

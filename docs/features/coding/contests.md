@@ -12,10 +12,6 @@ glance:
     menu: "Learn › Contests"
   permissions: [contests.manage, contests.grade]
   module: coding
-  demo:
-    as: a student
-    email: student@greenwood.demo.invalid
-    path: /contests
 ---
 
 A contest is a timed competition on a set of problems (and questions that mark themselves), open to

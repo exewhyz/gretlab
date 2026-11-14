@@ -16,10 +16,6 @@ glance:
     menu: "Every day › Attendance"
   permissions: [attendance.mark, attendance.view]
   module: attendance
-  demo:
-    as: a class teacher
-    email: teacher@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/attendance
 ---
 
 A **register** is taken for a class on a day, for a period or the whole day. Every page that talks

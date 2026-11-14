@@ -12,10 +12,6 @@ glance:
     menu: "People › Students; Academics › Academic years"
   permissions: [students.manage, students.view, students.edit, students.years]
   module: records
-  demo:
-    as: office staff
-    email: office@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/students
 ---
 
 A student's **record**: their admission number and personal details, and an **enrolment** per academic

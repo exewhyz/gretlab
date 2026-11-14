@@ -10,10 +10,6 @@ glance:
     path: /orgs/<slug>/manage/reports
     menu: "School › Reports"
   permissions: [reports.view, gradebook.export]
-  demo:
-    as: the school's owner
-    email: owner@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/reports
 ---
 
 ## What's in it

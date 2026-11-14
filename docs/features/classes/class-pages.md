@@ -11,10 +11,6 @@ glance:
     path: /orgs/<slug>/classes/<group>
     menu: "Learn › My classes; Teach"
   permissions: [teaching.log, gradebook.view, attendance.mark]
-  demo:
-    as: a class teacher
-    email: teacher@greenwood.demo.invalid
-    path: /teach
 ---
 
 A class is any group someone teaches, at any level. Its page gathers everything about it.

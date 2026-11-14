@@ -14,10 +14,6 @@ glance:
     menu: "Events; Groups"
   permissions: [events.manage, org.groups.manage]
   module: events
-  demo:
-    as: a community member
-    email: member@osclub.demo.invalid
-    path: /orgs/osclub/events
 ---
 
 ## Events

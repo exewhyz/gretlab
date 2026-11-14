@@ -12,10 +12,6 @@ glance:
     menu: "People › Admissions"
   permissions: [admissions.manage]
   module: admissions
-  demo:
-    as: the admissions officer
-    email: admissions@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/admissions
 ---
 
 The yearly intake, from the public "Apply for admission" link to a student's first day.

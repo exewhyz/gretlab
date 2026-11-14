@@ -11,10 +11,6 @@ glance:
     path: /orgs/<slug>/manage/activity
     menu: "School › Activity; Dashboard › Activity"
   permissions: [org.audit.view, platform.audit.view]
-  demo:
-    as: the platform auditor
-    email: auditor@platform.demo.invalid
-    path: /admin
 ---
 
 ## What an entry records

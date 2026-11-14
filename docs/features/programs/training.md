@@ -14,10 +14,6 @@ glance:
     menu: "Academics › Training"
   permissions: [assignments.manage, gradebook.view]
   module: training
-  demo:
-    as: the L&D admin
-    email: ld.admin@acme.demo.invalid
-    path: /orgs/acme/manage/training
 ---
 
 A [course](/features/coding/courses/) given to a department or team with a **due date** and, for

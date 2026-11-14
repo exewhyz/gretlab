@@ -12,10 +12,6 @@ glance:
     menu: "Coding lab › Questions"
   permissions: [problems.manage, assignments.grade]
   module: coding
-  demo:
-    as: a teacher
-    email: teacher@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/questions
 ---
 
 Quiz questions live in a **question bank**, owned like problems (by the platform or one organization),

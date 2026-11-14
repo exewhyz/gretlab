@@ -32,15 +32,16 @@ glance:
     menu: "Every day › Attendance"
   permissions: [attendance.mark, attendance.view]
   module: attendance
-  demo:
-    as: a class teacher
-    email: teacher@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/attendance
 ```
 
 Permission and module keys are checked against the app (`packages/judge`) when the site builds, so a
 renamed one fails the build instead of going stale. Labels and which kinds have a module come from the
 app too.
+
+:::caution
+Never put sign-in details in these docs: no demo accounts, emails or passwords. They're public. The
+`glance` block has no field for them, and any field it doesn't know fails the build.
+:::
 
 ## Generated pages
 

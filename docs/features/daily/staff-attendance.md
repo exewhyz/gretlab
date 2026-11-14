@@ -12,10 +12,6 @@ glance:
     menu: "Every day › Staff attendance; My attendance"
   permissions: [staff_attendance.mark, staff_attendance.view]
   module: staffAttendance
-  demo:
-    as: office staff
-    email: office@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/staff-attendance
 ---
 
 A register for the people who work at the organization: one row per person per day.

@@ -54,5 +54,3 @@ export function listKinds(list: { label: string }[]) {
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
 }
 
-/** The demo password every demo account signs in with (packages/db/src/demo). */
-export const DEMO_PASSWORD = "Gretlab demo 2026"

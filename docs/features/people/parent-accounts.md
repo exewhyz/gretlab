@@ -12,10 +12,6 @@ glance:
     menu: "People › Parents"
   permissions: [parents.manage, parents.view, parents.link]
   module: parents
-  demo:
-    as: a parent
-    email: parent@greenwood.demo.invalid
-    path: /children
 ---
 
 A parent is linked to a student in one organization. The link is all they have: they aren't a member,

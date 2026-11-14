@@ -12,10 +12,6 @@ glance:
     menu: "Academics › Subjects"
   permissions: [subjects.manage, subjects.create, subjects.edit, subjects.delete, subjects.assign]
   module: subjects
-  demo:
-    as: the principal
-    email: principal@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/subjects
 ---
 
 Subjects (courses, in a college) are what classes study. The [timetable](/features/daily/timetable/),

@@ -16,10 +16,6 @@ glance:
     menu: "This school › Leave"
   permissions: [leave.manage, leave.students, leave.staff]
   module: leave
-  demo:
-    as: a parent
-    email: parent@greenwood.demo.invalid
-    path: /orgs/greenwood/leave
 ---
 
 One place to ask for leave and decide it, for students and for staff.

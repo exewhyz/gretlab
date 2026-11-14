@@ -12,10 +12,6 @@ glance:
     menu: "Campus › Transport"
   permissions: [transport.manage, transport.routes, transport.assign]
   module: transport
-  demo:
-    as: the transport manager
-    email: transport@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/transport
 ---
 
 ## How it works

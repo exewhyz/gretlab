@@ -10,10 +10,6 @@ glance:
     path: /orgs/<slug>/manage/members
     menu: "People › Members, Groups, Roles, Invites"
   permissions: [org.members.view, org.members.invite, org.members.manage, org.groups.manage, org.roles.manage, org.members.import]
-  demo:
-    as: the school's owner
-    email: owner@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/members
 ---
 
 An organization is its people, arranged in **groups** and given **roles**.

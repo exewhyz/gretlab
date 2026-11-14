@@ -13,10 +13,6 @@ glance:
     path: /certificates/<code>
     menu: "A class › Course › Certificates; account menu › My certificates"
   permissions: [assignments.manage]
-  demo:
-    as: a cohort graduate
-    email: graduate@launchpad.demo.invalid
-    path: /certificates
 ---
 
 ## How it works

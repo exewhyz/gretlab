@@ -12,10 +12,6 @@ glance:
     menu: "Campus › Hostel"
   permissions: [hostel.manage, hostel.rooms, hostel.allot]
   module: hostel
-  demo:
-    as: the hostel warden
-    email: warden@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/hostel
 ---
 
 ## How it works

@@ -12,10 +12,6 @@ glance:
     menu: "Campus › Books"
   permissions: [library.manage, library.catalog, library.lend]
   module: library
-  demo:
-    as: the librarian
-    email: librarian@greenwood.demo.invalid
-    path: /orgs/greenwood/manage/books
 ---
 
 The organization's physical library (the coding lab's content library is a different thing:

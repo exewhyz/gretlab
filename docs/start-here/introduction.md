@@ -55,15 +55,15 @@ discussion together.
 - **Guides** are formats and integrations: importing problems and questions, and the organization
   API.
 - **Setup & operations** is for the people who install and run Gretlab.
-- **Reference** lists roles, permissions, kinds and modules (read from the app itself, so always
-  current) and the demo accounts.
+- **Reference** lists roles, permissions, kinds and modules, read from the app itself, so always
+  current.
 
 ## Try it with the demo data
 
-The quickest way to understand Gretlab is to sign in to the demo. One command builds an organization
-of each kind (a school, a college, a coaching institute, a cohort program, a company and a community)
-with a few months of realistic activity, and a sign-in for every role. See
-[Demo data](/setup/demo-data/) and [Demo accounts](/reference/demo-accounts/).
+The quickest way to understand Gretlab is to build the demo on your own machine. One command makes an
+organization of each kind (a school, a college, a coaching institute, a cohort program, a company and a
+community) with a few months of realistic activity, and prints an account to try for every role. See
+[Demo data](/setup/demo-data/).
 
 ## Where the truth lives
 
