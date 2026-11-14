@@ -184,8 +184,6 @@ export function TaskList({
   )
 }
 
-/* ---------- the school (admin) ---------- */
-
 export const shortDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, {
     weekday: "short",

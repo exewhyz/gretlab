@@ -416,5 +416,3 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
     </div>
   )
 }
-
-/* ---------- teaching ---------- */

@@ -296,8 +296,6 @@ export function StudentHome({
   )
 }
 
-/* ---------- a parent ---------- */
-
 export function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
   const terms = useTerms()
   return (

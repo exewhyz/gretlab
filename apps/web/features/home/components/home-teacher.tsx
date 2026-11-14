@@ -249,5 +249,3 @@ export function TeacherHome({
     </div>
   )
 }
-
-/* ---------- a student ---------- */

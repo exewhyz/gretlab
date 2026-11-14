@@ -107,5 +107,3 @@ function HomeSkeleton() {
     </div>
   )
 }
-
-/* ---------- shared pieces ---------- */
