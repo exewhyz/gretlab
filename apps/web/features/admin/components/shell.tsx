@@ -1,5 +1,6 @@
 "use client"
 
+import { ErrorView } from "@/components/error-view"
 import {
   BellRingingIcon,
   BooksIcon,
@@ -61,7 +62,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         href: "/admin/library",
         icon: BooksIcon,
         label: "Library",
-        needs: ["platform.library.manage"],
+        needs: ["platform.library.create", "platform.library.edit"],
       },
       {
         href: "/admin/courses",
@@ -73,13 +74,13 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         href: "/admin/problems",
         icon: CodeIcon,
         label: "Problems",
-        needs: ["platform.library.manage"],
+        needs: ["platform.library.create", "platform.library.edit"],
       },
       {
         href: "/admin/questions",
         icon: QuestionIcon,
         label: "Questions",
-        needs: ["platform.library.manage"],
+        needs: ["platform.library.create", "platform.library.edit"],
       },
       {
         href: "/admin/units",
@@ -330,6 +331,9 @@ export function Table({
 }
 
 export function Loading({ error }: { error?: Error | null }) {
+  const status = (error as { status?: unknown } | null | undefined)?.status
+  // Refused or missing: a page that says so, with a way back, not a red line.
+  if (status === 403 || status === 404) return <ErrorView error={error} />
   return error ? (
     <p role="alert" className="text-body-sm text-destructive">
       {error.message}

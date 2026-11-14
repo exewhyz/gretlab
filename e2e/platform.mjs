@@ -55,9 +55,10 @@ check("but not settings, users, colleges or staff", !(await can(teacher, "/admin
 check("an owner gives a role, even to someone new to the site", (await give(owner, "plat-new@example.com", "reviewer")).status === 200 && psql(`select role from users where email='plat-new@example.com'`) === "teacher")
 const fresh = await client("plat-new@example.com")
 check("a Reviewer sees grades and submissions", await can(fresh, "/admin/assignments") && await can(fresh, "/admin/submissions"))
-check("and changes nothing", !(await can(fresh, "/admin/problems")) && (await fresh("/admin/assignments", { body: {} })).status === 403)
+// Reading the problem list is allowed (the plagiarism check picks from it); writing isn't.
+check("and changes nothing", (await fresh("/admin/problems", { body: {} })).status === 403 && (await fresh("/admin/assignments", { body: {} })).status === 403)
 await give(owner, "plat-a@example.com", "support")
-check("Support manages users and colleges, not content", await can(a, "/admin/users") && await can(a, "/admin/organizations") && !(await can(a, "/admin/problems")))
+check("Support manages users and colleges, not content", await can(a, "/admin/users") && await can(a, "/admin/organizations") && (await a("/admin/problems", { body: {} })).status === 403)
 check("access changes at once", (await give(owner, "plat-new@example.com", "content_admin")).status === 200 && await can(fresh, "/admin/problems"))
 
 // ---------- custom roles and the rules

@@ -3,7 +3,8 @@ import { listOwnedContests, saveContest } from "@/features/contests/server"
 import { contestInputSchema } from "@/features/problems/schemas"
 
 /** Platform contests. Organizations run theirs under /orgs/[slug]/contests. */
-export const GET = route({ access: "platform.work.manage" }, () => listOwnedContests(null))
+// Reviewers of submissions choose a contest to check for copying.
+export const GET = route({ access: ["platform.work.manage", "platform.submissions.view"] }, () => listOwnedContests(null))
 
 export const POST = route(
   { access: "platform.work.create", body: contestInputSchema },

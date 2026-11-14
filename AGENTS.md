@@ -214,6 +214,21 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - `visibleOrgNav()` filters by permission, kind and modules, and names the groups per kind (`navGroupLabel`: "School" becomes College, Institute, Program; "Academics" becomes Learning for companies and communities).
   - The frame and homes use the kind's words and noun (`orgShell().terms` and `.noun`, `orgHome().terms`).
   - A new page is one entry there, never a hand-written link.
+- **A link leads only where the person can go.** Links, cards and buttons follow the same rules as the pages and APIs they lead to.
+  - **Whole-organization pages.** `wholeOrg: true` on an `ORG_NAV` item means its permission must be held across the organization, not just in a group. Roles is one: a class teacher sees their class's members, but not the organization's roles. `visibleOrgNav` checks it with `canWholeOrg`; the shell sends `wholeOrg` (the permissions held across the organization).
+  - **Organization home links.** Home cards, shortcuts, the setup checklist, "Needs attention" and to-dos link to a management page only if the sidebar opens it:
+    - in the browser, `useOrgReach(slug).manages(key)`;
+    - on the server, `reachable(ctx, items)` in `features/home/server.ts`.
+    - Never gate a link on one permission or module by hand.
+  - **Kinds and modules on homes.** Home cards for a switched-off module aren't shown (attendance, timetable). Their words are the kind's (`terms.groups`, `terms.learners`).
+  - **Buttons on the shared admin screens.** `useOwner().can(orgPermission, platformPermission)` decides a button such as New assignment, New contest or New problem.
+    - Per-item rights come from the server. The assignments list has `canEdit` on each row; a row that can't be edited links to its gradebook. The gradebook has `can` (edit, rejudge, release, forgetAddresses, export, peer, sendGrades); each button and panel shows only where its action is allowed.
+  - **Several platform permissions on one route.** `route({ access: [...] })` takes a list (any of them). Library pages open to writers and editors (`platform.library.create` or `.edit`), not only `.manage`. The plagiarism check's problem and contest lists open to `platform.submissions.view`.
+  - **Refusals show a page.** A query refused with 403 or 404 before it has data is thrown to the nearest `error.tsx`: at the root, `/orgs/[slug]`, `/orgs/[slug]/manage` and `/admin`. These show `ErrorView` ("You don't have access to this", "Not found"), never an endless skeleton.
+    - An optional widget whose data may be refused sets `throwOnError: false`.
+    - A 403 or 404 isn't retried.
+  - **Redirected pages.** `/orgs/:slug/manage` goes to `/orgs/:slug`, the organization's one dashboard. `/orgs/:slug/manage/teaching/:group` goes to the class page's "Syllabus and log" tab.
+  - **Tests.** `e2e/access-links.mjs` covers this. A crawl of the demo accounts (`pnpm --filter @workspace/db demo`) should find no 403 or 404 behind any link.
 
 ## Attendance (module)
 

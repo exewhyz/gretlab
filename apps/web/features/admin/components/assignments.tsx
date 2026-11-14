@@ -79,6 +79,8 @@ interface AssignmentRow {
   phase: AssignmentPhase
   problemCount: number
   totalPoints: number
+  /** Whether its editor opens for them; otherwise its title leads to the gradebook. */
+  canEdit: boolean
 }
 
 export function AdminAssignments() {
@@ -93,12 +95,14 @@ export function AdminAssignments() {
     <>
       <PageTitle
         action={
-          <Link
-            href={owner.page("/assignments/new")}
-            className={cn(buttonVariants({ size: "sm" }))}
-          >
-            New assignment
-          </Link>
+          owner.can("assignments.create", "platform.work.create") && (
+            <Link
+              href={owner.page("/assignments/new")}
+              className={cn(buttonVariants({ size: "sm" }))}
+            >
+              New assignment
+            </Link>
+          )
         }
       >
         Assignments
@@ -115,7 +119,11 @@ export function AdminAssignments() {
             <tr key={a.id}>
               <td>
                 <Link
-                  href={owner.page(`/assignments/${a.id}`)}
+                  href={owner.page(
+                    a.canEdit
+                      ? `/assignments/${a.id}`
+                      : `/assignments/${a.id}/grades`
+                  )}
                   className="font-medium text-ink underline-offset-2 hover:underline"
                 >
                   {a.title}
@@ -195,8 +203,17 @@ interface StoredAssignment {
   published: boolean
   holdFeedback: boolean
   exam: ExamSettings | null
-  peerReview?: { reviews: number; anonymous: boolean; dueAt: string | null } | null
-  projects?: { id: string; title: string; instructions: string; points: number }[]
+  peerReview?: {
+    reviews: number
+    anonymous: boolean
+    dueAt: string | null
+  } | null
+  projects?: {
+    id: string
+    title: string
+    instructions: string
+    points: number
+  }[]
   audience?: string[][]
   /** Made from a template (assignments). */
   templateId?: string | null
@@ -313,7 +330,9 @@ export function AssignmentEditorPage({
         peer: Boolean(data.peerReview),
         peerReviews: String(data.peerReview?.reviews ?? 2),
         peerAnonymous: data.peerReview?.anonymous ?? true,
-        peerDueAt: data.peerReview?.dueAt ? toLocalInput(data.peerReview.dueAt) : "",
+        peerDueAt: data.peerReview?.dueAt
+          ? toLocalInput(data.peerReview.dueAt)
+          : "",
         examStartWithin: data.exam?.startWithin
           ? String(data.exam.startWithin)
           : "",
@@ -340,7 +359,9 @@ export function AssignmentEditorPage({
   )
 }
 
-type FieldErrors = Partial<Record<keyof AssignmentForm | "problems" | "peerReview", string>>
+type FieldErrors = Partial<
+  Record<keyof AssignmentForm | "problems" | "peerReview", string>
+>
 
 function AssignmentEditor({
   id,
@@ -453,9 +474,12 @@ function AssignmentEditor({
       peerReview:
         form.peer && !form.exam && !template
           ? {
-              reviews: form.peerReviews.trim() === "" ? NaN : Number(form.peerReviews),
+              reviews:
+                form.peerReviews.trim() === "" ? NaN : Number(form.peerReviews),
               anonymous: form.peerAnonymous,
-              dueAt: form.peerDueAt ? new Date(form.peerDueAt).toISOString() : null,
+              dueAt: form.peerDueAt
+                ? new Date(form.peerDueAt).toISOString()
+                : null,
             }
           : null,
       questions: form.questions.map((q) => ({
@@ -893,14 +917,24 @@ function AssignmentEditor({
         </div>
 
         {!template && !form.exam && (
-          <div className="grid gap-3 rounded-md border border-hairline p-3" data-testid="peer-settings">
+          <div
+            className="grid gap-3 rounded-md border border-hairline p-3"
+            data-testid="peer-settings"
+          >
             <label className="inline-flex items-center gap-2 self-start text-ink">
-              <Checkbox checked={form.peer} onCheckedChange={(checked) => set("peer", checked)} />
-              Peer review: after the due time, students review classmates&apos; final code
+              <Checkbox
+                checked={form.peer}
+                onCheckedChange={(checked) => set("peer", checked)}
+              />
+              Peer review: after the due time, students review classmates&apos;
+              final code
             </label>
             {form.peer && (
               <div className="grid gap-3 min-[901px]:grid-cols-3">
-                <Field label="Reviews each student writes" help="Per problem; they get as many on their own work.">
+                <Field
+                  label="Reviews each student writes"
+                  help="Per problem; they get as many on their own work."
+                >
                   <TextInput
                     type="number"
                     min={1}
@@ -909,7 +943,10 @@ function AssignmentEditor({
                     onChange={(event) => set("peerReviews", event.target.value)}
                   />
                 </Field>
-                <Field label="Reviews due (optional)" help="Empty: they can review any time.">
+                <Field
+                  label="Reviews due (optional)"
+                  help="Empty: they can review any time."
+                >
                   <TextInput
                     type="datetime-local"
                     value={form.peerDueAt}
@@ -924,9 +961,9 @@ function AssignmentEditor({
                   Anonymous (teachers still see names)
                 </label>
                 <p className="text-caption min-[901px]:col-span-3">
-                  Start it from the gradebook once the assignment is due. Students score each
-                  problem on its rubric (or one overall score) and comment; it never changes
-                  marks.
+                  Start it from the gradebook once the assignment is due.
+                  Students score each problem on its rubric (or one overall
+                  score) and comment; it never changes marks.
                 </p>
               </div>
             )}
@@ -999,6 +1036,16 @@ function AssignmentEditor({
 }
 
 interface Gradebook {
+  /** What this person may do from here (each button only where it would be allowed). */
+  can: {
+    edit: boolean
+    rejudge: boolean
+    release: boolean
+    forgetAddresses: boolean
+    export: boolean
+    peer: boolean
+    sendGrades: boolean
+  }
   assignment: {
     id: string
     slug: string
@@ -1041,7 +1088,12 @@ interface Gradebook {
       answered: boolean
       needsMarking: number
     } | null
-    projects: { earned: number; max: number; submitted: number; needsMarking: number } | null
+    projects: {
+      earned: number
+      max: number
+      submitted: number
+      needsMarking: number
+    } | null
   }[]
 }
 
@@ -1104,16 +1156,18 @@ export function AssignmentGradebook({ id }: { id: string }) {
       <PageTitle
         action={
           <span className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={rejudge.isPending}
-              title="After a runner outage: judge every submission that ended in a system error again, keeping when it was submitted."
-              onClick={() => rejudge.mutate()}
-            >
-              Re-judge system errors
-            </Button>
-            {data.assignment.exam && (
+            {data.can.rejudge && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={rejudge.isPending}
+                title="After a runner outage: judge every submission that ended in a system error again, keeping when it was submitted."
+                onClick={() => rejudge.mutate()}
+              >
+                Re-judge system errors
+              </Button>
+            )}
+            {data.assignment.exam && data.can.forgetAddresses && (
               <ConfirmButton
                 size="sm"
                 variant="outline"
@@ -1131,7 +1185,7 @@ export function AssignmentGradebook({ id }: { id: string }) {
                 Forget addresses
               </ConfirmButton>
             )}
-            {data.assignment.holdFeedback && (
+            {data.assignment.holdFeedback && data.can.release && (
               <ConfirmButton
                 size="sm"
                 disabled={release.isPending}
@@ -1144,19 +1198,25 @@ export function AssignmentGradebook({ id }: { id: string }) {
                 Release results
               </ConfirmButton>
             )}
-            <Link
-              href={owner.page(`/assignments/${id}`)}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              Edit
-            </Link>
-            <a
-              href={`/api/v1${owner.api(`/assignments/${id}/gradebook`)}?format=csv`}
-              download
-              className={cn(buttonVariants({ size: "sm" }))}
-            >
-              Download CSV
-            </a>
+            {data.can.edit && (
+              <Link
+                href={owner.page(`/assignments/${id}`)}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" })
+                )}
+              >
+                Edit
+              </Link>
+            )}
+            {data.can.export && (
+              <a
+                href={`/api/v1${owner.api(`/assignments/${id}/gradebook`)}?format=csv`}
+                download
+                className={cn(buttonVariants({ size: "sm" }))}
+              >
+                Download CSV
+              </a>
+            )}
           </span>
         }
       >
@@ -1171,8 +1231,8 @@ export function AssignmentGradebook({ id }: { id: string }) {
         {rejudged && <span data-testid="rejudge-result"> {rejudged}</span>}
       </p>
       <div className="mb-3 grid gap-3 empty:hidden">
-        <SendGrades id={id} />
-        <PeerReviewPanel id={id} />
+        {data.can.sendGrades && <SendGrades id={id} />}
+        {data.can.peer && <PeerReviewPanel id={id} />}
       </div>
       <div className="mb-4 grid grid-cols-2 gap-3 min-[901px]:grid-cols-4">
         {stats.map(([label, value]) => (
@@ -1198,7 +1258,9 @@ export function AssignmentGradebook({ id }: { id: string }) {
             ? [`Quiz (${data.assignment.quiz.points})`]
             : []),
           ...(data.assignment.projects
-            ? [`Projects (${data.assignment.projects.reduce((n, p) => n + p.points, 0)})`]
+            ? [
+                `Projects (${data.assignment.projects.reduce((n, p) => n + p.points, 0)})`,
+              ]
             : []),
           `Total (${data.total})`,
         ]}

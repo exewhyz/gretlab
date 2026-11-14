@@ -233,6 +233,8 @@ export async function orgShell(slug: string, user: User) {
           ? (kindTerms(ctx.org.type).guardian ?? "Parent")
           : "Member"),
     permissions,
+    /** Of those, the ones held across the whole organization (not just in some groups). */
+    wholeOrg: permissions.filter((p) => canFor(ctx, p, [])),
     modules: [...modules],
     pending: Number(pending?.n ?? 0),
     /** The kind's words, for the frame (My classes, About the school). */
@@ -245,6 +247,29 @@ export async function orgShell(slug: string, user: User) {
 }
 
 /* ---------- the dashboards ---------- */
+
+/** The management pages ("/attendance", "/roles") this person's sidebar opens here. */
+function managedNav(ctx: OrgContext) {
+  const held = new Set(heldAnywhere(ctx))
+  return visibleOrgNav(ORG_NAV, {
+    orgType: ctx.org.type,
+    can: (p) => held.has(p),
+    canWholeOrg: (p) => canFor(ctx, p, []),
+    enabledModules: ctx.modules,
+  })
+}
+
+/**
+ * Keeps the items whose link this person can open: a management page ("/exams/x") only if
+ * their sidebar has it (so no card leads to a refusal or a switched-off module); a full
+ * address (their own leave, a class) always.
+ */
+function reachable<T extends { href: string }>(ctx: OrgContext, items: T[]): T[] {
+  const paths = new Set(managedNav(ctx).flatMap((g) => g.items.map((i) => i.path)))
+  return items.filter(
+    (i) => i.href.startsWith("/orgs/") || paths.has(i.href.match(/^\/[^/?#]*/)?.[0] ?? "")
+  )
+}
 
 type Mark = {
   userId: string
@@ -561,7 +586,7 @@ async function adminHome(ctx: OrgContext) {
   const steps = [
     {
       key: "profile",
-      label: "School profile",
+      label: `${KINDS[ctx.org.type].noun.charAt(0).toUpperCase()}${KINDS[ctx.org.type].noun.slice(1)} profile`,
       done: ctx.org.description.trim().length > 0,
       href: "/settings",
     },
@@ -786,10 +811,10 @@ async function adminHome(ctx: OrgContext) {
         ? { present: presentToday, of: markedToday, open: notTaken.length }
         : null,
     },
-    steps,
+    steps: reachable(ctx, steps),
     classes: modules.has("attendance") ? rows : [],
     trend,
-    attention,
+    attention: reachable(ctx, attention),
     coverage,
   }
 }
@@ -900,7 +925,7 @@ async function teacherHome(ctx: OrgContext, user: User) {
         ? (classes.find((c) => c.id === p.groupId)?.taken ?? false)
         : false,
     })),
-    todo: [
+    todo: reachable(ctx, [
       ...toTake.map((c) => ({
         kind: "Register",
         tone: "bad",
@@ -933,7 +958,7 @@ async function teacherHome(ctx: OrgContext, user: User) {
         action: "View",
         href: "/attendance-report",
       })),
-    ],
+    ]),
     classes,
     attendanceOn: modules.has("attendance"),
   }
@@ -1173,11 +1198,7 @@ async function staffHome(ctx: OrgContext) {
   const held = new Set(heldAnywhere(ctx))
   const modules = ctx.modules
   const base = `/orgs/${ctx.org.slug}`
-  const links = visibleOrgNav(ORG_NAV, {
-    orgType: ctx.org.type,
-    can: (p) => held.has(p),
-    enabledModules: modules,
-  }).flatMap((g) =>
+  const links = managedNav(ctx).flatMap((g) =>
     g.items
       .filter((i) => i.key !== "overview")
       .map((i) => ({

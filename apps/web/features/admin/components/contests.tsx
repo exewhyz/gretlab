@@ -54,12 +54,14 @@ export function AdminContests() {
     <>
       <PageTitle
         action={
-          <Link
-            href={owner.page("/contests/new")}
-            className={cn(buttonVariants({ size: "sm" }))}
-          >
-            New contest
-          </Link>
+          owner.can("contests.create", "platform.work.create") && (
+            <Link
+              href={owner.page("/contests/new")}
+              className={cn(buttonVariants({ size: "sm" }))}
+            >
+              New contest
+            </Link>
+          )
         }
       >
         Contests

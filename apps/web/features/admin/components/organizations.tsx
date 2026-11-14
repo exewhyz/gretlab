@@ -136,7 +136,7 @@ export function AdminOrganizations() {
           <tr key={org.id} className={org.active ? "" : "opacity-60"}>
             <td>
               <Link
-                href={`/orgs/${org.slug}/manage`}
+                href={`/orgs/${org.slug}`}
                 className="font-medium text-ink underline-offset-2 hover:underline"
               >
                 {org.name}

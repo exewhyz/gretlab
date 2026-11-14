@@ -1,10 +1,11 @@
-import { ManageOverview } from "@/features/orgs/components/manage"
+import { redirect } from "next/navigation"
 
+// The organization's home is its dashboard; there's no second overview to keep in step.
 export default async function Page({
   params,
 }: {
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  return <ManageOverview slug={slug} />
+  redirect(`/orgs/${slug}`)
 }

@@ -3,7 +3,8 @@ import { questionInputSchema } from "@/features/questions/schemas"
 import { listQuestionsForStaff, saveQuestion } from "@/features/questions/server"
 
 /** The platform's question bank; ?for=picker for choosing them in a form. */
-export const GET = route({ access: "platform.library.manage" }, ({ user, query }) =>
+// Writers and editors read the bank; those who set work pick from it.
+export const GET = route({ access: ["platform.library.create", "platform.library.edit", "platform.work.create", "platform.work.edit"] }, ({ user, query }) =>
   listQuestionsForStaff(null, query.get("for") === "picker", user.id)
 )
 

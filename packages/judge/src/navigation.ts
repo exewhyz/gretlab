@@ -46,6 +46,11 @@ export interface NavItem {
   labels?: Partial<Record<OrgType, string>>
   /** Named with the kind's own word (Students, Learners, Employees). Wins over `labels`. */
   term?: keyof KindTerms
+  /**
+   * The page needs `anyOf` across the whole organization, not just in some groups (a class
+   * teacher may see their class's members, but the Roles page is the organization's).
+   */
+  wholeOrg?: boolean
 }
 
 /** The current org features, grouped. New modules (attendance, timetable, ...) are added here. */
@@ -81,6 +86,7 @@ export const ORG_NAV: NavItem[] = [
     path: "/roles",
     group: "People",
     anyOf: ["org.roles.manage", "org.members.view"],
+    wholeOrg: true,
   },
   {
     key: "invites",
@@ -341,7 +347,10 @@ export const ORG_NAV: NavItem[] = [
 
 export interface NavContext {
   orgType: OrgType
+  /** Held anywhere: across the organization or in some group. */
   can: (permission: Permission) => boolean
+  /** Held across the whole organization (for `wholeOrg` items); defaults to `can`. */
+  canWholeOrg?: (permission: Permission) => boolean
   /** Enabled toggleable modules; a core feature ignores this. */
   enabledModules?: ReadonlySet<string>
 }
@@ -378,7 +387,10 @@ export function visibleOrgNav(
           item.group === group &&
           (!item.orgTypes || item.orgTypes.includes(ctx.orgType)) &&
           (!item.module || (ctx.enabledModules?.has(item.module) ?? false)) &&
-          (item.anyOf.length === 0 || item.anyOf.some((p) => ctx.can(p)))
+          (item.anyOf.length === 0 ||
+            item.anyOf.some((p) =>
+              item.wholeOrg ? (ctx.canWholeOrg ?? ctx.can)(p) : ctx.can(p)
+            ))
       )
       .map((item) => ({
         key: item.key,

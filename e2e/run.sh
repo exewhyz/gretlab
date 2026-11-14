@@ -76,6 +76,7 @@ node e2e/emails.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/roles.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/teach-mode.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/platform-reach.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+node e2e/access-links.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 
 kill $RUNNER 2>/dev/null
 lsof -ti:3100 | xargs kill 2>/dev/null

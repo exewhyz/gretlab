@@ -6,7 +6,7 @@ import {
 } from "@/features/assignments/server"
 import { assignmentInputSchema } from "@/features/problems/schemas"
 
-export const GET = route({ access: "platform.work.manage" }, ({ params }) =>
+export const GET = route({ access: "platform.work.edit" }, ({ params }) =>
   getAssignmentForStaff(params.id ?? "", null)
 )
 

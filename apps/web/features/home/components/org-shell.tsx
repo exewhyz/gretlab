@@ -54,7 +54,10 @@ export interface Shell {
   org: { slug: string; name: string; type: OrgType; active: boolean }
   views: ("admin" | "teacher" | "student" | "parent" | "staff")[]
   role: string
+  /** Permissions held anywhere here: across the organization or in some group. */
   permissions: string[]
+  /** Of those, the ones held across the whole organization. */
+  wholeOrg: string[]
   modules: string[]
   pending: number
   children: { id: string; name: string }[]
@@ -69,6 +72,37 @@ export function useShell(slug: string) {
     queryKey: ["org", slug, "shell"],
     queryFn: () => api<Shell>(`/orgs/${slug}/shell`),
   })
+}
+
+/** The management pages (ORG_NAV keys) this person's sidebar opens here. */
+function managedKeys(shell: Shell): Set<string> {
+  return new Set(
+    visibleOrgNav(ORG_NAV, {
+      orgType: shell.org.type,
+      can: (p) => shell.permissions.includes(p),
+      canWholeOrg: (p) => shell.wholeOrg.includes(p),
+      enabledModules: new Set(shell.modules),
+    }).flatMap((g) => g.items.map((i) => i.key))
+  )
+}
+
+/**
+ * What this person can open here, decided exactly as the sidebar decides it. Home cards,
+ * shortcuts and checklists link to a management page only when `manages(key)` says so,
+ * so no link leads to a page that refuses them or a module that's switched off.
+ */
+export function useOrgReach(slug: string) {
+  const { data: shell } = useShell(slug)
+  const keys = shell ? managedKeys(shell) : new Set<string>()
+  return {
+    ready: Boolean(shell),
+    /** Holds this permission anywhere here. */
+    may: (permission: string) => shell?.permissions.includes(permission) ?? false,
+    /** This module is switched on. */
+    has: (module: string) => shell?.modules.includes(module) ?? false,
+    /** The sidebar opens this management page (an ORG_NAV key). */
+    manages: (key: string) => keys.has(key),
+  }
 }
 
 /** An icon for each sidebar item (by its ORG_NAV key, or our own keys). */
@@ -137,6 +171,7 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
   const managed = visibleOrgNav(ORG_NAV, {
     orgType: shell.org.type,
     can: (p) => shell.permissions.includes(p),
+    canWholeOrg: (p) => shell.wholeOrg.includes(p),
     enabledModules: new Set(shell.modules),
   })
   for (const g of managed) {

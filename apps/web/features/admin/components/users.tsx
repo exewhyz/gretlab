@@ -73,10 +73,14 @@ export function AdminUsers() {
                 <td className="text-body">
                   {user.role === "student" ? (
                     "Student"
-                  ) : (
+                  ) : viewer?.user?.platform.permissions.includes(
+                      "platform.roles.manage"
+                    ) ? (
                     <Link href="/admin/staff" className="underline-offset-2 hover:underline">
                       Platform staff
                     </Link>
+                  ) : (
+                    "Platform staff"
                   )}
                 </td>
                 <td className="text-body" data-testid={`two-factor-${user.email}`}>

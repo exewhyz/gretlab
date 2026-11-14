@@ -1,4 +1,4 @@
-import { getDb, notes, problems, sql, type User } from "@workspace/db"
+import { assignments, getDb, notes, problems, sql, type User } from "@workspace/db"
 import type { Permission } from "@workspace/judge"
 import {
   deleteQuestion,
@@ -143,17 +143,23 @@ export async function deleteOrgContest(slug: string, user: User, id: string) {
 export async function orgAssignments(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
   needAnywhere(ctx, "assignments.manage", "gradebook.view")
-  return (await listAssignmentsForStaff(ctx.org.id)).filter(
-    (a) =>
-      canFor(ctx, "assignments.manage", a.audience) ||
-      canAnywhere(ctx, "gradebook.view")
-  )
+  return (await listAssignmentsForStaff(ctx.org.id))
+    .filter(
+      (a) =>
+        canFor(ctx, "assignments.manage", a.audience) ||
+        canAnywhere(ctx, "gradebook.view")
+    )
+    .map((a) => ({
+      ...a,
+      // Whether its editor opens for them; otherwise the list links to its gradebook.
+      canEdit: canFor(ctx, "assignments.edit", a.audience),
+    }))
 }
 
 export async function orgAssignment(slug: string, user: User, id: string) {
   const ctx = await orgContext(slug, user)
   const assignment = await getAssignmentForStaff(id, ctx.org.id)
-  needFor(ctx, "assignments.manage", assignment.audience)
+  needFor(ctx, "assignments.edit", assignment.audience)
   return assignment
 }
 
@@ -216,7 +222,28 @@ export async function orgGradebook(
     })
     return gradebookCsv(id, ctx.org.id, scope)
   }
-  return getGradebook(id, ctx.org.id, scope)
+  const book = await getGradebook(id, ctx.org.id, scope)
+  const [row] = await getDb()
+    .select({ audience: assignments.audience })
+    .from(assignments)
+    .where(
+      sql.and(sql.eq(assignments.id, id), sql.eq(assignments.orgId, ctx.org.id))
+    )
+  const audience = row?.audience ?? []
+  const viewsAll = canFor(ctx, "gradebook.view", audience)
+  return {
+    ...book,
+    /** What the page offers them: each button only where its action would be allowed. */
+    can: {
+      edit: canFor(ctx, "assignments.edit", audience),
+      rejudge: canAnywhere(ctx, "assignments.grade"),
+      release: canAnywhere(ctx, "assignments.grade"),
+      forgetAddresses: canAnywhere(ctx, "assignments.manage"),
+      export: canAnywhere(ctx, "gradebook.export"),
+      peer: viewsAll,
+      sendGrades: viewsAll && canFor(ctx, "assignments.manage", audience),
+    },
+  }
 }
 
 /* ---------- problems ---------- */

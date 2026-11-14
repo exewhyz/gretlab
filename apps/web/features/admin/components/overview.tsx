@@ -152,13 +152,22 @@ export function AdminOverview() {
   const accepted =
     data.verdictsLast24h.find((v) => v.verdict === "accepted")?.total ?? 0
   const manageOrgs = held.includes("platform.orgs.manage")
+  // Each shortcut only for those whose role opens its page.
+  const actions = [
+    { href: "/admin/problems/new", label: "New problem", needs: "platform.library.create" },
+    { href: "/admin/assignments/new", label: "New assignment", needs: "platform.work.create" },
+    { href: "/admin/contests/new", label: "New contest", needs: "platform.work.create" },
+    { href: "/admin/daily", label: "Schedule daily challenge", needs: "platform.library.manage" },
+    { href: "/admin/notes", label: "Post a notice", needs: "platform.library.manage" },
+  ].filter((a) => held.includes(a.needs))
   const alerts: {
     tone: "bad" | "plain"
     text: string
     href?: string
     action?: string
   }[] = [
-    ...(queue.runners.length === 0
+    // Runner alerts are for those who run the platform; others can't act on them.
+    ...(queue.runners.length === 0 && held.includes("platform.settings.manage")
       ? [
           {
             tone: "bad" as const,
@@ -167,6 +176,7 @@ export function AdminOverview() {
         ]
       : []),
     ...(queue.runners.length > 0 &&
+    held.includes("platform.settings.manage") &&
     queue.oldestQueuedSeconds > STUCK_AFTER_SECONDS
       ? [
           {
@@ -192,38 +202,22 @@ export function AdminOverview() {
       <div>
         <PageTitle
           action={
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/admin/problems/new"
-                className={buttonVariants({ size: "sm" })}
-              >
-                New problem
-              </Link>
-              <Link
-                href="/admin/assignments/new"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                New assignment
-              </Link>
-              <Link
-                href="/admin/contests/new"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                New contest
-              </Link>
-              <Link
-                href="/admin/daily"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                Schedule daily challenge
-              </Link>
-              <Link
-                href="/admin/notes"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                Post a notice
-              </Link>
-            </div>
+            actions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {actions.map((a, n) => (
+                  <Link
+                    key={a.href}
+                    href={a.href}
+                    className={buttonVariants({
+                      variant: n === 0 ? "default" : "outline",
+                      size: "sm",
+                    })}
+                  >
+                    {a.label}
+                  </Link>
+                ))}
+              </div>
+            )
           }
         >
           Overview
@@ -281,13 +275,13 @@ export function AdminOverview() {
         <Tile
           label="Problems"
           value={data.problems}
-          href="/admin/problems"
+          href={held.includes("platform.library.edit") ? "/admin/problems" : null}
           icon={CodeIcon}
         />
         <Tile
           label="Contests"
           value={data.contests}
-          href="/admin/contests"
+          href={held.includes("platform.work.manage") ? "/admin/contests" : null}
           icon={TrophyIcon}
         />
       </div>

@@ -89,3 +89,16 @@ test("org type gates an item; a module shows only when enabled", () => {
     ["a"]
   )
 })
+
+test("a whole-organization page needs its permission across the organization, not in one group", () => {
+  const keys = (wholeOrg: boolean) =>
+    visibleOrgNav(ORG_NAV, {
+      orgType: "school",
+      // A class teacher: sees their class's members, but nothing across the school.
+      can: (p) => p === "org.members.view",
+      canWholeOrg: () => wholeOrg,
+    }).flatMap((g) => g.items.map((i) => i.key))
+  assert.ok(keys(false).includes("members"))
+  assert.ok(!keys(false).includes("roles"))
+  assert.ok(keys(true).includes("roles"))
+})

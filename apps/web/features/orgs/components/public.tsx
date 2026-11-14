@@ -144,7 +144,7 @@ export function MyOrganizations() {
               )}
               {org.canManage && (
                 <Link
-                  href={`/orgs/${org.slug}/manage`}
+                  href={`/orgs/${org.slug}`}
                   className={cn(
                     buttonVariants({ variant: "outline", size: "sm" }),
                     "justify-self-start"
@@ -367,7 +367,7 @@ export function OrgProfileView({ slug }: { slug: string }) {
             <div className="flex flex-wrap gap-2">
               {data.canManage && (
                 <Link
-                  href={`/orgs/${slug}/manage`}
+                  href={`/orgs/${slug}`}
                   className={cn(buttonVariants({ size: "sm" }))}
                 >
                   Manage

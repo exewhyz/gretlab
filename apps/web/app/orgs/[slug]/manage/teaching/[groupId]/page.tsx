@@ -1,10 +1,11 @@
-import { GroupTeachingView } from "@/features/teaching/components/teaching"
+import { redirect } from "next/navigation"
 
+// The syllabus and class log live on the class's own page, under "Syllabus and log".
 export default async function Page({
   params,
 }: {
   params: Promise<{ slug: string; groupId: string }>
 }) {
   const { slug, groupId } = await params
-  return <GroupTeachingView slug={slug} groupId={groupId} />
+  redirect(`/orgs/${slug}/classes/${groupId}?tab=classes`)
 }

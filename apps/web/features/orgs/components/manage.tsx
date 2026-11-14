@@ -97,69 +97,6 @@ export function ManageShell({
   )
 }
 
-/* ---------- overview ---------- */
-
-export function ManageOverview({ slug }: { slug: string }) {
-  const { data } = useSummary(slug)
-  if (!data) return null
-  const base = `/orgs/${slug}/manage`
-  const cards = [
-    ["Members", data.counts.members, `${base}/members`],
-    [
-      "Waiting for approval",
-      data.counts.pending,
-      `${base}/members?status=pending`,
-    ],
-    ["Groups", data.counts.groups, `${base}/groups`],
-    ["Active invite links", data.counts.invites, `${base}/invites`],
-  ] as const
-  return (
-    <>
-      <PageTitle>{data.org.name}</PageTitle>
-      <div className="mb-5 grid grid-cols-2 gap-3 min-[901px]:grid-cols-4">
-        {cards.map(([label, value, href]) => (
-          <Link key={label} href={href} className="hover:opacity-80">
-            <Card>
-              <div className="text-display-sm text-ink tabular-nums">
-                {value}
-              </div>
-              <div className="text-caption">{label} →</div>
-            </Card>
-          </Link>
-        ))}
-      </div>
-      <Card className="grid gap-2 text-body-sm">
-        <h2 className="text-title-sm text-ink">Getting people in</h2>
-        <ol className="grid list-decimal gap-1.5 pl-5 text-body">
-          <li>
-            Set up your{" "}
-            {data.org.groupLevels.map((l) => l.toLowerCase()).join(" and ")}{" "}
-            structure under{" "}
-            <Link href={`${base}/groups`} className="underline">
-              Groups
-            </Link>
-            .
-          </li>
-          <li>
-            Create an invite link for each{" "}
-            {data.org.groupLevels.at(-1)?.toLowerCase()} under{" "}
-            <Link href={`${base}/invites`} className="underline">
-              Invites
-            </Link>
-            ; people who use it land in that group with the role you chose.
-          </li>
-          <li>
-            Or add your email domain in{" "}
-            <Link href={`${base}/settings`} className="underline">
-              Settings
-            </Link>{" "}
-            so people with it join without waiting.
-          </li>
-        </ol>
-      </Card>
-    </>
-  )
-}
 
 /* ---------- members ---------- */
 

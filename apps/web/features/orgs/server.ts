@@ -1975,8 +1975,10 @@ export async function deleteGroup(
 
 export async function listRoles(slug: string, user: User) {
   const ctx = await context(slug, user)
-  const scope = scopeOf(ctx, "org.roles.manage")
-  if (scope !== "all" && scope.size === 0) need(ctx, "org.members.view")
+  // Role names and what they allow: whoever sees members anywhere (a class teacher their
+  // class's) needs them to read the members list; changing roles is checked on change.
+  if (!canAnywhere(ctx, "org.roles.manage") && !canAnywhere(ctx, "org.members.view"))
+    need(ctx, "org.members.view")
   const db = getDb()
   const [roles, counts] = await Promise.all([
     db

@@ -6,7 +6,7 @@ import {
   saveProblem,
 } from "@/features/problems/server"
 
-export const GET = route({ access: "platform.library.manage" }, ({ params }) =>
+export const GET = route({ access: ["platform.library.create", "platform.library.edit"] }, ({ params }) =>
   getProblemForStaff(params.id ?? "", null)
 )
 

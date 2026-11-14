@@ -189,7 +189,7 @@ export function TeacherHome() {
               <div className="flex flex-wrap gap-1">
                 {manages(org.slug) && (
                   <Link
-                    href={base}
+                    href={`/orgs/${org.slug}`}
                     className={buttonVariants({
                       variant: "outline",
                       size: "sm",
@@ -306,10 +306,13 @@ function ClassTree({
           </span>
           <span className="flex-1" />
           <ProgressBar progress={g.progress} />
-          <span className="w-28 text-end text-xs text-body">
+          <Link
+            href={`/orgs/${slug}/classes/${g.id}?tab=classes`}
+            className="w-28 text-end text-xs text-body hover:underline"
+          >
             {g.classesThisWeek} {g.classesThisWeek === 1 ? "class" : "classes"}{" "}
             this week
-          </span>
+          </Link>
         </div>
         {!q && expanded && kids.map((k) => row(k, depth + 1))}
       </div>

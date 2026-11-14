@@ -22,7 +22,12 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { createContext, useContext, useState } from "react"
 
-import { KINDS, type KindTerms, type RunState, type TrainingStatus } from "@workspace/judge"
+import {
+  KINDS,
+  type KindTerms,
+  type RunState,
+  type TrainingStatus,
+} from "@workspace/judge"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import { Badge } from "@workspace/ui/components/badge"
@@ -65,7 +70,7 @@ import { formatDay } from "@/lib/format"
 import { CheckInCard } from "@/features/staff-attendance/components/staff-attendance"
 import { api } from "@/lib/api/client"
 
-import { useShell } from "./org-shell"
+import { useOrgReach, useShell } from "./org-shell"
 
 type Tone = "bad" | "plain"
 
@@ -189,7 +194,11 @@ interface Runs {
     pod: { id: string; name: string } | null
     lead: string | null
   }[]
-  leading: { id: string; name: string; run: { id: string; name: string; state: RunState } }[]
+  leading: {
+    id: string
+    name: string
+    run: { id: string; name: string; state: RunState }
+  }[]
 }
 
 interface MyTrainingItem {
@@ -207,7 +216,14 @@ interface TeamTraining {
   done: number
   late: number
   soon: number
-  trainings: { courseId: string; groupId: string; course: string; group: string; late: number; soon: number }[]
+  trainings: {
+    courseId: string
+    groupId: string
+    course: string
+    group: string
+    late: number
+    soon: number
+  }[]
 }
 
 interface Home {
@@ -292,9 +308,11 @@ export function OrgHome({ slug }: { slug: string }) {
             training={data.training?.team ?? null}
           />
         )}
-        {(view === "teacher" || view === "admin") && data.events && data.events.length > 0 && (
-          <UpcomingEvents slug={slug} events={data.events} />
-        )}
+        {(view === "teacher" || view === "admin") &&
+          data.events &&
+          data.events.length > 0 && (
+            <UpcomingEvents slug={slug} events={data.events} />
+          )}
         {view === "student" && data.student && (
           <StudentHome
             slug={slug}
@@ -468,7 +486,7 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
   const { data: viewer } = useViewer()
   const { data: shell } = useShell(slug)
   const manage = `/orgs/${slug}/manage`
-  const may = (p: string) => shell?.permissions.includes(p) ?? false
+  const { manages } = useOrgReach(slug)
   const first = (viewer?.user?.name ?? "").split(" ")[0]
   const done = data.steps.filter((s) => s.done).length
   const present = data.tiles.present
@@ -484,42 +502,42 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
       hint: "Today, any class",
       href: "/attendance",
       icon: CheckSquareIcon,
-      show: may("attendance.mark"),
+      show: manages("attendance"),
     },
     {
-      title: "Add students",
+      title: `Add ${terms.learners.toLowerCase()}`,
       hint: "One by one or a list",
       href: "/import",
       icon: UserPlusIcon,
-      show: may("org.members.import"),
+      show: manages("import"),
     },
     {
       title: "Post a notice",
       hint: "A class or everyone",
       href: "/notes",
       icon: MegaphoneIcon,
-      show: may("notices.manage"),
+      show: manages("notices"),
     },
     {
       title: "Timetable",
       hint: "Periods and weeks",
       href: "/timetable",
       icon: CalendarDotsIcon,
-      show: may("timetable.periods") || may("timetable.edit"),
+      show: manages("timetable"),
     },
     {
       title: "Set an assignment",
       hint: "Coding lab",
       href: "/assignments",
       icon: CodeIcon,
-      show: may("assignments.manage"),
+      show: manages("assignments"),
     },
     {
       title: "Reports",
       hint: "Attendance and marks",
       href: "/reports",
       icon: ChartBarIcon,
-      show: may("reports.view"),
+      show: manages("reports"),
     },
   ]
   return (
@@ -529,15 +547,15 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
         title={first ? `${greeting()}, ${first}` : greeting()}
         actions={
           <>
-            {may("org.members.import") && (
+            {manages("import") && (
               <Link
                 href={`${manage}/import`}
                 className={buttonVariants({ variant: "outline" })}
               >
-                Add students
+                Add {terms.learners.toLowerCase()}
               </Link>
             )}
-            {may("attendance.mark") && (
+            {manages("attendance") && (
               <Link href={`${manage}/attendance`} className={buttonVariants()}>
                 Take attendance
               </Link>
@@ -546,7 +564,7 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
         }
       />
 
-      {done < data.steps.length && (
+      {data.steps.length > 0 && done < data.steps.length && (
         <Card data-testid="setup-checklist">
           <CardHeader>
             <CardTitle className="text-title-md">
@@ -639,14 +657,16 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
           <CardHeader>
             <CardTitle className="text-title-md">Attendance today</CardTitle>
             <CardDescription>Class by class</CardDescription>
-            <CardAction>
-              <Link
-                href={`${manage}/attendance`}
-                className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
-              >
-                Registers <ArrowRightIcon className="size-3.5" />
-              </Link>
-            </CardAction>
+            {manages("attendance") && (
+              <CardAction>
+                <Link
+                  href={`${manage}/attendance`}
+                  className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
+                >
+                  Registers <ArrowRightIcon className="size-3.5" />
+                </Link>
+              </CardAction>
+            )}
           </CardHeader>
           <CardContent>
             {data.classes.length === 0 ? (
@@ -835,7 +855,9 @@ function TeacherHome({
   training: TeamTraining | null
 }) {
   const terms = useTerms()
+  const { has, manages } = useOrgReach(slug)
   const manage = `/orgs/${slug}/manage`
+  const timetable = has("timetable")
   return (
     <div className="grid gap-5" data-testid="teacher-home">
       <Greeting
@@ -843,96 +865,121 @@ function TeacherHome({
         title={`${terms.instructor === "Mentor" ? "Mentoring" : terms.instructor === "Manager" ? "Your team" : "Teaching"} today`}
       />
       {data.checkIn && <CheckInCard slug={slug} />}
-      {runs && runs.leading.length > 0 && <LeadingRuns slug={slug} runs={runs} />}
-      {training && training.assigned > 0 && <TeamTrainingCard slug={slug} data={training} />}
+      {runs && runs.leading.length > 0 && (
+        <LeadingRuns slug={slug} runs={runs} />
+      )}
+      {training && training.assigned > 0 && (
+        <TeamTrainingCard slug={slug} data={training} />
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Tile
-          label="Lessons today"
-          value={String(data.tiles.lessons)}
-          hint="From the timetable"
-        />
-        <Tile
-          label="Registers to take"
-          value={String(data.tiles.toTake)}
-          tone={data.tiles.toTake ? "primary" : undefined}
-        />
+        {timetable && (
+          <Tile
+            label="Lessons today"
+            value={String(data.tiles.lessons)}
+            hint="From the timetable"
+          />
+        )}
+        {data.attendanceOn && (
+          <Tile
+            label="Registers to take"
+            value={String(data.tiles.toTake)}
+            tone={data.tiles.toTake ? "primary" : undefined}
+          />
+        )}
         <Tile
           label={`My ${terms.learners.toLowerCase()}`}
           value={String(data.tiles.students)}
         />
         <Tile
-          label="Below 75%"
-          value={String(data.tiles.low)}
-          hint="Attendance in my classes"
-          tone={data.tiles.low ? "bad" : undefined}
+          label={`My ${terms.groups.toLowerCase()}`}
+          value={String(data.classes.length)}
         />
+        {data.attendanceOn && (
+          <Tile
+            label="Below 75%"
+            value={String(data.tiles.low)}
+            hint={`Attendance in my ${terms.groups.toLowerCase()}`}
+            tone={data.tiles.low ? "bad" : undefined}
+          />
+        )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Card data-testid="my-day">
-          <CardHeader>
-            <CardTitle className="text-title-md">My day</CardTitle>
-            <CardAction>
-              <Link
-                href={`${manage}/my-timetable`}
-                className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
-              >
-                My week <ArrowRightIcon className="size-3.5" />
-              </Link>
-            </CardAction>
-          </CardHeader>
-          <CardContent>
-            {data.periods.length === 0 ? (
-              <Empty className="border border-dashed border-hairline">
-                <EmptyHeader>
-                  <EmptyTitle>No lessons on the timetable today</EmptyTitle>
-                  <EmptyDescription>Your classes are below.</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              <ol className="grid gap-1">
-                {data.periods.map((p, i) => (
-                  <li
-                    key={i}
-                    className={cn(
-                      "grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 sm:grid-cols-[6.5rem_minmax(0,1fr)_auto]",
-                      p.isBreak && "text-muted-foreground"
-                    )}
+      <div
+        className={cn(
+          "grid gap-4",
+          timetable && "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+        )}
+      >
+        {timetable && (
+          <Card data-testid="my-day">
+            <CardHeader>
+              <CardTitle className="text-title-md">My day</CardTitle>
+              {manages("my-timetable") && (
+                <CardAction>
+                  <Link
+                    href={`${manage}/my-timetable`}
+                    className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
                   >
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {p.time}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-body-sm font-semibold">
-                        {p.title}
-                      </span>
-                      {p.detail && (
-                        <span className="block text-xs text-muted-foreground">
-                          {p.detail}
-                        </span>
+                    My week <ArrowRightIcon className="size-3.5" />
+                  </Link>
+                </CardAction>
+              )}
+            </CardHeader>
+            <CardContent>
+              {data.periods.length === 0 ? (
+                <Empty className="border border-dashed border-hairline">
+                  <EmptyHeader>
+                    <EmptyTitle>No lessons on the timetable today</EmptyTitle>
+                    <EmptyDescription>Your classes are below.</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <ol className="grid gap-1">
+                  {data.periods.map((p, i) => (
+                    <li
+                      key={i}
+                      className={cn(
+                        "grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-lg px-2 py-2.5 sm:grid-cols-[6.5rem_minmax(0,1fr)_auto]",
+                        p.isBreak && "text-muted-foreground"
                       )}
-                    </span>
-                    {p.groupId && data.attendanceOn && (
-                      <span className="col-start-2 sm:col-start-auto">
-                        {p.taken ? (
-                          <Badge variant="secondary">Register taken</Badge>
-                        ) : (
-                          <Link
-                            href={`${manage}/attendance`}
-                            className={buttonVariants({ size: "sm" })}
-                          >
-                            Take register
-                          </Link>
+                    >
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {p.time}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-body-sm font-semibold">
+                          {p.title}
+                        </span>
+                        {p.detail && (
+                          <span className="block text-xs text-muted-foreground">
+                            {p.detail}
+                          </span>
                         )}
                       </span>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            )}
-          </CardContent>
-        </Card>
+                      {p.groupId &&
+                        data.attendanceOn &&
+                        manages("attendance") && (
+                          <span className="col-start-2 sm:col-start-auto">
+                            {p.taken ? (
+                              <Badge variant="secondary">Register taken</Badge>
+                            ) : (
+                              <Link
+                                href={`${manage}/attendance`}
+                                className={buttonVariants({ size: "sm" })}
+                              >
+                                Take register
+                              </Link>
+                            )}
+                          </span>
+                        )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card data-testid="teacher-todo">
           <CardHeader>
@@ -946,11 +993,12 @@ function TeacherHome({
 
       <section aria-labelledby="my-classes" className="grid gap-3">
         <h2 id="my-classes" className="text-title-md text-ink">
-          My classes
+          My {terms.groups.toLowerCase()}
         </h2>
         {data.classes.length === 0 ? (
           <p className="text-body-sm text-muted-foreground">
-            No classes with students are given to you yet.
+            No {terms.groups.toLowerCase()} with {terms.learners.toLowerCase()}{" "}
+            are given to you yet.
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
@@ -1029,13 +1077,19 @@ function FindAGroup({ slug }: { slug: string }) {
   return (
     <Card size="sm" data-testid="find-a-group">
       <CardHeader>
-        <CardTitle className="text-title-md">Find your {terms.groups.toLowerCase()}</CardTitle>
+        <CardTitle className="text-title-md">
+          Find your {terms.groups.toLowerCase()}
+        </CardTitle>
         <CardDescription>
-          Join the {terms.groups.toLowerCase()} you&apos;re into to see their events, notices and contests.
+          Join the {terms.groups.toLowerCase()} you&apos;re into to see their
+          events, notices and contests.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Link href={`/orgs/${slug}/groups`} className="text-body-sm font-medium text-primary hover:underline">
+        <Link
+          href={`/orgs/${slug}/groups`}
+          className="text-body-sm font-medium text-primary hover:underline"
+        >
           Browse {terms.groups.toLowerCase()}
         </Link>
       </CardContent>
@@ -1044,17 +1098,28 @@ function FindAGroup({ slug }: { slug: string }) {
 }
 
 /** The next few events, each with your answer, and a link to them all. */
-function UpcomingEvents({ slug, events }: { slug: string; events: EventView[] }) {
+function UpcomingEvents({
+  slug,
+  events,
+}: {
+  slug: string
+  events: EventView[]
+}) {
   return (
     <section className="grid gap-3" data-testid="upcoming-events">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-title-md font-semibold text-ink">Events</h2>
-        <Link href={`/orgs/${slug}/events`} className="text-body-sm font-medium text-primary hover:underline">
+        <Link
+          href={`/orgs/${slug}/events`}
+          className="text-body-sm font-medium text-primary hover:underline"
+        >
           All events
         </Link>
       </div>
       {events.length === 0 ? (
-        <p className="text-body-sm text-muted-foreground">No events coming up.</p>
+        <p className="text-body-sm text-muted-foreground">
+          No events coming up.
+        </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {events.map((e) => (
@@ -1085,14 +1150,19 @@ function MyTrainingCard({ items }: { items: MyTrainingItem[] }) {
               data-testid="my-training-item"
               className="flex flex-wrap items-center justify-between gap-2"
             >
-              <Link href={t.href} className="min-w-0 font-medium text-ink hover:underline">
+              <Link
+                href={t.href}
+                className="min-w-0 font-medium text-ink hover:underline"
+              >
                 {t.course}
               </Link>
               <span className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="tabular-nums">
                   {t.progress.done}/{t.progress.total}
                 </span>
-                {t.needBy && t.status !== "done" && <span>by {formatDay(t.needBy)}</span>}
+                {t.needBy && t.status !== "done" && (
+                  <span>by {formatDay(t.needBy)}</span>
+                )}
                 {t.status === "done" && t.validUntil && (
                   <span>valid until {formatDay(t.validUntil)}</span>
                 )}
@@ -1107,14 +1177,23 @@ function MyTrainingCard({ items }: { items: MyTrainingItem[] }) {
 }
 
 /** A manager's team view: how their teams are doing with training, and what's late. */
-function TeamTrainingCard({ slug, data }: { slug: string; data: TeamTraining }) {
+function TeamTrainingCard({
+  slug,
+  data,
+}: {
+  slug: string
+  data: TeamTraining
+}) {
   return (
     <Card size="sm" data-testid="team-training">
       <CardHeader>
         <CardTitle className="text-title-md">Team training</CardTitle>
         <CardDescription>
           {data.done} of {data.assigned} done ·{" "}
-          <span className={data.late ? "font-medium text-destructive" : ""} data-testid="team-late">
+          <span
+            className={data.late ? "font-medium text-destructive" : ""}
+            data-testid="team-late"
+          >
             {data.late} late
           </span>{" "}
           · {data.soon} due soon
@@ -1128,16 +1207,24 @@ function TeamTrainingCard({ slug, data }: { slug: string; data: TeamTraining }) 
             className="flex flex-wrap justify-between gap-2 text-body-sm hover:underline"
           >
             <span className="text-ink">
-              {t.course} <span className="text-muted-foreground">· {t.group}</span>
+              {t.course}{" "}
+              <span className="text-muted-foreground">· {t.group}</span>
             </span>
             <span className="text-xs">
-              {t.late > 0 && <span className="text-destructive">{t.late} late</span>}
+              {t.late > 0 && (
+                <span className="text-destructive">{t.late} late</span>
+              )}
               {t.late > 0 && t.soon > 0 && " · "}
-              {t.soon > 0 && <span className="text-primary-active">{t.soon} soon</span>}
+              {t.soon > 0 && (
+                <span className="text-primary-active">{t.soon} soon</span>
+              )}
             </span>
           </Link>
         ))}
-        <Link href={`/orgs/${slug}/manage/training`} className="text-body-sm font-medium text-primary hover:underline">
+        <Link
+          href={`/orgs/${slug}/manage/training`}
+          className="text-body-sm font-medium text-primary hover:underline"
+        >
           All training
         </Link>
       </CardContent>
@@ -1158,7 +1245,10 @@ function MyRuns({ runs }: { runs: Runs }) {
           </CardHeader>
           <CardContent className="grid gap-2">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-semibold text-ink" data-testid="my-run-week">
+              <span
+                className="font-semibold text-ink"
+                data-testid="my-run-week"
+              >
                 {runStatus(r.state)}
               </span>
               <span className="text-xs text-muted-foreground">
@@ -1192,7 +1282,10 @@ function LeadingRuns({ slug, runs }: { slug: string; runs: Runs }) {
       <CardContent>
         <ul className="grid gap-1.5">
           {runs.leading.map((g) => (
-            <li key={g.id} className="flex flex-wrap items-baseline justify-between gap-2">
+            <li
+              key={g.id}
+              className="flex flex-wrap items-baseline justify-between gap-2"
+            >
               <Link
                 href={`/orgs/${slug}/manage/progress/${g.run.id}`}
                 className="font-medium text-ink hover:underline"
@@ -1230,7 +1323,11 @@ function StudentHome({
 }) {
   const terms = useTerms()
   const { data: viewer } = useViewer()
+  const { has } = useOrgReach(slug)
   const first = (viewer?.user?.name ?? "").split(" ")[0]
+  const attendance = has("attendance")
+  const timetable = has("timetable")
+  const work = has("exams") ? "Assignments and exams" : "Assignments"
   return (
     <div className="grid gap-5" data-testid="student-home">
       <Greeting
@@ -1239,31 +1336,33 @@ function StudentHome({
       />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Card size="sm" data-testid="home-tile">
-          <CardHeader>
-            <CardDescription>Attendance</CardDescription>
-            <div className="text-3xl leading-tight font-semibold tracking-tight text-primary-active tabular-nums">
-              {data.tiles.attendance == null
-                ? "—"
-                : `${data.tiles.attendance}%`}
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            {data.tiles.attendance != null && (
-              <Meter
-                value={data.tiles.attendance}
-                bad={data.tiles.attendance < 75}
-              />
-            )}
-            <span className="text-xs text-muted-foreground">
-              Late counts as present
-            </span>
-          </CardContent>
-        </Card>
+        {attendance && (
+          <Card size="sm" data-testid="home-tile">
+            <CardHeader>
+              <CardDescription>Attendance</CardDescription>
+              <div className="text-3xl leading-tight font-semibold tracking-tight text-primary-active tabular-nums">
+                {data.tiles.attendance == null
+                  ? "—"
+                  : `${data.tiles.attendance}%`}
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-2">
+              {data.tiles.attendance != null && (
+                <Meter
+                  value={data.tiles.attendance}
+                  bad={data.tiles.attendance < 75}
+                />
+              )}
+              <span className="text-xs text-muted-foreground">
+                Late counts as present
+              </span>
+            </CardContent>
+          </Card>
+        )}
         <Tile
           label="Due this week"
           value={String(data.tiles.dueThisWeek)}
-          hint="Assignments and exams"
+          hint={work}
         />
         <Tile
           label={`My ${terms.groups.toLowerCase()}`}
@@ -1280,7 +1379,14 @@ function StudentHome({
           <Tile
             label="Notices"
             value={String(data.notices.length)}
-            hint="In your classes"
+            hint={`In your ${terms.groups.toLowerCase()}`}
+          />
+        )}
+        {!attendance && (
+          <Tile
+            label="Coming up"
+            value={String(data.coming.length)}
+            hint={work}
           />
         )}
       </div>
@@ -1288,67 +1394,77 @@ function StudentHome({
       {runs && runs.learning.length > 0 && <MyRuns runs={runs} />}
       {training && training.length > 0 && <MyTrainingCard items={training} />}
       {openGroups && data.classes.length === 0 && <FindAGroup slug={slug} />}
-      {events && (events.length > 0 || openGroups) && <UpcomingEvents slug={slug} events={events} />}
+      {events && (events.length > 0 || openGroups) && (
+        <UpcomingEvents slug={slug} events={events} />
+      )}
 
-      <MyCourseAttendance slug={slug} />
+      {attendance && <MyCourseAttendance slug={slug} />}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <Card data-testid="student-today">
-          <CardHeader>
-            <CardTitle className="text-title-md">Today</CardTitle>
-            {data.classes[0] && (
-              <CardAction>
-                <Link
-                  href={`/orgs/${slug}/classes/${data.classes[0].id}?tab=timetable`}
-                  className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
-                >
-                  My week <ArrowRightIcon className="size-3.5" />
-                </Link>
-              </CardAction>
-            )}
-          </CardHeader>
-          <CardContent>
-            {data.lessons.length === 0 ? (
-              <Empty className="border border-dashed border-hairline">
-                <EmptyHeader>
-                  <EmptyTitle>No lessons on the timetable today</EmptyTitle>
-                  <EmptyDescription>
-                    Your classes' pages have their work and notices.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              <ol className="grid gap-1">
-                {data.lessons.map((l, i) => {
-                  const now = !l.isBreak && isNow(l.starts, l.ends)
-                  return (
-                    <li
-                      key={i}
-                      className={cn(
-                        "grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5",
-                        now && "bg-primary/10",
-                        l.isBreak && "text-muted-foreground"
-                      )}
-                    >
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {l.starts}
-                      </span>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-body-sm font-semibold">
-                          {l.subject}
+      <div
+        className={cn(
+          "grid gap-4",
+          timetable && "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+        )}
+      >
+        {timetable && (
+          <Card data-testid="student-today">
+            <CardHeader>
+              <CardTitle className="text-title-md">Today</CardTitle>
+              {data.classes[0] && (
+                <CardAction>
+                  <Link
+                    href={`/orgs/${slug}/classes/${data.classes[0].id}?tab=timetable`}
+                    className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
+                  >
+                    My week <ArrowRightIcon className="size-3.5" />
+                  </Link>
+                </CardAction>
+              )}
+            </CardHeader>
+            <CardContent>
+              {data.lessons.length === 0 ? (
+                <Empty className="border border-dashed border-hairline">
+                  <EmptyHeader>
+                    <EmptyTitle>No lessons on the timetable today</EmptyTitle>
+                    <EmptyDescription>
+                      Your {terms.groups.toLowerCase()}&apos; pages have their
+                      work and notices.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <ol className="grid gap-1">
+                  {data.lessons.map((l, i) => {
+                    const now = !l.isBreak && isNow(l.starts, l.ends)
+                    return (
+                      <li
+                        key={i}
+                        className={cn(
+                          "grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5",
+                          now && "bg-primary/10",
+                          l.isBreak && "text-muted-foreground"
+                        )}
+                      >
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {l.starts}
                         </span>
-                        {now && <Badge>Now</Badge>}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {l.teacher}
-                      </span>
-                    </li>
-                  )
-                })}
-              </ol>
-            )}
-          </CardContent>
-        </Card>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-body-sm font-semibold">
+                            {l.subject}
+                          </span>
+                          {now && <Badge>Now</Badge>}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {l.teacher}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card data-testid="coming-up">
           <CardHeader>
@@ -1402,7 +1518,7 @@ function StudentHome({
           <CardContent>
             {data.notices.length === 0 ? (
               <p className="text-body-sm text-muted-foreground">
-                No notices in your classes yet.
+                No notices in your {terms.groups.toLowerCase()} yet.
               </p>
             ) : (
               <ul className="grid">
@@ -1433,6 +1549,7 @@ function StudentHome({
 /* ---------- a parent ---------- */
 
 function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
+  const terms = useTerms()
   return (
     <div className="grid gap-5" data-testid="parent-home">
       <Greeting day={data.day} title="My children" />
@@ -1465,7 +1582,7 @@ function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
                   <div className="min-w-0">
                     <CardTitle className="text-title-md">{c.name}</CardTitle>
                     <CardDescription className="truncate">
-                      {c.classes.join(", ") || "Not in a class yet"}
+                      {c.classes.join(", ") || `Not in a ${terms.group.toLowerCase()} yet`}
                     </CardDescription>
                   </div>
                 </div>
@@ -1545,29 +1662,35 @@ function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
   )
 }
 
-/** What each page is for, on the staff home's cards. */
-const PAGE_HINTS: Record<string, string> = {
-  "staff-attendance": "Mark today's staff register, see the month",
-  leave: "Ask for leave, decide requests",
-  admissions: "Review applications and admit students",
-  students: "Records, admission numbers, classes",
-  "academic-years": "Years, class teachers, promotion",
-  exams: "Exams, marks and report cards",
-  members: "Everyone in the school",
-  groups: "Classes and sections",
-  parents: "Link parents to students",
-  attendance: "Take a class's register",
-  "attendance-report": "A class's month",
-  timetable: "Periods and class timetables",
-  subjects: "What each class takes, and who teaches it",
-  books: "Books and loans",
-  transport: "Routes, stops and riders",
-  hostel: "Rooms, beds and residents",
-  notices: "Post to a class or everyone",
-  reports: "Attendance and marks",
-  roles: "Who may do what",
-  invites: "Links to join",
-  import: "Add people from a spreadsheet",
+/** What each page is for, on the staff home's cards, in the kind's words. */
+function pageHints(t: KindTerms): Record<string, string> {
+  const group = t.group.toLowerCase()
+  const groups = t.groups.toLowerCase()
+  const learners = t.learners.toLowerCase()
+  const guardians = (t.guardians ?? "Parents").toLowerCase()
+  return {
+    "staff-attendance": "Mark today's staff register, see the month",
+    leave: "Ask for leave, decide requests",
+    admissions: `Review applications and admit ${learners}`,
+    students: `Records, admission numbers, ${groups}`,
+    "academic-years": `${t.periods}, ${t.groupLead.toLowerCase()}s, promotion`,
+    exams: `${t.assessments}, marks and report cards`,
+    members: "Everyone here",
+    groups: `${t.groups} and how they nest`,
+    parents: `Link ${guardians} to ${learners}`,
+    attendance: `Take a ${group}'s register`,
+    "attendance-report": `A ${group}'s month`,
+    timetable: `Periods and ${group} timetables`,
+    subjects: `What each ${group} takes, and who teaches it`,
+    books: "Books and loans",
+    transport: "Routes, stops and riders",
+    hostel: "Rooms, beds and residents",
+    notices: `Post to a ${group} or everyone`,
+    reports: "Attendance and marks",
+    roles: "Who may do what",
+    invites: "Links to join",
+    import: "Add people from a spreadsheet",
+  }
 }
 
 const PAGE_ICONS: Record<string, Icon> = {
@@ -1592,6 +1715,7 @@ function StaffHome({
   slug: string
   data: NonNullable<Home["staff"]>
 }) {
+  const hints = pageHints(useTerms())
   const { data: viewer } = useViewer()
   const first = (viewer?.user?.name ?? "").split(" ")[0]
   const t = data.staffToday
@@ -1693,9 +1817,9 @@ function StaffHome({
                         <span className="block text-body-sm font-semibold text-ink">
                           {l.label}
                         </span>
-                        {PAGE_HINTS[l.key] && (
+                        {hints[l.key] && (
                           <span className="block text-xs text-muted-foreground">
-                            {PAGE_HINTS[l.key]}
+                            {hints[l.key]}
                           </span>
                         )}
                       </span>
