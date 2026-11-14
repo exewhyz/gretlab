@@ -12,6 +12,21 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 A coding lab a teacher or institution can run for their students: practice problems, graded submissions and contests, all configured from a dashboard. Read this before changing anything. Keep it current: when a decision changes or a roadmap item ships, update this file in the same change.
 
+## Working agreements (the owner's, binding)
+
+- **Commits.** Commit as `32168046+exewhyz@users.noreply.github.com`, with no "Co-Authored-By" or other AI attribution lines in commits or PRs.
+- **Branches and merging.**
+  - Work on a branch; there's no PR review.
+  - Merge only after the full regression (`pnpm test:e2e`) is green, then fast-forward `main` and push `main` and the branch.
+  - Don't force-push.
+  - A check that fails only under machine load counts as green if it passes when the suite is rerun on its own with the runner, and the report says so.
+- **The full regression owns port 3100 and the `gretlab_test` database.** Never run another suite, quick script or server on them while it runs; a clash corrupts both runs. Low free memory on the Mac causes timeouts (browsers that won't start); rerun those suites alone.
+- **Env files.** `apps/web/.env` is production (Neon): never edit or use it. Local work uses `apps/web/.env.local` and the root `.env` (the local database at 127.0.0.1:5433).
+- **Production database.** The owner runs Neon migrations and other production commands themselves. Never push code that needs a migration until they confirm it's applied. Never paste database URLs or secrets.
+- **Vercel.** Don't poll it after a push.
+- **The owner's own dev server** (`next dev` on port 3000, `tsx watch`): never kill it.
+- **Product brief.** For design work, `apps/web/PRODUCT.md` is the brief the Impeccable design skill reads (`.claude/skills/impeccable`, hooks off). The look is decided: keep the existing identity, improve layout, hierarchy and data presentation.
+
 ## Architecture
 
 ```
@@ -871,6 +886,25 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Classes: class pages (stream, classwork, people, grades, syllabus and log, insights), class notices, attendance, teacher class tree with today's work, student My classes, Learn/Teach modes, organization switcher
 - [x] Scale: replicas, load balancer, connection pooling, queue priorities, load shedding, crash recovery, metrics, containers
 
+- [x] Kinds of organization, roles per kind, cohort runs, company training, community groups and events, leave, admissions, records, exams and report cards, timetable, attendance and staff attendance, library, transport, hostel, parents
+- [x] Email and password sign-in beside Google; two-factor (authenticator app, email codes, backup codes); editable email templates
+- [x] Holidays, and a calendar of everything dated (exam papers, leave, training, cohort runs, holidays)
+- [x] Integrations: organization API keys and signed webhooks (`docs/api.md`)
+- [x] Links that only lead where people can go; access and not-found pages; Coding lab as a module; foldable sidebar; data screens with summary lines; server-paged long lists
+- [x] Codebase: CI (lint, typecheck, unit tests, migrations), typed page addresses (`orgPages`), screens typed from server functions (`ApiResult`), large files split by job, structured error logging with references
+
+**On hold (the owner's decision, November 2026), don't start without asking:**
+- fees and payments (the `finance` module is listed but not ready);
+- using Google's sign-in strength (amr/auth_time) in two-factor;
+- the public landing page.
+
+**Open follow-ups:**
+- A flaky check in `e2e/assignments.mjs`: "locked: drafts from before the exam don't come back". It fails now and then and passes when rerun alone; the cause isn't found yet (the clocks of the app and the database agreed).
+- Design: there's no `DESIGN.md` yet; `/impeccable document` would record the existing visual system, and `/impeccable doctor` reports the skill's setup gaps.
+- About 230 hand-written client types remain where screens shape data on purpose; convert others as they're touched.
+- The problem library isn't paged on the server; it sends compact rows and pages in the browser. Revisit if a library grows past a few thousand items.
+- Production demo data: the owner resets it with `cd packages/db && DATABASE_URL='<Neon URL>' pnpm exec tsx src/demo.ts`, a dry run first, then with `--wipe=<database name>`.
+
 Decided not to build for now: the AI tutor (it needs an Anthropic API key and a usage policy).
 
 Shipped (November 2026): https://gretlab.grettech.com. The web app is on Vercel (Sydney, `syd1`), Postgres on Neon (the pooled address with `DATABASE_PREPARE=false` for Vercel, the direct address for the runner and migrations), and the runner on a dedicated AWS EC2 server with gVisor, set up and updated by `deploy/runner-setup.sh`. README › How the live site runs has the settings, the release steps (migrate first, then push, then update the judge if it changed) and how to watch it. Railway was tried and dropped: it can't run gVisor. Turborepo runs in strict env mode, so every setting the build needs must be listed in `turbo.json`.
@@ -879,11 +913,11 @@ The organization hierarchy we're heading for (from the owner's notes): platform 
 
 Next, roughly in order of value for a college deployment:
 
-0. Organizations, next: per-organization time and memory limits; class feedback reminders; members-only problems inside study plans; tagging assignments with syllabus topics; a server-paged members list for very large organizations.
+0. Organizations, next: per-organization time and memory limits; class feedback reminders; members-only problems inside study plans; tagging assignments with syllabus topics. (The server-paged members list is built.)
 0. From the LeetCode/HackerRank research, not built yet: discussion and solution posts with votes and moderation; contest ratings (Elo-style, newcomers rated separately) and contest history; virtual contests; contest code replay; test-case groups; company/position filters (n/a for a college); AI help (needs a policy decision first).
 
 1. A separate, least-privilege database role for runners.
-2. Student sign-in without Google: email and password, or college SSO (SAML/OIDC).
+2. College SSO (SAML/OIDC). (Email and password sign-in is built.)
 2. Two-factor authentication in the app, for everyone (the owner's decision, November 2026): passkeys or an authenticator app (TOTP) with recovery codes, independent of the sign-in provider. Required for platform staff and organization admins, then teachers, optional for students (an organization setting can require it). Step-up: critical actions ask for the second factor again if it's older than a few minutes (changing roles and permissions, grades and overrides, exam settings and extra time, LTI and organization settings, deleting content), recorded in the activity log. Google's "authentication strength" claims were considered and not used: they need a verified Google app, cover only Google sign-ins, and the app would still need its own check.
 3. Plagiarism: cross-language detection and a side-by-side diff view (pairwise similarity within a language is built, under Plagiarism check).
 4. Rate limiting on public endpoints at the edge; a Content-Security-Policy (Monaco and AdSense need care).
