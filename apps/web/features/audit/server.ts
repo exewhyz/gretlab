@@ -4,6 +4,7 @@ import { z } from "zod"
 
 import { ApiError } from "@/lib/api/errors"
 import { requestInfo } from "@/lib/api/request-context"
+import { queueWebhooks } from "@/features/integrations/deliver"
 
 /*
  * The audit log: one row per change, in organizations (`org_id` set) and on the platform
@@ -30,13 +31,25 @@ export interface AuditInput {
 
 /** Writes one entry, in the caller's transaction when given one. */
 export async function writeEntry(tx: Writer, input: AuditInput) {
-  const { ip, userAgent } = requestInfo()
+  const info = requestInfo()
+  const { ip, userAgent, apiKey } = info
+  const who = input.actor.name
+    ? `${input.actor.name} <${input.actor.email}>`
+    : input.actor.email
+  const actorLabel = apiKey ? `${who}, API key "${apiKey.name}"` : who
+  // What's told to the organization's webhooks, in the same transaction as the entry.
+  if (input.orgId && (await queueWebhooks(tx, input.orgId, {
+    event: input.action,
+    at: new Date().toISOString(),
+    summary: input.summary.slice(0, 1000),
+    actor: { id: input.actor.id, label: actorLabel },
+    detail: input.detail ?? null,
+  })))
+    info.webhooksQueued = true
   await tx.insert(auditLog).values({
     orgId: input.orgId,
     actorId: input.actor.id,
-    actorLabel: input.actor.name
-      ? `${input.actor.name} <${input.actor.email}>`
-      : input.actor.email,
+    actorLabel,
     action: input.action,
     category: auditCategory(input.action),
     summary: input.summary.slice(0, 1000),

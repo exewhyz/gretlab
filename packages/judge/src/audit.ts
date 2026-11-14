@@ -26,6 +26,7 @@ export const AUDIT_CATEGORIES: Record<string, string> = {
   discussion: "Discussions",
   certificate: "Certificates",
   gradebook: "Grades",
+  integration: "Integrations",
   outcomes: "Outcomes",
   class: "Classes",
   syllabus: "Classes",

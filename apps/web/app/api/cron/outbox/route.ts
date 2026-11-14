@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto"
 
 import { NextResponse, type NextRequest } from "next/server"
 
+import { deliverDueWebhooks, webhooksWaiting } from "@/features/integrations/deliver"
 import { runDueDigests } from "@/features/notifications/digest"
 import { drainOutbox, outboxHealth } from "@/features/notifications/outbox"
 
@@ -59,7 +60,17 @@ async function handle(request: NextRequest) {
     return { organizations: 0, emails: 0 }
   })
   const done = await drainOutbox()
-  return NextResponse.json({ ...done, ...(await outboxHealth()), digests })
+  // Webhook deliveries that failed once and are due again (each is tried at once first).
+  const webhooks = await deliverDueWebhooks(100).catch((error) => {
+    console.error("[webhooks]", error)
+    return { sent: 0, failed: 0 }
+  })
+  return NextResponse.json({
+    ...done,
+    ...(await outboxHealth()),
+    digests,
+    webhooks: { ...webhooks, waiting: await webhooksWaiting().catch(() => null) },
+  })
 }
 
 export const GET = handle

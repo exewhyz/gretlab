@@ -10,6 +10,10 @@ export interface RequestInfo {
   /** The visitor's address, when this server can tell it (./client-ip.ts). */
   ip: string | null
   userAgent: string | null
+  /** The organization API key this request came with, if any (features/integrations). */
+  apiKey?: { id: string; orgId: string; name: string; permissions: string[] }
+  /** Set when the request queued webhook deliveries, so they're sent once it's answered. */
+  webhooksQueued?: boolean
 }
 
 const store = new AsyncLocalStorage<RequestInfo>()

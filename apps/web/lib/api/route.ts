@@ -1,16 +1,18 @@
 import type { User } from "@workspace/db"
-import { NextResponse, type NextRequest } from "next/server"
+import { after, NextResponse, type NextRequest } from "next/server"
 import { z, type ZodType } from "zod"
 
 import { isPlatformPermission, type PlatformPermission } from "@workspace/judge"
 
 import { readSession } from "@/features/auth/current-user"
 import { mustUseTwoFactor } from "@/features/auth/two-factor"
+import { deliverDueWebhooks } from "@/features/integrations/deliver"
+import { userForApiKey } from "@/features/integrations/keys"
 import { platformCan } from "@/features/platform/access"
 
 import { clientIp } from "./client-ip"
 import { ApiError } from "./errors"
-import { withRequest } from "./request-context"
+import { withRequest, type RequestInfo } from "./request-context"
 import { reportError } from "../report-error"
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024
@@ -102,12 +104,23 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
 ) {
   return async (request: NextRequest, context: RouteContext) => {
     try {
-      assertSameOrigin(request)
-      const session = await readSession()
+      // Another system with an organization API key: it acts as the key's maker, limited to
+      // the key's permissions and its organization (features/integrations/keys.ts).
+      const bearer = request.headers.get("authorization")?.match(/^Bearer\s+(glk_\S+)$/i)?.[1]
+      const keyed = bearer
+        ? await userForApiKey(bearer, request.nextUrl.pathname)
+        : null
+      if (!keyed) assertSameOrigin(request)
+      const session = keyed
+        ? { user: keyed.user, twoFactor: true, pending: null }
+        : await readSession()
       const user = session.user
+      if (keyed && !(options.access === "user" || options.access === "public"))
+        throw new ApiError(403, "forbidden", "An API key can't use this.")
       await authorize(user, options.access)
       // Required two-factor not yet on: only the security page's routes until it is.
       if (
+        !keyed &&
         user &&
         options.access !== "public" &&
         !options.beforeTwoFactor &&
@@ -149,9 +162,10 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
 
       const params = (await context.params) as Record<string, string>
       // Where the request came from, for the audit log (lib/api/request-context.ts).
-      const info = {
+      const info: RequestInfo = {
         ip: clientIp(request),
         userAgent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
+        ...(keyed ? { apiKey: keyed.key } : {}),
       }
       const data = await withRequest(info, () =>
         handler({
@@ -162,6 +176,8 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
           request,
         })
       )
+      // Webhooks this request queued go out once it's answered (and the cron retries them).
+      if (info.webhooksQueued) after(() => deliverDueWebhooks())
       // A handler may answer with its own Response, for downloads such as CSV.
       if (data instanceof Response) return data
       // A safety net: a password hash never leaves the server, even in a whole user row.

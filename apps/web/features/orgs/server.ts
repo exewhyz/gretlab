@@ -51,6 +51,7 @@ import {
 import type { z } from "zod"
 
 import { ApiError, notFound } from "@/lib/api/route"
+import { requestInfo } from "@/lib/api/request-context"
 import {
   auditCsv,
   readAudit,
@@ -145,7 +146,7 @@ async function context(slug: string, user: User): Promise<OrgContext> {
     orgReach(user),
   ])
   const active = membership?.status === "active"
-  return {
+  const ctx: OrgContext = {
     org,
     user,
     platformAdmin: reach === "act",
@@ -160,6 +161,24 @@ async function context(slug: string, user: User): Promise<OrgContext> {
     groups,
     modules: enabledModules(org.type, org.modules, policies[org.type]),
   }
+  // An API key: its maker's roles here, narrowed to the key's permissions; no platform reach.
+  const key = requestInfo().apiKey
+  if (key) {
+    if (key.orgId !== org.id) throw notFound("Organization not found")
+    return {
+      ...ctx,
+      platformAdmin: false,
+      platformViewer: false,
+      grants: ctx.grants.map((g) => ({
+        ...g,
+        systemKey: null,
+        permissions: (key.permissions as Permission[]).filter((p) =>
+          grantsPermission(g.permissions, p)
+        ),
+      })),
+    }
+  }
+  return ctx
 }
 
 function chainOf(ctx: OrgContext, groupId: string) {

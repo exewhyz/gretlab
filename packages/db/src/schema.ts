@@ -1401,6 +1401,76 @@ export const examPapers = pgTable(
 )
 
 /**
+ * A key another system uses to call this organization's API, acting as the person who made
+ * it but limited to the permissions chosen for it. Only a hash of its secret is kept.
+ */
+export const orgApiKeys = pgTable(
+  "org_api_keys",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** The visible start of the key (glk_<prefix>_…), to find it and to show which it is. */
+    prefix: text("prefix").notNull(),
+    /** sha256 of the whole key, hex. */
+    hash: text("hash").notNull(),
+    permissions: jsonb("permissions").$type<string[]>().notNull().default([]),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("org_api_keys_prefix").on(table.prefix)]
+)
+
+/** An address told, with a signed POST, when something it asked for happens in an organization. */
+export const orgWebhooks = pgTable(
+  "org_webhooks",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    /** The signing secret (needed to sign, so kept as is; shown to its maker once). */
+    secret: text("secret").notNull(),
+    /** Event patterns: "leave.decide", "member.*", or "*" for everything. */
+    events: jsonb("events").$type<string[]>().notNull().default(["*"]),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("org_webhooks_org").on(table.orgId)]
+)
+
+/** One event on its way to one webhook: tried at once, then again with backoff until it lands. */
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: id(),
+    webhookId: uuid("webhook_id")
+      .notNull()
+      .references(() => orgWebhooks.id, { onDelete: "cascade" }),
+    event: text("event").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    status: text("status", { enum: ["pending", "sent", "failed"] }).notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    responseStatus: integer("response_status"),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("webhook_deliveries_due").on(table.status, table.nextAttemptAt),
+    index("webhook_deliveries_hook").on(table.webhookId, table.createdAt),
+  ]
+)
+
+/**
  * A day or run of days an organization is closed (Diwali break, a national holiday): on
  * everyone's calendar, and no register is expected on it.
  */

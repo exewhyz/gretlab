@@ -351,6 +351,14 @@ export const ORG_NAV: NavItem[] = [
     anyOf: ["org.settings.manage"],
   },
   {
+    key: "integrations",
+    label: "Integrations",
+    path: "/integrations",
+    group: "School",
+    anyOf: ["org.settings.manage"],
+    wholeOrg: true,
+  },
+  {
     key: "lms",
     label: "LMS (LTI)",
     path: "/lms",

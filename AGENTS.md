@@ -649,6 +649,21 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - These are whole days (`allDay`): the page shows "All day" or the last day, keyed by the date itself so it never shifts with the viewer's time zone.
 - The same events as a private iCal feed at `/api/v1/calendar/<secret>.ics` (`users.calendar_token`, 24 random bytes): calendar apps can't sign in, so the address is the key. Off until turned on; "New link" retires the old one; blocked accounts' feeds stop. It never includes marks or code. iCal rules (escaping, 75-octet folding, UTC, CRLF, stable UIDs): `packages/judge/src/ical.ts`, unit-tested. Absolute links use `NEXTAUTH_URL`.
 
+## Integrations: API keys and webhooks
+
+- **Where.** Manage › Integrations (`features/integrations`), for whoever holds `org.settings.manage` across the organization. The guide for whoever builds the other side is `docs/api.md`.
+- **API keys** (`org_api_keys`, migration 0070):
+  - The format is `glk_<10-char prefix>_<secret>`. Only its SHA-256 is stored; it's shown once.
+  - `route()` sees `Authorization: Bearer glk_…`, finds the key (`userForApiKey` in `keys.ts`), and refuses any path outside `/api/v1/orgs/<its slug>`. It then runs the handler as the key's maker, with the key in the request context and no cookies or CSRF check. Routes with platform access refuse keys.
+  - The org context narrows the maker's grants to the key's permissions and drops platform reach (`context()` in `features/orgs/server.ts`).
+  - A key can only carry permissions its maker holds across the organization. A key can't manage keys or webhooks.
+  - Audit entries name the key in their actor label.
+- **Webhooks** (`org_webhooks`, `webhook_deliveries`):
+  - Every audit entry with an organization queues a delivery for each active webhook whose patterns match its action (`*`, `area.*` or exact; `eventMatches` in `packages/judge/src/integrations.ts`, server-only entry `@workspace/judge/integrations`). It's queued in the same transaction.
+  - Deliveries are sent after the response (`after()` in `route()`), and the cron route retries the rest. Each is leased with `FOR UPDATE SKIP LOCKED` so two senders don't double up.
+  - Requests are signed (`Gretlab-Signature: t=…,v1=HMAC-SHA256("t.body")`). Backoff runs from 1 minute to 24 hours; after 8 attempts a delivery is "failed". Redirects aren't followed.
+  - Addresses must be public https (`webhookUrlProblem`). `WEBHOOKS_ALLOW_LOCAL=true` allows local addresses for tests.
+
 ## Holidays
 
 - **The table.** `org_holidays` (migration 0069) holds the days an organization is closed: a name and a first and last day, at most three months.
