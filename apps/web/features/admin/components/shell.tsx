@@ -302,6 +302,101 @@ export function Card({
   )
 }
 
+/**
+ * The figures above a list, in one line: each a number and what it counts, an optional
+ * note, and a link to the rows behind it when there's a page for them. Not a row of tiles:
+ * the list below is the point, and this is its summary.
+ */
+export function Stats({
+  items,
+  className,
+}: {
+  items: {
+    label: string
+    value: ReactNode
+    hint?: ReactNode
+    tone?: "bad" | "good"
+    href?: string
+  }[]
+  className?: string
+}) {
+  return (
+    <dl
+      data-testid="stats"
+      className={cn(
+        "mb-4 flex flex-wrap gap-x-8 gap-y-3 border-y border-hairline py-3",
+        className
+      )}
+    >
+      {items.map((item) => {
+        const body = (
+          <>
+            <dt className="text-caption text-muted-foreground">{item.label}</dt>
+            <dd
+              className={cn(
+                "text-title-md font-semibold text-ink tabular-nums",
+                item.tone === "bad" && "text-destructive",
+                item.tone === "good" && "text-success"
+              )}
+            >
+              {item.value}
+              {item.hint && (
+                <span className="ml-1.5 text-caption font-normal text-muted-foreground">
+                  {item.hint}
+                </span>
+              )}
+            </dd>
+          </>
+        )
+        return item.href ? (
+          <a
+            key={item.label}
+            href={item.href}
+            className="grid gap-0.5 rounded-sm underline-offset-4 hover:[&_dd]:underline"
+          >
+            {body}
+          </a>
+        ) : (
+          <div key={item.label} className="grid gap-0.5">
+            {body}
+          </div>
+        )
+      })}
+    </dl>
+  )
+}
+
+/** A percentage as a short bar and its number, aligned in a table column. */
+export function PercentBar({
+  value,
+  low = 40,
+}: {
+  /** 0 to 100, or null for nothing to show. */
+  value: number | null
+  /** Below this the bar is drawn as a concern. */
+  low?: number
+}) {
+  if (value === null) return <span className="text-muted-foreground">—</span>
+  const v = Math.max(0, Math.min(100, value))
+  return (
+    <span className="inline-flex items-center gap-2 tabular-nums">
+      <span
+        aria-hidden
+        className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-strong"
+      >
+        <span
+          className={cn(
+            "block h-full rounded-full",
+            v < low ? "bg-destructive" : "bg-ink/70"
+          )}
+          style={{ width: `${v}%` }}
+        />
+      </span>
+      <span className="w-10 text-right">{Math.round(v)}%</span>
+    </span>
+  )
+}
+
 export function Table({
   headers,
   children,

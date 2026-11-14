@@ -1328,6 +1328,10 @@ function StudentHome({
   const attendance = has("attendance")
   const timetable = has("timetable")
   const work = has("exams") ? "Assignments and exams" : "Assignments"
+  // Library, bus or hostel: shown beside the notices only when there's something.
+  const hasCampus = Boolean(
+    data.campus.library || data.campus.transport?.ride || data.campus.hostel?.stay
+  )
   return (
     <div className="grid gap-5" data-testid="student-home">
       <Greeting
@@ -1335,7 +1339,12 @@ function StudentHome({
         title={first ? `Hi ${first}, here's your week` : "Your week"}
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div
+        className={cn(
+          "grid grid-cols-2 gap-3 sm:gap-4",
+          attendance ? "lg:grid-cols-4" : "lg:grid-cols-3"
+        )}
+      >
         {attendance && (
           <Card size="sm" data-testid="home-tile">
             <CardHeader>
@@ -1380,13 +1389,6 @@ function StudentHome({
             label="Notices"
             value={String(data.notices.length)}
             hint={`In your ${terms.groups.toLowerCase()}`}
-          />
-        )}
-        {!attendance && (
-          <Tile
-            label="Coming up"
-            value={String(data.coming.length)}
-            hint={work}
           />
         )}
       </div>
@@ -1510,7 +1512,12 @@ function StudentHome({
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div
+        className={cn(
+          "grid gap-4",
+          hasCampus && "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+        )}
+      >
         <Card>
           <CardHeader>
             <CardTitle className="text-title-md">Notices</CardTitle>
@@ -1538,9 +1545,11 @@ function StudentHome({
             )}
           </CardContent>
         </Card>
-        <div className="[&_[data-testid=campus]]:grid-cols-1">
-          <CampusSummary data={data.campus} slug={slug} own />
-        </div>
+        {hasCampus && (
+          <div className="[&_[data-testid=campus]]:grid-cols-1">
+            <CampusSummary data={data.campus} slug={slug} own />
+          </div>
+        )}
       </div>
     </div>
   )

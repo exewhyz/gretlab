@@ -43,7 +43,13 @@ interface Dashboard {
     contests: boolean
     profiles: boolean
   }
-  orgs: { slug: string; name: string; type: OrgType; roles: string[] }[]
+  orgs: {
+    slug: string
+    name: string
+    type: OrgType
+    roles: string[]
+    staff: boolean
+  }[]
   pendingOrgs: { slug: string; name: string }[]
   children: { id: string; name: string; org: { slug: string; name: string } }[]
   work: {
@@ -224,6 +230,121 @@ export function MemberHome() {
   const first = data.name.split(" ")[0]
   const p = data.practice
   const nothingYet = data.orgs.length === 0 && data.children.length === 0
+  // Here as a parent or as staff, with nothing to code: a row of zeros helps nobody, so
+  // the coding lab shrinks to one line and their organizations lead.
+  const quiet =
+    !nothingYet &&
+    data.work.open === 0 &&
+    data.work.overdue === 0 &&
+    (p?.solved ?? 0) === 0 &&
+    (p?.streak.longest ?? 0) === 0 &&
+    (data.children.length > 0 || data.orgs.some((o) => o.staff))
+  const orgsSection = (
+    <section aria-labelledby="my-schools" className="grid gap-2.5">
+      <h2
+        id="my-schools"
+        className="text-body-sm font-medium text-muted-foreground"
+      >
+        Your organizations
+      </h2>
+      {nothingYet ? (
+        <Empty className="border border-dashed border-hairline">
+          <EmptyHeader>
+            <EmptyTitle>You haven&apos;t joined a school yet</EmptyTitle>
+            <EmptyDescription>
+              Use the invite link your school sent, or{" "}
+              <Link href="/orgs" className="underline underline-offset-2">
+                find yours
+              </Link>
+              .
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3">
+          {data.orgs.map((o) => (
+            <Link
+              key={o.slug}
+              href={`/orgs/${o.slug}`}
+              className="group/org"
+              data-testid="member-org"
+            >
+              <Card
+                size="sm"
+                className="h-full flex-row items-center gap-3 px-4 transition-colors group-hover/org:ring-foreground/20"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary font-mono text-xs font-bold text-primary-foreground"
+                >
+                  {o.name.slice(0, 2).toUpperCase()}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-body-sm font-semibold text-ink">
+                    {o.name}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {ORG_TYPE_CONFIG[o.type]?.label ?? o.type}
+                    {o.roles.length > 0 && ` · ${o.roles.join(", ")}`}
+                  </span>
+                </span>
+              </Card>
+            </Link>
+          ))}
+          {data.children.map((c) => (
+            <Link
+              key={c.id}
+              href={`/orgs/${c.org.slug}/children/${c.id}`}
+              className="group/org"
+              data-testid="member-child"
+            >
+              <Card
+                size="sm"
+                className="h-full flex-row items-center gap-3 px-4 transition-colors group-hover/org:ring-foreground/20"
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-ink"
+                >
+                  {c.name
+                    .split(/\s+/)
+                    .map((w) => w[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-body-sm font-semibold text-ink">
+                    {c.name}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    Your child · {c.org.name}
+                  </span>
+                </span>
+              </Card>
+            </Link>
+          ))}
+          {data.pendingOrgs.map((o) => (
+            <Card
+              key={o.slug}
+              size="sm"
+              className="flex-row items-center gap-3 px-4 opacity-80"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-body-sm font-semibold text-ink">
+                  {o.name}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Your request to join is waiting
+                </span>
+              </span>
+              <Badge variant="outline">Waiting</Badge>
+            </Card>
+          ))}
+        </div>
+      )}
+    </section>
+  )
   return (
     <div className="grid gap-6" data-testid="member-home">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -236,7 +357,7 @@ export function MemberHome() {
           </h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          {data.features.practice && (
+          {data.features.practice && !quiet && (
             <Link href="/problems" className={buttonVariants()}>
               Practise
             </Link>
@@ -252,393 +373,321 @@ export function MemberHome() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {data.features.assignments && (
-          <Tile
-            label="Due this week"
-            value={String(data.work.dueThisWeek)}
-            hint={`${data.work.open} open in all`}
-            tone={data.work.dueThisWeek ? "primary" : undefined}
-            href="/assignments"
-          />
-        )}
-        {data.features.assignments && (
-          <Tile
-            label="Overdue"
-            value={String(data.work.overdue)}
-            hint={
-              data.work.overdue
-                ? "Still accepting late work"
-                : "Nothing overdue"
-            }
-            tone={data.work.overdue ? "bad" : undefined}
-            href="/assignments"
-          />
-        )}
-        {p && (
-          <Tile
-            label="Problems solved"
-            value={String(p.solved)}
-            hint={`${p.solvedBy.easy} easy · ${p.solvedBy.medium} medium · ${p.solvedBy.hard} hard`}
-            href="/problems"
-          />
-        )}
-        {p && (
-          <Tile
-            label="Streak"
-            value={`${p.streak.current} day${p.streak.current === 1 ? "" : "s"}`}
-            hint={`Longest ${p.streak.longest}`}
-            tone={p.streak.current ? "primary" : undefined}
-          />
-        )}
-      </div>
+      {!nothingYet && orgsSection}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className="grid content-start gap-4">
-          {data.features.assignments && (
-            <Card data-testid="due-next">
-              <CardHeader>
-                <CardTitle className="text-title-md">Due next</CardTitle>
-                <CardAction>
-                  <Link
-                    href="/assignments"
-                    className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
-                  >
-                    All work <ArrowRightIcon className="size-3.5" />
-                  </Link>
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                {data.work.next.length === 0 ? (
-                  <Empty className="border border-dashed border-hairline">
-                    <EmptyHeader>
-                      <EmptyTitle>You&apos;re all caught up</EmptyTitle>
-                      <EmptyDescription>
-                        New work from your classes shows up here.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                ) : (
-                  <ul className="grid">
-                    {data.work.next.map((a) => {
-                      const pct =
-                        a.total > 0
-                          ? (100 * a.earned) / a.total
-                          : a.problemCount
-                            ? (100 * a.solved) / a.problemCount
-                            : 0
-                      return (
-                        <li
-                          key={a.slug}
-                          className="border-t border-hairline-soft py-3 first:border-t-0 first:pt-0"
-                          data-testid="due-item"
-                        >
-                          <Link
-                            href={`/assignments/${a.slug}`}
-                            className="group grid gap-2"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="min-w-0 font-medium text-ink group-hover:underline">
-                                {a.title}
-                                {a.exam && (
-                                  <Badge variant="secondary" className="ml-2">
-                                    Exam
-                                  </Badge>
-                                )}
-                              </span>
-                              <span className="text-caption text-muted-foreground">
-                                {due(a.dueAt)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Progress value={pct} className="flex-1" />
-                              <span className="w-28 shrink-0 text-right text-caption text-muted-foreground tabular-nums">
-                                {a.problemCount
-                                  ? `${a.solved} of ${a.problemCount} solved`
-                                  : `${Math.round(pct)}%`}
-                              </span>
-                            </div>
-                            {a.org && (
-                              <span className="text-caption text-muted-foreground">
-                                {a.org}
-                              </span>
-                            )}
-                          </Link>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          )}
+      {quiet ? (
+        data.features.practice && (
+          <div
+            data-testid="coding-invite"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline bg-card px-4 py-3"
+          >
+            <span className="min-w-0">
+              <span className="block text-body-sm font-semibold text-ink">
+                Coding lab
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Problems to practise in the browser, with instant results.
+              </span>
+            </span>
+            <Link
+              href="/problems"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Try a problem
+            </Link>
+          </div>
+        )
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {data.features.assignments && (
+              <Tile
+                label="Due this week"
+                value={String(data.work.dueThisWeek)}
+                hint={`${data.work.open} open in all`}
+                tone={data.work.dueThisWeek ? "primary" : undefined}
+                href="/assignments"
+              />
+            )}
+            {data.features.assignments && (
+              <Tile
+                label="Overdue"
+                value={String(data.work.overdue)}
+                hint={
+                  data.work.overdue
+                    ? "Still accepting late work"
+                    : "Nothing overdue"
+                }
+                tone={data.work.overdue ? "bad" : undefined}
+                href="/assignments"
+              />
+            )}
+            {p && (
+              <Tile
+                label="Problems solved"
+                value={String(p.solved)}
+                hint={`${p.solvedBy.easy} easy · ${p.solvedBy.medium} medium · ${p.solvedBy.hard} hard`}
+                href="/problems"
+              />
+            )}
+            {p && (
+              <Tile
+                label="Streak"
+                value={`${p.streak.current} day${p.streak.current === 1 ? "" : "s"}`}
+                hint={`Longest ${p.streak.longest}`}
+                tone={p.streak.current ? "primary" : undefined}
+              />
+            )}
+          </div>
 
-          {data.features.contests && data.contests.length > 0 && (
-            <Card data-testid="contests-coming">
-              <CardHeader>
-                <CardTitle className="text-title-md">Contests</CardTitle>
-                <CardAction>
-                  <Link
-                    href="/contests"
-                    className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
-                  >
-                    All contests <ArrowRightIcon className="size-3.5" />
-                  </Link>
-                </CardAction>
-              </CardHeader>
-              <CardContent className="grid gap-2">
-                {data.contests.map((c) => (
-                  <Link
-                    key={c.slug}
-                    href={`/contests/${c.slug}`}
-                    className="flex flex-wrap items-center gap-3 rounded-lg border border-hairline p-3 transition-colors hover:border-hairline-strong"
-                  >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-ink">
-                      <TrophyIcon className="size-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-ink">
-                        {c.title}
-                      </span>
-                      <span className="block text-caption text-muted-foreground">
-                        {c.phase === "live"
-                          ? "On now"
-                          : `Starts ${when(c.startsAt)}`}
-                        {c.org && ` · ${c.org}`}
-                      </span>
-                    </span>
-                    {c.phase === "live" ? (
-                      <Badge>Live</Badge>
-                    ) : (
-                      <Badge variant="outline">Soon</Badge>
-                    )}
-                  </Link>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        <div className="grid content-start gap-4">
-          {data.daily?.problem && (
-            <Card data-testid="daily">
-              <CardHeader>
-                <CardDescription className="flex items-center gap-2">
-                  <LightningIcon className="size-4" aria-hidden="true" />{" "}
-                  Today&apos;s challenge
-                </CardDescription>
-                <CardTitle className="text-title-md">
-                  {data.daily.problem.title}
-                </CardTitle>
-                <CardAction>
-                  <Badge variant="secondary" className="capitalize">
-                    {data.daily.problem.level}
-                  </Badge>
-                </CardAction>
-              </CardHeader>
-              <CardContent className="flex-row flex-wrap items-center justify-between gap-3">
-                {data.daily.solvedToday ? (
-                  <span className="inline-flex items-center gap-1.5 text-body-sm text-success">
-                    <CheckCircleIcon className="size-4" weight="fill" /> Solved
-                    today
-                  </span>
-                ) : (
-                  <span className="text-body-sm text-muted-foreground">
-                    {data.daily.streak
-                      ? `Keep your ${data.daily.streak}-day run going`
-                      : "Solve it to start a run"}
-                  </span>
-                )}
-                <Link
-                  href={`/problems/${data.daily.problem.slug}`}
-                  className={buttonVariants({
-                    size: "sm",
-                    variant: data.daily.solvedToday ? "outline" : "default",
-                  })}
-                >
-                  {data.daily.solvedToday ? "Open" : "Solve"}
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-
-          {p && (
-            <Card data-testid="practice">
-              <CardHeader>
-                <CardTitle className="text-title-md">Practice</CardTitle>
-                <CardDescription className="flex items-center gap-1.5">
-                  <FireIcon
-                    className="size-4 text-primary"
-                    aria-hidden="true"
-                  />
-                  {p.streak.current
-                    ? `${p.streak.current}-day streak`
-                    : "No streak yet: solve one today"}
-                </CardDescription>
-                {data.handle && data.features.profiles && (
-                  <CardAction>
-                    <Link
-                      href={`/u/${data.handle}`}
-                      className="text-body-sm font-medium hover:text-primary-active"
-                    >
-                      Profile
-                    </Link>
-                  </CardAction>
-                )}
-              </CardHeader>
-              <CardContent className="grid gap-4">
-                <Heatmap days={p.activity} />
-                <div className="grid gap-2">
-                  {(["easy", "medium", "hard"] as const).map((l) => (
-                    <div key={l} className="grid gap-1">
-                      <div className="flex justify-between text-caption">
-                        <span className="text-ink capitalize">{l}</span>
-                        <span className="text-muted-foreground tabular-nums">
-                          {p.solvedBy[l]} / {p.totalBy[l]}
-                        </span>
-                      </div>
-                      <Progress
-                        value={
-                          p.totalBy[l]
-                            ? (100 * p.solvedBy[l]) / p.totalBy[l]
-                            : 0
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-                {p.recent.length > 0 && (
-                  <div className="grid gap-1">
-                    <div className="text-caption font-medium text-muted-foreground">
-                      Recently solved
-                    </div>
-                    {p.recent.map((r) => (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <div className="grid content-start gap-4">
+              {data.features.assignments && (
+                <Card data-testid="due-next">
+                  <CardHeader>
+                    <CardTitle className="text-title-md">Due next</CardTitle>
+                    <CardAction>
                       <Link
-                        key={`${r.slug}${r.at}`}
-                        href={`/problems/${r.slug}`}
-                        className="flex justify-between gap-2 text-body-sm hover:underline"
+                        href="/assignments"
+                        className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
                       >
-                        <span className="truncate text-ink">{r.title}</span>
-                        <span className="shrink-0 text-caption text-muted-foreground">
-                          {new Date(r.at).toLocaleDateString(undefined, {
-                            day: "numeric",
-                            month: "short",
-                          })}
+                        All work <ArrowRightIcon className="size-3.5" />
+                      </Link>
+                    </CardAction>
+                  </CardHeader>
+                  <CardContent>
+                    {data.work.next.length === 0 ? (
+                      <Empty className="border border-dashed border-hairline">
+                        <EmptyHeader>
+                          <EmptyTitle>You&apos;re all caught up</EmptyTitle>
+                          <EmptyDescription>
+                            New work from your classes shows up here.
+                          </EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
+                    ) : (
+                      <ul className="grid">
+                        {data.work.next.map((a) => {
+                          const pct =
+                            a.total > 0
+                              ? (100 * a.earned) / a.total
+                              : a.problemCount
+                                ? (100 * a.solved) / a.problemCount
+                                : 0
+                          return (
+                            <li
+                              key={a.slug}
+                              className="border-t border-hairline-soft py-3 first:border-t-0 first:pt-0"
+                              data-testid="due-item"
+                            >
+                              <Link
+                                href={`/assignments/${a.slug}`}
+                                className="group grid gap-2"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="min-w-0 font-medium text-ink group-hover:underline">
+                                    {a.title}
+                                    {a.exam && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="ml-2"
+                                      >
+                                        Exam
+                                      </Badge>
+                                    )}
+                                  </span>
+                                  <span className="text-caption text-muted-foreground">
+                                    {due(a.dueAt)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <Progress value={pct} className="flex-1" />
+                                  <span className="w-28 shrink-0 text-right text-caption text-muted-foreground tabular-nums">
+                                    {a.problemCount
+                                      ? `${a.solved} of ${a.problemCount} solved`
+                                      : `${Math.round(pct)}%`}
+                                  </span>
+                                </div>
+                                {a.org && (
+                                  <span className="text-caption text-muted-foreground">
+                                    {a.org}
+                                  </span>
+                                )}
+                              </Link>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {data.features.contests && data.contests.length > 0 && (
+                <Card data-testid="contests-coming">
+                  <CardHeader>
+                    <CardTitle className="text-title-md">Contests</CardTitle>
+                    <CardAction>
+                      <Link
+                        href="/contests"
+                        className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
+                      >
+                        All contests <ArrowRightIcon className="size-3.5" />
+                      </Link>
+                    </CardAction>
+                  </CardHeader>
+                  <CardContent className="grid gap-2">
+                    {data.contests.map((c) => (
+                      <Link
+                        key={c.slug}
+                        href={`/contests/${c.slug}`}
+                        className="flex flex-wrap items-center gap-3 rounded-lg border border-hairline p-3 transition-colors hover:border-hairline-strong"
+                      >
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-ink">
+                          <TrophyIcon className="size-4" />
                         </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium text-ink">
+                            {c.title}
+                          </span>
+                          <span className="block text-caption text-muted-foreground">
+                            {c.phase === "live"
+                              ? "On now"
+                              : `Starts ${when(c.startsAt)}`}
+                            {c.org && ` · ${c.org}`}
+                          </span>
+                        </span>
+                        {c.phase === "live" ? (
+                          <Badge>Live</Badge>
+                        ) : (
+                          <Badge variant="outline">Soon</Badge>
+                        )}
                       </Link>
                     ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
-      <section aria-labelledby="my-schools" className="grid gap-2.5">
-        <h2
-          id="my-schools"
-          className="text-body-sm font-medium text-muted-foreground"
-        >
-          Your schools and groups
-        </h2>
-        {nothingYet ? (
-          <Empty className="border border-dashed border-hairline">
-            <EmptyHeader>
-              <EmptyTitle>You haven&apos;t joined a school yet</EmptyTitle>
-              <EmptyDescription>
-                Use the invite link your school sent, or{" "}
-                <Link href="/orgs" className="underline underline-offset-2">
-                  find yours
-                </Link>
-                .
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-3">
-            {data.orgs.map((o) => (
-              <Link
-                key={o.slug}
-                href={`/orgs/${o.slug}`}
-                className="group/org"
-                data-testid="member-org"
-              >
-                <Card
-                  size="sm"
-                  className="h-full flex-row items-center gap-3 px-4 transition-colors group-hover/org:ring-foreground/20"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary font-mono text-xs font-bold text-primary-foreground"
-                  >
-                    {o.name.slice(0, 2).toUpperCase()}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-body-sm font-semibold text-ink">
-                      {o.name}
-                    </span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {ORG_TYPE_CONFIG[o.type]?.label ?? o.type}
-                      {o.roles.length > 0 && ` · ${o.roles.join(", ")}`}
-                    </span>
-                  </span>
+            <div className="grid content-start gap-4">
+              {data.daily?.problem && (
+                <Card data-testid="daily">
+                  <CardHeader>
+                    <CardDescription className="flex items-center gap-2">
+                      <LightningIcon className="size-4" aria-hidden="true" />{" "}
+                      Today&apos;s challenge
+                    </CardDescription>
+                    <CardTitle className="text-title-md">
+                      {data.daily.problem.title}
+                    </CardTitle>
+                    <CardAction>
+                      <Badge variant="secondary" className="capitalize">
+                        {data.daily.problem.level}
+                      </Badge>
+                    </CardAction>
+                  </CardHeader>
+                  <CardContent className="flex-row flex-wrap items-center justify-between gap-3">
+                    {data.daily.solvedToday ? (
+                      <span className="inline-flex items-center gap-1.5 text-body-sm text-success">
+                        <CheckCircleIcon className="size-4" weight="fill" />{" "}
+                        Solved today
+                      </span>
+                    ) : (
+                      <span className="text-body-sm text-muted-foreground">
+                        {data.daily.streak
+                          ? `Keep your ${data.daily.streak}-day run going`
+                          : "Solve it to start a run"}
+                      </span>
+                    )}
+                    <Link
+                      href={`/problems/${data.daily.problem.slug}`}
+                      className={buttonVariants({
+                        size: "sm",
+                        variant: data.daily.solvedToday ? "outline" : "default",
+                      })}
+                    >
+                      {data.daily.solvedToday ? "Open" : "Solve"}
+                    </Link>
+                  </CardContent>
                 </Card>
-              </Link>
-            ))}
-            {data.children.map((c) => (
-              <Link
-                key={c.id}
-                href={`/orgs/${c.org.slug}/children/${c.id}`}
-                className="group/org"
-                data-testid="member-child"
-              >
-                <Card
-                  size="sm"
-                  className="h-full flex-row items-center gap-3 px-4 transition-colors group-hover/org:ring-foreground/20"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-ink"
-                  >
-                    {c.name
-                      .split(/\s+/)
-                      .map((w) => w[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase()}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-body-sm font-semibold text-ink">
-                      {c.name}
-                    </span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      Your child · {c.org.name}
-                    </span>
-                  </span>
+              )}
+
+              {p && (
+                <Card data-testid="practice">
+                  <CardHeader>
+                    <CardTitle className="text-title-md">Practice</CardTitle>
+                    <CardDescription className="flex items-center gap-1.5">
+                      <FireIcon
+                        className="size-4 text-primary"
+                        aria-hidden="true"
+                      />
+                      {p.streak.current
+                        ? `${p.streak.current}-day streak`
+                        : "No streak yet: solve one today"}
+                    </CardDescription>
+                    {data.handle && data.features.profiles && (
+                      <CardAction>
+                        <Link
+                          href={`/u/${data.handle}`}
+                          className="text-body-sm font-medium hover:text-primary-active"
+                        >
+                          Profile
+                        </Link>
+                      </CardAction>
+                    )}
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    <Heatmap days={p.activity} />
+                    <div className="grid gap-2">
+                      {(["easy", "medium", "hard"] as const).map((l) => (
+                        <div key={l} className="grid gap-1">
+                          <div className="flex justify-between text-caption">
+                            <span className="text-ink capitalize">{l}</span>
+                            <span className="text-muted-foreground tabular-nums">
+                              {p.solvedBy[l]} / {p.totalBy[l]}
+                            </span>
+                          </div>
+                          <Progress
+                            value={
+                              p.totalBy[l]
+                                ? (100 * p.solvedBy[l]) / p.totalBy[l]
+                                : 0
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {p.recent.length > 0 && (
+                      <div className="grid gap-1">
+                        <div className="text-caption font-medium text-muted-foreground">
+                          Recently solved
+                        </div>
+                        {p.recent.map((r) => (
+                          <Link
+                            key={`${r.slug}${r.at}`}
+                            href={`/problems/${r.slug}`}
+                            className="flex justify-between gap-2 text-body-sm hover:underline"
+                          >
+                            <span className="truncate text-ink">{r.title}</span>
+                            <span className="shrink-0 text-caption text-muted-foreground">
+                              {new Date(r.at).toLocaleDateString(undefined, {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
                 </Card>
-              </Link>
-            ))}
-            {data.pendingOrgs.map((o) => (
-              <Card
-                key={o.slug}
-                size="sm"
-                className="flex-row items-center gap-3 px-4 opacity-80"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-body-sm font-semibold text-ink">
-                    {o.name}
-                  </span>
-                  <span className="block text-xs text-muted-foreground">
-                    Your request to join is waiting
-                  </span>
-                </span>
-                <Badge variant="outline">Waiting</Badge>
-              </Card>
-            ))}
+              )}
+            </div>
           </div>
-        )}
-      </section>
+        </>
+      )}
+
+      {nothingYet && orgsSection}
     </div>
   )
 }

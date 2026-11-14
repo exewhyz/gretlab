@@ -72,6 +72,8 @@ import {
   type Message,
   type Role,
   type Summary,
+  memberKind,
+  type MemberKind,
 } from "./manage-shared"
 
 /* ---------- shell ---------- */
@@ -116,6 +118,7 @@ export function ManageMembers({
   const [status, setStatus] = useState(
     initialStatus === "pending" ? "pending" : ""
   )
+  const [kind, setKind] = useState<MemberKind | "">("")
   const [editing, setEditing] = useState<{
     id: string
     what: "groups" | "role"
@@ -145,10 +148,48 @@ export function ManageMembers({
   }
   const can = (p: Permission) => summary.permissions.includes(p)
   const list = groups.data.groups
+  const terms = summary.org.kind?.terms
+  const kindLabel: Record<MemberKind, string> = {
+    staff: "Staff",
+    learner: terms?.learners ?? "Students",
+    parent: terms?.guardians ?? "Parents",
+    other: "Others",
+  }
+  const counts = { staff: 0, learner: 0, parent: 0, other: 0 }
+  for (const m of members.data) counts[memberKind(m)]++
+  const shown = kind
+    ? members.data.filter((m) => memberKind(m) === kind)
+    : members.data
 
   return (
     <>
       <PageTitle>Members</PageTitle>
+      <div
+        role="group"
+        aria-label="Show"
+        className="mb-3 flex flex-wrap gap-1.5"
+        data-testid="member-kinds"
+      >
+        {(
+          [
+            ["", "Everyone", members.data.length],
+            ...(["learner", "staff", "parent", "other"] as const)
+              .filter((k) => counts[k] > 0)
+              .map((k) => [k, kindLabel[k], counts[k]] as const),
+          ] as const
+        ).map(([k, label, n]) => (
+          <Button
+            key={k || "all"}
+            size="sm"
+            variant={kind === k ? "default" : "outline"}
+            aria-pressed={kind === k}
+            onClick={() => setKind(k)}
+          >
+            {label}
+            <span className="tabular-nums opacity-70">{n}</span>
+          </Button>
+        ))}
+      </div>
       <div className="mb-3 flex flex-wrap gap-2">
         <TextInput
           aria-label="Search members"
@@ -179,7 +220,7 @@ export function ManageMembers({
       </div>
       <FormMessage message={message} />
       <Table headers={["Person", "Groups", "Roles", ""]}>
-        {members.data.map((m) => (
+        {shown.map((m) => (
           <MemberRow
             key={m.userId}
             slug={slug}
@@ -196,10 +237,17 @@ export function ManageMembers({
             }
             run={(call) => act.mutate(call)}
             busy={act.isPending}
+            plainLabel={
+              memberKind(m) === "learner"
+                ? (terms?.learner ?? "Student")
+                : memberKind(m) === "parent"
+                  ? `${terms?.guardian ?? "Parent"} of ${m.children.join(", ")}`
+                  : "Member"
+            }
           />
         ))}
       </Table>
-      {members.data.length === 0 && (
+      {shown.length === 0 && (
         <p className="mt-3 text-body-sm text-body">Nobody matches.</p>
       )}
     </>
@@ -256,6 +304,7 @@ function MemberRow({
   setEditing,
   run,
   busy,
+  plainLabel,
 }: {
   slug: string
   member: Member
@@ -269,6 +318,8 @@ function MemberRow({
   setEditing: (what: "groups" | "role" | null) => void
   run: (call: () => Promise<unknown>) => void
   busy: boolean
+  /** What they are when they hold no role beyond Member: Student, Parent of …, Member. */
+  plainLabel: string
 }) {
   // Ticks show last-level groups; where they sit "not placed yet" stays until they're placed.
   const leaves = leafIds(groups)
@@ -392,7 +443,7 @@ function MemberRow({
             ))}
           {m.status === "active" &&
             m.roles.every((r) => r.systemKey === "member") && (
-              <span className="text-xs">Member</span>
+              <span className="text-xs">{plainLabel}</span>
             )}
         </div>
         <Dialog

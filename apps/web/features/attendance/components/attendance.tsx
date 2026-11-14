@@ -12,6 +12,8 @@ import {
   Card,
   Loading,
   PageTitle,
+  PercentBar,
+  Stats,
   Table,
 } from "@/features/admin/components/shell"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
@@ -56,10 +58,13 @@ function ClassPicker({
   data,
   value,
   onChange,
+  extra,
 }: {
   data: Groups
   value: string
   onChange: (id: string) => void
+  /** Choices above the classes, such as every class at once. */
+  extra?: readonly { value: string; label: string }[]
 }) {
   return (
     <GroupPicker
@@ -68,6 +73,7 @@ function ClassPicker({
       levels={data.levels}
       value={value}
       onChange={onChange}
+      extra={extra}
       placeholder="Choose a class"
       isDisabled={(id) => !data.choosable.includes(id)}
     />
@@ -339,6 +345,84 @@ const SHORT: Record<AttendanceStatus, string> = {
   excused: "E",
 }
 
+interface Overview {
+  month: string
+  minimum: number
+  rows: {
+    id: string
+    path: string
+    days: number
+    students: number
+    percent: number | null
+    below: number
+  }[]
+}
+
+/**
+ * Before a class is chosen: every class's month in one table, lowest attendance first, so
+ * the classes that need a look are at the top. Choosing one opens its register grid.
+ */
+function MonthOverview({
+  slug,
+  month,
+  onOpen,
+}: {
+  slug: string
+  month: string
+  onOpen: (groupId: string) => void
+}) {
+  const { data, error } = useQuery({
+    queryKey: ["org", slug, "attendance", "overview", month],
+    queryFn: () => api<Overview>(`/orgs/${slug}/attendance/overview?month=${month}`),
+  })
+  if (!data) return <Loading error={error} />
+  const taken = data.rows.filter((r) => r.days > 0)
+  if (data.rows.length === 0)
+    return <p className="text-body-sm text-body">No classes to report on yet.</p>
+  const rows = [...data.rows].sort(
+    (a, b) => (a.percent ?? 101) - (b.percent ?? 101) || a.path.localeCompare(b.path)
+  )
+  const below = taken.reduce((n, r) => n + r.below, 0)
+  const all = taken.filter((r) => r.percent !== null)
+  const average = all.length
+    ? Math.round(all.reduce((n, r) => n + (r.percent ?? 0), 0) / all.length)
+    : null
+  return (
+    <div data-testid="attendance-overview">
+      <Stats
+        items={[
+          { label: "Classes with registers", value: taken.length, hint: `of ${data.rows.length}` },
+          { label: "Average attendance", value: average === null ? "—" : `${average}%` },
+          {
+            label: `Students below ${data.minimum}%`,
+            value: below,
+            tone: below > 0 ? "bad" : undefined,
+          },
+        ]}
+      />
+      <Table headers={["Class", "Days taken", "Present", `Below ${data.minimum}%`, ""]}>
+        {rows.map((r) => (
+          <tr key={r.id} data-testid="overview-row">
+            <td className="text-ink">{r.path}</td>
+            <td className="tabular-nums">{r.days || "—"}</td>
+            <td>
+              <PercentBar value={r.percent} low={data.minimum} />
+            </td>
+            <td className={cn("tabular-nums", r.below > 0 && "text-destructive")}>
+              {r.days ? r.below : "—"}
+            </td>
+            <td className="text-right">
+              <Button size="xs" variant="outline" onClick={() => onOpen(r.id)}>
+                Open
+              </Button>
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </div>
+  )
+}
+
 /** Manage › Attendance report: a class's month, one column per register. */
 export function AttendanceReport({ slug }: { slug: string }) {
   const groups = useAttendanceGroups(slug)
@@ -380,6 +464,11 @@ export function AttendanceReport({ slug }: { slug: string }) {
             data={groups.data}
             value={groupId}
             onChange={setGroupId}
+            extra={
+              view === "month"
+                ? [{ value: "", label: "Every class (overview)" }]
+                : undefined
+            }
           />
         </Field>
         {view === "month" && (
@@ -401,9 +490,9 @@ export function AttendanceReport({ slug }: { slug: string }) {
           </p>
         )
       ) : !groupId ? (
-        <p className="text-body-sm text-body">
-          Choose a class to see its month.
-        </p>
+        month ? (
+          <MonthOverview slug={slug} month={month} onOpen={setGroupId} />
+        ) : null
       ) : !report.data ? (
         <Loading error={report.error} />
       ) : report.data.columns.length === 0 ? (

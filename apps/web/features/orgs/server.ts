@@ -5,6 +5,7 @@ import {
   auditLog,
   getDb,
   groupMembers,
+  guardians,
   orgGroups,
   orgInvites,
   orgMembers,
@@ -1374,7 +1375,7 @@ export async function listMembers(
     .orderBy(asc(users.name), asc(users.email))
     .limit(1000)
   const ids = rows.map((r) => r.user.id)
-  const [memberships, assignments] = ids.length
+  const [memberships, assignments, families] = ids.length
     ? await Promise.all([
         db
           .select()
@@ -1398,8 +1399,16 @@ export async function listMembers(
               inArray(roleAssignments.userId, ids)
             )
           ),
+        // Whose parent each one is here, so the list can say so.
+        db
+          .select({ parentId: guardians.parentId, name: users.name, email: users.email })
+          .from(guardians)
+          .innerJoin(users, eq(guardians.studentId, users.id))
+          .where(
+            and(eq(guardians.orgId, ctx.org.id), inArray(guardians.parentId, ids))
+          ),
       ])
-    : [[], []]
+    : [[], [], []]
 
   const inScope = (userId: string) => {
     if (scope === "all") return true
@@ -1440,7 +1449,13 @@ export async function listMembers(
           name: a.role.name,
           systemKey: a.role.systemKey,
           groupId: a.assignment.groupId,
+          /** Whether the role grants anything (else it's the plain Member role). */
+          grants: rolePermissions(a.role).length > 0,
         })),
+      /** The children they're a parent of here (names), if any. */
+      children: families
+        .filter((f) => f.parentId === person.id)
+        .map((f) => f.name ?? f.email),
     }))
 }
 

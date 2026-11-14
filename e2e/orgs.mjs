@@ -620,9 +620,10 @@ await outsiderPage.waitForTimeout(800)
 check("people in no organization don't get one", (await outsiderPage.getByTestId("scope-switcher").count()) === 0)
 
 const o = await open(PEOPLE.owner[0])
+// The organization's home is its dashboard (the old /manage overview redirects there).
 await o.goto(`${BASE}${O}/manage`)
-await o.getByRole("heading", { name: "Test College" }).waitFor({ timeout: 30000 })
-await o.getByRole("link", { name: /^Members/ }).click()
+await o.waitForURL((u) => u.pathname === O, { timeout: 30000 })
+await o.getByRole("navigation", { name: "Organization" }).getByRole("link", { name: "Members", exact: true }).click({ timeout: 30000 })
 await o.getByTestId("member-row").first().waitFor({ timeout: 15000 })
 check("members page lists people with roles and groups", await o.getByTestId("member-row").filter({ hasText: PEOPLE.s1[0] }).getByText("Admin").first().isVisible())
 await o.screenshot({ path: SHOTS + "org-members.png", fullPage: true })

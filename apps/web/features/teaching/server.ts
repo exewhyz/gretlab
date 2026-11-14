@@ -498,12 +498,11 @@ export async function orgReport(
       .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
       .where(eq(roleAssignments.orgId, ctx.org.id)),
   ])
+  // Students, as the organization's home counts them: members seated in a group who hold no
+  // role that grants anything. Parents, librarians and office staff are members too, but
+  // not students.
   const staff = new Set(
-    grants
-      .filter((g) =>
-        rolePermissions(g).some((p) => TEACHING.includes(p as Permission))
-      )
-      .map((g) => g.userId)
+    grants.filter((g) => rolePermissions(g).length > 0).map((g) => g.userId)
   )
   const groupsOf = (userId: string) =>
     memberships.filter((m) => m.userId === userId).map((m) => m.groupId)
@@ -515,6 +514,7 @@ export async function orgReport(
   const students = members.filter(
     (m) =>
       !staff.has(m.id) &&
+      groupsOf(m.id).length > 0 &&
       (reportScope === "all" || groupsOf(m.id).some((g) => reportScope.has(g)))
   )
   const ids = students.map((s) => s.id)

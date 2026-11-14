@@ -90,7 +90,20 @@ export interface Member {
     name: string
     systemKey: string | null
     groupId: string | null
+    /** Whether the role grants anything (else it's the plain Member role). */
+    grants: boolean
   }[]
+  /** The children they're a parent of here (names). */
+  children: string[]
+}
+
+/** What someone is here, for reading a list at a glance. */
+export type MemberKind = "staff" | "learner" | "parent" | "other"
+export function memberKind(m: Member): MemberKind {
+  if (m.roles.some((r) => r.grants)) return "staff"
+  if (m.groupIds.length > 0) return "learner"
+  if (m.children.length > 0) return "parent"
+  return "other"
 }
 
 export type Message = { text: string; kind?: "ok" | "err" } | null

@@ -380,6 +380,81 @@ export async function attendanceMonth(
 }
 
 /** The groups this person may take or see attendance for, to choose a register. */
+/**
+ * The whole organization's month at a glance: for each class this person may see, how
+ * many days had a register, the share present, and how many students are below the line.
+ * Counted from the marks themselves (only students are marked), so it needs no roster.
+ */
+export async function attendanceOverview(slug: string, user: User, month: string) {
+  if (!MONTH.test(month))
+    throw new ApiError(400, "bad_month", "Choose a month.")
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  // Classes where students sit (no groups inside), that this person may see.
+  const leaves = ctx.groups.filter(
+    (g) =>
+      !ctx.groups.some((c) => c.parentId === g.id) &&
+      (canFor(ctx, "attendance.mark", [[g.id]]) ||
+        canFor(ctx, "attendance.view", [[g.id]]))
+  )
+  const ids = leaves.map((g) => g.id)
+  const [y, m] = month.split("-").map(Number) as [number, number]
+  const next =
+    m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`
+  const db = getDb()
+  const sessions = ids.length
+    ? await db
+        .select({
+          id: teachingSessions.id,
+          groupId: teachingSessions.groupId,
+          day: teachingSessions.day,
+        })
+        .from(teachingSessions)
+        .where(
+          and(
+            inArray(teachingSessions.groupId, ids),
+            gte(teachingSessions.day, `${month}-01`),
+            lt(teachingSessions.day, `${next}-01`)
+          )
+        )
+    : []
+  const marks = sessions.length
+    ? await db
+        .select({
+          sessionId: attendance.sessionId,
+          userId: attendance.userId,
+          status: attendance.status,
+        })
+        .from(attendance)
+        .where(inArray(attendance.sessionId, sessions.map((x) => x.id)))
+    : []
+  const sessionOf = new Map(sessions.map((x) => [x.id, x]))
+  const minimum = readAttendanceSettings(ctx.org.moduleSettings).minPercent
+  const rows = leaves.map((g) => {
+    const own = marks.filter((x) => sessionOf.get(x.sessionId)?.groupId === g.id)
+    const days = new Set(own.map((x) => sessionOf.get(x.sessionId)!.day))
+    const byStudent = new Map<string, AttendanceStatus[]>()
+    for (const x of own)
+      byStudent.set(x.userId, [...(byStudent.get(x.userId) ?? []), x.status as AttendanceStatus])
+    const below = [...byStudent.values()].filter((list) => {
+      const p = summarizeAttendance(list).percent
+      return p !== null && p < minimum
+    }).length
+    return {
+      id: g.id,
+      path: groupChain(ctx, g.id)
+        .reverse()
+        .map((id) => ctx.groups.find((x) => x.id === id)?.name ?? "")
+        .join(" › "),
+      days: days.size,
+      students: byStudent.size,
+      percent: summarizeAttendance(own.map((x) => x.status as AttendanceStatus)).percent,
+      below,
+    }
+  })
+  return { month, minimum, rows }
+}
+
 export async function attendanceGroups(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
   needModule(ctx)

@@ -78,6 +78,8 @@ export async function memberDashboard(user: User) {
         name: o.name,
         type: o.type,
         roles: o.roles,
+        /** Holds a role here that grants something (staff, not just a member). */
+        staff: o.canManage,
       })),
     pendingOrgs: orgs
       .filter((o) => o.status === "pending")

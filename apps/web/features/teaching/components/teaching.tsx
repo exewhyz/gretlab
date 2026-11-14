@@ -15,6 +15,8 @@ import {
   Card,
   Loading,
   PageTitle,
+  PercentBar,
+  Stats,
   Table,
 } from "@/features/admin/components/shell"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
@@ -848,6 +850,7 @@ export function OrgReports({
   fixedGroup?: string
 }) {
   const [chosen, setGroup] = useState("")
+  const [onlyInactive, setOnlyInactive] = useState(false)
   const group = fixedGroup ?? chosen
   const { data, error, isFetching } = useQuery({
     queryKey: ["org", slug, "reports", group],
@@ -855,17 +858,11 @@ export function OrgReports({
   })
   if (!data) return <Loading error={error} />
   const inactive = data.summary.students - data.summary.activeThisWeek
-  const cards = [
-    ["Students", data.summary.students],
-    ["Active this week", data.summary.activeThisWeek],
-    [
-      "Assignment average",
-      data.summary.averageAssignment === null
-        ? "—"
-        : `${data.summary.averageAssignment}%`,
-    ],
-    ["Sharing practice", `${data.summary.sharing} of ${data.summary.students}`],
-  ] as const
+  const pct = (n: number) =>
+    data.summary.students ? Math.round((100 * n) / data.summary.students) : 0
+  const students = onlyInactive
+    ? data.students.filter((s) => !s.activeThisWeek)
+    : data.students
 
   return (
     <>
@@ -914,26 +911,34 @@ export function OrgReports({
           <span className="text-caption text-body">Updating…</span>
         )}
       </div>
-      <div className="mb-4 grid grid-cols-2 gap-3 min-[901px]:grid-cols-4">
-        {cards.map(([label, value]) => (
-          <Card key={label}>
-            <div className="text-display-sm text-ink tabular-nums">{value}</div>
-            <div className="text-caption">{label}</div>
-          </Card>
-        ))}
-      </div>
-      {inactive > 0 && data.summary.students > 0 && (
-        <p
-          role="status"
-          data-testid="inactive-warning"
-          className="mb-4 rounded-md border border-hairline-strong bg-canvas-soft p-3 text-body-sm text-ink"
-        >
-          {inactive} of {data.summary.students} students (
-          {Math.round((100 * inactive) / data.summary.students)}%) did no work
-          for this organization this week. They&apos;re at the top of the table
-          below.
-        </p>
-      )}
+      <Stats
+        items={[
+          { label: "Students", value: data.summary.students },
+          {
+            label: "Active this week",
+            value: data.summary.activeThisWeek,
+            hint: `${pct(data.summary.activeThisWeek)}%`,
+          },
+          {
+            label: "Did no work this week",
+            value: inactive,
+            hint: `${pct(inactive)}%`,
+            tone: inactive > 0 ? "bad" : undefined,
+          },
+          {
+            label: "Assignment average",
+            value:
+              data.summary.averageAssignment === null
+                ? "—"
+                : `${data.summary.averageAssignment}%`,
+          },
+          {
+            label: "Sharing practice",
+            value: data.summary.sharing,
+            hint: `of ${data.summary.students}`,
+          },
+        ]}
+      />
       <p className="mb-5 text-caption text-body">
         Activity counts work on this organization&apos;s assignments and
         contests, plus general practice for students who chose to share it.
@@ -951,7 +956,9 @@ export function OrgReports({
                   <td className="tabular-nums">
                     {a.started} / {a.students}
                   </td>
-                  <td className="tabular-nums">{a.averagePercent}%</td>
+                  <td>
+                    <PercentBar value={a.averagePercent} />
+                  </td>
                 </tr>
               ))}
             </Table>
@@ -996,7 +1003,29 @@ export function OrgReports({
         </div>
       )}
 
-      <h2 className="mb-2 text-title-sm text-ink">Students</h2>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-title-sm text-ink">Students</h2>
+        {inactive > 0 && (
+          <div role="group" aria-label="Show" className="flex gap-1.5">
+            <Button
+              size="sm"
+              variant={onlyInactive ? "outline" : "default"}
+              aria-pressed={!onlyInactive}
+              onClick={() => setOnlyInactive(false)}
+            >
+              Everyone <span className="tabular-nums opacity-70">{data.students.length}</span>
+            </Button>
+            <Button
+              size="sm"
+              variant={onlyInactive ? "default" : "outline"}
+              aria-pressed={onlyInactive}
+              onClick={() => setOnlyInactive(true)}
+            >
+              No work this week <span className="tabular-nums opacity-70">{inactive}</span>
+            </Button>
+          </div>
+        )}
+      </div>
       <Table
         headers={[
           "Student",
@@ -1006,7 +1035,7 @@ export function OrgReports({
           "Practice solved",
         ]}
       >
-        {data.students.map((s) => (
+        {students.map((s) => (
           <tr key={s.email} data-testid="report-student">
             <td>
               <div className="text-ink">{s.name ?? s.email}</div>
@@ -1016,8 +1045,8 @@ export function OrgReports({
             <td className={cn(!s.activeThisWeek && "text-primary")}>
               {s.lastActive ? formatDate(s.lastActive) : "Not in 30 days"}
             </td>
-            <td className="tabular-nums">
-              {s.assignmentPercent === null ? "—" : `${s.assignmentPercent}%`}
+            <td>
+              <PercentBar value={s.assignmentPercent} />
             </td>
             <td
               className="tabular-nums"
