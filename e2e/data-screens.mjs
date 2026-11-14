@@ -76,6 +76,15 @@ check("...filtering by kind on the server", (await owner(`${O}/members?page=1&ki
 check("without a page, everyone at once (no cap)", (await owner(`${O}/members`)).json?.length === p1?.total)
 psql(`delete from users where email like 'ds-bulk%'`)
 
+// ---------- parents and the platform's organizations, paged and searched on the server
+const parentsPage = (await owner(`${O}/parents?page=1&q=ds-s1`)).json
+check("parent links come a page at a time, searched", parentsPage?.links.length === 1 && parentsPage.total === 1 && parentsPage.pages === 1, JSON.stringify(parentsPage).slice(0, 200))
+check("...and none for a search that matches nothing", (await owner(`${O}/parents?page=1&q=nobody-at-all`)).json?.total === 0)
+check("...and all at once without a page", Array.isArray((await owner(`${O}/parents`)).json?.links))
+const orgsPage = (await admin(`/admin/organizations?page=1&q=Ds%20School`)).json
+check("the platform's organizations are searched and paged in the database", orgsPage?.organizations.some((o) => o.slug === "ds-school") && orgsPage.total >= 1 && orgsPage.page === 1, JSON.stringify(orgsPage).slice(0, 200))
+check("...and the whole list without a page, as before", Array.isArray((await admin("/admin/organizations")).json))
+
 // ---------- attendance across the school
 const day = (await owner(`${O}/attendance`)).json.today
 await owner(`${O}/attendance/register`, { method: "PUT", body: { groupId: a.id, day, period: "", marks: [{ userId: uid("ds-s1"), status: "absent" }] } })
