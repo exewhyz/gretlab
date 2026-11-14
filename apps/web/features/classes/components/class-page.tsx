@@ -282,8 +282,17 @@ export function ClassPage({
         )}
       </header>
 
-      <Tabs value={current} onValueChange={(v) => choose(v as Tab)}>
-        <TabsList variant="line" className="max-w-full overflow-x-auto">
+      {/* A grid item grows to its widest child unless told not to: on a phone the tab row
+          would otherwise stretch the whole page past the screen. */}
+      <Tabs
+        value={current}
+        onValueChange={(v) => choose(v as Tab)}
+        className="min-w-0"
+      >
+        <TabsList
+          variant="line"
+          className="max-w-full justify-start overflow-x-auto"
+        >
           {shown.map(([value, label]) => (
             <TabsTrigger key={value} value={value}>
               {label}

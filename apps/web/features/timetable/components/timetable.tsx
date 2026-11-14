@@ -3,7 +3,7 @@
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { WEEKDAYS } from "@workspace/judge"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -52,6 +52,84 @@ const dayName = (d: number) =>
   WEEKDAYS.find((w) => w.day === d)?.short ?? String(d)
 
 /** A week: periods down, days across. Cells show a subject, or a picker when editing. */
+/** Narrower than a small tablet: the week grid becomes one day at a time. */
+function useNarrow() {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 639px)")
+    const apply = () => setNarrow(query.matches)
+    apply()
+    query.addEventListener("change", apply)
+    return () => query.removeEventListener("change", apply)
+  }, [])
+  return narrow
+}
+
+/** One day's periods, with the week's days to switch between: a timetable on a phone. */
+function DayList({
+  days,
+  periods,
+  cells,
+  show,
+}: {
+  days: number[]
+  periods: Period[]
+  cells: Cell[]
+  show: (cell: Cell) => string | null | undefined
+}) {
+  const today = ((new Date().getDay() + 6) % 7) + 1
+  const [day, setDay] = useState(days.includes(today) ? today : days[0]!)
+  return (
+    <div className="grid gap-2" data-testid="day-list">
+      <div role="group" aria-label="Day" className="flex gap-1 overflow-x-auto">
+        {days.map((d) => (
+          <Button
+            key={d}
+            size="sm"
+            variant={d === day ? "default" : "outline"}
+            aria-pressed={d === day}
+            onClick={() => setDay(d)}
+          >
+            {dayName(d)}
+          </Button>
+        ))}
+      </div>
+      <ol className="grid rounded-lg border border-hairline bg-card">
+        {periods.map((p) => {
+          const cell = cells.find((c) => c.day === day && c.periodId === p.id)
+          return (
+            <li
+              key={p.id}
+              className={cn(
+                "grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 border-b border-hairline px-3 py-2.5 text-body-sm last:border-0",
+                p.isBreak && "bg-muted/40 text-body"
+              )}
+            >
+              <span className="text-xs text-body tabular-nums">
+                {p.starts}–{p.ends}
+              </span>
+              <span className="min-w-0">
+                {p.isBreak ? (
+                  "Break"
+                ) : cell ? (
+                  <>
+                    <span className="block font-medium text-ink">{cell.subject}</span>
+                    {show(cell) && (
+                      <span className="block text-xs text-body">{show(cell)}</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-caption">Free</span>
+                )}
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
+}
+
 export function WeekGrid({
   days,
   periods,
@@ -74,8 +152,11 @@ export function WeekGrid({
     pending: boolean
   }
 }) {
+  const narrow = useNarrow()
   if (periods.length === 0)
     return <p className="text-body-sm text-body">No periods are set up yet.</p>
+  if (narrow && !edit && days.length > 0)
+    return <DayList days={days} periods={periods} cells={cells} show={show} />
   return (
     <div
       className="overflow-x-auto rounded-lg border border-hairline bg-card"

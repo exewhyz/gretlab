@@ -175,7 +175,15 @@ export function ChildPage({
             >
               {data.absences.map((a, i) => (
                 <li key={i} className="text-body">
-                  <span className="text-ink">{a.day}</span> ·{" "}
+                  <span className="text-ink">
+                    {new Date(`${a.day}T00:00:00Z`).toLocaleDateString(undefined, {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      timeZone: "UTC",
+                    })}
+                  </span>{" "}
+                  ·{" "}
                   {a.status === "late" ? "Late" : "Absent"} · {a.group}
                   {a.period && ` (${a.period})`}
                 </li>
