@@ -158,7 +158,8 @@ check("My submissions page opens a submission", (await s.getByTestId("submission
 const ownUrl = s.url()
 const other = await as("flows-other@example.com")
 await other.goto(ownUrl)
-await other.getByRole("alert").waitFor({ timeout: 15000 })
+// The page's own message, not Next's route announcer (which is an alert too).
+await other.locator('[role="alert"]:not(#__next-route-announcer__)').waitFor({ timeout: 15000 })
 check("another student can't open it", !(await other.getByTestId("submission-verdict").isVisible()))
 
 // ---------- creating a contest, as a teacher
