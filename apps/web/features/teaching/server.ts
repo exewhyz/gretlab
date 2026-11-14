@@ -749,6 +749,38 @@ export async function orgReport(
   }
 }
 
+const REPORT_STUDENTS_PER_PAGE = 100
+
+/**
+ * The report with its student table a page at a time (the Reports screen): figures and the
+ * other tables as before, students filtered (`inactive`: no work this week; `q`: name or
+ * email) and paged on the server, with how many match.
+ */
+export async function orgReportPage(
+  slug: string,
+  user: User,
+  groupId: string | null,
+  opts: { page: number; inactive?: boolean; q?: string }
+) {
+  const report = await orgReport(slug, user, groupId)
+  const term = opts.q?.trim().toLowerCase() ?? ""
+  const matching = report.students.filter(
+    (s) =>
+      (!opts.inactive || !s.activeThisWeek) &&
+      (!term || `${s.name ?? ""} ${s.email}`.toLowerCase().includes(term))
+  )
+  const pages = Math.max(1, Math.ceil(matching.length / REPORT_STUDENTS_PER_PAGE))
+  const page = Math.min(Math.max(1, opts.page), pages)
+  return {
+    ...report,
+    students: matching.slice(
+      (page - 1) * REPORT_STUDENTS_PER_PAGE,
+      page * REPORT_STUDENTS_PER_PAGE
+    ),
+    studentsPage: { total: matching.length, page, pages },
+  }
+}
+
 /** The student table as CSV, defused against spreadsheet formulas. */
 export async function orgReportCsv(
   slug: string,

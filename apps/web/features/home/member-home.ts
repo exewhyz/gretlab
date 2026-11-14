@@ -7,6 +7,7 @@ import { classAttendance, classStream } from "@/features/classes/server"
 import { listContests } from "@/features/contests/server"
 import { type OrgContext } from "@/features/orgs/server"
 import { childOverview } from "@/features/parents/server"
+import { dayOff } from "@/features/holidays/server"
 import { classTimetable } from "@/features/timetable/server"
 import { orgPages } from "@/lib/paths"
 import { DAY_MS, pathName, weekdayOf } from "./home-core"
@@ -67,35 +68,37 @@ export async function studentHome(ctx: OrgContext, user: User) {
   const marked = perGroup.reduce((sum, g) => sum + (g.att?.marked ?? 0), 0)
   const present = perGroup.reduce((sum, g) => sum + (g.att?.present ?? 0), 0)
 
-  // Today's lessons, from the first of their classes with a timetable.
+  // Today's lessons, from the first of their classes with a timetable (none on a day off).
   const weekday = weekdayOf(day)
+  const off = await dayOff(ctx.org, day)
   const week = perGroup.find((g) => g.week && g.week.periods.length)?.week
-  const lessons = week
-    ? week.periods
-        .map((p) => {
-          if (p.isBreak)
-            return {
-              starts: p.starts,
-              ends: p.ends,
-              subject: p.name,
-              teacher: "",
-              isBreak: true,
-            }
-          const slot = week.slots.find(
-            (s) => s.day === weekday && s.periodId === p.id
-          )
-          return slot
-            ? {
+  const lessons =
+    week && !off
+      ? week.periods
+          .map((p) => {
+            if (p.isBreak)
+              return {
                 starts: p.starts,
                 ends: p.ends,
-                subject: slot.subject,
-                teacher: slot.teacher ?? "",
-                isBreak: false,
+                subject: p.name,
+                teacher: "",
+                isBreak: true,
               }
-            : null
-        })
-        .filter((l): l is NonNullable<typeof l> => l !== null)
-    : []
+            const slot = week.slots.find(
+              (s) => s.day === weekday && s.periodId === p.id
+            )
+            return slot
+              ? {
+                  starts: p.starts,
+                  ends: p.ends,
+                  subject: slot.subject,
+                  teacher: slot.teacher ?? "",
+                  isBreak: false,
+                }
+              : null
+          })
+          .filter((l): l is NonNullable<typeof l> => l !== null)
+      : []
   while (lessons[0]?.isBreak) lessons.shift()
   while (lessons.at(-1)?.isBreak) lessons.pop()
 
@@ -161,6 +164,7 @@ export async function studentHome(ctx: OrgContext, user: User) {
     .slice(0, 5)
 
   return {
+    dayOff: off?.label ?? null,
     day,
     classes: seats.map((s) => ({
       id: s.groupId,

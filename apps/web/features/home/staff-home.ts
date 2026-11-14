@@ -5,6 +5,7 @@ import { newApplications } from "@/features/admissions/server"
 import { today } from "@/features/catalog/server"
 import { pendingLeaveCount } from "@/features/leave/server"
 import { heldAnywhere, type OrgContext } from "@/features/orgs/server"
+import { dayOff } from "@/features/holidays/server"
 import { staffToday } from "@/features/staff-attendance/server"
 import { listTraining } from "@/features/training/server"
 import { managedNav } from "./home-core"
@@ -49,7 +50,8 @@ export async function staffHome(ctx: OrgContext) {
   return {
     day,
     links,
-    checkIn: modules.has("staffAttendance"),
+    // No check-in on a day off (a holiday, or not a school day).
+    checkIn: modules.has("staffAttendance") && !(await dayOff(ctx.org, day)),
     waiting: {
       leave:
         modules.has("leave") &&

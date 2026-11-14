@@ -1,12 +1,8 @@
 import { getDb, orgHolidays, sql, type User } from "@workspace/db"
+import { readTimetableSettings } from "@workspace/judge"
 import { z } from "zod"
 
-import {
-  canFor,
-  needFor,
-  orgContext,
-  writeAudit,
-} from "@/features/orgs/server"
+import { canFor, needFor, orgContext, writeAudit } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/route"
 
 /*
@@ -71,7 +67,11 @@ export async function addHoliday(
       86_400_000 +
     1
   if (days > 92)
-    throw new ApiError(400, "too_long", "A holiday can be at most three months.")
+    throw new ApiError(
+      400,
+      "too_long",
+      "A holiday can be at most three months."
+    )
   const [row] = await getDb()
     .insert(orgHolidays)
     .values({ orgId: ctx.org.id, ...input })
@@ -113,7 +113,11 @@ export async function holidayOn(orgId: string, day: string) {
 }
 
 /** Holidays of these organizations touching a span of days (for calendars). */
-export async function holidaysBetween(orgIds: string[], from: string, to: string) {
+export async function holidaysBetween(
+  orgIds: string[],
+  from: string,
+  to: string
+) {
   if (orgIds.length === 0) return []
   return getDb()
     .select({
@@ -131,4 +135,21 @@ export async function holidaysBetween(orgIds: string[], from: string, to: string
         gte(orgHolidays.endsOn, from)
       )
     )
+}
+
+/**
+ * Whether a day is off for an organization, and why: a holiday by name, or not one of its
+ * school days (Timetable › days; Monday to Friday unless set). Homes ask for no registers,
+ * lessons or check-ins on a day off.
+ */
+export async function dayOff(
+  org: { id: string; moduleSettings: unknown },
+  day: string
+): Promise<{ holiday: string | null; label: string } | null> {
+  const holiday = await holidayOn(org.id, day)
+  if (holiday) return { holiday, label: `Holiday: ${holiday}` }
+  const weekday = ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1
+  if (!readTimetableSettings(org.moduleSettings).days.includes(weekday))
+    return { holiday: null, label: "Not a school day" }
+  return null
 }

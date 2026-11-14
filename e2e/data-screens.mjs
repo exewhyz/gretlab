@@ -17,115 +17,406 @@ const SECRET = process.env.NEXTAUTH_SECRET ?? "e2e-only-secret"
 const DB = process.env.E2E_DB ?? "gretlab_test"
 let failures = 0
 const check = (name, ok, detail = "") => {
-  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${ok || detail === "" ? "" : "  -- " + String(detail).slice(0, 300)}`)
+  console.log(
+    `${ok ? "PASS" : "FAIL"}  ${name}${ok || detail === "" ? "" : "  -- " + String(detail).slice(0, 300)}`
+  )
   if (!ok) failures++
 }
-const psql = (q) => execFileSync("docker", ["compose", "-f", ROOT + "docker-compose.yml", "exec", "-T", "postgres", "psql", "-U", "gretlab", "-d", DB, "-Atqc", q]).toString().trim()
+const psql = (q) =>
+  execFileSync("docker", [
+    "compose",
+    "-f",
+    ROOT + "docker-compose.yml",
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "gretlab",
+    "-d",
+    DB,
+    "-Atqc",
+    q,
+  ])
+    .toString()
+    .trim()
 const cleanup = () => {
   psql(`delete from organizations where slug='ds-school'`)
   psql(`delete from users where email like 'ds-%'`)
 }
 cleanup()
-psql(`insert into users(email,name,role) values ('admin@example.com','Admin','admin') on conflict (email) do nothing`)
-for (const h of ["ds-s1", "ds-s2", "ds-t", "ds-lib", "ds-p"]) psql(`insert into users(email,name,role,handle) values ('${h}@example.com','${h} Name','student','${h}')`)
+psql(
+  `insert into users(email,name,role) values ('admin@example.com','Admin','admin') on conflict (email) do nothing`
+)
+for (const h of ["ds-s1", "ds-s2", "ds-t", "ds-lib", "ds-p"])
+  psql(
+    `insert into users(email,name,role,handle) values ('${h}@example.com','${h} Name','student','${h}')`
+  )
 const token = (email) => encode({ token: { email }, secret: SECRET })
 const client = async (email) => {
   const cookie = `next-auth.session-token=${await token(email)}`
   return async (path, { method, body } = {}) => {
-    const res = await fetch(BASE + "/api/v1" + path, { method: method ?? (body === undefined ? "GET" : "POST"), headers: { cookie, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) })
+    const res = await fetch(BASE + "/api/v1" + path, {
+      method: method ?? (body === undefined ? "GET" : "POST"),
+      headers: { cookie, "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
     return { status: res.status, json: await res.json().catch(() => null) }
   }
 }
 const uid = (h) => psql(`select id from users where email='${h}@example.com'`)
 const admin = await client("admin@example.com")
-await admin("/admin/organizations", { body: { name: "Ds School", slug: "ds-school", type: "school", ownerEmail: "ds-o@example.com" } })
+await admin("/admin/organizations", {
+  body: {
+    name: "Ds School",
+    slug: "ds-school",
+    type: "school",
+    ownerEmail: "ds-o@example.com",
+  },
+})
 const O = "/orgs/ds-school"
 const orgId = psql(`select id from organizations where slug='ds-school'`)
 const owner = await client("ds-o@example.com")
 const grade = (await owner(`${O}/groups`, { body: { name: "Ds 6" } })).json
-const a = (await owner(`${O}/groups`, { body: { name: "A", parentId: grade.id } })).json
-const b = (await owner(`${O}/groups`, { body: { name: "B", parentId: grade.id } })).json
-for (const h of ["ds-s1", "ds-s2", "ds-t", "ds-lib", "ds-p"]) psql(`insert into org_members(org_id,user_id,status,joined_via) values ('${orgId}','${uid(h)}','active','created')`)
-await owner(`${O}/groups/${a.id}/members`, { body: { userIds: ["ds-s1", "ds-t"].map(uid) } })
-await owner(`${O}/groups/${b.id}/members`, { body: { userIds: [uid("ds-s2")] } })
+const a = (
+  await owner(`${O}/groups`, { body: { name: "A", parentId: grade.id } })
+).json
+const b = (
+  await owner(`${O}/groups`, { body: { name: "B", parentId: grade.id } })
+).json
+for (const h of ["ds-s1", "ds-s2", "ds-t", "ds-lib", "ds-p"])
+  psql(
+    `insert into org_members(org_id,user_id,status,joined_via) values ('${orgId}','${uid(h)}','active','created')`
+  )
+await owner(`${O}/groups/${a.id}/members`, {
+  body: { userIds: ["ds-s1", "ds-t"].map(uid) },
+})
+await owner(`${O}/groups/${b.id}/members`, {
+  body: { userIds: [uid("ds-s2")] },
+})
 const roles = (await owner(`${O}/roles`)).json
-await owner(`${O}/members/${uid("ds-t")}/roles`, { body: { roleId: roles.find((r) => r.systemKey === "teacher").id, groupId: a.id } })
-await owner(`${O}/members/${uid("ds-lib")}/roles`, { body: { roleId: roles.find((r) => r.name === "Librarian").id, groupId: null } })
-psql(`insert into guardians(org_id,parent_id,student_id) values ('${orgId}','${uid("ds-p")}','${uid("ds-s1")}')`)
+await owner(`${O}/members/${uid("ds-t")}/roles`, {
+  body: {
+    roleId: roles.find((r) => r.systemKey === "teacher").id,
+    groupId: a.id,
+  },
+})
+await owner(`${O}/members/${uid("ds-lib")}/roles`, {
+  body: { roleId: roles.find((r) => r.name === "Librarian").id, groupId: null },
+})
+psql(
+  `insert into guardians(org_id,parent_id,student_id) values ('${orgId}','${uid("ds-p")}','${uid("ds-s1")}')`
+)
 
 // ---------- who counts as a student
 const report = (await owner(`${O}/reports`)).json
 const emails = report?.students.map((s) => s.email) ?? []
-check("Reports counts the two students", report?.summary.students === 2 && emails.includes("ds-s1@example.com") && emails.includes("ds-s2@example.com"), emails.join())
-check("...not the parent, the librarian or the teacher", !emails.some((e) => ["ds-p@example.com", "ds-lib@example.com", "ds-t@example.com"].includes(e)))
+check(
+  "Reports counts the two students",
+  report?.summary.students === 2 &&
+    emails.includes("ds-s1@example.com") &&
+    emails.includes("ds-s2@example.com"),
+  emails.join()
+)
+check(
+  "...not the parent, the librarian or the teacher",
+  !emails.some((e) =>
+    ["ds-p@example.com", "ds-lib@example.com", "ds-t@example.com"].includes(e)
+  )
+)
+const rp = (await owner(`${O}/reports?page=1&inactive=true`)).json
+check(
+  "Reports pages its students on the server",
+  rp?.studentsPage?.total === 2 &&
+    rp.studentsPage.pages === 1 &&
+    rp.students.length === 2 &&
+    rp.summary.students === 2,
+  JSON.stringify(rp?.studentsPage)
+)
+const rq = (await owner(`${O}/reports?page=1&inactive=true&q=ds-s1`)).json
+check(
+  "...and searches them there",
+  rq?.studentsPage?.total === 1 &&
+    rq.students[0]?.email === "ds-s1@example.com",
+  JSON.stringify(rq?.studentsPage)
+)
 
 // ---------- who's who on Members
 const members = (await owner(`${O}/members`)).json ?? []
 const m = (h) => members.find((x) => x.email === `${h}@example.com`)
-check("Members knows whose parent someone is", m("ds-p")?.children.join() === "ds-s1 Name")
-check("...and whose role grants something", m("ds-lib")?.roles.some((r) => r.grants) && !m("ds-s1")?.roles.some((r) => r.grants))
+check(
+  "Members knows whose parent someone is",
+  m("ds-p")?.children.join() === "ds-s1 Name"
+)
+check(
+  "...and whose role grants something",
+  m("ds-lib")?.roles.some((r) => r.grants) &&
+    !m("ds-s1")?.roles.some((r) => r.grants)
+)
 
 // ---------- a big organization's members come a page at a time
-psql(`insert into users(email,name,role,handle) select 'ds-bulk' || n || '@example.com', 'ds Bulk ' || lpad(n::text, 3, '0'), 'student', 'ds-bulk-' || n from generate_series(1, 120) n`)
-psql(`insert into org_members(org_id,user_id,status,joined_via) select '${orgId}', id, 'active', 'created' from users where email like 'ds-bulk%'`)
+psql(
+  `insert into users(email,name,role,handle) select 'ds-bulk' || n || '@example.com', 'ds Bulk ' || lpad(n::text, 3, '0'), 'student', 'ds-bulk-' || n from generate_series(1, 120) n`
+)
+psql(
+  `insert into org_members(org_id,user_id,status,joined_via) select '${orgId}', id, 'active', 'created' from users where email like 'ds-bulk%'`
+)
 const p1 = (await owner(`${O}/members?page=1`)).json
 const p2 = (await owner(`${O}/members?page=2`)).json
-check("Members comes a hundred at a time, with the total", p1?.members.length === 100 && p1.pages === 2 && p1.total === p2?.total && p2.members.length === p1.total - 100, JSON.stringify({ n: p1?.members.length, total: p1?.total, pages: p1?.pages }))
-check("...and counts each kind across all of them", p1?.counts.all === p1?.total && p1.counts.parent === 1 && p1.counts.learner === 2, JSON.stringify(p1?.counts))
-check("...filtering by kind on the server", (await owner(`${O}/members?page=1&kind=parent`)).json?.members.map((m) => m.email).join() === "ds-p@example.com")
-check("without a page, everyone at once (no cap)", (await owner(`${O}/members`)).json?.length === p1?.total)
+check(
+  "Members comes a hundred at a time, with the total",
+  p1?.members.length === 100 &&
+    p1.pages === 2 &&
+    p1.total === p2?.total &&
+    p2.members.length === p1.total - 100,
+  JSON.stringify({ n: p1?.members.length, total: p1?.total, pages: p1?.pages })
+)
+check(
+  "...and counts each kind across all of them",
+  p1?.counts.all === p1?.total &&
+    p1.counts.parent === 1 &&
+    p1.counts.learner === 2,
+  JSON.stringify(p1?.counts)
+)
+check(
+  "...filtering by kind on the server",
+  (await owner(`${O}/members?page=1&kind=parent`)).json?.members
+    .map((m) => m.email)
+    .join() === "ds-p@example.com"
+)
+check(
+  "without a page, everyone at once (no cap)",
+  (await owner(`${O}/members`)).json?.length === p1?.total
+)
 psql(`delete from users where email like 'ds-bulk%'`)
 
 // ---------- parents and the platform's organizations, paged and searched on the server
 const parentsPage = (await owner(`${O}/parents?page=1&q=ds-s1`)).json
-check("parent links come a page at a time, searched", parentsPage?.links.length === 1 && parentsPage.total === 1 && parentsPage.pages === 1, JSON.stringify(parentsPage).slice(0, 200))
-check("...and none for a search that matches nothing", (await owner(`${O}/parents?page=1&q=nobody-at-all`)).json?.total === 0)
-check("...and all at once without a page", Array.isArray((await owner(`${O}/parents`)).json?.links))
+check(
+  "parent links come a page at a time, searched",
+  parentsPage?.links.length === 1 &&
+    parentsPage.total === 1 &&
+    parentsPage.pages === 1,
+  JSON.stringify(parentsPage).slice(0, 200)
+)
+check(
+  "...and none for a search that matches nothing",
+  (await owner(`${O}/parents?page=1&q=nobody-at-all`)).json?.total === 0
+)
+check(
+  "...and all at once without a page",
+  Array.isArray((await owner(`${O}/parents`)).json?.links)
+)
 const orgsPage = (await admin(`/admin/organizations?page=1&q=Ds%20School`)).json
-check("the platform's organizations are searched and paged in the database", orgsPage?.organizations.some((o) => o.slug === "ds-school") && orgsPage.total >= 1 && orgsPage.page === 1, JSON.stringify(orgsPage).slice(0, 200))
-check("...and the whole list without a page, as before", Array.isArray((await admin("/admin/organizations")).json))
+check(
+  "the platform's organizations are searched and paged in the database",
+  orgsPage?.organizations.some((o) => o.slug === "ds-school") &&
+    orgsPage.total >= 1 &&
+    orgsPage.page === 1,
+  JSON.stringify(orgsPage).slice(0, 200)
+)
+check(
+  "...and the whole list without a page, as before",
+  Array.isArray((await admin("/admin/organizations")).json)
+)
 
 // ---------- attendance across the school
 const day = (await owner(`${O}/attendance`)).json.today
-await owner(`${O}/attendance/register`, { method: "PUT", body: { groupId: a.id, day, period: "", marks: [{ userId: uid("ds-s1"), status: "absent" }] } })
-await owner(`${O}/attendance/register`, { method: "PUT", body: { groupId: b.id, day, period: "", marks: [{ userId: uid("ds-s2"), status: "present" }] } })
-const overview = (await owner(`${O}/attendance/overview?month=${day.slice(0, 7)}`)).json
+await owner(`${O}/attendance/register`, {
+  method: "PUT",
+  body: {
+    groupId: a.id,
+    day,
+    period: "",
+    marks: [{ userId: uid("ds-s1"), status: "absent" }],
+  },
+})
+await owner(`${O}/attendance/register`, {
+  method: "PUT",
+  body: {
+    groupId: b.id,
+    day,
+    period: "",
+    marks: [{ userId: uid("ds-s2"), status: "present" }],
+  },
+})
+const overview = (
+  await owner(`${O}/attendance/overview?month=${day.slice(0, 7)}`)
+).json
 const rowA = overview?.rows.find((r) => r.id === a.id)
-check("the month overview has every section, with days taken and the share present", overview?.rows.length === 2 && rowA?.days === 1 && rowA.percent === 0 && rowA.below === 1, JSON.stringify(overview?.rows))
-check("...and only sections, not the grade above them", !overview?.rows.some((r) => r.id === grade.id))
+check(
+  "the month overview has every section, with days taken and the share present",
+  overview?.rows.length === 2 &&
+    rowA?.days === 1 &&
+    rowA.percent === 0 &&
+    rowA.below === 1,
+  JSON.stringify(overview?.rows)
+)
+check(
+  "...and only sections, not the grade above them",
+  !overview?.rows.some((r) => r.id === grade.id)
+)
 const teacher = await client("ds-t@example.com")
-check("a class teacher's overview is their own class", (await teacher(`${O}/attendance/overview?month=${day.slice(0, 7)}`)).json?.rows.map((r) => r.id).join() === a.id)
-check("a bad month is refused", (await owner(`${O}/attendance/overview?month=soon`)).status === 400)
+check(
+  "a class teacher's overview is their own class",
+  (
+    await teacher(`${O}/attendance/overview?month=${day.slice(0, 7)}`)
+  ).json?.rows
+    .map((r) => r.id)
+    .join() === a.id
+)
+check(
+  "a bad month is refused",
+  (await owner(`${O}/attendance/overview?month=soon`)).status === 400
+)
 
 // ---------- the coding lab is a module
-check("the coding lab is on for a new school", (await owner(`${O}/shell`)).json?.modules.includes("coding"))
+check(
+  "the coding lab is on for a new school",
+  (await owner(`${O}/shell`)).json?.modules.includes("coding")
+)
 await owner(O, { method: "PATCH", body: { modules: { coding: false } } })
 const off = (await owner(`${O}/shell`)).json
-check("switched off, it leaves the organization", !off?.modules.includes("coding") && (await owner(`${O}/assignments`)).status === 404 && (await owner(`${O}/problems`)).status === 404)
-check("...and its class page offers no new assignment", (await owner(`${O}/classes/${a.id}`)).json?.can?.assignments === false)
+check(
+  "switched off, it leaves the organization",
+  !off?.modules.includes("coding") &&
+    (await owner(`${O}/assignments`)).status === 404 &&
+    (await owner(`${O}/problems`)).status === 404
+)
+check(
+  "...and its class page offers no new assignment",
+  (await owner(`${O}/classes/${a.id}`)).json?.can?.assignments === false
+)
 await owner(O, { method: "PATCH", body: { modules: { coding: true } } })
-check("switched back on, it's back", (await owner(`${O}/assignments`)).status === 200)
+check(
+  "switched back on, it's back",
+  (await owner(`${O}/assignments`)).status === 200
+)
 
 // ---------- holidays and the calendar
 const t1 = await client("ds-s1@example.com")
-check("only those who run the settings add holidays", (await t1(`${O}/holidays`, { body: { name: "x", startsOn: day, endsOn: day } })).status === 403)
-check("the last day can't come before the first", (await owner(`${O}/holidays`, { body: { name: "Bad", startsOn: day, endsOn: "2000-01-01" } })).status === 400)
-const hol = await owner(`${O}/holidays`, { body: { name: "Ds Founders Day", startsOn: day, endsOn: day } })
-check("the owner adds a holiday for today", hol.status === 200, JSON.stringify(hol.json))
-check("everyone in it can read the list", (await t1(`${O}/holidays`)).json?.holidays.some((h) => h.name === "Ds Founders Day"))
+check(
+  "only those who run the settings add holidays",
+  (
+    await t1(`${O}/holidays`, {
+      body: { name: "x", startsOn: day, endsOn: day },
+    })
+  ).status === 403
+)
+check(
+  "the last day can't come before the first",
+  (
+    await owner(`${O}/holidays`, {
+      body: { name: "Bad", startsOn: day, endsOn: "2000-01-01" },
+    })
+  ).status === 400
+)
+const hol = await owner(`${O}/holidays`, {
+  body: { name: "Ds Founders Day", startsOn: day, endsOn: day },
+})
+check(
+  "the owner adds a holiday for today",
+  hol.status === 200,
+  JSON.stringify(hol.json)
+)
+check(
+  "everyone in it can read the list",
+  (await t1(`${O}/holidays`)).json?.holidays.some(
+    (h) => h.name === "Ds Founders Day"
+  )
+)
 const home = (await owner(`${O}/home`)).json
-check("today's holiday is named on the home, with no registers asked for", home?.admin?.holiday === "Ds Founders Day" && home.admin.tiles.present?.open === 0, JSON.stringify(home?.admin?.tiles))
+check(
+  "today's holiday is named on the home, with no registers asked for",
+  home?.admin?.holiday === "Ds Founders Day" &&
+    home.admin.tiles.present?.open === 0,
+  JSON.stringify(home?.admin?.tiles)
+)
 const cal = (await t1("/me/calendar")).json?.events ?? []
-check("it's on a student's calendar as a whole day", cal.some((e) => e.kind === "holiday" && e.title === "Holiday: Ds Founders Day" && e.allDay))
-check("...and on their parent's", ((await client("ds-p@example.com").then((c) => c("/me/calendar"))).json?.events ?? []).some((e) => e.kind === "holiday"))
+check(
+  "it's on a student's calendar as a whole day",
+  cal.some(
+    (e) =>
+      e.kind === "holiday" && e.title === "Holiday: Ds Founders Day" && e.allDay
+  )
+)
+check(
+  "...and on their parent's",
+  (
+    (await client("ds-p@example.com").then((c) => c("/me/calendar"))).json
+      ?.events ?? []
+  ).some((e) => e.kind === "holiday")
+)
 await owner(`${O}/holidays/${hol.json.id}`, { method: "DELETE" })
-check("removing it takes it off", !((await t1("/me/calendar")).json?.events ?? []).some((e) => e.kind === "holiday"))
+check(
+  "removing it takes it off",
+  !((await t1("/me/calendar")).json?.events ?? []).some(
+    (e) => e.kind === "holiday"
+  )
+)
+
+// ---------- a day that isn't a school day (a weekend, by the timetable's days)
+{
+  const weekday = ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1
+  const days = [1, 2, 3, 4, 5, 6, 7].filter((d) => d !== weekday)
+  const P = [
+    { name: "Period 1", starts: "09:00", ends: "09:45", isBreak: false },
+  ]
+  const set = await owner(`${O}/timetable/periods`, {
+    method: "PUT",
+    body: { days, periods: P },
+  })
+  check(
+    "the school's days leave out today",
+    set.status === 200,
+    JSON.stringify(set.json)
+  )
+  const h = (await owner(`${O}/home`)).json
+  check(
+    "the admin's home says it isn't a school day and asks for no registers",
+    h?.admin?.dayOff === "Not a school day" &&
+      h.admin.holiday === null &&
+      h.admin.tiles.present?.open === 0,
+    JSON.stringify({ dayOff: h?.admin?.dayOff, tiles: h?.admin?.tiles })
+  )
+  const th = (await teacher(`${O}/home`)).json?.teacher
+  check(
+    "...nor does the teacher's: no registers, no lessons, no check-in",
+    th?.dayOff === "Not a school day" &&
+      th.tiles.toTake === 0 &&
+      th.periods.length === 0 &&
+      th.checkIn === false,
+    JSON.stringify({
+      dayOff: th?.dayOff,
+      tiles: th?.tiles,
+      checkIn: th?.checkIn,
+    })
+  )
+  await owner(`${O}/timetable/periods`, {
+    method: "PUT",
+    body: { days: [1, 2, 3, 4, 5, 6, 7], periods: P },
+  })
+  const back = (await owner(`${O}/home`)).json
+  check(
+    "on a school day, it's an ordinary day again",
+    back?.admin?.dayOff === null &&
+      (await teacher(`${O}/home`)).json?.teacher?.dayOff === null,
+    JSON.stringify(back?.admin?.tiles)
+  )
+}
 
 // ---------- the pages
 const browser = await chromium.launch()
 const view = async (email, width = 1440) => {
   const ctx = await browser.newContext({ viewport: { width, height: 1000 } })
-  await ctx.addCookies([{ name: "next-auth.session-token", value: await token(email), domain: new URL(BASE).hostname, path: "/" }])
+  await ctx.addCookies([
+    {
+      name: "next-auth.session-token",
+      value: await token(email),
+      domain: new URL(BASE).hostname,
+      path: "/",
+    },
+  ])
   return ctx.newPage()
 }
 {
@@ -133,20 +424,49 @@ const view = async (email, width = 1440) => {
   await p.goto(`${BASE}${O}/manage/members`)
   const kinds = p.getByTestId("member-kinds")
   await kinds.waitFor({ timeout: 30000 })
-  check("Members shows how many of each", /Students\s*2/.test(await kinds.innerText()) && /Parents\s*1/.test(await kinds.innerText()), await kinds.innerText())
+  check(
+    "Members shows how many of each",
+    /Students\s*2/.test(await kinds.innerText()) &&
+      /Parents\s*1/.test(await kinds.innerText()),
+    await kinds.innerText()
+  )
   await kinds.getByRole("button", { name: /Parents/ }).click()
   // The filtered page comes from the server; the previous one stays until it does.
-  await p.waitForFunction(() => document.querySelectorAll('[data-testid="member-row"]').length === 1, null, { timeout: 15000 }).catch(() => {})
-  check("...and filters to them", (await p.getByTestId("member-row").count()) === 1 && (await p.getByTestId("member-row").innerText()).includes("Parent of ds-s1 Name"))
+  await p
+    .waitForFunction(
+      () =>
+        document.querySelectorAll('[data-testid="member-row"]').length === 1,
+      null,
+      { timeout: 15000 }
+    )
+    .catch(() => {})
+  check(
+    "...and filters to them",
+    (await p.getByTestId("member-row").count()) === 1 &&
+      (await p.getByTestId("member-row").innerText()).includes(
+        "Parent of ds-s1 Name"
+      )
+  )
   await p.goto(`${BASE}${O}/manage/attendance-report`)
   await p.getByTestId("attendance-overview").waitFor({ timeout: 30000 })
-  check("the attendance report opens on every class, lowest first", (await p.getByTestId("overview-row").count()) === 2 && (await p.getByTestId("overview-row").first().innerText()).includes("A"))
-  await p.getByTestId("overview-row").first().getByRole("button", { name: "Open" }).click()
+  check(
+    "the attendance report opens on every class, lowest first",
+    (await p.getByTestId("overview-row").count()) === 2 &&
+      (await p.getByTestId("overview-row").first().innerText()).includes("A")
+  )
+  await p
+    .getByTestId("overview-row")
+    .first()
+    .getByRole("button", { name: "Open" })
+    .click()
   await p.getByTestId("attendance-report").waitFor({ timeout: 30000 })
   check("...and opens a class's register grid from there", true)
   await p.goto(`${BASE}${O}/manage/reports`)
   await p.getByTestId("stats").waitFor({ timeout: 30000 })
-  check("Reports leads with its figures in one line", (await p.getByTestId("stats").innerText()).includes("Students"))
+  check(
+    "Reports leads with its figures in one line",
+    (await p.getByTestId("stats").innerText()).includes("Students")
+  )
   await p.screenshot({ path: SHOTS + "data-reports.png", fullPage: true })
   await p.context().close()
 }
@@ -154,19 +474,32 @@ const view = async (email, width = 1440) => {
   const p = await view("ds-p@example.com", 390)
   await p.goto(`${BASE}/home`)
   await p.getByTestId("member-home").waitFor({ timeout: 30000 })
-  check("a parent's home leads with their school and child", (await p.getByTestId("member-child").count()) === 1)
+  check(
+    "a parent's home leads with their school and child",
+    (await p.getByTestId("member-child").count()) === 1
+  )
   // With nothing to code the coding lab is one line; with open work (earlier suites may have
   // published platform-wide assignments), the work tiles show, as for anyone.
   const dash = (await (await client("ds-p@example.com"))("/me/dashboard")).json
-  const quiet = dash?.work.open === 0 && dash.work.overdue === 0 && (dash.practice?.solved ?? 0) === 0
+  const quiet =
+    dash?.work.open === 0 &&
+    dash.work.overdue === 0 &&
+    (dash.practice?.solved ?? 0) === 0
   check(
     "...and keeps the coding lab to one line when there's nothing to code",
     quiet
-      ? (await p.getByTestId("coding-invite").count()) === (dash.features.practice ? 1 : 0) && (await p.getByTestId("member-tile").count()) === 0
+      ? (await p.getByTestId("coding-invite").count()) ===
+          (dash.features.practice ? 1 : 0) &&
+          (await p.getByTestId("member-tile").count()) === 0
       : (await p.getByTestId("member-tile").count()) > 0,
     JSON.stringify(dash?.work)
   )
-  check("...with no sideways scrolling", await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+  check(
+    "...with no sideways scrolling",
+    await p.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth
+    )
+  )
   await p.screenshot({ path: SHOTS + "data-parent-home.png", fullPage: true })
   await p.context().close()
 }

@@ -119,7 +119,7 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
     <div className="grid gap-5" data-testid="admin-home">
       <Greeting
         day={data.day}
-        holiday={data.holiday}
+        dayOff={data.dayOff}
         title={first ? `${greeting()}, ${first}` : greeting()}
         actions={
           <>
@@ -131,7 +131,7 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
                 Add {terms.learners.toLowerCase()}
               </Link>
             )}
-            {manages("attendance") && (
+            {manages("attendance") && !data.dayOff && (
               <Link href={`${manage}/attendance`} className={buttonVariants()}>
                 Take attendance
               </Link>
@@ -210,7 +210,11 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
                 ? `${Math.round((100 * present.present) / present.of)}%`
                 : "—"
             }
-            hint={`${present.present} of ${present.of}${present.open ? ` · ${present.open} registers open` : ""}`}
+            hint={
+              data.dayOff
+                ? data.dayOff
+                : `${present.present} of ${present.of}${present.open ? ` · ${present.open} registers open` : ""}`
+            }
             tone="primary"
           />
         ) : (
@@ -245,7 +249,14 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
             )}
           </CardHeader>
           <CardContent>
-            {data.classes.length === 0 ? (
+            {data.dayOff ? (
+              <p
+                className="text-body-sm text-muted-foreground"
+                data-testid="no-registers"
+              >
+                No registers today: {data.dayOff.toLowerCase()}.
+              </p>
+            ) : data.classes.length === 0 ? (
               <p className="text-body-sm text-muted-foreground">
                 No classes with students yet.
               </p>

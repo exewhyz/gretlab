@@ -20,7 +20,7 @@ import { KINDS, kindTerms, readAdmissionSettings } from "@workspace/judge"
 
 import { newApplications } from "@/features/admissions/server"
 import { today } from "@/features/catalog/server"
-import { holidayOn } from "@/features/holidays/server"
+import { dayOff } from "@/features/holidays/server"
 import { pendingLeaveCount } from "@/features/leave/server"
 import { type OrgContext } from "@/features/orgs/server"
 import { orgPages } from "@/lib/paths"
@@ -349,9 +349,9 @@ export async function adminHome(ctx: OrgContext) {
       : []),
   ]
 
-  // On a holiday no register is expected, so none is "not taken".
-  const holiday = await holidayOn(ctx.org.id, day)
-  const notTaken = holiday ? [] : rows.filter((r) => !r.taken)
+  // On a day off (a holiday, or not a school day) no register is expected.
+  const off = await dayOff(ctx.org, day)
+  const notTaken = off ? [] : rows.filter((r) => !r.taken)
   const attention = [
     ...(newApps > 0
       ? [
@@ -472,7 +472,9 @@ export async function adminHome(ctx: OrgContext) {
         ? { present: presentToday, of: markedToday, open: notTaken.length }
         : null,
     },
-    holiday,
+    holiday: off?.holiday ?? null,
+    /** Why today is off ("Holiday: Diwali", "Not a school day"), or null on a school day. */
+    dayOff: off?.label ?? null,
     steps: reachable(ctx, steps),
     classes: modules.has("attendance") ? rows : [],
     trend,

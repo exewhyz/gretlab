@@ -1,7 +1,7 @@
 import { type User } from "@workspace/db"
 
 import { today } from "@/features/catalog/server"
-import { holidayOn } from "@/features/holidays/server"
+import { dayOff } from "@/features/holidays/server"
 import { pendingLeaveCount } from "@/features/leave/server"
 import { type OrgContext } from "@/features/orgs/server"
 import { papersToMark } from "@/features/results/server"
@@ -45,7 +45,9 @@ export async function teacherHome(ctx: OrgContext, user: User) {
     groupId: string | null
     isBreak: boolean
   }[] = []
-  if (modules.has("timetable")) {
+  // A day off (a holiday, or not a school day): no lessons, registers or check-in.
+  const off = await dayOff(ctx.org, day)
+  if (modules.has("timetable") && !off) {
     const [all, slots] = await Promise.all([
       periodsOf(ctx.org.id),
       slotsOf(ctx.org.id, null, user.id),
@@ -67,7 +69,9 @@ export async function teacherHome(ctx: OrgContext, user: User) {
           time: `${p.starts}–${p.ends}`,
           title: `${pathName(ctx, slot.groupId)} · ${slot.subject}`,
           detail: [
-            slot.room && `Room ${slot.room}`,
+            // Rooms are often named "Room 601" already.
+            slot.room &&
+              (/^room\b/i.test(slot.room) ? slot.room : `Room ${slot.room}`),
             `${byGroup.get(slot.groupId)?.length ?? 0} students`,
           ]
             .filter(Boolean)
@@ -109,9 +113,8 @@ export async function teacherHome(ctx: OrgContext, user: User) {
   }
   low.sort((a, b) => a.percent - b.percent)
 
-  const holiday = await holidayOn(ctx.org.id, day)
   const toTake =
-    modules.has("attendance") && !holiday ? classes.filter((c) => !c.taken) : []
+    modules.has("attendance") && !off ? classes.filter((c) => !c.taken) : []
   // The newer processes: marks still to enter in their subjects, leave waiting for them.
   const [toMark, leaveWaiting] = await Promise.all([
     papersToMark(ctx),
@@ -119,7 +122,7 @@ export async function teacherHome(ctx: OrgContext, user: User) {
   ])
   return {
     day,
-    checkIn: modules.has("staffAttendance"),
+    checkIn: modules.has("staffAttendance") && !off,
     tiles: {
       lessons: periods.filter((p) => !p.isBreak).length,
       toTake: toTake.length,
@@ -168,6 +171,7 @@ export async function teacherHome(ctx: OrgContext, user: User) {
     ]),
     classes,
     attendanceOn: modules.has("attendance"),
-    holiday,
+    holiday: off?.holiday ?? null,
+    dayOff: off?.label ?? null,
   }
 }

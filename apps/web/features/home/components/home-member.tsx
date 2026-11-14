@@ -77,6 +77,7 @@ export function StudentHome({
     <div className="grid gap-5" data-testid="student-home">
       <Greeting
         day={data.day}
+        dayOff={data.dayOff}
         title={first ? `Hi ${first}, here's your week` : "Your week"}
       />
 
@@ -168,7 +169,11 @@ export function StudentHome({
               {data.lessons.length === 0 ? (
                 <Empty className="border border-dashed border-hairline">
                   <EmptyHeader>
-                    <EmptyTitle>No lessons on the timetable today</EmptyTitle>
+                    <EmptyTitle>
+                      {data.dayOff
+                        ? `No lessons: ${data.dayOff.toLowerCase()}`
+                        : "No lessons on the timetable today"}
+                    </EmptyTitle>
                     <EmptyDescription>
                       Your {terms.groups.toLowerCase()}&apos; pages have their
                       work and notices.

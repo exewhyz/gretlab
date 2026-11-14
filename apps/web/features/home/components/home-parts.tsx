@@ -67,23 +67,23 @@ export function Greeting({
   day,
   title,
   actions,
-  holiday,
+  dayOff,
 }: {
   day: string
   title: string
   actions?: React.ReactNode
-  /** Today's holiday, if the organization is closed. */
-  holiday?: string | null
+  /** Why today is off ("Holiday: Diwali", "Not a school day"), if it is. */
+  dayOff?: string | null
 }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
         <p className="text-body-sm text-muted-foreground">
           {longDay(day)}
-          {holiday && (
-            <span data-testid="holiday-today">
+          {dayOff && (
+            <span data-testid="day-off">
               {" "}
-              · <span className="font-medium text-ink">Holiday: {holiday}</span>
+              · <span className="font-medium text-ink">{dayOff}</span>
             </span>
           )}
         </p>

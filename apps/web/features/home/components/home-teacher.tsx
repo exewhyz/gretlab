@@ -57,7 +57,7 @@ export function TeacherHome({
     <div className="grid gap-5" data-testid="teacher-home">
       <Greeting
         day={data.day}
-        holiday={data.holiday}
+        dayOff={data.dayOff}
         title={`${terms.instructor === "Mentor" ? "Mentoring" : terms.instructor === "Manager" ? "Your team" : "Teaching"} today`}
       />
       {data.checkIn && <CheckInCard slug={slug} />}
