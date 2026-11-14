@@ -22,6 +22,7 @@ import {
 } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { today } from "@/features/catalog/server"
 import { rolePermissions } from "@/features/orgs/access"
 import {
@@ -121,7 +122,7 @@ async function staffOf(ctx: OrgContext) {
     if (!s.roles.includes(r.role)) s.roles.push(r.role)
     byId.set(r.id, s)
   }
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+  return [...byId.values()].sort((a, b) => byName(a.name, b.name))
 }
 
 /** Staff on approved leave each day of a span, with the kind's key. */

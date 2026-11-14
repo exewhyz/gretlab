@@ -37,6 +37,7 @@ import {
   rulesOf,
   saveCourseOutcomes,
 } from "@/features/outcomes/server"
+import { byName } from "@/lib/by-name"
 import type { CourseOutcomesInput } from "@/features/outcomes/schemas"
 import { listContests } from "@/features/contests/server"
 import { accessTo, rolePermissions, viewpoint } from "@/features/orgs/access"
@@ -173,7 +174,7 @@ export async function studentsIn(cc: ClassContext) {
   const teachers = new Set((await teachersOf(cc)).map((t) => t.id))
   return rows
     .filter((r) => !teachers.has(r.id))
-    .sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email))
+    .sort((a, b) => byName(a.name ?? a.email, b.name ?? b.email))
 }
 
 /** People with a teaching role covering this class, named for its page and its discussion. */
@@ -269,7 +270,7 @@ function teachersAmong(
     )
     seen.set(r.id, t)
   }
-  return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
+  return [...seen.values()].sort((a, b) => byName(a.name, b.name))
 }
 
 /* ---------- the class ---------- */
@@ -298,7 +299,7 @@ export async function classOverview(slug: string, user: User, groupId: string) {
           .map((s) => s.userId)
       ).size,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+    .sort((a, b) => byName(a.name, b.name))
   return {
     org: { slug: ctx.org.slug, name: ctx.org.name },
     group: {
@@ -717,9 +718,9 @@ export async function myClasses(user: User) {
             level: org.levels[path.length - 1] ?? null,
           }
         })
-        .sort((a, b) => a.path.localeCompare(b.path)),
+        .sort((a, b) => byName(a.path, b.path)),
     }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => byName(a.name, b.name))
 }
 
 /* ---------- outcomes ---------- */

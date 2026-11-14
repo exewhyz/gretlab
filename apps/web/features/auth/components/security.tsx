@@ -84,6 +84,39 @@ export function SecuritySettings() {
         >
           {s.enabled ? `On since ${formatDate(s.enabledAt!)}.` : "Off."}
         </p>
+        {/* Setting a method up is one focused step: a dialog over the page. */}
+        <Dialog
+          open={setting !== null}
+          onOpenChange={(open) => !open && setSetting(null)}
+        >
+          <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>
+                {setting === "email"
+                  ? "Turn on codes by email"
+                  : "Set up an authenticator app"}
+              </DialogTitle>
+              <DialogDescription>
+                {setting === "email"
+                  ? `We'll send a code to ${s.email}; enter it to confirm.`
+                  : "Scan the code with your app, keep the backup codes somewhere safe, then enter the code the app shows."}
+              </DialogDescription>
+            </DialogHeader>
+            {setting === "app" && (
+              <AppSetup
+                onDone={() => (setSetting(null), refresh())}
+                onCancel={() => setSetting(null)}
+              />
+            )}
+            {setting === "email" && (
+              <EmailSetup
+                address={s.email}
+                onDone={() => (setSetting(null), refresh())}
+                onCancel={() => setSetting(null)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
         <div className="grid divide-y divide-hairline rounded-md border border-hairline">
           <MethodRow
             title="Authenticator app"
@@ -92,14 +125,7 @@ export function SecuritySettings() {
             onAdd={() => setSetting("app")}
             onRemove={() => setDialog({ kind: "remove", method: "app" })}
             testId="method-app"
-          >
-            {setting === "app" && (
-              <AppSetup
-                onDone={() => (setSetting(null), refresh())}
-                onCancel={() => setSetting(null)}
-              />
-            )}
-          </MethodRow>
+          />
           {(s.emailAvailable || s.methods.email) && (
             <MethodRow
               title="Codes by email"
@@ -108,15 +134,7 @@ export function SecuritySettings() {
               onAdd={() => setSetting("email")}
               onRemove={() => setDialog({ kind: "remove", method: "email" })}
               testId="method-email"
-            >
-              {setting === "email" && (
-                <EmailSetup
-                  address={s.email}
-                  onDone={() => (setSetting(null), refresh())}
-                  onCancel={() => setSetting(null)}
-                />
-              )}
-            </MethodRow>
+            />
           )}
         </div>
         {s.enabled && (

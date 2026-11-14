@@ -8,6 +8,7 @@ import {
 } from "@workspace/db"
 import { describeReason, warningFor, WARNING_RULES } from "@workspace/judge"
 
+import { byName } from "@/lib/by-name"
 import { getGradebook } from "@/features/assignments/server"
 import { notify } from "@/features/notifications/server"
 import { groupsFor, needFor, writeAudit } from "@/features/orgs/server"
@@ -32,7 +33,7 @@ export async function classWarnings(slug: string, user: User, groupId: string) {
     students: list
       .filter((s) => s.level !== null)
       .map(({ id, name, email, level, reasons }) => ({ id, name, email, level, reasons }))
-      .sort((a, b) => rank[a.level!] - rank[b.level!] || a.name.localeCompare(b.name)),
+      .sort((a, b) => rank[a.level!] - rank[b.level!] || byName(a.name, b.name)),
     total,
   }
 }

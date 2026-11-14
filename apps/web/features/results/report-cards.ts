@@ -27,6 +27,7 @@ import {
 } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { pathName } from "@/features/campus/people"
 import { notify } from "@/features/notifications/server"
 import { writeAudit, type OrgContext } from "@/features/orgs/server"
@@ -618,7 +619,7 @@ export async function composeCards(
     ),
   ]
     .map(([subjectId, name]) => ({ subjectId, name }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => byName(a.name, b.name))
   return students.map((student) => {
     const id = student.id
     const mine = notes.filter((n) => n.userId === id)

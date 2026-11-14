@@ -26,6 +26,7 @@ import {
 } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { pathName } from "@/features/campus/people"
 import { groupChain, writeAudit } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/errors"
@@ -495,7 +496,7 @@ export async function getExam(slug: string, user: User, id: string) {
           }
         }),
     }))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+    .sort((a, b) => byName(a.name, b.name))
   const setup = canSetup(ctx)
   return {
     exam: {
@@ -516,9 +517,7 @@ export async function getExam(slug: string, user: User, id: string) {
       ? ctx.groups
           .filter((g) => isLeaf(ctx, g.id))
           .map((g) => ({ id: g.id, name: pathName(ctx, g.id) }))
-          .sort((a, b) =>
-            a.name.localeCompare(b.name, undefined, { numeric: true })
-          )
+          .sort((a, b) => byName(a.name, b.name))
       : [],
     grades: setup
       ? ctx.groups

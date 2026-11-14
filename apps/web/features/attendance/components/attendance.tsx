@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { byName } from "@/lib/by-name"
 import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
 import {
   Card,
@@ -356,8 +357,7 @@ function MonthOverview({
       <p className="text-body-sm text-body">No classes to report on yet.</p>
     )
   const rows = [...data.rows].sort(
-    (a, b) =>
-      (a.percent ?? 101) - (b.percent ?? 101) || a.path.localeCompare(b.path)
+    (a, b) => (a.percent ?? 101) - (b.percent ?? 101) || byName(a.path, b.path)
   )
   const below = taken.reduce((n, r) => n + r.below, 0)
   const all = taken.filter((r) => r.percent !== null)

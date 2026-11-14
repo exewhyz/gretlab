@@ -1,5 +1,7 @@
 "use client"
 
+import { XIcon } from "@phosphor-icons/react"
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { AttainmentRules } from "@workspace/judge"
 import Link from "next/link"
@@ -8,6 +10,7 @@ import { useState } from "react"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { EditorSheet } from "@/components/editor-sheet"
 import { FormMessage, SelectInput, TextInput } from "@/components/form"
 import { Loading, Table } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
@@ -43,19 +46,17 @@ export function ClassOutcomes({ slug, groupId }: { slug: string; groupId: string
   const [editing, setEditing] = useState(false)
   if (!data) return <Loading error={error} />
 
-  if (editing) {
-    return (
-      <OutcomeEditor
-        slug={slug}
-        groupId={groupId}
-        report={data}
-        onDone={() => setEditing(false)}
-      />
-    )
-  }
-
   return (
     <div className="grid gap-5" data-testid="class-outcomes">
+      {/* Editing opens beside the report, which stays as it was until saved. */}
+      {editing && (
+        <OutcomeEditor
+          slug={slug}
+          groupId={groupId}
+          report={data}
+          onDone={() => setEditing(false)}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="max-w-2xl text-caption">
           A student reaches a CO with {data.rules.threshold}% of the marks on problems
@@ -239,8 +240,16 @@ function OutcomeEditor({
   const pos = report.programOutcomes
 
   return (
-    <div className="grid gap-3" data-testid="outcome-editor">
-      <h3 className="text-title-sm text-ink">Course outcomes</h3>
+    <EditorSheet
+      title="Course outcomes"
+      description="What students of this class should be able to do, and which program outcomes each supports."
+      error={message}
+      submitLabel="Save outcomes"
+      submitDisabled={save.isPending}
+      onSubmit={() => save.mutate()}
+      onClose={onDone}
+      testId="outcome-editor"
+    >
       {pos.length === 0 && (
         <p className="text-caption">
           Your organization has no program outcomes yet, so there&apos;s nothing to map to.
@@ -276,7 +285,7 @@ function OutcomeEditor({
               aria-label={`Remove ${row.code || "outcome"}`}
               onClick={() => setRows((all) => all.filter((r) => r.key !== row.key))}
             >
-              ×
+              <XIcon />
             </Button>
           </div>
           {pos.length > 0 && (
@@ -335,15 +344,6 @@ function OutcomeEditor({
       <p className="text-caption">
         Removing a CO also removes it from problems tagged with it.
       </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button disabled={save.isPending} onClick={() => save.mutate()}>
-          Save outcomes
-        </Button>
-        <Button variant="ghost" onClick={onDone}>
-          Cancel
-        </Button>
-        {message && <FormMessage message={{ text: message, kind: "err" }} />}
-      </div>
-    </div>
+    </EditorSheet>
   )
 }

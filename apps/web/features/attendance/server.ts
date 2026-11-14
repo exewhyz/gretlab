@@ -22,6 +22,7 @@ import {
 } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { today } from "@/features/catalog/server"
 import { classContext, studentsIn } from "@/features/classes/server"
 import { subjectsOfGroups } from "@/features/subjects/server"
@@ -123,7 +124,7 @@ async function coursesOf(cc: { ctx: OrgContext; groupId: string }) {
   for (const r of rows)
     if (!seen.has(r.subjectId))
       seen.set(r.subjectId, { id: r.subjectId, name: r.name, code: r.code })
-  return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
+  return [...seen.values()].sort((a, b) => byName(a.name, b.name))
 }
 
 /** One day's register for a group: its students and their marks so far. */
@@ -622,7 +623,7 @@ export async function courseAttendance(
     span,
     courses: taught,
     students: rows.sort(
-      (a, b) => b.short - a.short || a.name.localeCompare(b.name)
+      (a, b) => b.short - a.short || byName(a.name, b.name)
     ),
     shortStudents: rows.filter((r) => r.short > 0).length,
   }

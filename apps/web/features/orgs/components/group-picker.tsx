@@ -22,6 +22,7 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
+import { byName } from "@/lib/by-name"
 
 export interface PickerGroup {
   id: string
@@ -51,9 +52,7 @@ export function placeGroups<T extends PickerGroup>(groups: readonly T[]) {
           ? g.parentId === null || !ids.has(g.parentId)
           : g.parentId === parentId
       )
-      .sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true })
-      )
+      .sort((a, b) => byName(a.name, b.name))
     for (const g of here) {
       const children = groups.filter((x) => x.parentId === g.id).length
       out.push({ group: g, depth, path: [...path, g.name], children })

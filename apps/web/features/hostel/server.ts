@@ -23,6 +23,7 @@ import {
   pathName,
   studentsWithGroups,
 } from "@/features/campus/people"
+import { byName } from "@/lib/by-name"
 import { today } from "@/features/catalog/server"
 import { notify } from "@/features/notifications/server"
 import {
@@ -297,11 +298,7 @@ export async function hostelRoomsList(
   return {
     hostel: { id: h.id, name: h.name },
     rooms: rooms
-      .sort(
-        (a, b) =>
-          a.floor.localeCompare(b.floor, undefined, { numeric: true }) ||
-          a.name.localeCompare(b.name, undefined, { numeric: true })
-      )
+      .sort((a, b) => byName(a.floor, b.floor) || byName(a.name, b.name))
       .map((r) => ({
         id: r.id,
         name: r.name,
@@ -310,7 +307,7 @@ export async function hostelRoomsList(
           .filter((b) => b.roomId === r.id)
           .sort(
             (a, b) =>
-              a.label.length - b.label.length || a.label.localeCompare(b.label)
+              a.label.length - b.label.length || byName(a.label, b.label)
           )
           .map((b) => {
             const p = b.userId ? people.get(b.userId) : undefined
@@ -712,8 +709,7 @@ export async function importResidents(
           b.room.toLowerCase() === row.room.toLowerCase()
       )
       .sort(
-        (a, b) =>
-          a.label.length - b.label.length || a.label.localeCompare(b.label)
+        (a, b) => a.label.length - b.label.length || byName(a.label, b.label)
       )
     const bed = row.bed
       ? inRoom.find((b) => b.label === row.bed)

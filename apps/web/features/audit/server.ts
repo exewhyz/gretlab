@@ -2,6 +2,7 @@ import { auditLog, getDb, sql, users, type User } from "@workspace/db"
 import { auditCategory, categoryLabel, describeDevice } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { ApiError } from "@/lib/api/errors"
 import { requestInfo } from "@/lib/api/request-context"
 import { queueWebhooks } from "@/features/integrations/deliver"
@@ -191,10 +192,10 @@ export async function readAudit(orgId: string | null, f: AuditFilters) {
       categories: categories
         .map((c) => ({ key: c.category, label: categoryLabel(c.category) }))
         .filter((c) => c.key)
-        .sort((a, b) => a.label.localeCompare(b.label)),
+        .sort((a, b) => byName(a.label, b.label)),
       people: people
         .map((p) => ({ id: p.id!, name: p.name ?? p.email, email: p.email }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) => byName(a.name, b.name)),
     },
   }
 }

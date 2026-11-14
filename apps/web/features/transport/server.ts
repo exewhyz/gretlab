@@ -17,6 +17,7 @@ import {
   pathName,
   studentsWithGroups,
 } from "@/features/campus/people"
+import { byName } from "@/lib/by-name"
 import { notify } from "@/features/notifications/server"
 import {
   canFor,
@@ -313,7 +314,7 @@ export async function routeRiders(slug: string, user: User, routeId: string) {
       stopId: rows.find((r) => r.userId === p.id)!.stopId,
       canChange: covers(ctx, "transport.assign", p.groupIds),
     }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => byName(a.name, b.name))
 }
 
 /** Members this person may put on a route, matching a search, with their current route. */

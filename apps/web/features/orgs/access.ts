@@ -20,6 +20,7 @@ import {
   type SystemRoleKey,
 } from "@workspace/judge"
 
+import { byName } from "@/lib/by-name"
 import { orgReach } from "@/features/platform/access"
 import { orgPages } from "@/lib/paths"
 
@@ -209,5 +210,5 @@ export async function classLinks(
   ])
   return rows
     .map((g) => ({ name: g.name, href: orgPages(org!.slug).cls(g.id) }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => byName(a.name, b.name))
 }

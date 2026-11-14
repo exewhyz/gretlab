@@ -34,6 +34,8 @@ export function EditorSheet({
   width = "42rem",
   testId,
   extra,
+  notice,
+  cancelLabel = "Cancel",
 }: {
   title: string
   description?: ReactNode
@@ -49,6 +51,10 @@ export function EditorSheet({
   testId?: string
   /** A secondary action at the start of the footer, such as Delete. */
   extra?: ReactNode
+  /** A success note beside the buttons ("Saved."), when the sheet stays open after saving. */
+  notice?: string | null
+  /** "Close" when the sheet can save without closing (drafts). */
+  cancelLabel?: string
 }) {
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
@@ -67,10 +73,14 @@ export function EditorSheet({
         <SheetFooter className="flex-row flex-wrap items-center border-t border-hairline">
           {extra}
           <span className="min-w-0 flex-1">
-            {error && <FormMessage message={{ text: error, kind: "err" }} />}
+            {error ? (
+              <FormMessage message={{ text: error, kind: "err" }} />
+            ) : (
+              notice && <FormMessage message={{ text: notice, kind: "ok" }} />
+            )}
           </span>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
+            {cancelLabel}
           </Button>
           <Button disabled={submitDisabled} onClick={onSubmit}>
             {submitLabel}

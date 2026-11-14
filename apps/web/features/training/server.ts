@@ -13,6 +13,7 @@ import {
 import { KINDS, trainingState, type TrainingStatus } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { today } from "@/features/catalog/server"
 import { classContext, studentsIn } from "@/features/classes/server"
 import { addClassCourse, finished, renewalCutoffs } from "@/features/courses/classes"
@@ -129,7 +130,7 @@ async function statusOf(slug: string, user: User, ctx: OrgContext, map: Map_, sc
         certificate: cert?.code ?? null,
       }
     })
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => byName(a.name, b.name))
 }
 
 /**
@@ -201,7 +202,7 @@ export async function listTraining(slug: string, user: User) {
     day,
     terms: kind.terms,
     levels: ctx.org.groupLevels,
-    trainings: rows.sort((a, b) => (a.dueOn ?? "9").localeCompare(b.dueOn ?? "9") || a.course.localeCompare(b.course)),
+    trainings: rows.sort((a, b) => (a.dueOn ?? "9").localeCompare(b.dueOn ?? "9") || byName(a.course, b.course)),
     canAssign,
     /** Ready courses to assign, and groups to assign them to. */
     courses: canAssign

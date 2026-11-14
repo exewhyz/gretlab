@@ -6,6 +6,8 @@ import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 
+import { DetailSheet } from "@/components/detail-sheet"
+import { EditorSheet } from "@/components/editor-sheet"
 import { Field, FormMessage, TextArea, TextInput } from "@/components/form"
 import { api } from "@/lib/api/client"
 
@@ -38,11 +40,10 @@ export function AdminStudyPlans() {
     },
   })
   if (!data) return <Loading error={error} />
-  if (editing) {
-    return <PlanEditor slug={editing} onDone={() => setEditing(null)} />
-  }
   return (
     <>
+      {/* The builder opens over the list, which stays where it was. */}
+      {editing && <PlanEditor slug={editing} onDone={() => setEditing(null)} />}
       <PageTitle>Study plans</PageTitle>
       <p className="mb-3 text-body-sm text-body">
         Curated, ordered sets of problems, such as &ldquo;Week 1: loops&rdquo;.
@@ -105,7 +106,11 @@ function PlanEditor({ slug, onDone }: { slug: string; onDone: () => void }) {
     queryFn: () => api<StaffProblemList>("/admin/problems"),
   })
   if (!plan.data || !problems.data) {
-    return <Loading error={plan.error ?? problems.error} />
+    return (
+      <DetailSheet title="Edit study plan" onClose={onDone}>
+        <Loading error={plan.error ?? problems.error} />
+      </DetailSheet>
+    )
   }
   return (
     <PlanForm
@@ -156,62 +161,46 @@ function PlanForm({
     onSuccess: onSaved,
   })
   return (
-    <>
-      <PageTitle
-        action={
-          <Button variant="ghost" size="sm" onClick={onDone}>
-            ← All study plans
-          </Button>
-        }
-      >
-        Edit study plan
-      </PageTitle>
-      <Card className="grid gap-4">
-        <Field label="Title">
-          <TextInput
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-        </Field>
-        <Field
-          label="Description"
-          help="Optional. Shown at the top of the plan."
+    <EditorSheet
+      title="Edit study plan"
+      description="An ordered set of problems learners work through. Save a draft any time; Publish puts it in the library."
+      width="48rem"
+      error={save.error?.message}
+      notice={save.isSuccess ? "Saved." : null}
+      submitLabel="Publish"
+      submitDisabled={save.isPending}
+      onSubmit={() => save.mutate(true)}
+      onClose={onDone}
+      cancelLabel="Close"
+      testId="plan-editor"
+      extra={
+        <Button
+          variant="outline"
+          disabled={save.isPending}
+          onClick={() => save.mutate(false)}
         >
-          <TextArea
-            rows={3}
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </Field>
-        <ProblemPicker
-          problems={problems}
-          selected={selected}
-          onChange={setSelected}
+          Save draft
+        </Button>
+      }
+    >
+      <Field label="Title">
+        <TextInput
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
         />
-        <div className="flex flex-wrap items-center gap-3 border-t border-hairline pt-3.5">
-          <span className="flex-1">
-            <FormMessage
-              message={
-                save.isSuccess
-                  ? { text: "Saved.", kind: "ok" }
-                  : save.error
-                    ? { text: save.error.message, kind: "err" }
-                    : null
-              }
-            />
-          </span>
-          <Button
-            variant="outline"
-            disabled={save.isPending}
-            onClick={() => save.mutate(false)}
-          >
-            Save draft
-          </Button>
-          <Button disabled={save.isPending} onClick={() => save.mutate(true)}>
-            Publish
-          </Button>
-        </div>
-      </Card>
-    </>
+      </Field>
+      <Field label="Description" help="Optional. Shown at the top of the plan.">
+        <TextArea
+          rows={3}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </Field>
+      <ProblemPicker
+        problems={problems}
+        selected={selected}
+        onChange={setSelected}
+      />
+    </EditorSheet>
   )
 }

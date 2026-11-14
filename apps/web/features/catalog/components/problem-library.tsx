@@ -13,6 +13,7 @@ import {
   CollapsibleTrigger,
 } from "@workspace/ui/components/collapsible"
 
+import { byName } from "@/lib/by-name"
 import { SelectInput, TextInput } from "@/components/form"
 import { useViewer } from "@/features/account/use-viewer"
 import { useProgress } from "@/features/lab/hooks/use-progress"
@@ -153,7 +154,7 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
     })
     const byAcceptance = (problem: CatalogProblem) => problem.acceptance ?? -1
     const sorted = [...rows]
-    if (sort === "title") sorted.sort((a, b) => a.title.localeCompare(b.title))
+    if (sort === "title") sorted.sort((a, b) => byName(a.title, b.title))
     if (sort === "difficulty") {
       sorted.sort(
         (a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level] || a.no - b.no

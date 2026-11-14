@@ -18,6 +18,7 @@ import {
 } from "@workspace/judge"
 import type { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { ApiError, notFound } from "@/lib/api/route"
 
 import { rolePermissions } from "./access"
@@ -85,7 +86,7 @@ export async function listGroups(slug: string, user: User) {
     },
     canManageAll: can(ctx, "org.groups.manage"),
     groups: ctx.groups
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .sort((a, b) => byName(a.name, b.name))
       .map((g) => {
         const direct = rows.filter((r) => r.groupId === g.id).length
         return {
@@ -365,8 +366,7 @@ export async function openGroups(slug: string, user: User) {
         mine: seats.some((s) => s.groupId === g.id && s.userId === user.id),
       }))
       .sort(
-        (a, b) =>
-          Number(b.mine) - Number(a.mine) || a.name.localeCompare(b.name)
+        (a, b) => Number(b.mine) - Number(a.mine) || byName(a.name, b.name)
       ),
   }
 }
@@ -521,7 +521,7 @@ export async function groupPeople(slug: string, user: User, groupId: string) {
     canManage: can(ctx, "org.members.manage", groupId),
     people: [...people.values()]
       .map((p) => ({ ...p, notPlaced: p.direct && !leaf }))
-      .sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email)),
+      .sort((a, b) => byName(a.name ?? a.email, b.name ?? b.email)),
   }
 }
 

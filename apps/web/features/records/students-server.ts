@@ -27,6 +27,7 @@ import {
 } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { anyGroupGrant, pathName } from "@/features/campus/people"
 import { campusOf } from "@/features/campus/server"
 import { today } from "@/features/catalog/server"
@@ -924,7 +925,7 @@ export async function idCardData(slug: string, user: User, groupId: string) {
       }))
       .sort(
         (a, b) =>
-          (a.rollNo ?? 1e9) - (b.rollNo ?? 1e9) || a.name.localeCompare(b.name)
+          (a.rollNo ?? 1e9) - (b.rollNo ?? 1e9) || byName(a.name, b.name)
       ),
   }
 }

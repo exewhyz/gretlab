@@ -310,7 +310,7 @@ A table wider than its column scrolls sideways inside its own box (`ScrollX` in 
 
 ### Editors (create and edit)
 - Creating or editing an item from a list opens a right-hand sheet over the list (`EditorSheet`, `components/editor-sheet.tsx`), never a form pushed into the top of the page. Its title says what's being edited; the form scrolls in the middle; the error, Cancel and the main action stay pinned at the bottom (a secondary action such as Delete sits at the start of that bar). Full width on phones, 42rem from sm up by default.
-- A short form (a few fields) is a Dialog; anything with a long list or several sections is a sheet.
+- A short form (a few fields) is a Dialog; anything with a long list or several sections is a sheet. Two-factor setup is a Dialog; the course-outcome editor and the study-plan builder are sheets over the page they edit.
 - What's behind a row (a student's work in the gradebook, their quiz) opens beside the list in `DetailSheet` (`components/detail-sheet.tsx`), not below the table, so it appears where the person clicked.
 - A long checklist inside (permissions) has a search bar, a count of what's chosen, and chips that jump to each area, stuck to the top while it scrolls; every option stays visible, never folded away by default.
 - A sheet's size is set with `--sheet-width` / `--sheet-max-width` on `SheetContent`; a plain `sm:max-w-*` class is ignored by the shadcn sheet.
@@ -352,6 +352,7 @@ Progress bars (`Progress`, the homes' `Meter`) are 70% ink on a Rule track, red 
 - **Do** use the named type scale and keep `text-body-sm` (14px) as the working size of app screens.
 - **Do** check new shadcn registry components in both themes; they sometimes arrive with forced colours.
 - **Do** put wide tables in `ScrollX` (or the shared tables), with the identifying column pinned.
+- **Do** sort anything people read by name with `byName` (`lib/by-name.ts`): "Grade 6" before "Grade 10".
 
 ### Don't:
 - **Don't** use Tailwind's cool greys (`gray`, `slate`, `zinc`) or pure black; neutrals are warm.

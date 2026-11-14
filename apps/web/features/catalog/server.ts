@@ -28,6 +28,7 @@ import {
   streaks,
 } from "@workspace/judge"
 
+import { byName } from "@/lib/by-name"
 import { ApiError, isStaff, notFound } from "@/lib/api/route"
 import { cached, invalidate } from "@/lib/ttl-cache"
 import { isPublicProblem } from "@/features/problems/server"
@@ -144,7 +145,7 @@ export async function getCatalog(): Promise<{
         submissions: stat?.total ?? 0,
       }
     }),
-    tags: [...tagCounts.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    tags: [...tagCounts.values()].sort((a, b) => byName(a.name, b.name)),
   }
 }
 

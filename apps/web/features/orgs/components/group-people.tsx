@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 
+import { byName } from "@/lib/by-name"
 import { ConfirmButton } from "@/components/confirm"
 import { FormMessage, TextInput } from "@/components/form"
 import { Loading } from "@/features/admin/components/shell"
@@ -204,7 +205,7 @@ export function GroupPeople({
     }
   }
   const sectionList = [...sections.entries()].sort(([a], [b]) =>
-    a === "direct" ? -1 : b === "direct" ? 1 : a.localeCompare(b)
+    a === "direct" ? -1 : b === "direct" ? 1 : byName(a, b)
   )
   // One section, or a search, shows people straight away.
   const isOpen = (key: string) =>

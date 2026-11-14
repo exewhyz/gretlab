@@ -21,6 +21,7 @@ import {
 import { syllabusProgress, type Permission } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { ApiError, notFound } from "@/lib/api/route"
 import { likeTerm, paged } from "@/lib/api/paging"
 import { getGradebook } from "@/features/assignments/server"
@@ -377,7 +378,7 @@ export async function teacherHome(user: User) {
           canLog: canFor(ctx, "teaching.log", [[g.id]]),
         }
       })
-      .sort((a, b) => a.path.localeCompare(b.path))
+      .sort((a, b) => byName(a.path, b.path))
     // Published work this person runs, due in the coming week.
     const now = new Date()
     const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
@@ -820,7 +821,7 @@ async function reportFigures(
         parentId: g.parentId,
         path: pathOf(g.id),
       }))
-      .sort((a, b) => a.path.localeCompare(b.path)),
+      .sort((a, b) => byName(a.path, b.path)),
     summary: {
       students: students.length,
       activeThisWeek,
@@ -854,7 +855,7 @@ async function reportFigures(
           ).length,
         }))
         .filter((g) => g.progress.total > 0 || g.classes > 0)
-        .sort((a, b) => a.path.localeCompare(b.path)),
+        .sort((a, b) => byName(a.path, b.path)),
       teachers: [...teacherTotals].map(([name, t]) => ({
         name,
         classes: t.classes,
@@ -890,7 +891,7 @@ export async function orgReport(
     students: rows.sort(
       (a, b) =>
         Number(a.activeThisWeek) - Number(b.activeThisWeek) ||
-        (a.name ?? a.email).localeCompare(b.name ?? b.email)
+        byName(a.name ?? a.email, b.name ?? b.email)
     ),
   }
 }

@@ -9,6 +9,7 @@ import {
 import { KINDS } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { teachersOfGroup } from "@/features/classes/server"
 import {
   canAnywhere,
@@ -172,7 +173,7 @@ export async function listSubjects(slug: string, user: User) {
             : null,
           canChange: canFor(ctx, "subjects.assign", [[u.groupId]]),
         }))
-        .sort((a, b) => a.group.localeCompare(b.group)),
+        .sort((a, b) => byName(a.group, b.group)),
     })),
   }
 }

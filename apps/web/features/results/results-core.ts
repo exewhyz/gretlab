@@ -23,6 +23,7 @@ import {
 } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { covers } from "@/features/campus/people"
 import {
   canFor,
@@ -407,8 +408,7 @@ export async function sitting(
   return rows
     .map((r) => ({ ...r, name: r.name ?? r.email }))
     .sort(
-      (a, b) =>
-        (a.rollNo ?? 1e9) - (b.rollNo ?? 1e9) || a.name.localeCompare(b.name)
+      (a, b) => (a.rollNo ?? 1e9) - (b.rollNo ?? 1e9) || byName(a.name, b.name)
     )
 }
 

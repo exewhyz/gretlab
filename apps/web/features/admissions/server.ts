@@ -20,6 +20,7 @@ import {
 } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { pathName } from "@/features/campus/people"
 import { today } from "@/features/catalog/server"
 import { notify } from "@/features/notifications/server"
@@ -129,7 +130,7 @@ function gradesOpen(ctx: OrgContext) {
   const top = ctx.groups.filter((g) => !g.parentId)
   const chosen = settingsOf(ctx).gradeIds
   return (chosen.length ? top.filter((g) => chosen.includes(g.id)) : top).sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { numeric: true })
+    byName(a.name, b.name)
   )
 }
 
@@ -355,7 +356,7 @@ export async function listApplications(
     grades: ctx.groups
       .filter((g) => !g.parentId)
       .map((g) => ({ id: g.id, name: g.name }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+      .sort((a, b) => byName(a.name, b.name)),
     applications: rows.map(({ app, email }) => ({
       id: app.id,
       number: app.number,
@@ -566,7 +567,7 @@ export async function admissionSettings(slug: string, user: User) {
     grades: ctx.groups
       .filter((g) => !g.parentId)
       .map((g) => ({ id: g.id, name: g.name }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+      .sort((a, b) => byName(a.name, b.name)),
     applyUrl: `/orgs/${ctx.org.slug}/apply`,
   }
 }

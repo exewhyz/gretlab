@@ -2,6 +2,7 @@ import { enrolments, getDb, sql, users, type User } from "@workspace/db"
 import { suggestPromotion } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { pathName } from "@/features/campus/people"
 import {
   canFor,
@@ -118,15 +119,11 @@ export async function promotionPlan(
             already: placed.has(r.userId),
           })),
       }))
-      .sort((a, b) =>
-        a.path.localeCompare(b.path, undefined, { numeric: true })
-      ),
+      .sort((a, b) => byName(a.path, b.path)),
     targets: ctx.groups
       .filter((g) => isLeaf(ctx, g.id))
       .map((g) => ({ id: g.id, path: pathName(ctx, g.id) }))
-      .sort((a, b) =>
-        a.path.localeCompare(b.path, undefined, { numeric: true })
-      ),
+      .sort((a, b) => byName(a.path, b.path)),
   }
 }
 

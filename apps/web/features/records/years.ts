@@ -9,6 +9,7 @@ import {
 import { changesBetween, KINDS, yearProblem } from "@workspace/judge"
 import { z } from "zod"
 
+import { byName } from "@/lib/by-name"
 import { anyGroupGrant, pathName } from "@/features/campus/people"
 import { teachersOfGroups } from "@/features/classes/server"
 import {
@@ -257,9 +258,7 @@ export async function classTeachersOf(
           name: t.name,
         })),
       }))
-      .sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { numeric: true })
-      ),
+      .sort((a, b) => byName(a.name, b.name)),
   }
 }
 

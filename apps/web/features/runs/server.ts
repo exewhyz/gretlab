@@ -1,6 +1,7 @@
 import { certificates, getDb, groupMembers, sql, users, type User } from "@workspace/db"
 import { KINDS, runState } from "@workspace/judge"
 
+import { byName } from "@/lib/by-name"
 import { today } from "@/features/catalog/server"
 import { learnerSignals } from "@/features/classes/warnings"
 import { canFor, groupChain, orgContext, type OrgContext } from "@/features/orgs/server"
@@ -80,7 +81,7 @@ export async function listRuns(slug: string, user: User) {
             lead: g.leadId ? (leads.get(g.leadId) ?? null) : null,
             mine: g.leadId === user.id,
           }))
-          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+          .sort((a, b) => byName(a.name, b.name)),
       }))
       .sort((a, b) => b.startsOn.localeCompare(a.startsOn)),
   }
@@ -137,7 +138,7 @@ export async function runProgress(slug: string, user: User, groupId: string) {
       pod: podOf(s.id),
       graduated: graduated.find((g) => g.userId === s.id)?.code ?? null,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => byName(a.name, b.name))
   const kind = KINDS[ctx.org.type]
   return {
     terms: kind.terms,
@@ -158,7 +159,7 @@ export async function runProgress(slug: string, user: User, groupId: string) {
         lead: p.leadId ? (leads.get(p.leadId) ?? null) : null,
         mine: p.leadId === user.id,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })),
+      .sort((a, b) => byName(a.name, b.name)),
     learners,
     whole: scopes.includes(groupId),
     canGraduate: canFor(ctx, "assignments.manage", [[groupId]]),
