@@ -104,7 +104,6 @@ export function ManageShell({
   )
 }
 
-
 /* ---------- members ---------- */
 
 export function ManageMembers({
@@ -242,34 +241,42 @@ export function ManageMembers({
         </SelectInput>
       </div>
       <FormMessage message={message} />
-      <Table headers={["Person", "Groups", "Roles", ""]}>
-        {shown.map((m) => (
-          <MemberRow
-            key={m.userId}
-            slug={slug}
-            member={m}
-            groups={list}
-            levels={groups.data.levels}
-            roles={roles.data ?? []}
-            canApprove={can("org.members.invite")}
-            canManage={can("org.members.manage")}
-            canRoles={can("org.roles.manage")}
-            editing={editing?.id === m.userId ? editing.what : null}
-            setEditing={(what) =>
-              setEditing(what ? { id: m.userId, what } : null)
-            }
-            run={(call) => act.mutate(call)}
-            busy={act.isPending}
-            plainLabel={
-              memberKind(m) === "learner"
-                ? (terms?.learner ?? "Student")
-                : memberKind(m) === "parent"
-                  ? `${terms?.guardian ?? "Parent"} of ${m.children.join(", ")}`
-                  : "Member"
-            }
-          />
-        ))}
-      </Table>
+      <div
+        aria-busy={members.isPlaceholderData}
+        className={cn(
+          "transition-opacity",
+          members.isPlaceholderData && "opacity-60"
+        )}
+      >
+        <Table headers={["Person", "Groups", "Roles", ""]}>
+          {shown.map((m) => (
+            <MemberRow
+              key={m.userId}
+              slug={slug}
+              member={m}
+              groups={list}
+              levels={groups.data.levels}
+              roles={roles.data ?? []}
+              canApprove={can("org.members.invite")}
+              canManage={can("org.members.manage")}
+              canRoles={can("org.roles.manage")}
+              editing={editing?.id === m.userId ? editing.what : null}
+              setEditing={(what) =>
+                setEditing(what ? { id: m.userId, what } : null)
+              }
+              run={(call) => act.mutate(call)}
+              busy={act.isPending}
+              plainLabel={
+                memberKind(m) === "learner"
+                  ? (terms?.learner ?? "Student")
+                  : memberKind(m) === "parent"
+                    ? `${terms?.guardian ?? "Parent"} of ${m.children.join(", ")}`
+                    : "Member"
+              }
+            />
+          ))}
+        </Table>
+      </div>
       {pages > 1 && (
         <div className="mt-3 flex items-center justify-between gap-2 text-body-sm text-body">
           <span className="tabular-nums">
@@ -707,7 +714,11 @@ export function ManageRoles({ slug }: { slug: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-title-sm text-ink">{role.name}</span>
               <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-body">
-                {role.systemKey ? "Built in" : role.templateKey ? "Suggested" : "Custom"}
+                {role.systemKey
+                  ? "Built in"
+                  : role.templateKey
+                    ? "Suggested"
+                    : "Custom"}
               </span>
               <span className="text-xs text-body">
                 {role.assigned} {role.assigned === 1 ? "person" : "people"}
@@ -755,14 +766,21 @@ interface Suggested {
 }
 
 /** The kind's suggested roles this organization doesn't have yet, each one click to add. */
-function SuggestedRoles({ slug, onMessage }: { slug: string; onMessage: (m: Message) => void }) {
+function SuggestedRoles({
+  slug,
+  onMessage,
+}: {
+  slug: string
+  onMessage: (m: Message) => void
+}) {
   const queryClient = useQueryClient()
   const { data } = useQuery({
     queryKey: ["org", slug, "roles", "suggested"],
     queryFn: () => api<Suggested>(`/orgs/${slug}/roles/suggested`),
   })
   const add = useMutation({
-    mutationFn: (key: string) => api(`/orgs/${slug}/roles/suggested`, { body: { key } }),
+    mutationFn: (key: string) =>
+      api(`/orgs/${slug}/roles/suggested`, { body: { key } }),
     onSuccess: () => {
       onMessage(null)
       void queryClient.invalidateQueries({ queryKey: ["org", slug] })
@@ -773,19 +791,27 @@ function SuggestedRoles({ slug, onMessage }: { slug: string; onMessage: (m: Mess
   return (
     <section className="mt-6 grid gap-3" data-testid="suggested-roles">
       <div>
-        <h2 className="text-title-md text-ink">Suggested for a {data.kind.toLowerCase()}</h2>
+        <h2 className="text-title-md text-ink">
+          Suggested for a {data.kind.toLowerCase()}
+        </h2>
         <p className="text-caption text-body">
           Roles such places usually have. Add one and change it as you like.
         </p>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         {data.suggestions.map((s) => (
-          <Card key={s.key} className="grid content-between gap-2" data-testid="suggested-role">
+          <Card
+            key={s.key}
+            className="grid content-between gap-2"
+            data-testid="suggested-role"
+          >
             <div className="grid gap-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-title-sm text-ink">{s.name}</span>
                 <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-body">
-                  {s.scope === "group" ? "Given within a group" : "Organization-wide"}
+                  {s.scope === "group"
+                    ? "Given within a group"
+                    : "Organization-wide"}
                 </span>
               </div>
               <p className="text-caption text-body">{s.description}</p>

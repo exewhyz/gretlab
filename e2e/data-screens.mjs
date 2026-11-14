@@ -126,6 +126,8 @@ const view = async (email, width = 1440) => {
   await kinds.waitFor({ timeout: 30000 })
   check("Members shows how many of each", /Students\s*2/.test(await kinds.innerText()) && /Parents\s*1/.test(await kinds.innerText()), await kinds.innerText())
   await kinds.getByRole("button", { name: /Parents/ }).click()
+  // The filtered page comes from the server; the previous one stays until it does.
+  await p.waitForFunction(() => document.querySelectorAll('[data-testid="member-row"]').length === 1, null, { timeout: 15000 }).catch(() => {})
   check("...and filters to them", (await p.getByTestId("member-row").count()) === 1 && (await p.getByTestId("member-row").innerText()).includes("Parent of ds-s1 Name"))
   await p.goto(`${BASE}${O}/manage/attendance-report`)
   await p.getByTestId("attendance-overview").waitFor({ timeout: 30000 })
