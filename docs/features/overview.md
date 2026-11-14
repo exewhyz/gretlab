@@ -23,14 +23,28 @@ The `coding` module: on for every kind from the start, and switchable off.
 - [Contests](/features/coding/contests/): ICPC or IOI scoring, a scoreboard that can freeze, and
   questions beside problems.
 
+- [Templates](/features/coding/templates/): an assignment or exam written once, used for many classes.
+- [Courses](/features/coding/courses/): modules of practice with release rules.
+- [The content library](/features/coding/content-library/): collections, sharing and copying.
+- [Peer review](/features/coding/peer-review/) and [GitHub projects](/features/coding/github-projects/).
+
+## Classes
+
+- [Class pages](/features/classes/class-pages/): stream, classwork, course, discussion, people, grades,
+  syllabus and log.
+- [Discussions](/features/classes/discussions/), [Early warnings](/features/classes/early-warnings/)
+  and [Certificates](/features/classes/certificates/).
+
 ## Every day
 
 - [Attendance](/features/daily/attendance/): a register per class, day and period (and course, for
   colleges), with the minimum to sit exams.
+- [Staff attendance](/features/daily/staff-attendance/): the staff register and self check-in.
 - [Timetable](/features/daily/timetable/): periods and school days, each class's week, and no teacher
   in two places at once.
 - [Leave](/features/daily/leave/): students, parents and staff ask; the class teacher or the office
   decides; approved leave excuses absences.
+- [Holidays](/features/daily/holidays/) and [Notices](/features/daily/notices/).
 
 ## People
 
@@ -38,17 +52,32 @@ The `coding` module: on for every kind from the start, and switchable off.
   the organization's own levels, and roles given across it or within a group.
 - [Student records](/features/people/student-records/): academic years, admission numbers, enrolments,
   import and promotion.
+- [Admissions](/features/people/admissions/) and [Parent accounts](/features/people/parent-accounts/).
 
-## Assessment
+## Academics
 
+- [Subjects](/features/assessment/subjects/): what classes take, and who teaches each.
 - [Exams and report cards](/features/assessment/exams-and-report-cards/): term exams, marks by paper,
   the school's grading scale or a college's credits, remarks and printable report cards.
+- [Course and program outcomes](/features/assessment/outcomes/): CO–PO mapping and attainment.
 
-## More in the app
+## Campus
 
-These are built and documented in `AGENTS.md`; their pages here are on the way: subjects, staff
-attendance, admissions, parent accounts, the library desk, transport, the hostel, holidays, the
-calendar and iCal feed, notifications and email, certificates, class discussions, early warnings,
-course and program outcomes (CO–PO), templates, courses, the content library and sharing, peer
-review, GitHub projects, LTI 1.3, cohort runs, assigned training, events and open groups, two-factor
-sign-in and the activity log. The [organization API](/api/) has its own guide.
+- [The library desk](/features/campus/library-desk/), [Transport](/features/campus/transport/) and
+  [Hostel](/features/campus/hostel/).
+
+## Programs
+
+- [Cohort runs and mentors](/features/programs/cohort-runs/), [Assigned training](/features/programs/training/)
+  and [Events and open groups](/features/programs/events/).
+
+## Communication and reports
+
+- [Notifications and email](/features/communication/notifications/), [Calendar](/features/communication/calendar/)
+  and [Reports](/features/communication/reports/).
+
+## Platform and security
+
+- [Sign-in and two-factor](/features/platform/two-factor/), [Activity log](/features/platform/activity-log/),
+  [Platform staff and organizations](/features/platform/platform-staff/) and [LTI 1.3](/features/platform/lti/).
+- The [organization API](/api/) has its own guide.

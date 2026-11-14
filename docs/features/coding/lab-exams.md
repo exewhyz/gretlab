@@ -9,7 +9,7 @@ glance:
       note: sits it once
   where:
     path: /orgs/<slug>/manage/assignments
-    menu: "Manage › Assignments › an assignment's exam settings"
+    menu: "Coding lab › Assignments › an assignment's exam settings"
   permissions: [assignments.manage, assignments.extend, gradebook.view]
   module: coding
 ---

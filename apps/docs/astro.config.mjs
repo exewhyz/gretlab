@@ -51,6 +51,7 @@ export default defineConfig({
             { label: "Features overview", slug: "features/overview" },
             {
               label: "Coding lab",
+              collapsed: true,
               items: [
                 { label: "Problems and practice", slug: "features/coding/problems-and-practice" },
                 { label: "Run and Submit", slug: "features/coding/run-and-submit" },
@@ -58,27 +59,89 @@ export default defineConfig({
                 { label: "Quizzes and the question bank", slug: "features/coding/quizzes" },
                 { label: "Lab exams", slug: "features/coding/lab-exams" },
                 { label: "Contests", slug: "features/coding/contests" },
+                { label: "Templates", slug: "features/coding/templates" },
+                { label: "Courses", slug: "features/coding/courses" },
+                { label: "The content library", slug: "features/coding/content-library" },
+                { label: "Peer review", slug: "features/coding/peer-review" },
+                { label: "GitHub projects", slug: "features/coding/github-projects" },
+              ],
+            },
+            {
+              label: "Classes",
+              collapsed: true,
+              items: [
+                { label: "Class pages", slug: "features/classes/class-pages" },
+                { label: "Discussions", slug: "features/classes/discussions" },
+                { label: "Early warnings", slug: "features/classes/early-warnings" },
+                { label: "Certificates", slug: "features/classes/certificates" },
               ],
             },
             {
               label: "Every day",
+              collapsed: true,
               items: [
                 { label: "Attendance", slug: "features/daily/attendance" },
+                { label: "Staff attendance", slug: "features/daily/staff-attendance" },
                 { label: "Timetable", slug: "features/daily/timetable" },
                 { label: "Leave", slug: "features/daily/leave" },
+                { label: "Holidays", slug: "features/daily/holidays" },
+                { label: "Notices", slug: "features/daily/notices" },
               ],
             },
             {
               label: "People",
+              collapsed: true,
               items: [
                 { label: "Members, groups and roles", slug: "features/people/members-groups-roles" },
                 { label: "Student records", slug: "features/people/student-records" },
+                { label: "Admissions", slug: "features/people/admissions" },
+                { label: "Parent accounts", slug: "features/people/parent-accounts" },
               ],
             },
             {
-              label: "Assessment",
+              label: "Academics",
+              collapsed: true,
               items: [
+                { label: "Subjects", slug: "features/assessment/subjects" },
                 { label: "Exams and report cards", slug: "features/assessment/exams-and-report-cards" },
+                { label: "Course and program outcomes", slug: "features/assessment/outcomes" },
+              ],
+            },
+            {
+              label: "Campus",
+              collapsed: true,
+              items: [
+                { label: "The library desk", slug: "features/campus/library-desk" },
+                { label: "Transport", slug: "features/campus/transport" },
+                { label: "Hostel", slug: "features/campus/hostel" },
+              ],
+            },
+            {
+              label: "Programs",
+              collapsed: true,
+              items: [
+                { label: "Cohort runs and mentors", slug: "features/programs/cohort-runs" },
+                { label: "Assigned training", slug: "features/programs/training" },
+                { label: "Events and open groups", slug: "features/programs/events" },
+              ],
+            },
+            {
+              label: "Communication and reports",
+              collapsed: true,
+              items: [
+                { label: "Notifications and email", slug: "features/communication/notifications" },
+                { label: "Calendar", slug: "features/communication/calendar" },
+                { label: "Reports", slug: "features/communication/reports" },
+              ],
+            },
+            {
+              label: "Platform and security",
+              collapsed: true,
+              items: [
+                { label: "Sign-in and two-factor", slug: "features/platform/two-factor" },
+                { label: "Activity log", slug: "features/platform/activity-log" },
+                { label: "Platform staff and organizations", slug: "features/platform/platform-staff" },
+                { label: "LTI 1.3", slug: "features/platform/lti" },
               ],
             },
           ],

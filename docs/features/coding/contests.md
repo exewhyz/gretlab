@@ -33,7 +33,7 @@ everyone on the platform or aimed at an organization's groups.
 
 ## Step by step
 
-1. **Manage › Contests › New contest** (or from a class, aimed at it).
+1. **Coding lab › Contests › New contest** (or from a class, aimed at it).
 2. Choose the start and end, the scoring and the freeze, and the audience.
 3. Pick problems and questions; **Write a problem** and **Import problems** create ones only this
    contest uses.

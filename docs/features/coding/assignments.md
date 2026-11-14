@@ -9,7 +9,7 @@ glance:
       note: does the work
   where:
     path: /orgs/<slug>/manage/assignments
-    menu: "Manage › Assignments › Gradebook"
+    menu: "Coding lab › Assignments › Gradebook"
   permissions: [assignments.manage, assignments.grade, assignments.extend, gradebook.view, gradebook.export]
   module: coding
   demo:
@@ -49,7 +49,7 @@ and the gradebook works out everyone's marks from their submissions.
 
 ### Set an assignment
 
-1. **Manage › Assignments › New assignment** (or **New assignment** from a class, which aims it at that
+1. **Coding lab › Assignments › New assignment** (or **New assignment** from a class, which aims it at that
    class).
 2. Give it a title, opening and due times, and an audience.
 3. Pick problems (and questions) with their points. **Write a problem** and **Import problems** are in

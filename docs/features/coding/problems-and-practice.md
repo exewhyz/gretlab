@@ -60,7 +60,7 @@ solve, with the daily challenge, personal lists and a leaderboard around it.
 
 ### Write a problem for your organization
 
-1. Go to **Manage › Problems › New problem** (needs "Write problems").
+1. Go to **Coding lab › Problems › New problem** (needs "Write problems").
 2. Write the statement in Markdown, add tests (mark which are samples) and, per language, starter code
    and a reference solution. "Generate from the reference solution" drafts starter code for you.
 3. Publish it. Choose **members only** to keep it inside the organization.

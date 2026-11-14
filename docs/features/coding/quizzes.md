@@ -9,7 +9,7 @@ glance:
       note: answers them
   where:
     path: /orgs/<slug>/manage/questions
-    menu: "Manage › Questions"
+    menu: "Coding lab › Questions"
   permissions: [problems.manage, assignments.grade]
   module: coding
   demo:
@@ -44,7 +44,7 @@ problems.
 
 ## Step by step
 
-1. **Manage › Questions** to write one, or **Import** with the [question file format](/question-format/).
+1. **Coding lab › Questions** to write one, or **Import** with the [question file format](/question-format/).
 2. In an assignment, exam or contest form, use the question picker beside the problem picker, giving
    each question its points.
 3. Mark written and unmatched short answers from the gradebook's **Quiz** column. A teacher's mark
