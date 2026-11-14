@@ -23,6 +23,8 @@ import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { useContentScope } from "@/features/account/scope"
 import { ScopeNote } from "@/features/account/scope-switcher"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { orgReport } from "@/features/teaching/server"
 import { formatDate, formatDateTime } from "@/lib/format"
 import { orgPages } from "@/lib/paths"
 
@@ -804,43 +806,8 @@ function SessionTable({
 
 /* ---------- organization reports ---------- */
 
-interface Report {
-  org: string
-  levels: string[]
-  groups: { id: string; name: string; parentId: string | null; path: string }[]
-  summary: {
-    students: number
-    activeThisWeek: number
-    sharing: number
-    averageAssignment: number | null
-  }
-  assignments: {
-    title: string
-    dueAt: string
-    students: number
-    started: number
-    averagePercent: number
-  }[]
-  teaching: {
-    groups: { path: string; progress: Progress; classes: number }[]
-    teachers: {
-      name: string
-      classes: number
-      minutes: number
-      rating: number | null
-      ratings: number
-    }[]
-  }
-  students: {
-    name: string | null
-    email: string
-    groups: string[]
-    lastActive: string | null
-    activeThisWeek: boolean
-    assignmentPercent: number | null
-    practiceSolved: number | null
-  }[]
-}
+/** What the reports route answers (features/teaching/server.ts). */
+type Report = ApiResult<typeof orgReport>
 
 /** With `fixedGroup`, one class's insights: no title or group picker. */
 export function OrgReports({

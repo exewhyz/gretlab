@@ -18,6 +18,8 @@ import {
 } from "@/features/admin/components/shell"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { attendanceOverview } from "@/features/attendance/server"
 
 interface Groups {
   levels: string[]
@@ -345,18 +347,7 @@ const SHORT: Record<AttendanceStatus, string> = {
   excused: "E",
 }
 
-interface Overview {
-  month: string
-  minimum: number
-  rows: {
-    id: string
-    path: string
-    days: number
-    students: number
-    percent: number | null
-    below: number
-  }[]
-}
+type Overview = ApiResult<typeof attendanceOverview>
 
 /**
  * Before a class is chosen: every class's month in one table, lowest attendance first, so

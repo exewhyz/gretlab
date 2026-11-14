@@ -58,6 +58,11 @@ import { OwnerProvider } from "@/features/admin/owner"
 import { AuditLog } from "@/features/audit/components/audit-log"
 import { OrgShell } from "@/features/home/components/org-shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { listMembers } from "@/features/orgs/server"
+
+/** One page of the Members screen, as the paged form of the members route answers it. */
+type MembersPage = ApiResult<typeof listMembers>
 import { PermissionPicker } from "./permission-picker"
 
 import { GroupChecklist, leafIds } from "./group-checklist"
@@ -136,13 +141,7 @@ export function ManageMembers({
   const members = useQuery({
     queryKey: ["org", slug, "members", q, groupId, status, kind, page],
     queryFn: () =>
-      api<{
-        members: Member[]
-        total: number
-        page: number
-        pages: number
-        counts: Record<MemberKind, number> & { all: number }
-      }>(
+      api<MembersPage>(
         `/orgs/${slug}/members?${new URLSearchParams({ q, group: groupId, status, kind, page: String(page) })}`
       ),
     placeholderData: keepPreviousData,

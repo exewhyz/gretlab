@@ -33,38 +33,11 @@ import {
 } from "@/features/admin/components/shell"
 import { PermissionPicker } from "@/features/orgs/components/permission-picker"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { listIntegrations } from "@/features/integrations/server"
 import { formatDateTime } from "@/lib/format"
 
-interface Data {
-  keys: {
-    id: string
-    name: string
-    prefix: string
-    permissions: string[]
-    madeBy: string
-    lastUsedAt: string | null
-    revokedAt: string | null
-    createdAt: string
-  }[]
-  webhooks: {
-    id: string
-    url: string
-    events: string[]
-    active: boolean
-    createdAt: string
-    deliveries: {
-      id: string
-      event: string
-      status: "pending" | "sent" | "failed"
-      attempts: number
-      responseStatus: number | null
-      lastError: string | null
-      createdAt: string
-    }[]
-  }[]
-  grantable: string[]
-  areas: { key: string; label: string }[]
-}
+type Data = ApiResult<typeof listIntegrations>
 
 /** A value shown once, with a copy button. */
 function Secret({ label, value }: { label: string; value: string }) {

@@ -711,6 +711,9 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
   - management pages: `.manage("/exams")`.
   - A page that moves changes there.
   - API addresses stay with the `api()` calls that use them.
+- **Response types.** A screen takes its data's type from the server function behind the route, not a copy: `type Report = ApiResult<typeof orgReport>`, with `import type` only (`apps/web/lib/api/types.ts`; `Jsonified` turns dates into strings, as JSON does). Done so far:
+  - Reports, the attendance overview, holidays, integrations and the Members page;
+  - convert other screens as they're touched.
 - **Errors.** Unexpected server errors go through `reportError()` (`apps/web/lib/report-error.ts`): one JSON log line with a short `ref`. API 500s show that ref to the person, and `instrumentation.ts` reports page and server-action errors the same way.
 - **CI.** `.github/workflows/ci.yml` runs lint, typecheck, unit tests and `drizzle-kit check` on every push. The end-to-end regression stays local (`pnpm test:e2e`, Docker with gVisor).
 

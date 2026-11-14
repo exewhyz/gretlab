@@ -20,13 +20,10 @@ import {
   Table,
 } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import type { ApiResult } from "@/lib/api/types"
+import type { listHolidays } from "@/features/holidays/server"
 
-interface Holiday {
-  id: string
-  name: string
-  startsOn: string
-  endsOn: string
-}
+type Holiday = ApiResult<typeof listHolidays>["holidays"][number]
 
 /** "Mon, Nov 9" (UTC, so a day never shifts with the viewer's zone). */
 const day = (d: string) =>
@@ -49,7 +46,7 @@ export function ManageHolidays({ slug }: { slug: string }) {
   const { data, error } = useQuery({
     queryKey: key,
     queryFn: () =>
-      api<{ holidays: Holiday[]; canEdit: boolean }>(`/orgs/${slug}/holidays`),
+      api<ApiResult<typeof listHolidays>>(`/orgs/${slug}/holidays`),
   })
   const [name, setName] = useState("")
   const [startsOn, setStartsOn] = useState("")
