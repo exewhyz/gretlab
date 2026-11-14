@@ -67,7 +67,7 @@ import { AudiencePicker } from "./audience"
 
 import { FieldError, ProblemPicker, toLocalInput } from "./contests"
 import type { StaffProblemList } from "./problems"
-import { Card, Loading, PageTitle, Table } from "./shell"
+import { Card, Loading, PageTitle, Stats, Table } from "./shell"
 
 interface AssignmentRow {
   id: string
@@ -1144,12 +1144,9 @@ export function AssignmentGradebook({ id }: { id: string }) {
       row.email.toLowerCase().includes(query) ||
       (row.name ?? "").toLowerCase().includes(query)
   )
-  const stats = [
-    ["Students", data.summary.students],
-    ["Started", data.summary.started],
-    ["Full marks", data.summary.fullMarks],
-    ["Average", `${data.summary.average} / ${data.total}`],
-  ] as const
+  const { students, started, fullMarks, average } = data.summary
+  const notStarted = students - started
+  const averagePercent = data.total ? Math.round((100 * average) / data.total) : null
 
   return (
     <>
@@ -1234,14 +1231,27 @@ export function AssignmentGradebook({ id }: { id: string }) {
         {data.can.sendGrades && <SendGrades id={id} />}
         {data.can.peer && <PeerReviewPanel id={id} />}
       </div>
-      <div className="mb-4 grid grid-cols-2 gap-3 min-[901px]:grid-cols-4">
-        {stats.map(([label, value]) => (
-          <Card key={label}>
-            <div className="text-display-sm text-ink tabular-nums">{value}</div>
-            <div className="text-caption">{label}</div>
-          </Card>
-        ))}
-      </div>
+      <Stats
+        items={[
+          { label: "Students", value: students },
+          {
+            label: "Started",
+            value: started,
+            hint: students ? `${Math.round((100 * started) / students)}%` : undefined,
+          },
+          {
+            label: "Not started",
+            value: notStarted,
+            tone: notStarted > 0 ? "bad" : undefined,
+          },
+          { label: "Full marks", value: fullMarks },
+          {
+            label: "Average",
+            value: averagePercent === null ? "—" : `${averagePercent}%`,
+            hint: `${Math.round(average * 10) / 10} of ${data.total}`,
+          },
+        ]}
+      />
       <TextInput
         aria-label="Search students"
         placeholder="Search by name or email"

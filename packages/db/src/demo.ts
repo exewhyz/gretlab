@@ -90,6 +90,7 @@ const { buildCohort } = await import("./demo/cohort.ts")
 const { buildCompany } = await import("./demo/company.ts")
 const { buildCommunity } = await import("./demo/community.ts")
 const { buildSchoolCoding } = await import("./demo/coding.ts")
+const { buildHolidays } = await import("./demo/holidays.ts")
 
 console.log("Making the demo organizations…")
 const school = await buildSchool()
@@ -99,6 +100,7 @@ await buildCoaching()
 await buildCohort(library.slice(0, 12))
 await buildCompany()
 await buildCommunity()
+await buildHolidays()
 
 console.log(`\nDone in ${Math.round((Date.now() - t0) / 1000)} s. Sign in with email and password; every demo account's password is:\n\n  ${DEMO_PASSWORD}\n`)
 let last = ""

@@ -77,6 +77,30 @@ const teacher = await client("ds-t@example.com")
 check("a class teacher's overview is their own class", (await teacher(`${O}/attendance/overview?month=${day.slice(0, 7)}`)).json?.rows.map((r) => r.id).join() === a.id)
 check("a bad month is refused", (await owner(`${O}/attendance/overview?month=soon`)).status === 400)
 
+// ---------- the coding lab is a module
+check("the coding lab is on for a new school", (await owner(`${O}/shell`)).json?.modules.includes("coding"))
+await owner(O, { method: "PATCH", body: { modules: { coding: false } } })
+const off = (await owner(`${O}/shell`)).json
+check("switched off, it leaves the organization", !off?.modules.includes("coding") && (await owner(`${O}/assignments`)).status === 404 && (await owner(`${O}/problems`)).status === 404)
+check("...and its class page offers no new assignment", (await owner(`${O}/classes/${a.id}`)).json?.can?.assignments === false)
+await owner(O, { method: "PATCH", body: { modules: { coding: true } } })
+check("switched back on, it's back", (await owner(`${O}/assignments`)).status === 200)
+
+// ---------- holidays and the calendar
+const t1 = await client("ds-s1@example.com")
+check("only those who run the settings add holidays", (await t1(`${O}/holidays`, { body: { name: "x", startsOn: day, endsOn: day } })).status === 403)
+check("the last day can't come before the first", (await owner(`${O}/holidays`, { body: { name: "Bad", startsOn: day, endsOn: "2000-01-01" } })).status === 400)
+const hol = await owner(`${O}/holidays`, { body: { name: "Ds Founders Day", startsOn: day, endsOn: day } })
+check("the owner adds a holiday for today", hol.status === 200, JSON.stringify(hol.json))
+check("everyone in it can read the list", (await t1(`${O}/holidays`)).json?.holidays.some((h) => h.name === "Ds Founders Day"))
+const home = (await owner(`${O}/home`)).json
+check("today's holiday is named on the home, with no registers asked for", home?.admin?.holiday === "Ds Founders Day" && home.admin.tiles.present?.open === 0, JSON.stringify(home?.admin?.tiles))
+const cal = (await t1("/me/calendar")).json?.events ?? []
+check("it's on a student's calendar as a whole day", cal.some((e) => e.kind === "holiday" && e.title === "Holiday: Ds Founders Day" && e.allDay))
+check("...and on their parent's", ((await client("ds-p@example.com").then((c) => c("/me/calendar"))).json?.events ?? []).some((e) => e.kind === "holiday"))
+await owner(`${O}/holidays/${hol.json.id}`, { method: "DELETE" })
+check("removing it takes it off", !((await t1("/me/calendar")).json?.events ?? []).some((e) => e.kind === "holiday"))
+
 // ---------- the pages
 const browser = await chromium.launch()
 const view = async (email, width = 1440) => {

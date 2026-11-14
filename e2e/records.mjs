@@ -58,7 +58,7 @@ const officeRole = (await owner(`${O}/roles`, { body: { name: "Grade 1 office", 
 await owner(`${O}/members/${uid("rec-office")}/roles`, { body: { roleId: officeRole.id, groupId: g1.id } })
 
 // ---------- the module and years
-check("a school has student records by default", (await owner(O + "/manage")).json?.org.modules[0] === "records")
+check("a school has student records by default", (await owner(O + "/manage")).json?.org.modules.includes("records"))
 check("a company doesn't", (await owner("/orgs/rec-co/students")).status === 404)
 const add = (who, body) => who(`${O}/students`, { body })
 check("with no current year, a student can't be placed", (await add(owner, { name: "Rec Early", groupId: a1.id })).json?.error?.code === "no_year")

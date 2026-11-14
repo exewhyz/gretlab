@@ -34,6 +34,7 @@ export const coaching = {
   },
   groupLevels: ["Course", "Batch"],
   capabilities: [
+    "coding",
     "records",
     "admissions",
     "exams",
@@ -49,6 +50,7 @@ export const coaching = {
     "finance",
   ],
   defaults: [
+    "coding",
     "records",
     "admissions",
     "exams",

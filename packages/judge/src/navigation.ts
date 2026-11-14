@@ -135,6 +135,7 @@ export const ORG_NAV: NavItem[] = [
     path: "/assignments",
     group: "Coding lab",
     anyOf: ["assignments.manage", "gradebook.view"],
+    module: "coding",
   },
   {
     key: "academic-years",
@@ -229,6 +230,7 @@ export const ORG_NAV: NavItem[] = [
     path: "/templates",
     group: "Coding lab",
     anyOf: ["assignments.manage"],
+    module: "coding",
   },
   {
     key: "contests",
@@ -236,6 +238,7 @@ export const ORG_NAV: NavItem[] = [
     path: "/contests",
     group: "Coding lab",
     anyOf: ["contests.manage"],
+    module: "coding",
   },
 
   {
@@ -244,6 +247,7 @@ export const ORG_NAV: NavItem[] = [
     path: "/library",
     group: "Coding lab",
     anyOf: ["problems.manage", "assignments.manage", "contests.manage"],
+    module: "coding",
   },
   {
     key: "courses",
@@ -258,6 +262,7 @@ export const ORG_NAV: NavItem[] = [
     path: "/problems",
     group: "Coding lab",
     anyOf: ["problems.manage"],
+    module: "coding",
   },
   {
     key: "questions",
@@ -265,6 +270,7 @@ export const ORG_NAV: NavItem[] = [
     path: "/questions",
     group: "Coding lab",
     anyOf: ["problems.manage"],
+    module: "coding",
   },
 
   {
@@ -329,6 +335,14 @@ export const ORG_NAV: NavItem[] = [
     anyOf: ["org.notifications.manage"],
   },
 
+  {
+    key: "holidays",
+    label: "Holidays",
+    path: "/holidays",
+    group: "Every day",
+    anyOf: ["org.settings.manage"],
+    wholeOrg: true,
+  },
   {
     key: "settings",
     label: "Settings",

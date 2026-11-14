@@ -397,8 +397,9 @@ export async function teacherHome(user: User) {
         (s) => s.teacherId === user.id && s.day >= weekAgo
       ).length,
       can: {
-        assignments: canAnywhere(ctx, "assignments.manage"),
-        contests: canAnywhere(ctx, "contests.manage"),
+        assignments:
+          ctx.modules.has("coding") && canAnywhere(ctx, "assignments.manage"),
+        contests: ctx.modules.has("coding") && canAnywhere(ctx, "contests.manage"),
         grades: canAnywhere(ctx, "gradebook.view"),
         reports: canAnywhere(ctx, "reports.view"),
       },

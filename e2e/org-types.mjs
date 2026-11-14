@@ -50,7 +50,7 @@ const school = (await owner("/orgs/typ-school/manage")).json
 check("a school starts with Grade › Section", school?.org.groupLevels.join() === "Grade,Section", JSON.stringify(school?.org.groupLevels))
 check("a cohort starts with Cohort › Pod", (await owner("/orgs/typ-cohort/manage")).json?.org.groupLevels.join() === "Cohort,Pod")
 check("a company starts with Department › Team", (await owner("/orgs/typ-company/manage")).json?.org.groupLevels.join() === "Department,Team")
-check("a school starts with its ready default modules on", school?.org.modules.join() === "records,exams,admissions,leave,staffAttendance,attendance,timetable,subjects,parents" && JSON.stringify(school?.org.moduleChoices) === "{}", JSON.stringify(school?.org.modules))
+check("a school starts with its ready default modules on", school?.org.modules.join() === "coding,records,exams,admissions,leave,staffAttendance,attendance,timetable,subjects,parents" && JSON.stringify(school?.org.moduleChoices) === "{}", JSON.stringify(school?.org.modules))
 
 // ---------- switching modules
 const patch = (slug, modules) => owner(`/orgs/${slug}`, { method: "PATCH", body: { modules } })

@@ -10,6 +10,7 @@ import {
   BusIcon,
   CalendarCheckIcon,
   CalendarDotsIcon,
+  CalendarXIcon,
   CalendarStarIcon,
   ChalkboardTeacherIcon,
   ChartBarIcon,
@@ -97,7 +98,8 @@ export function useOrgReach(slug: string) {
   return {
     ready: Boolean(shell),
     /** Holds this permission anywhere here. */
-    may: (permission: string) => shell?.permissions.includes(permission) ?? false,
+    may: (permission: string) =>
+      shell?.permissions.includes(permission) ?? false,
     /** This module is switched on. */
     has: (module: string) => shell?.modules.includes(module) ?? false,
     /** The sidebar opens this management page (an ORG_NAV key). */
@@ -125,6 +127,7 @@ const ICONS: Record<string, Icon> = {
   subjects: BookOpenIcon,
   timetable: CalendarDotsIcon,
   "my-timetable": CalendarDotsIcon,
+  holidays: CalendarXIcon,
   courses: StackIcon,
   outcomes: TargetIcon,
   training: SealCheckIcon,
@@ -208,14 +211,15 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
           : []),
       ],
     })
-    groups.push({
-      group: "Coding lab",
-      items: [
-        { key: "assignments", label: "Assignments", href: "/assignments" },
-        { key: "practice", label: "Practice", href: "/problems" },
-        { key: "contests", label: "Contests", href: "/contests" },
-      ],
-    })
+    if (shell.modules.includes("coding"))
+      groups.push({
+        group: "Coding lab",
+        items: [
+          { key: "assignments", label: "Assignments", href: "/assignments" },
+          { key: "practice", label: "Practice", href: "/problems" },
+          { key: "contests", label: "Contests", href: "/contests" },
+        ],
+      })
   }
   // Parents: each child.
   if (shell.views.includes("parent") && shell.children.length) {
@@ -237,7 +241,9 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
             {
               key: "open-groups",
               // Next to the Groups page staff manage, this one says what it's for.
-              label: managed.some((g) => g.items.some((i) => i.key === "groups"))
+              label: managed.some((g) =>
+                g.items.some((i) => i.key === "groups")
+              )
                 ? `Join ${(shell.terms?.groups ?? "groups").toLowerCase()}`
                 : (shell.terms?.groups ?? "Groups"),
               href: `${base}/groups`,

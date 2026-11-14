@@ -69,7 +69,7 @@ import {
   TextArea,
   TextInput,
 } from "@/components/form"
-import { Loading, PageTitle } from "@/features/admin/components/shell"
+import { Loading, PageTitle, Stats } from "@/features/admin/components/shell"
 import { api, ApiRequestError } from "@/lib/api/client"
 
 /* ---------- shared ---------- */
@@ -1723,6 +1723,19 @@ export function MarksSheet({
     const d = draft[s.id]
     return d && (d.absent || d.text.trim() !== "")
   }).length
+  // The paper as it stands (unsaved changes included): what a teacher checks before saving.
+  const scores = data.students
+    .map((s, i) => {
+      const d = draft[s.id]
+      if (!d || d.absent || d.text.trim() === "" || errors[i]) return null
+      return Number(d.text)
+    })
+    .filter((n): n is number => n !== null && Number.isFinite(n))
+  const absent = data.students.filter((s) => draft[s.id]?.absent).length
+  const below = scores.filter((n) => n < paper.passMarks).length
+  const mean = scores.length
+    ? scores.reduce((t, n) => t + n, 0) / scores.length
+    : null
   return (
     <>
       <div className="mb-1 text-body-sm text-muted-foreground">
@@ -1760,6 +1773,28 @@ export function MarksSheet({
             ? "Only the subject teacher can enter these."
             : "Press Enter to go to the next student. Halves are allowed."}
       </p>
+      {data.students.length > 0 && (
+        <Stats
+          items={[
+            { label: "Entered", value: entered, hint: `of ${data.students.length}` },
+            {
+              label: "Average",
+              value: mean === null ? "—" : fmt(Math.round(mean * 10) / 10),
+              hint: mean === null ? undefined : `${Math.round((100 * mean) / paper.maxMarks)}%`,
+            },
+            {
+              label: "Highest",
+              value: scores.length ? fmt(Math.max(...scores)) : "—",
+            },
+            {
+              label: `Below pass (${fmt(paper.passMarks)})`,
+              value: below,
+              tone: below > 0 ? "bad" : undefined,
+            },
+            { label: "Absent", value: absent },
+          ]}
+        />
+      )}
       {save.error && (
         <FormMessage message={{ text: save.error.message, kind: "err" }} />
       )}

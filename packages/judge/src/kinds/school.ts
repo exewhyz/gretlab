@@ -35,6 +35,7 @@ export const school = {
   },
   groupLevels: ["Grade", "Section"],
   capabilities: [
+    "coding",
     "records",
     "admissions",
     "exams",
@@ -51,6 +52,7 @@ export const school = {
     "finance",
   ],
   defaults: [
+    "coding",
     "records",
     "admissions",
     "exams",

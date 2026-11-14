@@ -35,6 +35,7 @@ export const college = {
   },
   groupLevels: ["Department", "Batch"],
   capabilities: [
+    "coding",
     "records",
     "admissions",
     "exams",
@@ -51,6 +52,7 @@ export const college = {
     "finance",
   ],
   defaults: [
+    "coding",
     "records",
     "admissions",
     "exams",

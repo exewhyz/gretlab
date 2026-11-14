@@ -246,6 +246,18 @@ export async function buildSchool(): Promise<SchoolResult> {
     await insertAll(attendance, rows, 1000)
   }
 
+  // ---------- the next exam: Unit test 2, a paper a day from ten days on (no marks yet)
+  const [upcoming] = await db
+    .insert(termExams)
+    .values({ orgId: org.id, yearId: year!.id, name: "Unit test 2", startsOn: day(10), endsOn: day(10 + subjectRows.length - 1), weight: 20 })
+    .returning({ id: termExams.id })
+  await insertAll(
+    examPapers,
+    sections.flatMap((sec) =>
+      subjectRows.map((subj, i) => ({ orgId: org.id, examId: upcoming!.id, groupId: sec.id, subjectId: subj.id, maxMarks: 25, passMarks: 8, heldOn: day(10 + i) }))
+    )
+  )
+
   // ---------- exams: unit test 1 and the half-yearly, published, with marks
   const exams = await db
     .insert(termExams)

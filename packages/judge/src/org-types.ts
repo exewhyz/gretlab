@@ -45,6 +45,12 @@ export interface OrgTypeConfig {
 }
 
 export const MODULES = {
+  coding: {
+    label: "Coding lab",
+    description:
+      "Programming assignments, lab exams and contests, judged by running students' code, with the problem and question library and templates.",
+    ready: true,
+  },
   records: {
     label: "Student records",
     description:

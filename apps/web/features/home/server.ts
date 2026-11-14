@@ -39,6 +39,7 @@ import { campusOf } from "@/features/campus/server"
 import { today } from "@/features/catalog/server"
 import { classAttendance, classStream } from "@/features/classes/server"
 import { listContests } from "@/features/contests/server"
+import { holidayOn } from "@/features/holidays/server"
 import { pendingLeaveCount } from "@/features/leave/server"
 import { papersToMark } from "@/features/results/server"
 import { staffToday } from "@/features/staff-attendance/server"
@@ -690,7 +691,9 @@ async function adminHome(ctx: OrgContext) {
       : []),
   ]
 
-  const notTaken = rows.filter((r) => !r.taken)
+  // On a holiday no register is expected, so none is "not taken".
+  const holiday = await holidayOn(ctx.org.id, day)
+  const notTaken = holiday ? [] : rows.filter((r) => !r.taken)
   const attention = [
     ...(newApps > 0
       ? [
@@ -811,6 +814,7 @@ async function adminHome(ctx: OrgContext) {
         ? { present: presentToday, of: markedToday, open: notTaken.length }
         : null,
     },
+    holiday,
     steps: reachable(ctx, steps),
     classes: modules.has("attendance") ? rows : [],
     trend,
@@ -902,9 +906,9 @@ async function teacherHome(ctx: OrgContext, user: User) {
   }
   low.sort((a, b) => a.percent - b.percent)
 
-  const toTake = modules.has("attendance")
-    ? classes.filter((c) => !c.taken)
-    : []
+  const holiday = await holidayOn(ctx.org.id, day)
+  const toTake =
+    modules.has("attendance") && !holiday ? classes.filter((c) => !c.taken) : []
   // The newer processes: marks still to enter in their subjects, leave waiting for them.
   const [toMark, leaveWaiting] = await Promise.all([
     papersToMark(ctx),
@@ -961,6 +965,7 @@ async function teacherHome(ctx: OrgContext, user: User) {
     ]),
     classes,
     attendanceOn: modules.has("attendance"),
+    holiday,
   }
 }
 

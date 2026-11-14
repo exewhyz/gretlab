@@ -76,6 +76,7 @@ type Tone = "bad" | "plain"
 
 interface AdminData {
   day: string
+  holiday: string | null
   tiles: {
     students: number
     teachers: number
@@ -103,6 +104,7 @@ interface AdminData {
 
 interface TeacherData {
   day: string
+  holiday: string | null
   checkIn?: boolean
   tiles: { lessons: number; toTake: number; students: number; low: number }
   periods: {
@@ -369,15 +371,26 @@ function Greeting({
   day,
   title,
   actions,
+  holiday,
 }: {
   day: string
   title: string
   actions?: React.ReactNode
+  /** Today's holiday, if the organization is closed. */
+  holiday?: string | null
 }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-body-sm text-muted-foreground">{longDay(day)}</p>
+        <p className="text-body-sm text-muted-foreground">
+          {longDay(day)}
+          {holiday && (
+            <span data-testid="holiday-today">
+              {" "}
+              · <span className="font-medium text-ink">Holiday: {holiday}</span>
+            </span>
+          )}
+        </p>
         <h1 className="mt-1 text-[26px] leading-tight tracking-tight text-ink sm:text-display-lg">
           {title}
         </h1>
@@ -544,6 +557,7 @@ function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
     <div className="grid gap-5" data-testid="admin-home">
       <Greeting
         day={data.day}
+        holiday={data.holiday}
         title={first ? `${greeting()}, ${first}` : greeting()}
         actions={
           <>
@@ -862,6 +876,7 @@ function TeacherHome({
     <div className="grid gap-5" data-testid="teacher-home">
       <Greeting
         day={data.day}
+        holiday={data.holiday}
         title={`${terms.instructor === "Mentor" ? "Mentoring" : terms.instructor === "Manager" ? "Your team" : "Teaching"} today`}
       />
       {data.checkIn && <CheckInCard slug={slug} />}

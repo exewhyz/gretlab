@@ -89,8 +89,18 @@ function needAnywhere(
 
 /* ---------- contests ---------- */
 
+/**
+ * The Coding lab module: switched off, nothing new is set or written (lists and editors are
+ * gone, as in the sidebar). What exists stays readable: gradebooks, and students' own work.
+ */
+function needCoding(ctx: { modules: ReadonlySet<string> }) {
+  if (!ctx.modules.has("coding"))
+    throw new ApiError(404, "module_off", "The coding lab is switched off here.")
+}
+
 export async function orgContests(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   needAnywhere(ctx, "contests.manage")
   return (await listOwnedContests(ctx.org.id)).filter((c) =>
     canFor(ctx, "contests.manage", c.audience)
@@ -111,6 +121,7 @@ export async function saveOrgContest(
   input: ContestInput
 ) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   checkAudience(ctx, input.audience)
   // Both who it was for and who it will be for must be within reach.
   const contestAction = id ? "contests.edit" : "contests.create"
@@ -142,6 +153,7 @@ export async function deleteOrgContest(slug: string, user: User, id: string) {
 
 export async function orgAssignments(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   needAnywhere(ctx, "assignments.manage", "gradebook.view")
   return (await listAssignmentsForStaff(ctx.org.id))
     .filter(
@@ -170,6 +182,7 @@ export async function saveOrgAssignment(
   input: AssignmentInput
 ) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   checkAudience(ctx, input.audience)
   const existing = id ? await getAssignmentForStaff(id, ctx.org.id) : null
   const action = id ? "assignments.edit" : "assignments.create"
@@ -251,6 +264,7 @@ export async function orgGradebook(
 /** With `picker`, also everyone's published problems, for choosing contest problems. */
 export async function orgProblems(slug: string, user: User, picker: boolean) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   if (picker)
     needAnywhere(
       ctx,
@@ -270,6 +284,7 @@ export async function orgProblem(slug: string, user: User, id: string) {
 
 export async function orgQuestions(slug: string, user: User, picker: boolean) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   // Picking needs the right to set work; the bank itself, to write problems.
   if (picker)
     needAnywhere(
@@ -295,6 +310,7 @@ export async function saveOrgQuestion(
   input: Parameters<typeof saveQuestion>[1]
 ) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   needAnywhere(ctx, id ? "problems.edit" : "problems.create")
   const saved = await saveQuestion(id, input, ctx.org.id)
   await writeAudit(
@@ -320,6 +336,7 @@ export async function orgImportQuestions(
   input: { file: unknown; published: boolean }
 ) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   needAnywhere(ctx, "problems.create")
   const result = await importQuestions(ctx.org.id, input.file, input.published)
   await writeAudit(
@@ -336,6 +353,7 @@ export async function orgImportProblems(
   input: { file: unknown; listed: boolean; published: boolean }
 ) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   needAnywhere(ctx, "problems.create")
   const result = await importProblems(ctx.org.id, input.file, input)
   await writeAudit(
@@ -354,6 +372,7 @@ export async function saveOrgProblem(
   input: ProblemInput
 ) {
   const ctx = await orgContext(slug, user)
+  needCoding(ctx)
   needAnywhere(ctx, id ? "problems.edit" : "problems.create")
   if (input.published) needAnywhere(ctx, "problems.publish")
   const problem = await saveProblem(id, input, ctx.org.id)

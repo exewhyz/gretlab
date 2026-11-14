@@ -1,10 +1,11 @@
 "use client"
 
-import type { Icon } from "@phosphor-icons/react"
+import { CaretDownIcon, type Icon } from "@phosphor-icons/react"
 import Link from "next/link"
 import { useEffect, useState, type ReactNode } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
+import { cn } from "@workspace/ui/lib/utils"
 import { Separator } from "@workspace/ui/components/separator"
 import {
   Sidebar,
@@ -62,6 +63,37 @@ function useWideEnough() {
   return [open, setOpen] as const
 }
 
+/**
+ * Sidebar groups this person folded away, remembered on this device (per navigation, so a
+ * school's and the platform's don't mix). Every group starts open; a long sidebar can be
+ * cut down to what someone uses without anything being hidden by default.
+ */
+function useFolded(navLabel: string) {
+  const key = `gretlab.folded.${navLabel}`
+  const [folded, setFolded] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(key) ?? "[]") as unknown
+      if (Array.isArray(saved)) setFolded(new Set(saved.map(String)))
+    } catch {
+      // Storage off or unreadable: everything stays open.
+    }
+  }, [key])
+  const toggle = (group: string) =>
+    setFolded((cur) => {
+      const next = new Set(cur)
+      if (next.has(group)) next.delete(group)
+      else next.add(group)
+      try {
+        localStorage.setItem(key, JSON.stringify([...next]))
+      } catch {
+        // Not remembered; it still folds for now.
+      }
+      return next
+    })
+  return [folded, toggle] as const
+}
+
 export function AppFrame({
   brand,
   navLabel,
@@ -93,6 +125,7 @@ export function AppFrame({
   children: ReactNode
 }) {
   const [open, setOpen] = useWideEnough()
+  const [folded, toggleFolded] = useFolded(navLabel)
   return (
     <TooltipProvider>
       <SidebarProvider open={open} onOpenChange={setOpen}>
@@ -139,28 +172,55 @@ export function AppFrame({
                 </div>
               ))}
             <nav aria-label={navLabel} className="flex flex-col gap-2">
-              {groups.map((g) => (
-                <SidebarGroup key={g.group || "home"}>
-                  {g.group && <SidebarGroupLabel>{g.group}</SidebarGroupLabel>}
-                  <SidebarMenu>
-                    {g.items.map((item) => (
-                      <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton
-                          isActive={isActive(item.href)}
-                          tooltip={item.label}
-                          render={<Link href={item.href} />}
-                        >
-                          <item.icon />
-                          <span>{item.label}</span>
-                        </SidebarMenuButton>
-                        {item.badge && (
-                          <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
-                        )}
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroup>
-              ))}
+              {groups.map((g) => {
+                // A folded group still shows the page you're on.
+                const shut = Boolean(g.group) && folded.has(g.group)
+                const items = shut
+                  ? g.items.filter((item) => isActive(item.href))
+                  : g.items
+                return (
+                  <SidebarGroup key={g.group || "home"}>
+                    {g.group && (
+                      <SidebarGroupLabel
+                        render={
+                          <button
+                            type="button"
+                            aria-expanded={!shut}
+                            onClick={() => toggleFolded(g.group)}
+                          />
+                        }
+                        className="w-full cursor-pointer justify-between hover:text-sidebar-foreground"
+                      >
+                        {g.group}
+                        <CaretDownIcon
+                          aria-hidden
+                          className={cn(
+                            "transition-transform",
+                            shut && "-rotate-90"
+                          )}
+                        />
+                      </SidebarGroupLabel>
+                    )}
+                    <SidebarMenu>
+                      {items.map((item) => (
+                        <SidebarMenuItem key={item.href}>
+                          <SidebarMenuButton
+                            isActive={isActive(item.href)}
+                            tooltip={item.label}
+                            render={<Link href={item.href} />}
+                          >
+                            <item.icon />
+                            <span>{item.label}</span>
+                          </SidebarMenuButton>
+                          {item.badge && (
+                            <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+                          )}
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroup>
+                )
+              })}
             </nav>
           </SidebarContent>
           <SidebarRail />

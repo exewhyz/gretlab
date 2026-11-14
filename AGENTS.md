@@ -228,6 +228,12 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
     - An optional widget whose data may be refused sets `throwOnError: false`.
     - A 403 or 404 isn't retried.
   - **Redirected pages.** `/orgs/:slug/manage` goes to `/orgs/:slug`, the organization's one dashboard. `/orgs/:slug/manage/teaching/:group` goes to the class page's "Syllabus and log" tab.
+  - **Coding lab module.** `coding` covers assignments, contests, problems, questions, templates and the library. It's on by default for every kind, so existing organizations keep it, and an organization can switch it off in Settings.
+    - Switched off, its sidebar items, the student "Coding lab" group, and the New assignment and New contest buttons go.
+    - The content API refuses listing and writing new work (`needCoding()` in `features/orgs/content.ts`; 404 `module_off`).
+    - Gradebooks and students' own past work stay readable.
+  - **Sidebar groups fold.** Every group starts open; its heading folds it, and the choice is remembered per device and per navigation (`useFolded` in `components/app-frame.tsx`). A folded group still shows the page you're on.
+  - **Data screens.** A list's figures go above it in one line (`Stats` in `features/admin/components/shell.tsx`), not as a row of tiles, and percentages in tables are `PercentBar`s. Used on Reports, the gradebook, marks entry and the attendance overview.
   - **Tests.** `e2e/access-links.mjs` covers this. A crawl of the demo accounts (`pnpm --filter @workspace/db demo`) should find no 403 or 404 behind any link.
 
 ## Attendance (module)
@@ -615,6 +621,11 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 ## Demo data
 
 - `pnpm --filter @workspace/db demo` (`packages/db/src/demo.ts`) shows which database it would wipe and changes nothing; `--wipe=<database name>` (typed exactly) empties every table except configuration (settings, language settings, runners, LTI keys, kind decisions, email wording), re-imports the problem library, and makes one organization of each kind with a few months of realistic activity (`src/demo/*.ts`, seeded randomness: the same data each run, dates relative to today). Re-running replaces it all.
+- **What else it makes:**
+  - The school has a Grade 10 contest from ten days ago, with results.
+  - The platform has an open contest next week.
+  - The school has an upcoming Unit test 2 with a paper a day.
+  - The school, college and coaching centre have holidays: a break that just ended, one coming up, and the national days (`demo/holidays.ts`).
 - Every demo account signs in with email and the password "Gretlab demo 2026"; addresses are on `<org>.demo.invalid`, so no email is ever sent to them (`isUndeliverable` in `packages/judge/src/records.ts`; `isNoLoginEmail` is only the no-login students' domain). The script prints the accounts to try, one per role. Platform admins still come from ADMIN_EMAILS.
 
 ## Platform staff inside organizations
@@ -625,8 +636,24 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 
 ## Calendar
 
-- `/calendar` (account menu) lists everything with a date for the viewer, by day (`features/calendar/server.ts`, `eventsFor`): published assignments' due times with their own extension, exam windows, peer reviews still to write that have a due time, and contests they registered for or their organizations run (the platform's open contests don't fill everyone's calendar).
+- `/calendar` (account menu) lists everything with a date for the viewer, by day (`features/calendar/server.ts`, `eventsFor`):
+  - published assignments' due times with their own extension, exam windows, and peer reviews still to write that have a due time;
+  - contests they registered for or their organizations run (the platform's open contests don't fill everyone's calendar).
+- From each organization they're in, `orgDates()` adds:
+  - its holidays;
+  - exam papers with a date in the classes they or their children sit (named for the child);
+  - their own or their children's leave, approved or waiting;
+  - training they still need to do, on its need-by date;
+  - the dates of cohort runs they're in.
+- These are whole days (`allDay`): the page shows "All day" or the last day, keyed by the date itself so it never shifts with the viewer's time zone.
 - The same events as a private iCal feed at `/api/v1/calendar/<secret>.ics` (`users.calendar_token`, 24 random bytes): calendar apps can't sign in, so the address is the key. Off until turned on; "New link" retires the old one; blocked accounts' feeds stop. It never includes marks or code. iCal rules (escaping, 75-octet folding, UTC, CRLF, stable UIDs): `packages/judge/src/ical.ts`, unit-tested. Absolute links use `NEXTAUTH_URL`.
+
+## Holidays
+
+- **The table.** `org_holidays` (migration 0069) holds the days an organization is closed: a name and a first and last day, at most three months.
+- **Who edits.** Manage › Holidays (`features/holidays`), for whoever holds `org.settings.manage` across the organization. Adding and removing are audited.
+- **Who sees them.** Everyone in the organization can read the list; they're on everyone's calendar.
+- **Homes.** On a holiday the admin and teacher homes ask for no registers ("not taken" is empty), and the greeting names it (`holidayOn()`).
 
 ## Notifications
 

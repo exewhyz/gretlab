@@ -312,8 +312,9 @@ export async function classOverview(slug: string, user: User, groupId: string) {
     viewer: { teaches: cc.teaches, sits: cc.sits },
     modules: [...ctx.modules],
     can: {
-      assignments: can("assignments.manage"),
-      contests: can("contests.manage"),
+      // Setting coding work needs the Coding lab module on, too.
+      assignments: ctx.modules.has("coding") && can("assignments.manage"),
+      contests: ctx.modules.has("coding") && can("contests.manage"),
       notices: can("notices.manage"),
       grades: can("gradebook.view"),
       people: can("org.members.view"),

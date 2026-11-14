@@ -1400,6 +1400,27 @@ export const examPapers = pgTable(
   ]
 )
 
+/**
+ * A day or run of days an organization is closed (Diwali break, a national holiday): on
+ * everyone's calendar, and no register is expected on it.
+ */
+export const orgHolidays = pgTable(
+  "org_holidays",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** "YYYY-MM-DD", first day closed. */
+    startsOn: text("starts_on").notNull(),
+    /** "YYYY-MM-DD", last day closed (the same day for one day). */
+    endsOn: text("ends_on").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("org_holidays_org_day").on(table.orgId, table.startsOn)]
+)
+
 /** A student's marks in a paper (halves allowed), or that they missed it. */
 export const examMarks = pgTable(
   "exam_marks",

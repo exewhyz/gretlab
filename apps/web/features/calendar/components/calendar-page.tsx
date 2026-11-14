@@ -15,13 +15,24 @@ import { api } from "@/lib/api/client"
 
 interface Event {
   id: string
-  kind: "due" | "exam" | "contest" | "peer_review" | "event"
+  kind:
+    | "due"
+    | "exam"
+    | "contest"
+    | "peer_review"
+    | "event"
+    | "holiday"
+    | "paper"
+    | "leave"
+    | "training"
+    | "run"
   title: string
   start: string
   end: string | null
   href: string
   detail: string
   done: boolean
+  allDay?: boolean
 }
 
 const KIND: Record<Event["kind"], { label: string; tone: string }> = {
@@ -30,24 +41,42 @@ const KIND: Record<Event["kind"], { label: string; tone: string }> = {
   contest: { label: "Contest", tone: "bg-muted text-ink" },
   peer_review: { label: "Reviews", tone: "bg-success/10 text-success" },
   event: { label: "Event", tone: "bg-primary/10 text-primary-active" },
+  holiday: { label: "Holiday", tone: "bg-success/10 text-success" },
+  paper: { label: "Exam paper", tone: "bg-destructive/10 text-destructive" },
+  leave: { label: "Leave", tone: "bg-muted text-ink" },
+  training: { label: "Training", tone: "bg-primary/10 text-primary" },
+  run: { label: "Cohort", tone: "bg-muted text-ink" },
 }
 
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString("en-CA")
-const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+/** The day an entry falls on: a whole-day one keeps its date in every time zone. */
+const dayOf = (e: { start: string; allDay?: boolean }) =>
+  e.allDay ? e.start.slice(0, 10) : dayKey(e.start)
+const lastDayOf = (e: {
+  start: string
+  end: string | null
+  allDay?: boolean
+}) => (e.end ? (e.allDay ? e.end.slice(0, 10) : dayKey(e.end)) : dayOf(e))
+const time = (iso: string) =>
+  new Date(iso).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  })
 
 /** Everything with a date, by day, and the private feed for calendar apps. */
 export function CalendarPage() {
   const { data, error } = useQuery({
     queryKey: ["me", "calendar"],
-    queryFn: () => api<{ events: Event[]; feed: string | null }>("/me/calendar"),
+    queryFn: () =>
+      api<{ events: Event[]; feed: string | null }>("/me/calendar"),
   })
   const [past, setPast] = useState(false)
   const days = useMemo(() => {
     if (!data) return []
     const today = new Date().toLocaleDateString("en-CA")
-    const shown = data.events.filter((e) => past || dayKey(e.end ?? e.start) >= today)
+    const shown = data.events.filter((e) => past || lastDayOf(e) >= today)
     const by = new Map<string, Event[]>()
-    for (const e of shown) by.set(dayKey(e.start), [...(by.get(dayKey(e.start)) ?? []), e])
+    for (const e of shown) by.set(dayOf(e), [...(by.get(dayOf(e)) ?? []), e])
     return [...by.entries()]
   }, [data, past])
   if (!data) return <Loading error={error} />
@@ -58,7 +87,8 @@ export function CalendarPage() {
         <div>
           <h1 className="text-display-lg text-ink">Calendar</h1>
           <p className="text-body-sm text-body">
-            Due times (with your extensions), exams, peer reviews and your contests.
+            Work due (with your extensions), exam papers, contests, events,
+            holidays, leave and training: everything with a date, in one place.
           </p>
         </div>
         <Check checked={past} onCheckedChange={setPast} label="Show past" />
@@ -70,14 +100,22 @@ export function CalendarPage() {
         <ol className="grid gap-4" data-testid="agenda">
           {days.map(([day, events]) => (
             <li key={day} className="grid gap-1.5">
-              <h2 className={cn("text-body-sm font-semibold", day === today ? "text-primary" : "text-ink")}>
+              <h2
+                className={cn(
+                  "text-body-sm font-semibold",
+                  day === today ? "text-primary" : "text-ink"
+                )}
+              >
                 {day === today
                   ? "Today"
                   : new Date(`${day}T00:00:00`).toLocaleDateString(undefined, {
                       weekday: "long",
                       month: "short",
                       day: "numeric",
-                      year: day.slice(0, 4) === today.slice(0, 4) ? undefined : "numeric",
+                      year:
+                        day.slice(0, 4) === today.slice(0, 4)
+                          ? undefined
+                          : "numeric",
                     })}
               </h2>
               <ul className="grid gap-1">
@@ -92,15 +130,36 @@ export function CalendarPage() {
                       )}
                     >
                       <span className="w-20 text-caption tabular-nums">
-                        {time(e.start)}
-                        {e.end && dayKey(e.end) === day && `–${time(e.end)}`}
+                        {e.allDay ? (
+                          lastDayOf(e) !== dayOf(e) ? (
+                            `To ${new Date(`${lastDayOf(e)}T00:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" })}`
+                          ) : (
+                            "All day"
+                          )
+                        ) : (
+                          <>
+                            {time(e.start)}
+                            {e.end &&
+                              dayKey(e.end) === day &&
+                              `–${time(e.end)}`}
+                          </>
+                        )}
                       </span>
-                      <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", KIND[e.kind].tone)}>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs font-medium",
+                          KIND[e.kind].tone
+                        )}
+                      >
                         {KIND[e.kind].label}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-body-sm text-ink">{e.title}</span>
-                        <span className="block truncate text-caption">{e.detail}</span>
+                        <span className="block line-clamp-2 text-body-sm text-ink">
+                          {e.title}
+                        </span>
+                        <span className="block truncate text-caption">
+                          {e.detail}
+                        </span>
                       </span>
                       {e.done && <span className="text-caption">Done</span>}
                     </Link>
@@ -119,14 +178,22 @@ function Feed({ feed }: { feed: string | null }) {
   const client = useQueryClient()
   const [copied, setCopied] = useState(false)
   const done = () => client.invalidateQueries({ queryKey: ["me", "calendar"] })
-  const rotate = useMutation({ mutationFn: () => api("/me/calendar/feed", { body: {} }), onSuccess: done })
+  const rotate = useMutation({
+    mutationFn: () => api("/me/calendar/feed", { body: {} }),
+    onSuccess: done,
+  })
   const remove = useMutation({
     mutationFn: () => api("/me/calendar/feed", { method: "DELETE" }),
     onSuccess: done,
   })
-  const url = feed ? `${window.location.origin}/api/v1/calendar/${feed}.ics` : null
+  const url = feed
+    ? `${window.location.origin}/api/v1/calendar/${feed}.ics`
+    : null
   return (
-    <section className="grid gap-2 rounded-lg border border-hairline bg-card p-3" data-testid="calendar-feed">
+    <section
+      className="grid gap-2 rounded-lg border border-hairline bg-card p-3"
+      data-testid="calendar-feed"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <CalendarBlankIcon className="size-5 text-body" />
         <span className="flex-1 text-body-sm text-ink">
@@ -135,14 +202,23 @@ function Feed({ feed }: { feed: string | null }) {
             : "See these in Google Calendar, Outlook or Apple Calendar, kept up to date."}
         </span>
         {!url && (
-          <Button size="sm" disabled={rotate.isPending} onClick={() => rotate.mutate()}>
+          <Button
+            size="sm"
+            disabled={rotate.isPending}
+            onClick={() => rotate.mutate()}
+          >
             Get calendar link
           </Button>
         )}
       </div>
       {url && (
         <div className="flex flex-wrap items-center gap-2">
-          <TextInput aria-label="Calendar link" readOnly value={url} className="min-w-0 flex-1 font-mono text-xs" />
+          <TextInput
+            aria-label="Calendar link"
+            readOnly
+            value={url}
+            className="min-w-0 flex-1 font-mono text-xs"
+          />
           <Button
             size="sm"
             variant="outline"
@@ -181,12 +257,17 @@ function Feed({ feed }: { feed: string | null }) {
       )}
       {url && (
         <p className="text-caption">
-          Anyone with this link sees your due dates and contests (never marks or code). Make a
-          new one if you shared it by mistake.
+          Anyone with this link sees your due dates and contests (never marks or
+          code). Make a new one if you shared it by mistake.
         </p>
       )}
       {(rotate.error ?? remove.error) && (
-        <FormMessage message={{ text: (rotate.error ?? remove.error)!.message, kind: "err" }} />
+        <FormMessage
+          message={{
+            text: (rotate.error ?? remove.error)!.message,
+            kind: "err",
+          }}
+        />
       )}
     </section>
   )
