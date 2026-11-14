@@ -31,6 +31,7 @@ import { Progress } from "@workspace/ui/components/progress"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { Figure, Figures } from "@/components/figures"
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
 import type { ApiResult } from "@/lib/api/types"
@@ -71,49 +72,15 @@ const when = (iso: string) =>
     minute: "2-digit",
   })
 
-function Tile({
-  label,
-  value,
-  hint,
-  tone,
-  href,
-}: {
+/** One of the home's figures (components/figures.tsx), leading to its detail. */
+function Tile(props: {
   label: string
   value: string
   hint?: string
-  tone?: "primary" | "bad"
+  tone?: "bad"
   href?: string
 }) {
-  const card = (
-    <Card
-      size="sm"
-      className={cn("h-full", href && "transition-shadow hover:shadow-md")}
-      data-testid="member-tile"
-    >
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <div
-          className={cn(
-            "text-3xl leading-tight font-semibold text-ink tabular-nums",
-            tone === "primary" && "text-primary-active",
-            tone === "bad" && "text-destructive"
-          )}
-        >
-          {value}
-        </div>
-        {hint && (
-          <div className="text-caption text-muted-foreground">{hint}</div>
-        )}
-      </CardHeader>
-    </Card>
-  )
-  return href ? (
-    <Link href={href} className="block h-full">
-      {card}
-    </Link>
-  ) : (
-    card
-  )
+  return <Figure {...props} testId="member-tile" />
 }
 
 /** Twelve weeks of practice, a column a week, darker for busier days. */
@@ -306,7 +273,11 @@ export function MemberHome() {
         </div>
         <div className="flex flex-wrap gap-2">
           {data.features.practice && !quiet && (
-            <Link href="/problems" className={buttonVariants()}>
+            // Outline: today's challenge carries the one orange button.
+            <Link
+              href="/problems"
+              className={buttonVariants({ variant: "outline" })}
+            >
               Practise
             </Link>
           )}
@@ -347,13 +318,12 @@ export function MemberHome() {
         )
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Figures>
             {data.features.assignments && (
               <Tile
                 label="Due this week"
                 value={String(data.work.dueThisWeek)}
                 hint={`${data.work.open} open in all`}
-                tone={data.work.dueThisWeek ? "primary" : undefined}
                 href="/assignments"
               />
             )}
@@ -383,10 +353,9 @@ export function MemberHome() {
                 label="Streak"
                 value={`${p.streak.current} day${p.streak.current === 1 ? "" : "s"}`}
                 hint={`Longest ${p.streak.longest}`}
-                tone={p.streak.current ? "primary" : undefined}
               />
             )}
-          </div>
+          </Figures>
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             <div className="grid content-start gap-4">
@@ -587,23 +556,26 @@ export function MemberHome() {
                   <CardContent className="grid gap-4">
                     <Heatmap days={p.activity} />
                     <div className="grid gap-2">
-                      {(["easy", "medium", "hard"] as const).map((l) => (
-                        <div key={l} className="grid gap-1">
-                          <div className="flex justify-between text-caption">
-                            <span className="text-ink capitalize">{l}</span>
-                            <span className="text-muted-foreground tabular-nums">
-                              {p.solvedBy[l]} / {p.totalBy[l]}
-                            </span>
+                      {/* A level with no problems yet is left out, not shown as 0 / 0. */}
+                      {(["easy", "medium", "hard"] as const)
+                        .filter((l) => p.totalBy[l] > 0)
+                        .map((l) => (
+                          <div key={l} className="grid gap-1">
+                            <div className="flex justify-between text-caption">
+                              <span className="text-ink capitalize">{l}</span>
+                              <span className="text-muted-foreground tabular-nums">
+                                {p.solvedBy[l]} / {p.totalBy[l]}
+                              </span>
+                            </div>
+                            <Progress
+                              value={
+                                p.totalBy[l]
+                                  ? (100 * p.solvedBy[l]) / p.totalBy[l]
+                                  : 0
+                              }
+                            />
                           </div>
-                          <Progress
-                            value={
-                              p.totalBy[l]
-                                ? (100 * p.solvedBy[l]) / p.totalBy[l]
-                                : 0
-                            }
-                          />
-                        </div>
-                      ))}
+                        ))}
                     </div>
                     {p.recent.length > 0 && (
                       <div className="grid gap-1">

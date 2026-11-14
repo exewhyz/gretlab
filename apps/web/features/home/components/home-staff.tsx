@@ -21,6 +21,7 @@ import { type KindTerms } from "@workspace/judge"
 
 import { Card } from "@workspace/ui/components/card"
 
+import { Figures } from "@/components/figures"
 import { useViewer } from "@/features/account/use-viewer"
 import { CheckInCard } from "@/features/staff-attendance/components/staff-attendance"
 
@@ -91,7 +92,6 @@ export function StaffHome({
             label: "Leave to decide",
             value: String(data.waiting.leave),
             hint: data.waiting.leave ? "Waiting for you" : "Nothing waiting",
-            tone: data.waiting.leave ? ("primary" as const) : undefined,
             href: orgPages(slug).leave,
           },
         ]
@@ -102,7 +102,6 @@ export function StaffHome({
             label: "New applications",
             value: String(data.waiting.applications),
             hint: "Admissions",
-            tone: data.waiting.applications ? ("primary" as const) : undefined,
             href: orgPages(slug).manage(`/admissions`),
           },
         ]
@@ -121,7 +120,6 @@ export function StaffHome({
               ]
                 .filter(Boolean)
                 .join(" · ") || "Everyone's in",
-            tone: t.unmarked ? ("primary" as const) : undefined,
             href: orgPages(slug).manage(`/staff-attendance`),
           },
         ]
@@ -136,23 +134,18 @@ export function StaffHome({
       />
       {data.checkIn && <CheckInCard slug={slug} />}
       {tiles.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <Figures>
           {tiles.map((tile) => (
-            <Link
+            <Tile
               key={tile.label}
+              label={tile.label}
+              value={tile.value}
+              hint={tile.hint}
               href={tile.href}
-              className="block"
-              data-testid="staff-tile"
-            >
-              <Tile
-                label={tile.label}
-                value={tile.value}
-                hint={tile.hint}
-                tone={tile.tone}
-              />
-            </Link>
+              testId="staff-tile"
+            />
           ))}
-        </div>
+        </Figures>
       )}
       {groups.map((g) => (
         <section key={g} aria-label={g} className="grid gap-2.5">

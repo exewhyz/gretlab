@@ -133,7 +133,8 @@ export function Students({ slug }: { slug: string }) {
         </Alert>
       )}
       <div
-        className="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_minmax(0,11rem)]"
+        // Phones: search on its own line, then the class and status side by side.
+        className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_minmax(0,11rem)] [&>:first-child]:col-span-2 sm:[&>:first-child]:col-span-1"
         data-testid="student-filters"
       >
         <TextInput

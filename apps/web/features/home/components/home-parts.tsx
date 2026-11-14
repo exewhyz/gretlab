@@ -1,12 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { createContext, useContext } from "react"
+import { createContext, useContext, useState } from "react"
 
 import { KINDS, type KindTerms } from "@workspace/judge"
 
 import { Badge } from "@workspace/ui/components/badge"
-import { buttonVariants } from "@workspace/ui/components/button"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 import {
   Card,
   CardContent,
@@ -17,6 +17,7 @@ import {
 import { Progress } from "@workspace/ui/components/progress"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { Figure } from "@/components/figures"
 import { runLabel, runPercent, runStatus } from "@/features/runs/format"
 import { StatusBadge } from "@/features/training/components/training"
 import { EventCard, type EventView } from "@/features/events/components/events"
@@ -96,41 +97,35 @@ export function Greeting({
   )
 }
 
+/** One of a home's figures; put them in `Figures` (components/figures.tsx). */
 export function Tile({
   label,
   value,
   hint,
   tone,
+  href,
+  testId = "home-tile",
 }: {
   label: string
   value: string
   hint?: string
-  tone?: "primary" | "bad"
+  tone?: "bad"
+  href?: string
+  testId?: string
 }) {
   return (
-    <Card size="sm" data-testid="home-tile">
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        {/* Not CardTitle: a small card sizes its title down, and this is the figure. */}
-        <div
-          className={cn(
-            "text-3xl leading-tight font-semibold tracking-tight text-ink tabular-nums",
-            tone === "primary" && "text-primary-active",
-            tone === "bad" && "text-destructive"
-          )}
-        >
-          {value}
-        </div>
-      </CardHeader>
-      {hint && (
-        <CardContent className="text-xs text-muted-foreground">
-          {hint}
-        </CardContent>
-      )}
-    </Card>
+    <Figure
+      label={label}
+      value={value}
+      hint={hint}
+      tone={tone}
+      href={href}
+      testId={testId}
+    />
   )
 }
 
+/** A share as a bar: ink (Progress's own colour), or red when it's a concern. */
 export function Meter({ value, bad }: { value: number; bad?: boolean }) {
   return (
     <Progress
@@ -144,43 +139,81 @@ export function Meter({ value, bad }: { value: number; bad?: boolean }) {
   )
 }
 
+type Task = {
+  kind: string
+  tone: Tone
+  text: string
+  action: string
+  href: string
+}
+
+/** A kind with more items than this shows its first `FOLDED_SHOWS` and a "Show more". */
+const FOLD_OVER = 3
+const FOLDED_SHOWS = 2
+
+/**
+ * A home's to-do list. Items keep their order, but a kind with many of them (six registers,
+ * six marks sheets) folds after the first two, so one kind never buries the rest.
+ */
 export function TaskList({
   base,
   items,
   empty,
 }: {
   base: string
-  items: {
-    kind: string
-    tone: Tone
-    text: string
-    action: string
-    href: string
-  }[]
+  items: Task[]
   empty: string
 }) {
+  const [opened, setOpened] = useState<Set<string>>(new Set())
   if (items.length === 0)
     return <p className="text-body-sm text-muted-foreground">{empty}</p>
+  const kinds = [...new Set(items.map((t) => t.kind))]
   return (
     <ul className="grid">
-      {items.map((t, i) => (
-        <li
-          key={i}
-          className="flex items-center gap-3 border-t border-hairline-soft py-2.5 text-body-sm first:border-t-0"
-        >
-          <Badge variant={t.tone === "bad" ? "destructive" : "secondary"}>
-            {t.kind}
-          </Badge>
-          <span className="min-w-0 flex-1">{t.text}</span>
-          <Link
-            href={t.href.startsWith("/orgs/") ? t.href : `${base}${t.href}`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            {t.action}
-          </Link>
-        </li>
-      ))}
+      {kinds.flatMap((kind) => {
+        const all = items.filter((t) => t.kind === kind)
+        const folded = all.length > FOLD_OVER && !opened.has(kind)
+        const shown = folded ? all.slice(0, FOLDED_SHOWS) : all
+        return [
+          ...shown.map((t, i) => (
+            <TaskRow key={`${kind}-${i}`} base={base} task={t} />
+          )),
+          ...(folded
+            ? [
+                <li
+                  key={`${kind}-more`}
+                  className="border-t border-hairline-soft py-1.5"
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setOpened(new Set(opened).add(kind))}
+                  >
+                    Show {all.length - FOLDED_SHOWS} more · {kind.toLowerCase()}
+                  </Button>
+                </li>,
+              ]
+            : []),
+        ]
+      })}
     </ul>
+  )
+}
+
+function TaskRow({ base, task: t }: { base: string; task: Task }) {
+  return (
+    <li className="flex items-center gap-3 border-t border-hairline-soft py-2.5 text-body-sm first:border-t-0">
+      <Badge variant={t.tone === "bad" ? "destructive" : "secondary"}>
+        {t.kind}
+      </Badge>
+      <span className="min-w-0 flex-1">{t.text}</span>
+      <Link
+        href={t.href.startsWith("/orgs/") ? t.href : `${base}${t.href}`}
+        className={buttonVariants({ variant: "outline", size: "sm" })}
+      >
+        {t.action}
+      </Link>
+    </li>
   )
 }
 

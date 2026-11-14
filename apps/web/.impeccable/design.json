@@ -410,6 +410,13 @@
       "description": "A list's figures in one hairline-ruled line, not tiles.",
       "html": "<dl class=\"ds-stats\"><div><dt>Students</dt><dd>412</dd></div><div><dt>Present today</dt><dd class=\"good\">96%</dd></div><div><dt>Below 75%</dt><dd class=\"bad\">7</dd></div></dl>",
       "css": ".ds-stats{font-family: Inter, ui-sans-serif, system-ui, sans-serif;display:flex;flex-wrap:wrap;gap:12px 32px;margin:0;padding:12px 0;border-top:1px solid var(--hairline,#e6e5e0);border-bottom:1px solid var(--hairline,#e6e5e0)}.ds-stats div{display:grid;gap:2px}.ds-stats dt{font-size:13px;color:var(--muted-foreground,#807d72)}.ds-stats dd{margin:0;font-size:18px;font-weight:600;color:var(--ink,#26251e);font-variant-numeric:tabular-nums}.ds-stats .good{color:var(--success,#1f8a65)}.ds-stats .bad{color:var(--destructive,#cf2d56)}"
+    },
+    {
+      "name": "Figures Row",
+      "kind": "custom",
+      "description": "A home's headline numbers in one ruled card, cells filling each row.",
+      "html": "<div class=\"ds-figs\"><div><span>Students</span><b>180</b><small>Active, in a class</small></div><div><span>Present today</span><b>94%</b><small>169 of 180</small></div><div><span>Below 75%</span><b class=\"bad\">7</b><small>In my classes</small></div></div>",
+      "css": ".ds-figs{font-family:Inter,ui-sans-serif,system-ui,sans-serif;display:flex;flex-wrap:wrap;gap:1px;width:520px;overflow:hidden;border-radius:12px;background:var(--hairline,#e6e5e0);box-shadow:0 0 0 1px rgba(38,37,30,.1),0 1px 2px rgba(0,0,0,.05)}.ds-figs>div{flex:1 1 9rem;display:flex;flex-direction:column;gap:4px;padding:14px 16px;background:var(--card,#fff)}.ds-figs span,.ds-figs small{font-size:13px;color:var(--muted-foreground,#807d72)}.ds-figs b{font-size:26px;font-weight:600;color:var(--ink,#26251e);font-variant-numeric:tabular-nums}.ds-figs b.bad{color:var(--destructive,#cf2d56)}"
     }
   ],
   "narrative": {
@@ -461,12 +468,13 @@
       "Do separate surfaces with hairlines and a 1px ring; leave shadows to popovers, menus and dialogs.",
       "Do set numbers that are compared with `tabular-nums`, and show percentages in tables as `PercentBar`s.",
       "Do put a list's figures in one `Stats` line above it, each leading to the detail behind it.",
+      "Do put a home's headline numbers in one `Figures` row, and fold a to-do kind with more than three items.",
       "Do use the named type scale and keep `text-body-sm` (14px) as the working size of app screens.",
       "Do check new shadcn registry components in both themes; they sometimes arrive with forced colours."
     ],
     "donts": [
       "Don't use Tailwind's cool greys (`gray`, `slate`, `zinc`) or pure black; neutrals are warm.",
-      "Don't use orange for warnings, lateness or any status; status is green, red or ochre.",
+      "Don't use orange for warnings, lateness, figures, progress or any status; status is green, red or ochre, and data is ink.",
       "Don't put a row of figure tiles above a list where one `Stats` line will do.",
       "Don't give in-page surfaces shadows heavier than `shadow-xs`.",
       "Don't use native `<button>`, `<input>`, `<select>`, `<textarea>` or hand-made popups; use the `packages/ui` components.",

@@ -39,6 +39,7 @@ import {
 } from "@workspace/ui/components/empty"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { Figures } from "@/components/figures"
 import { useViewer } from "@/features/account/use-viewer"
 
 import { useOrgReach, useShell } from "./org-shell"
@@ -53,7 +54,7 @@ import {
 } from "./home-parts"
 
 export const trendConfig = {
-  percent: { label: "Present", color: "var(--chart-1)" },
+  percent: { label: "Present", color: "var(--chart-3)" },
 } satisfies ChartConfig
 
 export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
@@ -196,7 +197,7 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <Figures>
         <Tile
           label={terms.learners}
           value={String(data.tiles.students)}
@@ -215,7 +216,6 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
                 ? data.dayOff
                 : `${present.present} of ${present.of}${present.open ? ` · ${present.open} registers open` : ""}`
             }
-            tone="primary"
           />
         ) : (
           <Tile
@@ -230,7 +230,7 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
           value={String(data.tiles.classes)}
           hint="Where students sit"
         />
-      </div>
+      </Figures>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Card>
@@ -260,6 +260,34 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
               <p className="text-body-sm text-muted-foreground">
                 No classes with students yet.
               </p>
+            ) : !data.classes.some((c) => c.taken) ? (
+              // Ten empty bars say less than one line: nothing is taken yet.
+              <div
+                className="flex flex-wrap items-center justify-between gap-3"
+                data-testid="attendance-today"
+              >
+                <p className="text-body-sm text-body">
+                  No registers taken yet today.{" "}
+                  <span className="text-muted-foreground">
+                    {data.classes.length}{" "}
+                    {data.classes.length === 1
+                      ? terms.group.toLowerCase()
+                      : terms.groups.toLowerCase()}{" "}
+                    to take.
+                  </span>
+                </p>
+                {manages("attendance") && (
+                  <Link
+                    href={`${manage}/attendance`}
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "sm",
+                    })}
+                  >
+                    Open registers
+                  </Link>
+                )}
+              </div>
             ) : (
               <ul className="grid gap-2.5" data-testid="attendance-today">
                 {data.classes.map((c) => (
@@ -275,9 +303,7 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
                     <span
                       className={cn(
                         "text-right tabular-nums",
-                        c.taken
-                          ? "text-muted-foreground"
-                          : "font-medium text-destructive"
+                        c.taken ? "text-ink" : "text-muted-foreground"
                       )}
                     >
                       {c.taken ? `${c.present}/${c.students}` : "Not taken"}
@@ -341,7 +367,9 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
                   <Bar
                     dataKey="percent"
                     fill="var(--color-percent)"
-                    radius={[6, 6, 2, 2]}
+                    // Slim ink bars: ten full-width dark blocks outweighed the page.
+                    maxBarSize={18}
+                    radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
               </ChartContainer>

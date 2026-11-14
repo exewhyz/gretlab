@@ -319,6 +319,12 @@ The summary above a list: a hairline above and below, items spaced 32px apart. E
 ### Percent Bar
 An 80 × 6px pill track in Rule fill. The bar is 70% ink, or Correction Red below the threshold (40% by default), followed by the rounded percentage in a 40px tabular column.
 
+### Figures Row
+A home's headline numbers (`components/figures.tsx`): one white, ringed, 12px card split into cells by 1px hairlines, never a row of separate tiles. Each cell has a caption label, a `display-md` semibold tabular figure, and an optional caption line. Cells wrap and grow to fill each row, so an odd count never leaves a gap. A figure is ink, or Correction Red when it's a concern; never orange. A cell with a link leads to the detail behind it and lightens to Margin Cream on hover.
+
+### Progress
+Progress bars (`Progress`, the homes' `Meter`) are 70% ink on a Rule track, red when the share is a concern. They show a share, not an action, so they're never orange.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -327,12 +333,13 @@ An 80 × 6px pill track in Rule fill. The bar is 70% ink, or Correction Red belo
 - **Do** separate surfaces with hairlines and a 1px ring; leave shadows to popovers, menus and dialogs.
 - **Do** set numbers that are compared with `tabular-nums`, and show percentages in tables as `PercentBar`s.
 - **Do** put a list's figures in one `Stats` line above it, each leading to the detail behind it.
+- **Do** put a home's headline numbers in one `Figures` row, and fold a to-do kind with more than three items.
 - **Do** use the named type scale and keep `text-body-sm` (14px) as the working size of app screens.
 - **Do** check new shadcn registry components in both themes; they sometimes arrive with forced colours.
 
 ### Don't:
 - **Don't** use Tailwind's cool greys (`gray`, `slate`, `zinc`) or pure black; neutrals are warm.
-- **Don't** use orange for warnings, lateness or any status; status is green, red or ochre.
+- **Don't** use orange for warnings, lateness, figures, progress or any status; status is green, red or ochre, and data is ink.
 - **Don't** put a row of figure tiles above a list where one `Stats` line will do.
 - **Don't** give in-page surfaces shadows heavier than `shadow-xs`.
 - **Don't** use native `<button>`, `<input>`, `<select>`, `<textarea>` or hand-made popups; use the `packages/ui` components.

@@ -21,6 +21,7 @@ import {
 } from "@workspace/ui/components/empty"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { Figures } from "@/components/figures"
 import { useViewer } from "@/features/account/use-viewer"
 import { CampusSummary } from "@/features/campus/components/campus"
 import { MyCourseAttendance } from "@/features/attendance/components/attendance"
@@ -81,34 +82,20 @@ export function StudentHome({
         title={first ? `Hi ${first}, here's your week` : "Your week"}
       />
 
-      <div
-        className={cn(
-          "grid grid-cols-2 gap-3 sm:gap-4",
-          attendance ? "lg:grid-cols-4" : "lg:grid-cols-3"
-        )}
-      >
+      <Figures>
         {attendance && (
-          <Card size="sm" data-testid="home-tile">
-            <CardHeader>
-              <CardDescription>Attendance</CardDescription>
-              <div className="text-3xl leading-tight font-semibold tracking-tight text-primary-active tabular-nums">
-                {data.tiles.attendance == null
-                  ? "—"
-                  : `${data.tiles.attendance}%`}
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-2">
-              {data.tiles.attendance != null && (
-                <Meter
-                  value={data.tiles.attendance}
-                  bad={data.tiles.attendance < 75}
-                />
-              )}
-              <span className="text-xs text-muted-foreground">
-                Late counts as present
-              </span>
-            </CardContent>
-          </Card>
+          <Tile
+            label="Attendance"
+            value={
+              data.tiles.attendance == null ? "—" : `${data.tiles.attendance}%`
+            }
+            hint="Late counts as present"
+            tone={
+              data.tiles.attendance != null && data.tiles.attendance < 75
+                ? "bad"
+                : undefined
+            }
+          />
         )}
         <Tile
           label="Due this week"
@@ -133,7 +120,7 @@ export function StudentHome({
             hint={`In your ${terms.groups.toLowerCase()}`}
           />
         )}
-      </div>
+      </Figures>
 
       {runs && runs.learning.length > 0 && <MyRuns runs={runs} />}
       {training && training.length > 0 && <MyTrainingCard items={training} />}
@@ -347,7 +334,7 @@ export function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
                 )}
               </CardHeader>
               <CardContent className="grid gap-4">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
                   {[
                     {
                       label: "Attendance",
@@ -371,7 +358,13 @@ export function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
                       <div className="text-xs text-muted-foreground">
                         {s.label}
                       </div>
-                      <div className={cn("truncate text-title-sm", s.tone)}>
+                      {/* Wraps rather than cutting off: a bus is "Route 12 · Stop 4". */}
+                      <div
+                        className={cn(
+                          "text-title-sm break-words tabular-nums",
+                          s.tone
+                        )}
+                      >
                         {s.value}
                       </div>
                     </div>
@@ -402,9 +395,12 @@ export function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
                 <div className="flex flex-wrap gap-2">
                   <Link
                     href={orgPages(slug).child(c.id)}
-                    className={buttonVariants({ size: "sm" })}
+                    className={buttonVariants({
+                      variant: "outline",
+                      size: "sm",
+                    })}
                   >
-                    Open
+                    Open {c.name.split(/\s+/)[0]}&apos;s page
                   </Link>
                 </div>
               </CardContent>

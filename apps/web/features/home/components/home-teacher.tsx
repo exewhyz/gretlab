@@ -27,6 +27,7 @@ import { useOrgReach } from "./org-shell"
 import { orgPages } from "@/lib/paths"
 import {
   Greeting,
+  isNow,
   LeadingRuns,
   Meter,
   Runs,
@@ -37,6 +38,13 @@ import {
   Tile,
   useTerms,
 } from "./home-parts"
+import { Figures } from "@/components/figures"
+
+/** Whether a lesson "08:00–08:40" is on now, by this device's clock. */
+const onNow = (time: string) => {
+  const [starts, ends] = time.split("–")
+  return Boolean(starts && ends && isNow(starts, ends))
+}
 
 export function TeacherHome({
   slug,
@@ -68,7 +76,7 @@ export function TeacherHome({
         <TeamTrainingCard slug={slug} data={training} />
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <Figures>
         {timetable && (
           <Tile
             label="Lessons today"
@@ -77,11 +85,7 @@ export function TeacherHome({
           />
         )}
         {data.attendanceOn && (
-          <Tile
-            label="Registers to take"
-            value={String(data.tiles.toTake)}
-            tone={data.tiles.toTake ? "primary" : undefined}
-          />
+          <Tile label="Registers to take" value={String(data.tiles.toTake)} />
         )}
         <Tile
           label={`My ${terms.learners.toLowerCase()}`}
@@ -99,11 +103,11 @@ export function TeacherHome({
             tone={data.tiles.low ? "bad" : undefined}
           />
         )}
-      </div>
+      </Figures>
 
       <div
         className={cn(
-          "grid gap-4",
+          "grid items-start gap-4",
           timetable && "lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
         )}
       >
@@ -162,7 +166,13 @@ export function TeacherHome({
                             ) : (
                               <Link
                                 href={`${manage}/attendance`}
-                                className={buttonVariants({ size: "sm" })}
+                                // Orange only for the lesson on now; the rest can wait.
+                                className={buttonVariants({
+                                  size: "sm",
+                                  variant: onNow(p.time)
+                                    ? "default"
+                                    : "outline",
+                                })}
                               >
                                 Take register
                               </Link>
@@ -226,7 +236,10 @@ export function TeacherHome({
                     {data.attendanceOn && !data.dayOff && (
                       <Link
                         href={`${manage}/attendance`}
-                        className={buttonVariants({ size: "sm" })}
+                        className={buttonVariants({
+                          variant: "outline",
+                          size: "sm",
+                        })}
                       >
                         Register
                       </Link>
@@ -234,7 +247,7 @@ export function TeacherHome({
                     <Link
                       href={orgPages(slug).cls(c.id)}
                       className={buttonVariants({
-                        variant: "outline",
+                        variant: "ghost",
                         size: "sm",
                       })}
                     >

@@ -214,7 +214,8 @@ export async function parentHome(ctx: OrgContext, user: User) {
         ...o.absences.slice(0, 2).map((a) => ({
           kind: a.status === "late" ? "Late" : "Absent",
           tone: "bad" as const,
-          text: `${a.group}${a.period ? `, ${a.period}` : ""}`,
+          // Say what happened, not only where: "Arrived late · Grade 6 › 6-A, Period 2".
+          text: `${a.status === "late" ? "Arrived late" : "Absent"} · ${a.group}${a.period ? `, ${a.period}` : ""}`,
           at: `${a.day}T12:00:00.000Z`,
         })),
         ...o.classes
