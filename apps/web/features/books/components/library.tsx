@@ -29,7 +29,16 @@ import {
   TextArea,
   TextInput,
 } from "@/components/form"
-import { Card, Loading, PageTitle } from "@/features/admin/components/shell"
+import { Loading, PageTitle, Stats } from "@/features/admin/components/shell"
+
+/** "Oct 18", or "Oct 18, 2025" in another year (a loan's day, the same in every time zone). */
+const loanDay = (day: string) =>
+  new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    ...(day.slice(0, 4) === String(new Date().getUTCFullYear()) ? {} : { year: "numeric" }),
+    timeZone: "UTC",
+  })
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
 import type { ApiResult } from "@/lib/api/types"
@@ -93,30 +102,25 @@ export function ManageLibrary({ slug }: { slug: string }) {
       >
         Library
       </PageTitle>
-      <div
-        className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4"
-        data-testid="library-counts"
-      >
-        {(
-          [
-            ["Titles", data.counts.titles],
-            ["Copies", data.counts.copies],
-            ["On loan", data.counts.out],
-            ["Overdue", data.counts.overdue],
-          ] as const
-        ).map(([label, n]) => (
-          <Card key={label}>
-            <div className="text-caption text-body">{label}</div>
-            <div
-              className={cn(
-                "text-display-sm",
-                label === "Overdue" && n > 0 ? "text-destructive" : "text-ink"
-              )}
-            >
-              {n}
-            </div>
-          </Card>
-        ))}
+      <div data-testid="library-counts">
+        <Stats
+          items={[
+            { label: "Titles", value: data.counts.titles },
+            { label: "Copies", value: data.counts.copies },
+            {
+              label: "On loan",
+              value: data.counts.out,
+              hint: data.counts.copies
+                ? `${Math.round((100 * data.counts.out) / data.counts.copies)}% of copies`
+                : undefined,
+            },
+            {
+              label: "Overdue",
+              value: data.counts.overdue,
+              tone: data.counts.overdue > 0 ? "bad" : undefined,
+            },
+          ]}
+        />
       </div>
       <p className="mb-4 text-body-sm text-body">
         Loans last {data.settings.loanDays} days; each person may hold{" "}
@@ -231,7 +235,7 @@ function Loans({
                 </span>
                 <span className="text-body">
                   {" "}
-                  · {l.returnedOn ? `back ${l.returnedOn}` : `due ${l.dueOn}`}
+                  · {l.returnedOn ? `back ${loanDay(l.returnedOn)}` : `due ${loanDay(l.dueOn)}`}
                 </span>
               </div>
               {(l.status === "out" || l.status === "overdue") && (
@@ -881,8 +885,8 @@ export function MemberLibrary({ slug }: { slug: string }) {
                   )}
                 >
                   {l.status === "overdue"
-                    ? `Overdue since ${l.dueOn}`
-                    : `Due ${l.dueOn}`}
+                    ? `Overdue since ${loanDay(l.dueOn)}`
+                    : `Due ${loanDay(l.dueOn)}`}
                 </span>
               </li>
             ))}
