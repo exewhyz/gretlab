@@ -1,6 +1,11 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import {
   MODULE_KEYS,
   MODULES,
@@ -118,18 +123,30 @@ export function ManageMembers({
   const [status, setStatus] = useState(
     initialStatus === "pending" ? "pending" : ""
   )
-  const [kind, setKind] = useState<MemberKind | "">("")
+  const [kind, setKindState] = useState<MemberKind | "">("")
+  const [page, setPage] = useState(1)
+  const setKind = (k: MemberKind | "") => {
+    setKindState(k)
+    setPage(1)
+  }
   const [editing, setEditing] = useState<{
     id: string
     what: "groups" | "role"
   } | null>(null)
   const [message, setMessage] = useState<Message>(null)
   const members = useQuery({
-    queryKey: ["org", slug, "members", q, groupId, status],
+    queryKey: ["org", slug, "members", q, groupId, status, kind, page],
     queryFn: () =>
-      api<Member[]>(
-        `/orgs/${slug}/members?q=${encodeURIComponent(q)}&group=${groupId}&status=${status}`
+      api<{
+        members: Member[]
+        total: number
+        page: number
+        pages: number
+        counts: Record<MemberKind, number> & { all: number }
+      }>(
+        `/orgs/${slug}/members?${new URLSearchParams({ q, group: groupId, status, kind, page: String(page) })}`
       ),
+    placeholderData: keepPreviousData,
   })
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["org", slug] })
@@ -155,11 +172,8 @@ export function ManageMembers({
     parent: terms?.guardians ?? "Parents",
     other: "Others",
   }
-  const counts = { staff: 0, learner: 0, parent: 0, other: 0 }
-  for (const m of members.data) counts[memberKind(m)]++
-  const shown = kind
-    ? members.data.filter((m) => memberKind(m) === kind)
-    : members.data
+  const { counts, total, pages } = members.data
+  const shown = members.data.members
 
   return (
     <>
@@ -172,7 +186,7 @@ export function ManageMembers({
       >
         {(
           [
-            ["", "Everyone", members.data.length],
+            ["", "Everyone", counts.all],
             ...(["learner", "staff", "parent", "other"] as const)
               .filter((k) => counts[k] > 0)
               .map((k) => [k, kindLabel[k], counts[k]] as const),
@@ -196,7 +210,10 @@ export function ManageMembers({
           placeholder="Search by name or email"
           className="w-64"
           value={q}
-          onChange={(event) => setQ(event.target.value)}
+          onChange={(event) => {
+            setQ(event.target.value)
+            setPage(1)
+          }}
         />
         <GroupPicker
           label="Group"
@@ -206,13 +223,19 @@ export function ManageMembers({
           levels={groups.data.levels}
           extra={[{ value: "", label: "Everyone" }]}
           value={groupId}
-          onChange={setGroupId}
+          onChange={(id) => {
+            setGroupId(id)
+            setPage(1)
+          }}
         />
         <SelectInput
           aria-label="Status"
           className="w-48"
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          onChange={(event) => {
+            setStatus(event.target.value)
+            setPage(1)
+          }}
         >
           <option value="">Members and requests</option>
           <option value="pending">Waiting for approval</option>
@@ -247,6 +270,32 @@ export function ManageMembers({
           />
         ))}
       </Table>
+      {pages > 1 && (
+        <div className="mt-3 flex items-center justify-between gap-2 text-body-sm text-body">
+          <span className="tabular-nums">
+            {(members.data.page - 1) * 100 + 1}–
+            {Math.min(members.data.page * 100, total)} of {total}
+          </span>
+          <span className="flex gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={members.data.page <= 1}
+              onClick={() => setPage(members.data.page - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={members.data.page >= pages}
+              onClick={() => setPage(members.data.page + 1)}
+            >
+              Next
+            </Button>
+          </span>
+        </div>
+      )}
       {shown.length === 0 && (
         <p className="mt-3 text-body-sm text-body">Nobody matches.</p>
       )}

@@ -232,6 +232,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
     - Switched off, its sidebar items, the student "Coding lab" group, and the New assignment and New contest buttons go.
     - The content API refuses listing and writing new work (`needCoding()` in `features/orgs/content.ts`; 404 `module_off`).
     - Gradebooks and students' own past work stay readable.
+  - **Members list.** `GET /orgs/:slug/members` returns everyone, with no cap, for pickers and integrations. With `?page=` it returns 100 at a time: `{ members, total, page, pages, counts }`, with counts by kind (staff, learner, parent, other) across all of them. `?kind=` filters by kind on the server. The Members screen uses the paged form.
   - **Sidebar groups fold.** Every group starts open; its heading folds it, and the choice is remembered per device and per navigation (`useFolded` in `components/app-frame.tsx`). A folded group still shows the page you're on.
   - **Data screens.** A list's figures go above it in one line (`Stats` in `features/admin/components/shell.tsx`), not as a row of tiles, and percentages in tables are `PercentBar`s. Used on Reports, the gradebook, marks entry and the attendance overview.
   - **Tests.** `e2e/access-links.mjs` covers this. A crawl of the demo accounts (`pnpm --filter @workspace/db demo`) should find no 403 or 404 behind any link.

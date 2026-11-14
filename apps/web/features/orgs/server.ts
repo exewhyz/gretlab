@@ -1345,7 +1345,62 @@ export async function updateSettings(
   })
 }
 
+/** What someone is here, for reading and filtering the members list. */
+export type MemberKind = "staff" | "learner" | "parent" | "other"
+
+const MEMBERS_PER_PAGE = 100
+
+/**
+ * The members this person may see. With `page`, one page of 100 (filtered by `kind`) and
+ * the counts of each kind, for the Members screen; without it, everyone, for pickers and
+ * integrations.
+ */
 export async function listMembers(
+  slug: string,
+  user: User,
+  filter: { groupId?: string; status?: string; q?: string }
+): Promise<Awaited<ReturnType<typeof allMembers>>>
+export async function listMembers(
+  slug: string,
+  user: User,
+  filter: { groupId?: string; status?: string; q?: string; kind?: string; page: number }
+): Promise<{
+  members: Awaited<ReturnType<typeof allMembers>>
+  total: number
+  page: number
+  pages: number
+  counts: Record<MemberKind, number> & { all: number }
+}>
+export async function listMembers(
+  slug: string,
+  user: User,
+  filter: { groupId?: string; status?: string; q?: string; kind?: string; page?: number }
+) {
+  const all = await allMembers(slug, user, filter)
+  if (!filter.page) return all
+  const kindOf = (m: (typeof all)[number]): MemberKind =>
+    m.roles.some((r) => r.grants)
+      ? "staff"
+      : m.groupIds.length > 0
+        ? "learner"
+        : m.children.length > 0
+          ? "parent"
+          : "other"
+  const counts = { all: all.length, staff: 0, learner: 0, parent: 0, other: 0 }
+  for (const m of all) counts[kindOf(m)]++
+  const shown = filter.kind ? all.filter((m) => kindOf(m) === filter.kind) : all
+  const pages = Math.max(1, Math.ceil(shown.length / MEMBERS_PER_PAGE))
+  const page = Math.min(Math.max(1, filter.page), pages)
+  return {
+    members: shown.slice((page - 1) * MEMBERS_PER_PAGE, page * MEMBERS_PER_PAGE),
+    total: shown.length,
+    page,
+    pages,
+    counts,
+  }
+}
+
+async function allMembers(
   slug: string,
   user: User,
   filter: { groupId?: string; status?: string; q?: string }
@@ -1374,7 +1429,6 @@ export async function listMembers(
       )
     )
     .orderBy(asc(users.name), asc(users.email))
-    .limit(1000)
   const ids = rows.map((r) => r.user.id)
   const [memberships, assignments, families] = ids.length
     ? await Promise.all([

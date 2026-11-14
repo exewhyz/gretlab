@@ -65,6 +65,17 @@ const m = (h) => members.find((x) => x.email === `${h}@example.com`)
 check("Members knows whose parent someone is", m("ds-p")?.children.join() === "ds-s1 Name")
 check("...and whose role grants something", m("ds-lib")?.roles.some((r) => r.grants) && !m("ds-s1")?.roles.some((r) => r.grants))
 
+// ---------- a big organization's members come a page at a time
+psql(`insert into users(email,name,role,handle) select 'ds-bulk' || n || '@example.com', 'ds Bulk ' || lpad(n::text, 3, '0'), 'student', 'ds-bulk-' || n from generate_series(1, 120) n`)
+psql(`insert into org_members(org_id,user_id,status,joined_via) select '${orgId}', id, 'active', 'created' from users where email like 'ds-bulk%'`)
+const p1 = (await owner(`${O}/members?page=1`)).json
+const p2 = (await owner(`${O}/members?page=2`)).json
+check("Members comes a hundred at a time, with the total", p1?.members.length === 100 && p1.pages === 2 && p1.total === p2?.total && p2.members.length === p1.total - 100, JSON.stringify({ n: p1?.members.length, total: p1?.total, pages: p1?.pages }))
+check("...and counts each kind across all of them", p1?.counts.all === p1?.total && p1.counts.parent === 1 && p1.counts.learner === 2, JSON.stringify(p1?.counts))
+check("...filtering by kind on the server", (await owner(`${O}/members?page=1&kind=parent`)).json?.members.map((m) => m.email).join() === "ds-p@example.com")
+check("without a page, everyone at once (no cap)", (await owner(`${O}/members`)).json?.length === p1?.total)
+psql(`delete from users where email like 'ds-bulk%'`)
+
 // ---------- attendance across the school
 const day = (await owner(`${O}/attendance`)).json.today
 await owner(`${O}/attendance/register`, { method: "PUT", body: { groupId: a.id, day, period: "", marks: [{ userId: uid("ds-s1"), status: "absent" }] } })
