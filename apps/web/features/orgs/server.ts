@@ -96,21 +96,57 @@ async function requirePlatformAdmin(user: User) {
   if (!(await platformCan(user, "platform.orgs.create"))) throw forbidden()
 }
 
-export async function listAllOrganizations(user: User) {
+const ORGS_PER_PAGE = 50
+
+/**
+ * Every organization, for the platform. With `page`, 50 at a time matching `q` (name or
+ * address), read a page at a time from the database, with the total; without, all.
+ */
+export async function listAllOrganizations(
+  user: User,
+  opts: { page?: number; q?: string } = {}
+) {
   await requirePlatformAdmin(user)
   const db = getDb()
-  const [rows, members] = await Promise.all([
-    db.select().from(organizations).orderBy(asc(organizations.name)),
-    db
-      .select({ orgId: orgMembers.orgId, total: count() })
-      .from(orgMembers)
-      .where(eq(orgMembers.status, "active"))
-      .groupBy(orgMembers.orgId),
+  const term = opts.q?.trim().replaceAll("%", "")
+  const where = term
+    ? or(ilike(organizations.name, `%${term}%`), ilike(organizations.slug, `%${term}%`))
+    : undefined
+  const [[{ total } = { total: 0 }], rows] = await Promise.all([
+    db.select({ total: count() }).from(organizations).where(where),
+    opts.page
+      ? db
+          .select()
+          .from(organizations)
+          .where(where)
+          .orderBy(asc(organizations.name))
+          .limit(ORGS_PER_PAGE)
+          .offset((Math.max(1, opts.page) - 1) * ORGS_PER_PAGE)
+      : db.select().from(organizations).where(where).orderBy(asc(organizations.name)),
   ])
-  return rows.map((org) => ({
+  const members = rows.length
+    ? await db
+        .select({ orgId: orgMembers.orgId, total: count() })
+        .from(orgMembers)
+        .where(
+          and(
+            eq(orgMembers.status, "active"),
+            inArray(orgMembers.orgId, rows.map((r) => r.id))
+          )
+        )
+        .groupBy(orgMembers.orgId)
+    : []
+  const list = rows.map((org) => ({
     ...org,
     members: members.find((m) => m.orgId === org.id)?.total ?? 0,
   }))
+  if (!opts.page) return list
+  return {
+    organizations: list,
+    total,
+    page: Math.max(1, opts.page),
+    pages: Math.max(1, Math.ceil(total / ORGS_PER_PAGE)),
+  }
 }
 
 export async function createOrganization(

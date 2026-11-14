@@ -1,6 +1,11 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query"
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
@@ -22,7 +27,7 @@ import {
   TextArea,
   TextInput,
 } from "@/components/form"
-import { Loading, PageTitle } from "@/features/admin/components/shell"
+import { Loading, PageTitle, Pager } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import type { importLinks, searchStudents } from "@/features/parents/server"
@@ -44,11 +49,16 @@ const RELATIONS = ["Mother", "Father", "Guardian", "Grandparent", "Other"]
 export function ManageParents({ slug }: { slug: string }) {
   const client = useQueryClient()
   const key = ["org", slug, "parents"]
-  const { data, error } = useQuery({
-    queryKey: key,
-    queryFn: () => api<ApiResult<typeof listLinks>>(`/orgs/${slug}/parents`),
-  })
   const [filter, setFilter] = useState("")
+  const [page, setPage] = useState(1)
+  const { data, error, isPlaceholderData } = useQuery({
+    queryKey: [...key, filter.trim(), page],
+    queryFn: () =>
+      api<ApiResult<typeof listLinks>>(
+        `/orgs/${slug}/parents?${new URLSearchParams({ q: filter.trim(), page: String(page) })}`
+      ),
+    placeholderData: keepPreviousData,
+  })
   const [dialog, setDialog] = useState<"add" | "import" | null>(null)
   const remove = useMutation({
     mutationFn: (id: string) =>
@@ -56,21 +66,8 @@ export function ManageParents({ slug }: { slug: string }) {
     onSuccess: () => client.invalidateQueries({ queryKey: key }),
   })
   if (!data) return <Loading error={error} />
-  const term = filter.trim().toLowerCase()
-  const shown = term
-    ? data.links.filter((l) =>
-        [
-          l.student.name,
-          l.student.email,
-          l.parent.name ?? "",
-          l.parent.email,
-          ...l.student.classes,
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(term)
-      )
-    : data.links
+  // Searched and paged on the server.
+  const shown = data.links
   const done = () => {
     void client.invalidateQueries({ queryKey: key })
   }
@@ -96,13 +93,16 @@ export function ManageParents({ slug }: { slug: string }) {
         copy of their child&apos;s notifications, and a note when the child is
         marked absent. Parents aren&apos;t members and hold no role.
       </p>
-      {data.links.length > 0 && (
+      {(data.total > 0 || filter) && (
         <div className="mb-3 max-w-sm">
           <TextInput
             aria-label="Search parents and students"
             placeholder="Search by name, email or class"
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => {
+              setFilter(e.target.value)
+              setPage(1)
+            }}
           />
         </div>
       )}
@@ -110,10 +110,15 @@ export function ManageParents({ slug }: { slug: string }) {
         <FormMessage message={{ text: remove.error.message, kind: "err" }} />
       )}
       {data.links.length === 0 ? (
-        <p className="text-body-sm text-body">No parents are linked yet.</p>
+        <p className="text-body-sm text-body">
+          {filter ? "Nobody matches." : "No parents are linked yet."}
+        </p>
       ) : (
         <ul
-          className="divide-y divide-hairline rounded-lg border border-hairline bg-card"
+          className={cn(
+            "divide-y divide-hairline rounded-lg border border-hairline bg-card",
+            isPlaceholderData && "opacity-60"
+          )}
           data-testid="parent-links"
         >
           {shown.map((l) => (
@@ -166,6 +171,12 @@ export function ManageParents({ slug }: { slug: string }) {
           )}
         </ul>
       )}
+      <Pager
+        page={data.page}
+        pages={data.pages}
+        total={data.total}
+        onPage={setPage}
+      />
       {dialog === "add" && (
         <AddParent
           slug={slug}

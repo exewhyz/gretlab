@@ -16,8 +16,8 @@ const fontMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" })
 
 export const metadata: Metadata = {
   title: {
-    default: "Python Practice Lab",
-    template: "%s · Python Practice Lab",
+    default: "GretLab",
+    template: "%s · GretLab",
   },
   description:
     "Practise Python programming problems and check your code against test cases in the browser.",

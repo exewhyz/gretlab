@@ -26,7 +26,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
-import { Loading, PageTitle, Table } from "@/features/admin/components/shell"
+import {
+  Loading,
+  PageTitle,
+  Table,
+  Pager,
+} from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import type { listMembers } from "@/features/orgs/server"
@@ -215,32 +220,12 @@ export function ManageMembers({
           ))}
         </Table>
       </div>
-      {pages > 1 && (
-        <div className="mt-3 flex items-center justify-between gap-2 text-body-sm text-body">
-          <span className="tabular-nums">
-            {(members.data.page - 1) * 100 + 1}–
-            {Math.min(members.data.page * 100, total)} of {total}
-          </span>
-          <span className="flex gap-1.5">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={members.data.page <= 1}
-              onClick={() => setPage(members.data.page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={members.data.page >= pages}
-              onClick={() => setPage(members.data.page + 1)}
-            >
-              Next
-            </Button>
-          </span>
-        </div>
-      )}
+      <Pager
+        page={members.data.page}
+        pages={pages}
+        total={total}
+        onPage={setPage}
+      />
       {shown.length === 0 && (
         <p className="mt-3 text-body-sm text-body">Nobody matches.</p>
       )}

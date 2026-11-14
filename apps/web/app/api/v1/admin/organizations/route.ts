@@ -6,8 +6,12 @@ import {
 } from "@/features/orgs/server"
 import { orgCreateSchema } from "@/features/orgs/schemas"
 
-export const GET = route({ access: "platform.orgs.manage" }, ({ user }) =>
-  listAllOrganizations(user)
+export const GET = route({ access: "platform.orgs.manage" }, ({ user, query }) =>
+  // With a page: 50 at a time, searched (the platform's screen); without, everyone.
+  listAllOrganizations(user, {
+    page: Number(query.get("page")) || undefined,
+    q: query.get("q") ?? undefined,
+  })
 )
 
 export const POST = route(

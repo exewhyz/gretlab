@@ -82,7 +82,17 @@ function needModule(ctx: OrgContext) {
 /* ---------- managing links (staff) ---------- */
 
 /** Manage › Parents: every link for the students this person may see, and what they may do. */
-export async function listLinks(slug: string, user: User) {
+const LINKS_PER_PAGE = 100
+
+/**
+ * Parents linked to the students this person may see. With `page`, a page of 100 matching
+ * `q` (names, emails, classes) and the total; without, all of them.
+ */
+export async function listLinks(
+  slug: string,
+  user: User,
+  opts: { page?: number; q?: string } = {}
+) {
   const ctx = await orgContext(slug, user)
   needModule(ctx)
   const can = {
@@ -131,7 +141,25 @@ export async function listLinks(slug: string, user: User) {
       },
     ]
   })
-  return { can, links }
+  const term = opts.q?.trim().toLowerCase() ?? ""
+  const matching = term
+    ? links.filter((l) =>
+        [l.student.name, l.student.email, l.parent.name ?? "", l.parent.email, ...l.student.classes]
+          .join(" ")
+          .toLowerCase()
+          .includes(term)
+      )
+    : links
+  if (!opts.page) return { can, links: matching, total: matching.length, page: 1, pages: 1 }
+  const pages = Math.max(1, Math.ceil(matching.length / LINKS_PER_PAGE))
+  const page = Math.min(Math.max(1, opts.page), pages)
+  return {
+    can,
+    links: matching.slice((page - 1) * LINKS_PER_PAGE, page * LINKS_PER_PAGE),
+    total: matching.length,
+    page,
+    pages,
+  }
 }
 
 /** Students this person may link parents to, matching a search (for the Add parent dialog). */

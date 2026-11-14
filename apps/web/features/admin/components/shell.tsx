@@ -1,6 +1,7 @@
 "use client"
 
 import { ErrorView } from "@/components/error-view"
+import { Button } from "@workspace/ui/components/button"
 import {
   BellRingingIcon,
   BooksIcon,
@@ -363,6 +364,41 @@ export function Stats({
         )
       })}
     </dl>
+  )
+}
+
+/** "1–100 of 340" with Previous and Next, under a paged list. Nothing when it fits on one page. */
+export function Pager({
+  page,
+  pages,
+  total,
+  perPage = 100,
+  onPage,
+}: {
+  page: number
+  pages: number
+  total: number
+  perPage?: number
+  onPage: (page: number) => void
+}) {
+  if (pages <= 1) return null
+  return (
+    <div
+      className="mt-3 flex items-center justify-between gap-2 text-body-sm text-body"
+      data-testid="pager"
+    >
+      <span className="tabular-nums">
+        {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
+      </span>
+      <span className="flex gap-1.5">
+        <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          Previous
+        </Button>
+        <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+          Next
+        </Button>
+      </span>
+    </div>
   )
 }
 
