@@ -109,6 +109,16 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Say "problem", never "question", in anything a person reads.
 - Messages must match who is reading: never tell a signed-in person to sign in. With server execution off, signed-in students run in the browser and Submit is paused.
 
+## Search engines and link previews
+
+- **One identity:** `apps/web/lib/site.ts` holds the name (Gretlab), the address (from `NEXTAUTH_URL`), the docs' address, the default description and `jsonLd()` (escapes `<`). The root layout sets `metadataBase`, the title template `%s · Gretlab`, share defaults and the Organization and WebSite structured data.
+- **Public pages** (problems, a problem, contests, privacy, playground) each set their own title, description and `alternates.canonical`. A page's `openGraph` replaces the layout's whole, so repeat `siteName` and `locale` when setting it.
+- **Private pages** carry `robots: { index: false }` (homes, organizations, the dashboard, assignments, calendars, profiles, certificates, a single contest). `robots.txt` blocks only `/api/`, so crawlers can read those `noindex` tags.
+- **`app/sitemap.ts`** lists the public pages and every public problem with its last change, built per request (builds need no database) and cached an hour.
+- **A problem page** describes itself from its own statement (`lib/seo-text.ts`), carries `LearningResource` and `BreadcrumbList` structured data, and has its own share card (`opengraph-image.tsx`, drawn by `lib/og-card.tsx` in Gretlab's look); every other page uses the site's card.
+- **The docs** (`apps/docs`) have `public/robots.txt` pointing at their sitemap, a share card (`public/og.png`), WebSite structured data on every page and TechArticle plus BreadcrumbList on each page (`components/PageTitle.astro`).
+- **Not yet:** problem addresses are `/problems/p2`; readable slugs need a data migration with permanent redirects from the old addresses.
+
 ## Problem statements are markdown
 
 - A problem's `description` is its statement in markdown. Input format, output format and constraints stay separate fields (one bullet each, shown under their own headings), and samples come from its test cases. Keep them out of the statement. Editorials and hints are markdown too.

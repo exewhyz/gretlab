@@ -1,7 +1,12 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
-export const metadata: Metadata = { title: "Privacy" }
+export const metadata: Metadata = {
+  title: "Privacy",
+  description:
+    "What Gretlab keeps of your code and your account, who can read it, and how its ads use cookies.",
+  alternates: { canonical: "/privacy" },
+}
 
 const LINK = "underline underline-offset-2 hover:text-ink"
 
@@ -26,8 +31,8 @@ export default function PrivacyPage() {
       <p>
         You sign in with Google, which shares your name and email with this
         site, or with your email and a password. Passwords are stored only as a
-        one-way hash, never as typed. A cookie keeps you signed in. Contest leaderboards show your name
-        to other visitors, but never your email.
+        one-way hash, never as typed. A cookie keeps you signed in. Contest
+        leaderboards show your name to other visitors, but never your email.
       </p>
 
       <h2 className="mt-4 text-title-md text-ink">Advertising</h2>

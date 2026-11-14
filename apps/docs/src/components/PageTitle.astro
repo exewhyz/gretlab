@@ -31,9 +31,36 @@ function trail(entries: Entry[], path: string[] = []): string[] | null {
   return null
 }
 const crumbs = trail(route.sidebar as Entry[]) ?? []
+
+// The same trail as schema.org data, with the page as a technical article, for search
+// results' breadcrumbs. Groups aren't pages, so only the site and this page have addresses.
+const site = Astro.site?.toString().replace(/\/+$/, "") ?? ""
+const here = `${site}${Astro.url.pathname}`
+const structured = JSON.stringify({
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      headline: data.title,
+      description: data.description,
+      url: here,
+      inLanguage: "en",
+      isPartOf: { "@id": `${site}/#website` },
+    },
+    {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Gretlab Docs", item: `${site}/` },
+        ...crumbs.map((name, i) => ({ "@type": "ListItem", position: i + 2, name })),
+        { "@type": "ListItem", position: crumbs.length + 2, name: data.title, item: here },
+      ],
+    },
+  ],
+}).replace(/</g, "\\u003c")
 const markdown = `# ${data.title}\n\n${data.description ? `${data.description}\n\n` : ""}${route.entry.body ?? ""}`
 ---
 
+<script type="application/ld+json" set:html={structured} />
 <div class="gl-title">
   {
     crumbs.length > 0 && (

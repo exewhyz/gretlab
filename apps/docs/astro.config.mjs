@@ -2,10 +2,14 @@
 import starlight from "@astrojs/starlight"
 import { defineConfig } from "astro/config"
 
+// The live address; DOCS_SITE_URL overrides it (a preview deploy, a local build).
+const SITE = (process.env.DOCS_SITE_URL ?? "https://docs.gretlab.grettech.com").replace(/\/+$/, "")
+// The app the docs describe.
+const APP = "https://gretlab.grettech.com"
+
 // The documentation site. Its pages are the repository's docs/ folder (src/content.config.ts).
 export default defineConfig({
-  // The live address; DOCS_SITE_URL overrides it (a preview deploy, a local build).
-  site: process.env.DOCS_SITE_URL ?? "https://docs.gretlab.grettech.com",
+  site: SITE,
   integrations: [
     starlight({
       title: "Gretlab Docs",
@@ -13,6 +17,37 @@ export default defineConfig({
         "Guides for running Gretlab: importing problems and questions, the organization API, lab exams and scaling.",
       logo: { src: "./src/assets/mark.svg", alt: "Gretlab" },
       favicon: "/favicon.svg",
+      // Every page: a share card (public/og.png), the large card on X, and who publishes the
+      // site as structured data. Pages add their own breadcrumbs (components/PageTitle).
+      head: [
+        { tag: "meta", attrs: { property: "og:image", content: `${SITE}/og.png` } },
+        { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
+        { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
+        {
+          tag: "meta",
+          attrs: { property: "og:image:alt", content: "Gretlab documentation" },
+        },
+        { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+        { tag: "meta", attrs: { name: "twitter:image", content: `${SITE}/og.png` } },
+        {
+          tag: "script",
+          attrs: { type: "application/ld+json" },
+          content: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "@id": `${SITE}/#website`,
+            name: "Gretlab Docs",
+            url: SITE,
+            inLanguage: "en",
+            publisher: {
+              "@type": "Organization",
+              name: "Gretlab",
+              url: APP,
+              logo: `${APP}/icon.svg`,
+            },
+          }),
+        },
+      ],
       customCss: [
         "@fontsource-variable/inter",
         "@fontsource/jetbrains-mono/400.css",

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://docs.gretlab.grettech.com/sitemap-index.xml

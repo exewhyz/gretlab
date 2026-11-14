@@ -7,8 +7,10 @@ import { getCatalog } from "@/features/catalog/server"
 import { getSettings } from "@/features/settings/server"
 
 export const metadata: Metadata = {
-  title: "Problems",
-  description: "Practice programming problems by topic and difficulty.",
+  title: "Coding problems",
+  description:
+    "Free programming practice problems by topic and difficulty, in Python, JavaScript, C, C++ and Java, with hints, editorials and a judge that runs your code in the browser.",
+  alternates: { canonical: "/problems" },
 }
 
 export const revalidate = 60
