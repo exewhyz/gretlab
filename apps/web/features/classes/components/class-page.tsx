@@ -40,7 +40,7 @@ import {
   OrgReports,
 } from "@/features/teaching/components/teaching"
 import { api } from "@/lib/api/client"
-import { formatDateTime } from "@/lib/format"
+import { formatDateTime, formatDay } from "@/lib/format"
 import { orgPages } from "@/lib/paths"
 import type { ApiResult } from "@/lib/api/types"
 import type { classAttendance, classwork } from "@/features/classes/server"
@@ -490,7 +490,7 @@ function Stream({
                 icon={<ChalkboardTeacherIcon className="size-4" />}
               >
                 <div className="text-body-sm text-ink">
-                  Class on {item.day} · {item.minutes} min
+                  Class on {formatDay(item.day)} · {item.minutes} min
                   {item.group && (
                     <span className="text-body"> · {item.group}</span>
                   )}

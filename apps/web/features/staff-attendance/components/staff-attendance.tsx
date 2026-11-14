@@ -43,6 +43,7 @@ import type { ApiResult } from "@/lib/api/types"
 import type { myAttendance } from "@/features/staff-attendance/server"
 import type { staffMonth } from "@/features/staff-attendance/server"
 import type { staffRegister } from "@/features/staff-attendance/server"
+import { formatDay } from "@/lib/format"
 
 type Status = "present" | "late" | "half_day" | "absent" | "on_leave"
 
@@ -189,7 +190,7 @@ function DayRegister({ slug }: { slug: string }) {
       </div>
       {!data.schoolDay && (
         <p className="text-body-sm text-muted-foreground">
-          {data.day} isn&apos;t a school day.
+          {formatDay(data.day)} isn&apos;t a school day.
         </p>
       )}
       {data.staff.length === 0 ? (

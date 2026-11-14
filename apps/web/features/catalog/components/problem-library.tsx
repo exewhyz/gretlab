@@ -25,6 +25,7 @@ import { Difficulty, TagChip } from "./difficulty"
 import type { ApiResult } from "@/lib/api/types"
 import type { getLists } from "@/features/catalog/server"
 import type { getCatalog } from "@/features/catalog/server"
+import { formatDay } from "@/lib/format"
 
 type Catalog = ApiResult<typeof getCatalog>
 
@@ -51,7 +52,7 @@ function DailyCard({ daily, signedIn }: { daily: Daily; signedIn: boolean }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-caption-upper text-body uppercase">
-          Daily challenge · {daily.day}
+          Daily challenge · {formatDay(daily.day)}
         </div>
         {daily.streak > 0 && (
           <span data-testid="streak" className="text-caption text-ink">

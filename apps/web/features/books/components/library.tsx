@@ -30,15 +30,8 @@ import {
   TextInput,
 } from "@/components/form"
 import { Loading, PageTitle, Stats } from "@/features/admin/components/shell"
+import { formatDay } from "@/lib/format"
 
-/** "Oct 18", or "Oct 18, 2025" in another year (a loan's day, the same in every time zone). */
-const loanDay = (day: string) =>
-  new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    ...(day.slice(0, 4) === String(new Date().getUTCFullYear()) ? {} : { year: "numeric" }),
-    timeZone: "UTC",
-  })
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
 import type { ApiResult } from "@/lib/api/types"
@@ -235,7 +228,7 @@ function Loans({
                 </span>
                 <span className="text-body">
                   {" "}
-                  · {l.returnedOn ? `back ${loanDay(l.returnedOn)}` : `due ${loanDay(l.dueOn)}`}
+                  · {l.returnedOn ? `back ${formatDay(l.returnedOn)}` : `due ${formatDay(l.dueOn)}`}
                 </span>
               </div>
               {(l.status === "out" || l.status === "overdue") && (
@@ -885,8 +878,8 @@ export function MemberLibrary({ slug }: { slug: string }) {
                   )}
                 >
                   {l.status === "overdue"
-                    ? `Overdue since ${loanDay(l.dueOn)}`
-                    : `Due ${loanDay(l.dueOn)}`}
+                    ? `Overdue since ${formatDay(l.dueOn)}`
+                    : `Due ${formatDay(l.dueOn)}`}
                 </span>
               </li>
             ))}

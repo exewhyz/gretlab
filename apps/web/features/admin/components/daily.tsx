@@ -21,6 +21,7 @@ import type { StaffProblemList } from "./problems"
 import { Loading, PageTitle, Table } from "./shell"
 import type { ApiResult } from "@/lib/api/types"
 import type { getDailySchedule } from "@/features/catalog/server"
+import { formatDay } from "@/lib/format"
 
 type Day = ApiResult<typeof getDailySchedule>[number]
 
@@ -55,7 +56,7 @@ export function AdminDaily() {
       <Table headers={["Day", "Problem", "Questions", ""]}>
         {data.map((row) => (
           <tr key={row.day} data-testid="daily-day">
-            <td className="w-32 whitespace-nowrap tabular-nums">{row.day}</td>
+            <td className="w-32 whitespace-nowrap tabular-nums">{formatDay(row.day)}</td>
             <td>
               {row.scheduled ? (
                 <span className="text-ink">{row.scheduled.title}</span>
@@ -150,7 +151,7 @@ function DayDialog({
         data-testid="daily-dialog"
       >
         <DialogHeader>
-          <DialogTitle>Daily challenge · {day.day}</DialogTitle>
+          <DialogTitle>Daily challenge · {formatDay(day.day)}</DialogTitle>
           <DialogDescription>
             Pick the problem and the questions, in the order students see them.
             Only questions that mark themselves can be used: choice questions,

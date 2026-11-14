@@ -6,6 +6,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { orgPages } from "@/lib/paths"
 import type { ApiResult } from "@/lib/api/types"
 import type { campusOf } from "@/features/campus/server"
+import { formatDay } from "@/lib/format"
 
 export interface CampusLoan {
   id: string
@@ -144,8 +145,8 @@ function LibraryCard({
                 )}
               >
                 {l.status === "overdue"
-                  ? `Overdue since ${l.dueOn}`
-                  : `Due ${l.dueOn}`}
+                  ? `Overdue since ${formatDay(l.dueOn)}`
+                  : `Due ${formatDay(l.dueOn)}`}
               </span>
             </li>
           ))}
