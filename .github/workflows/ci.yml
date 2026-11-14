@@ -1,0 +1,36 @@
+# Every push and pull request: install, lint, typecheck every package, run the unit tests,
+# and check the database migrations agree with each other. The end-to-end regression
+# (pnpm test:e2e) needs Docker with gVisor and runs on a developer's machine before a merge.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+      - name: Migrations are consistent
+        run: pnpm --filter @workspace/db exec drizzle-kit check

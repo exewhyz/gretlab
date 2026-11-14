@@ -41,7 +41,7 @@ test("a sitting ends at its time limit or the due time, whichever is first", () 
 })
 
 test("only submissions during the sitting count", () => {
-  const at = (m) => ({ createdAt: new Date(Date.UTC(2026, 10, 6, 10, m)) })
+  const at = (m: number) => ({ createdAt: new Date(Date.UTC(2026, 10, 6, 10, m)) })
   const attempts = [at(0), at(5), at(30), at(50)]
   const sitting = { startedAt: at(1).createdAt, endsAt: at(40).createdAt, finishedAt: null }
   assert.deepEqual(duringSitting(attempts, sitting), [at(5), at(30)])

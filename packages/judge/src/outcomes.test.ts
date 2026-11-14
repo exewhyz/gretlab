@@ -42,7 +42,7 @@ test("nobody assessed means no attainment yet, not zero", () => {
 })
 
 test("a PO averages its COs' levels by mapping strength", () => {
-  const cos = [
+  const cos: { level: number | null; mapping: Record<string, number> }[] = [
     { level: 3, mapping: { po1: 3, po2: 1 } },
     { level: 1, mapping: { po1: 1 } },
     { level: null, mapping: { po1: 3, po2: 3 } }, // not assessed: left out

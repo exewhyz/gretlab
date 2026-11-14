@@ -54,7 +54,7 @@ test("built-in platform roles keep their reach through parents", () => {
     "platform.work.grade",
     "platform.work.create",
     "platform.library.edit",
-  ]) {
+  ] as const) {
     assert.equal(
       grantsPlatformPermission(PLATFORM_ROLES.owner.permissions, child),
       true
