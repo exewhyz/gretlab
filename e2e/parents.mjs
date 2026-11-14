@@ -178,6 +178,8 @@ check("a list is linked from its dialog, skipping the header", (await list.getBy
 await list.getByRole("button", { name: "Done" }).click()
 await op.getByTestId("parent-link").filter({ hasText: "Pat Six" }).waitFor({ timeout: 15000 }).catch(() => {})
 await op.getByLabel("Search parents and students").fill("Pat Six")
+// The search runs on the server; the previous list stays until it answers.
+await op.waitForFunction(() => document.querySelectorAll('[data-testid="parent-link"]').length === 1, null, { timeout: 15000 }).catch(() => {})
 check("the search narrows the list", (await op.getByTestId("parent-link").count()) === 1)
 await op.screenshot({ path: SHOTS + "parents.png", fullPage: true })
 

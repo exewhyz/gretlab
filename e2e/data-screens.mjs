@@ -155,7 +155,17 @@ const view = async (email, width = 1440) => {
   await p.goto(`${BASE}/home`)
   await p.getByTestId("member-home").waitFor({ timeout: 30000 })
   check("a parent's home leads with their school and child", (await p.getByTestId("member-child").count()) === 1)
-  check("...and keeps the coding lab to one line", (await p.getByTestId("coding-invite").count()) === 1 && (await p.getByTestId("member-tile").count()) === 0)
+  // With nothing to code the coding lab is one line; with open work (earlier suites may have
+  // published platform-wide assignments), the work tiles show, as for anyone.
+  const dash = (await (await client("ds-p@example.com"))("/me/dashboard")).json
+  const quiet = dash?.work.open === 0 && dash.work.overdue === 0 && (dash.practice?.solved ?? 0) === 0
+  check(
+    "...and keeps the coding lab to one line when there's nothing to code",
+    quiet
+      ? (await p.getByTestId("coding-invite").count()) === (dash.features.practice ? 1 : 0) && (await p.getByTestId("member-tile").count()) === 0
+      : (await p.getByTestId("member-tile").count()) > 0,
+    JSON.stringify(dash?.work)
+  )
   check("...with no sideways scrolling", await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
   await p.screenshot({ path: SHOTS + "data-parent-home.png", fullPage: true })
   await p.context().close()

@@ -92,7 +92,7 @@ export function AdminDaily() {
               <Button
                 size="sm"
                 variant="outline"
-                aria-label={`Edit ${row.day}`}
+                aria-label={`Edit ${formatDay(row.day)}`}
                 onClick={() => setEditing(row)}
               >
                 Edit
