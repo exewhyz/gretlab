@@ -1,5 +1,3 @@
-import { randomBytes } from "node:crypto"
-
 import {
   academicYears,
   auditLog,
@@ -14,53 +12,35 @@ import {
   roleAssignments,
   sql,
   users,
-  type OrgGroup,
   type Organization,
   type User,
 } from "@workspace/db"
 import {
-  allows,
   ancestry,
-  audienceGroups,
-  inAudience,
-  type Audience,
   domainMatches,
   enabledModules,
   readAdmissionSettings,
-  ORG_VIEW_PERMISSIONS,
   grantsPermission,
   isModuleKey,
   KINDS,
-  type ModuleKey,
   moduleAvailable,
   MODULES,
   ORG_TYPE_CONFIG,
   readModuleChoices,
-  isPermission,
   PERMISSIONS,
   SYSTEM_ROLES,
-  type Grant,
   type Permission,
-  type SystemRoleKey,
   changesBetween,
   listChanges,
   yearProblem,
-  runProblem,
   type OrgType,
 } from "@workspace/judge"
 import type { z } from "zod"
 
 import { ApiError, notFound } from "@/lib/api/route"
-import { requestInfo } from "@/lib/api/request-context"
-import {
-  auditCsv,
-  readAudit,
-  writeEntry,
-  type AuditFilters,
-} from "@/features/audit/server"
+import { auditCsv, readAudit, type AuditFilters } from "@/features/audit/server"
 import { notify } from "@/features/notifications/server"
-import { orgReach, platformCan } from "@/features/platform/access"
-import { freeHandle } from "@/features/catalog/server"
+import { platformCan } from "@/features/platform/access"
 import { getSettings } from "@/features/settings/server"
 import { kindPolicies, kindRoleTemplates, moduleOptions } from "./kinds"
 
@@ -70,8 +50,6 @@ import type {
   signupSchema,
   assignRoleSchema,
   importSchema,
-  groupSchema,
-  groupRunSchema,
   inviteSchema,
   memberUpdateSchema,
   orgCreateSchema,
@@ -81,282 +59,35 @@ import type {
 import { orgPages } from "@/lib/paths"
 
 const { and, asc, count, desc, eq, ilike, inArray, isNull, or } = sql
-
-type Db = ReturnType<typeof getDb>
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0]
-
-/** Keeps `IN (...)` valid when an organization has no groups yet. */
-const NO_GROUP = "00000000-0000-0000-0000-000000000000"
-
-const forbidden = (message = "You don't have permission to do that.") =>
-  new ApiError(403, "forbidden", message)
-
-/* ---------- who may do what ---------- */
-
-interface OrgContext {
-  org: Organization
-  user: User
-  /**
-   * Platform staff who may act in any organization ("Act in organizations"; owners have
-   * it): everything an admin can do, joined or not, logged as support.
-   */
-  platformAdmin: boolean
-  /** Platform staff who may look inside any organization, read-only ("See inside organizations"). */
-  platformViewer: boolean
-  membership: typeof orgMembers.$inferSelect | null
-  grants: (Grant & { systemKey: string | null })[]
-  groups: OrgGroup[]
-  /** The modules on here: the kind's, as the platform allows, as the org chose. */
-  modules: Set<ModuleKey>
-}
-
-async function loadOrg(slug: string) {
-  const [org] = await getDb()
-    .select()
-    .from(organizations)
-    .where(eq(organizations.slug, slug))
-  if (!org) throw notFound("Organization not found")
-  return org
-}
-
-async function context(slug: string, user: User): Promise<OrgContext> {
-  const org = await loadOrg(slug)
-  const db = getDb()
-  const [[membership], rows, groups, policies, reach] = await Promise.all([
-    db
-      .select()
-      .from(orgMembers)
-      .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, user.id))),
-    db
-      .select({
-        permissions: orgRoles.permissions,
-        systemKey: orgRoles.systemKey,
-        groupId: roleAssignments.groupId,
-      })
-      .from(roleAssignments)
-      .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
-      .where(
-        and(
-          eq(roleAssignments.orgId, org.id),
-          eq(roleAssignments.userId, user.id)
-        )
-      ),
-    db.select().from(orgGroups).where(eq(orgGroups.orgId, org.id)),
-    kindPolicies(),
-    orgReach(user),
-  ])
-  const active = membership?.status === "active"
-  const ctx: OrgContext = {
-    org,
-    user,
-    platformAdmin: reach === "act",
-    platformViewer: reach !== null,
-    membership: membership ?? null,
-    // Roles only count while the person is an active member. Platform staff who may look
-    // inside every organization see it as with a read-only role across it.
-    grants: [
-      ...(active ? rows.map((row) => ({ ...row, permissions: rolePermissions(row) })) : []),
-      ...(reach === "view" ? [{ permissions: ORG_VIEW_PERMISSIONS, groupId: null, systemKey: null }] : []),
-    ],
-    groups,
-    modules: enabledModules(org.type, org.modules, policies[org.type]),
-  }
-  // An API key: its maker's roles here, narrowed to the key's permissions; no platform reach.
-  const key = requestInfo().apiKey
-  if (key) {
-    if (key.orgId !== org.id) throw notFound("Organization not found")
-    return {
-      ...ctx,
-      platformAdmin: false,
-      platformViewer: false,
-      grants: ctx.grants.map((g) => ({
-        ...g,
-        systemKey: null,
-        permissions: (key.permissions as Permission[]).filter((p) =>
-          grantsPermission(g.permissions, p)
-        ),
-      })),
-    }
-  }
-  return ctx
-}
-
-function chainOf(ctx: OrgContext, groupId: string) {
-  const parents = new Map(ctx.groups.map((g) => [g.id, g.parentId]))
-  return ancestry(groupId, (id) => parents.get(id))
-}
-
-const isOwner = (ctx: OrgContext) =>
-  ctx.grants.some((g) => g.systemKey === "owner" && g.groupId === null)
-
-function can(ctx: OrgContext, permission: Permission, groupId?: string | null) {
-  if (ctx.platformAdmin) return true
-  return allows(ctx.grants, permission, groupId ? chainOf(ctx, groupId) : null)
-}
-
-function need(
-  ctx: OrgContext,
-  permission: Permission,
-  groupId?: string | null
-) {
-  if (!can(ctx, permission, groupId)) {
-    throw forbidden(
-      `This needs the "${PERMISSIONS[permission].label}" permission.`
-    )
-  }
-}
-
-/** Permissions this person holds for a group (or the whole organization). */
-function heldFor(ctx: OrgContext, groupId: string | null): Set<string> {
-  const chain = groupId ? chainOf(ctx, groupId) : null
-  return new Set(
-    ctx.grants
-      .filter((g) => g.groupId === null || (chain && chain.includes(g.groupId)))
-      .flatMap((g) => g.permissions)
-  )
-}
-
-/** Nobody can hand out more than they have: the guard against giving yourself more. */
-function needSubset(
-  ctx: OrgContext,
-  permissions: readonly string[],
-  groupId: string | null
-) {
-  if (ctx.platformAdmin || isOwner(ctx)) return
-  const held = [...heldFor(ctx, groupId)]
-  // Holding a parent is holding every action under it, so it may be handed out.
-  const extra = permissions.filter(
-    (p) => !(isPermission(p) && grantsPermission(held, p))
-  )
-  if (extra.length) {
-    throw forbidden(
-      `You can't give permissions you don't have: ${extra
-        .map((p) => (isPermission(p) ? PERMISSIONS[p].label : p))
-        .join(", ")}.`
-    )
-  }
-}
-
-/** Permissions this person has somewhere in the organization, org-wide or in a group. */
-export function heldAnywhere(ctx: OrgContext) {
-  return (Object.keys(PERMISSIONS) as Permission[]).filter((p) => {
-    const scope = scopeOf(ctx, p)
-    return scope === "all" || scope.size > 0
-  })
-}
-
-/** Every group this person may act on for a permission, or "all". */
-function scopeOf(ctx: OrgContext, permission: Permission): "all" | Set<string> {
-  if (can(ctx, permission)) return "all"
-  const visible = new Set<string>()
-  for (const group of ctx.groups) {
-    if (can(ctx, permission, group.id)) visible.add(group.id)
-  }
-  return visible
-}
-
-async function audit(
-  tx: Tx | Db,
-  ctx: {
-    org: Organization
-    user: User
-    platformAdmin?: boolean
-    membership?: { status: string } | null
-  },
-  action: string,
-  summary: string,
-  detail?: Record<string, unknown>
-) {
-  await writeEntry(tx, {
-    orgId: ctx.org.id,
-    actor: ctx.user,
-    action,
-    summary,
-    detail,
-    // Platform staff stepping in for support, not as a member.
-    support: Boolean(ctx.platformAdmin) && ctx.membership?.status !== "active",
-  })
-}
-
-const newToken = () => randomBytes(16).toString("base64url")
-
-export async function userByEmail(tx: Tx | Db, email: string) {
-  const [found] = await tx.select().from(users).where(eq(users.email, email))
-  if (found) return found
-  // Someone who hasn't signed in yet: the account is waiting for their first sign-in.
-  const [created] = await tx
-    .insert(users)
-    .values({ email, handle: await freeHandle(email) })
-    .onConflictDoNothing({ target: users.email })
-    .returning()
-  if (created) return created
-  const [raced] = await tx.select().from(users).where(eq(users.email, email))
-  return raced!
-}
-
-async function systemRole(tx: Tx | Db, orgId: string, key: SystemRoleKey) {
-  const [role] = await tx
-    .select()
-    .from(orgRoles)
-    .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.systemKey, key)))
-  return role!
-}
-
-/** Adds someone as an active member with the Member role, if they aren't one already. */
-async function admitMember(
-  tx: Tx | Db,
-  org: Organization,
-  userId: string,
-  joinedVia: string,
-  shareProgress: boolean,
-  status: "active" | "pending" = "active"
-) {
-  const [existing] = await tx
-    .select()
-    .from(orgMembers)
-    .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, userId)))
-  if (existing?.status === "active") return existing
-  if (existing) {
-    await tx
-      .update(orgMembers)
-      .set({ status, shareProgress, joinedVia })
-      .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, userId)))
-  } else {
-    await tx
-      .insert(orgMembers)
-      .values({ orgId: org.id, userId, status, shareProgress, joinedVia })
-  }
-  if (status === "active") await giveRole(tx, org.id, userId, "member", null)
-  return { status }
-}
-
-async function giveRole(
-  tx: Tx | Db,
-  orgId: string,
-  userId: string,
-  role: SystemRoleKey | string,
-  groupId: string | null
-) {
-  const roleId =
-    role in SYSTEM_ROLES
-      ? (await systemRole(tx, orgId, role as SystemRoleKey)).id
-      : role
-  const [already] = await tx
-    .select({ id: roleAssignments.id })
-    .from(roleAssignments)
-    .where(
-      and(
-        eq(roleAssignments.roleId, roleId),
-        eq(roleAssignments.userId, userId),
-        groupId
-          ? eq(roleAssignments.groupId, groupId)
-          : isNull(roleAssignments.groupId)
-      )
-    )
-  if (!already) {
-    await tx.insert(roleAssignments).values({ orgId, userId, roleId, groupId })
-  }
-}
+import {
+  NO_GROUP,
+  admitMember,
+  audit,
+  can,
+  canAnywhere,
+  canFor,
+  chainOf,
+  context,
+  forbidden,
+  giveRole,
+  groupIn,
+  heldAnywhere,
+  heldFor,
+  isLeaf,
+  isOwner,
+  leavesUnder,
+  loadOrg,
+  memberOf,
+  need,
+  needSubset,
+  newToken,
+  roleIn,
+  scopeOf,
+  settleBelow,
+  systemRole,
+  userByEmail,
+  type Tx,
+} from "./core"
 
 /* ---------- platform ---------- */
 
@@ -432,16 +163,19 @@ async function createOrgInTx(
   // And the kind's suggested roles (a school's Principal, Class teacher…), as ordinary roles.
   const suggested = (await kindRoleTemplates())[input.type]
   if (suggested.length)
-    await tx.insert(orgRoles).values(
-      suggested.map((r) => ({
-        orgId: org!.id,
-        systemKey: null,
-        templateKey: r.key,
-        name: r.name,
-        description: r.description,
-        permissions: [...r.permissions],
-      }))
-    ).onConflictDoNothing()
+    await tx
+      .insert(orgRoles)
+      .values(
+        suggested.map((r) => ({
+          orgId: org!.id,
+          systemKey: null,
+          templateKey: r.key,
+          name: r.name,
+          description: r.description,
+          permissions: [...r.permissions],
+        }))
+      )
+      .onConflictDoNothing()
   await admitMember(tx, org!, ownerId, "created", false)
   await giveRole(tx, org!.id, ownerId, "owner", null)
   return org!
@@ -534,15 +268,13 @@ export async function signUpOrganization(
           .values({ orgId: org.id, name: `${levels[0] ?? "Grade"} ${n}` })
           .returning()
         if (levels.length > 1)
-          await tx
-            .insert(orgGroups)
-            .values(
-              input.grades.sections.map((name) => ({
-                orgId: org.id,
-                parentId: grade!.id,
-                name,
-              }))
-            )
+          await tx.insert(orgGroups).values(
+            input.grades.sections.map((name) => ({
+              orgId: org.id,
+              parentId: grade!.id,
+              name,
+            }))
+          )
       }
     }
     await audit(
@@ -1132,74 +864,6 @@ export async function revokeInvite(slug: string, user: User, id: string) {
 }
 
 /* ---------- management ---------- */
-
-function groupIn(ctx: OrgContext, groupId: string) {
-  const group = ctx.groups.find((g) => g.id === groupId)
-  if (!group) throw notFound("Group not found")
-  return group
-}
-
-/*
- * People sit in the last level of the group tree: a section, a team, a subject. Being in
- * a section is what puts them in its year. Someone placed directly in a group that later
- * gets groups inside it is "not placed yet" until moved into one of them.
- */
-const childrenOf = (ctx: OrgContext, id: string) =>
-  ctx.groups.filter((g) => g.parentId === id)
-
-const isLeaf = (ctx: OrgContext, id: string) => childrenOf(ctx, id).length === 0
-
-/**
- * Where someone added to a group actually goes: the group itself if it's the last level,
- * otherwise every last-level group inside it. Adding to "3rd Year" puts them in each
- * section (or each lab inside each section).
- */
-function leavesUnder(ctx: OrgContext, id: string): string[] {
-  if (isLeaf(ctx, id)) return [id]
-  return ctx.groups
-    .filter(
-      (g) => g.id !== id && isLeaf(ctx, g.id) && chainOf(ctx, g.id).includes(id)
-    )
-    .map((g) => g.id)
-}
-
-function needLeaf(ctx: OrgContext, id: string) {
-  if (isLeaf(ctx, id)) return
-  const group = groupIn(ctx, id)
-  throw new ApiError(
-    400,
-    "not_last_level",
-    `People go into the last level. ${group.name} has ${childrenOf(ctx, id)
-      .map((g) => g.name)
-      .join(", ")} inside it; add them to one of those.`
-  )
-}
-
-/** Once someone is in a group, they no longer sit directly in the groups above it. */
-async function settleBelow(
-  tx: Tx | Db,
-  ctx: OrgContext,
-  userId: string,
-  groupId: string
-) {
-  const above = chainOf(ctx, groupId).slice(1)
-  if (above.length === 0) return
-  await tx
-    .delete(groupMembers)
-    .where(
-      and(eq(groupMembers.userId, userId), inArray(groupMembers.groupId, above))
-    )
-}
-
-async function roleIn(ctx: OrgContext, roleId: string) {
-  const [role] = await getDb()
-    .select()
-    .from(orgRoles)
-    .where(and(eq(orgRoles.id, roleId), eq(orgRoles.orgId, ctx.org.id)))
-  if (!role) throw notFound("Role not found")
-  return role
-}
-
 export async function getManageSummary(slug: string, user: User) {
   const ctx = await context(slug, user)
   const permissions = heldAnywhere(ctx)
@@ -1382,7 +1046,13 @@ export async function listMembers(
 export async function listMembers(
   slug: string,
   user: User,
-  filter: { groupId?: string; status?: string; q?: string; kind?: string; page: number }
+  filter: {
+    groupId?: string
+    status?: string
+    q?: string
+    kind?: string
+    page: number
+  }
 ): Promise<{
   members: Awaited<ReturnType<typeof allMembers>>
   total: number
@@ -1393,7 +1063,13 @@ export async function listMembers(
 export async function listMembers(
   slug: string,
   user: User,
-  filter: { groupId?: string; status?: string; q?: string; kind?: string; page?: number }
+  filter: {
+    groupId?: string
+    status?: string
+    q?: string
+    kind?: string
+    page?: number
+  }
 ) {
   const all = await allMembers(slug, user, filter)
   if (!filter.page) return all
@@ -1411,7 +1087,10 @@ export async function listMembers(
   const pages = Math.max(1, Math.ceil(shown.length / MEMBERS_PER_PAGE))
   const page = Math.min(Math.max(1, filter.page), pages)
   return {
-    members: shown.slice((page - 1) * MEMBERS_PER_PAGE, page * MEMBERS_PER_PAGE),
+    members: shown.slice(
+      (page - 1) * MEMBERS_PER_PAGE,
+      page * MEMBERS_PER_PAGE
+    ),
     total: shown.length,
     page,
     pages,
@@ -1475,11 +1154,18 @@ async function allMembers(
           ),
         // Whose parent each one is here, so the list can say so.
         db
-          .select({ parentId: guardians.parentId, name: users.name, email: users.email })
+          .select({
+            parentId: guardians.parentId,
+            name: users.name,
+            email: users.email,
+          })
           .from(guardians)
           .innerJoin(users, eq(guardians.studentId, users.id))
           .where(
-            and(eq(guardians.orgId, ctx.org.id), inArray(guardians.parentId, ids))
+            and(
+              eq(guardians.orgId, ctx.org.id),
+              inArray(guardians.parentId, ids)
+            )
           ),
       ])
     : [[], [], []]
@@ -1531,16 +1217,6 @@ async function allMembers(
         .filter((f) => f.parentId === person.id)
         .map((f) => f.name ?? f.email),
     }))
-}
-
-async function memberOf(ctx: OrgContext, userId: string) {
-  const [row] = await getDb()
-    .select({ member: orgMembers, user: users })
-    .from(orgMembers)
-    .innerJoin(users, eq(orgMembers.userId, users.id))
-    .where(and(eq(orgMembers.orgId, ctx.org.id), eq(orgMembers.userId, userId)))
-  if (!row) throw notFound("Member not found")
-  return row
 }
 
 export async function updateMember(
@@ -1730,343 +1406,16 @@ export async function unassignRole(
   })
 }
 
-/* ---------- groups ---------- */
-
-export async function listGroups(slug: string, user: User) {
-  const ctx = await context(slug, user)
-  const rows = ctx.groups.length
-    ? await getDb()
-        .select({ groupId: groupMembers.groupId, userId: groupMembers.userId })
-        .from(groupMembers)
-        .where(
-          inArray(
-            groupMembers.groupId,
-            ctx.groups.map((g) => g.id)
-          )
-        )
-    : []
-  const leadIds = [...new Set(ctx.groups.flatMap((g) => (g.leadId ? [g.leadId] : [])))]
-  const leads = leadIds.length
-    ? (
-        await getDb()
-          .select({ id: users.id, name: users.name, email: users.email })
-          .from(users)
-          .where(inArray(users.id, leadIds))
-      ).map((u) => ({ id: u.id, name: u.name ?? u.email }))
-    : []
-  const kind = KINDS[ctx.org.type]
-  return {
-    levels: ctx.org.groupLevels,
-    run: {
-      dates: kind.groupDates,
-      lead: kind.leadPerGroup,
-      leadTerm: kind.terms.groupLead,
-      open: kind.openGroups,
-    },
-    canManageAll: can(ctx, "org.groups.manage"),
-    groups: ctx.groups
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((g) => {
-        const direct = rows.filter((r) => r.groupId === g.id).length
-        return {
-          id: g.id,
-          name: g.name,
-          description: g.description,
-          parentId: g.parentId,
-          depth: chainOf(ctx, g.id).length - 1,
-          // Everyone in it or in a group inside it, counted once.
-          members: new Set(
-            rows
-              .filter((r) => chainOf(ctx, r.groupId).includes(g.id))
-              .map((r) => r.userId)
-          ).size,
-          // People sitting directly in a group that now has groups inside it.
-          notPlaced: isLeaf(ctx, g.id) ? 0 : direct,
-          canManage: can(ctx, "org.groups.manage", g.id),
-          canEdit: can(ctx, "org.groups.edit", g.id),
-          startsOn: g.startsOn,
-          endsOn: g.endsOn,
-          open: g.open,
-          lead: g.leadId ? (leads.find((l) => l.id === g.leadId) ?? null) : null,
-        }
-      }),
-  }
-}
-
-export async function createGroup(
-  slug: string,
-  user: User,
-  input: z.infer<typeof groupSchema>
-) {
-  const ctx = await context(slug, user)
-  // Top-level groups need the permission org-wide; subgroups, on their parent.
-  need(ctx, "org.groups.create", input.parentId)
-  if (input.parentId) {
-    const depth = chainOf(ctx, groupIn(ctx, input.parentId).id).length
-    if (depth >= ctx.org.groupLevels.length) {
-      throw new ApiError(
-        400,
-        "too_deep",
-        `Groups go ${ctx.org.groupLevels.length} level${ctx.org.groupLevels.length > 1 ? "s" : ""} deep here. Add a level in Settings first.`
-      )
-    }
-  }
-  return getDb().transaction(async (tx) => {
-    const [group] = await tx
-      .insert(orgGroups)
-      .values({ orgId: ctx.org.id, ...input })
-      .returning()
-    await audit(tx, ctx, "group.create", `Created group ${group!.name}`)
-    // A group's first group inside takes its people down with it, so they stay in the last
-    // level. With other groups already inside, nobody sits directly in the parent anyway.
-    let movedDown = 0
-    if (input.parentId && isLeaf(ctx, input.parentId)) {
-      const people = await tx
-        .select({ userId: groupMembers.userId })
-        .from(groupMembers)
-        .where(eq(groupMembers.groupId, input.parentId))
-      if (people.length) {
-        await tx
-          .insert(groupMembers)
-          .values(people.map((p) => ({ groupId: group!.id, userId: p.userId })))
-          .onConflictDoNothing()
-        await tx
-          .delete(groupMembers)
-          .where(eq(groupMembers.groupId, input.parentId))
-        movedDown = people.length
-      }
-    }
-    const [waiting] = input.parentId
-      ? await tx
-          .select({ total: count() })
-          .from(groupMembers)
-          .where(eq(groupMembers.groupId, input.parentId))
-      : []
-    return { ...group!, movedDown, parentNotPlaced: waiting?.total ?? 0 }
-  })
-}
-
-export async function updateGroup(
-  slug: string,
-  user: User,
-  id: string,
-  input: Pick<z.infer<typeof groupSchema>, "name" | "description">
-) {
-  const ctx = await context(slug, user)
-  const group = groupIn(ctx, id)
-  need(ctx, "org.groups.edit", id)
-  await getDb().transaction(async (tx) => {
-    await tx.update(orgGroups).set(input).where(eq(orgGroups.id, id))
-    await audit(
-      tx,
-      ctx,
-      "group.update",
-      `Renamed ${group.name} to ${input.name}`
-    )
-  })
-}
-
-/**
- * A group's run and lead, for kinds that have them: a cohort's dates, a pod's mentor. The
- * lead is given the kind's instructor role on the group if nothing gives them teaching
- * there yet, so they can run it (it stays when they stop leading; take it off in People).
- */
-export async function setGroupRun(
-  slug: string,
-  user: User,
-  id: string,
-  input: z.infer<typeof groupRunSchema>
-) {
-  const ctx = await context(slug, user)
-  const group = groupIn(ctx, id)
-  need(ctx, "org.groups.edit", id)
-  const kind = KINDS[ctx.org.type]
-  const datesGiven = input.startsOn !== undefined || input.endsOn !== undefined
-  if (datesGiven && !kind.groupDates)
-    throw new ApiError(400, "not_for_kind", `${kind.terms.groups} don't run between dates in a ${kind.noun}.`)
-  if (input.open !== undefined && !kind.openGroups)
-    throw new ApiError(400, "not_for_kind", `People don't join ${kind.terms.groups.toLowerCase()} themselves in a ${kind.noun}.`)
-  if (input.leadId !== undefined && !kind.leadPerGroup)
-    throw new ApiError(400, "not_for_kind", `A ${kind.noun} names its ${kind.terms.groupLead.toLowerCase()}s per year, in Academic years.`)
-  const startsOn = input.startsOn === undefined ? group.startsOn : input.startsOn
-  const endsOn = input.endsOn === undefined ? group.endsOn : input.endsOn
-  const problem = runProblem(startsOn, endsOn)
-  if (problem) throw new ApiError(400, "bad_run", problem)
-  let lead: { id: string; email: string; name: string | null } | null = null
-  if (input.leadId) {
-    const [row] = await getDb()
-      .select({ id: users.id, email: users.email, name: users.name })
-      .from(orgMembers)
-      .innerJoin(users, eq(orgMembers.userId, users.id))
-      .where(and(eq(orgMembers.orgId, ctx.org.id), eq(orgMembers.userId, input.leadId), eq(orgMembers.status, "active")))
-    if (!row) throw new ApiError(400, "not_member", "The lead has to be an active member.")
-    lead = row
-  }
-  const instructor = lead ? await systemRole(getDb(), ctx.org.id, "teacher") : null
-  if (instructor) needSubset(ctx, rolePermissions(instructor), id)
-  await getDb().transaction(async (tx) => {
-    await tx
-      .update(orgGroups)
-      .set({
-        startsOn,
-        endsOn,
-        ...(input.leadId !== undefined ? { leadId: input.leadId } : {}),
-        ...(input.open !== undefined ? { open: input.open } : {}),
-      })
-      .where(eq(orgGroups.id, id))
-    if (lead && instructor) {
-      const [held] = await tx
-        .select({ systemKey: orgRoles.systemKey, permissions: orgRoles.permissions, groupId: roleAssignments.groupId })
-        .from(roleAssignments)
-        .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
-        .where(and(eq(roleAssignments.orgId, ctx.org.id), eq(roleAssignments.userId, lead.id)))
-        .then((rows) =>
-          rows.filter(
-            (r) =>
-              (r.groupId === null || chainOf(ctx, id).includes(r.groupId)) &&
-              rolePermissions(r).includes("teaching.log")
-          )
-        )
-      if (!held) await giveRole(tx, ctx.org.id, lead.id, instructor.id, id)
-    }
-    const parts = [
-      datesGiven ? (startsOn ? `runs ${startsOn} to ${endsOn}` : "no dates") : null,
-      input.leadId !== undefined
-        ? lead
-          ? `${kind.terms.groupLead} ${lead.name ?? lead.email}`
-          : `no ${kind.terms.groupLead.toLowerCase()}`
-        : null,
-      input.open !== undefined ? (input.open ? "open to join" : "closed") : null,
-    ].filter(Boolean)
-    await audit(tx, ctx, "group.run", `${group.name}: ${parts.join(", ")}`)
-  })
-  return {
-    startsOn,
-    endsOn,
-    leadId: input.leadId === undefined ? group.leadId : input.leadId,
-    open: input.open ?? group.open,
-  }
-}
-
-/* ---------- open groups (a community's) ---------- */
-
-function needOpenGroups(ctx: OrgContext) {
-  if (!KINDS[ctx.org.type].openGroups) throw notFound("Not part of this organization")
-  if (ctx.membership?.status !== "active") throw forbidden("Join the organization first.")
-}
-
-/** Groups members may join themselves, with who leads them and whether this person is in. */
-export async function openGroups(slug: string, user: User) {
-  const ctx = await context(slug, user)
-  needOpenGroups(ctx)
-  const open = ctx.groups.filter((g) => g.open)
-  const ids = open.map((g) => g.id)
-  const [seats, leads] = await Promise.all([
-    ids.length
-      ? getDb()
-          .select({ groupId: groupMembers.groupId, userId: groupMembers.userId })
-          .from(groupMembers)
-          .where(inArray(groupMembers.groupId, ids))
-      : [],
-    getDb()
-      .select({ id: users.id, name: users.name, email: users.email })
-      .from(users)
-      .where(inArray(users.id, [...new Set(open.flatMap((g) => (g.leadId ? [g.leadId] : [])))].concat(["00000000-0000-0000-0000-000000000000"]))),
-  ])
-  const kind = KINDS[ctx.org.type]
-  return {
-    terms: kind.terms,
-    groups: open
-      .map((g) => ({
-        id: g.id,
-        name: g.name,
-        description: g.description,
-        members: seats.filter((s) => s.groupId === g.id).length,
-        lead: g.leadId ? (leads.find((l) => l.id === g.leadId)?.name ?? null) : null,
-        mine: seats.some((s) => s.groupId === g.id && s.userId === user.id),
-      }))
-      .sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.localeCompare(b.name)),
-  }
-}
-
-/** Joins an open group, or leaves one. */
-export async function joinOpenGroup(slug: string, user: User, id: string, join: boolean) {
-  const ctx = await context(slug, user)
-  needOpenGroups(ctx)
-  const group = groupIn(ctx, id)
-  if (!group.open) throw forbidden(`${group.name} isn't open to join; ask its ${KINDS[ctx.org.type].terms.groupLead.toLowerCase()}.`)
-  await getDb().transaction(async (tx) => {
-    if (join) {
-      const [added] = await tx
-        .insert(groupMembers)
-        .values({ groupId: id, userId: user.id })
-        .onConflictDoNothing()
-        .returning()
-      if (added) await audit(tx, ctx, "group.join", `Joined ${group.name}`)
-    } else {
-      const [gone] = await tx
-        .delete(groupMembers)
-        .where(and(eq(groupMembers.groupId, id), eq(groupMembers.userId, user.id)))
-        .returning()
-      if (gone) await audit(tx, ctx, "group.leave", `Left ${group.name}`)
-    }
-  })
-  return openGroups(slug, user)
-}
-
-/**
- * Deletes a group and everything inside it. A group with people in it (or in a group
- * inside it) is only deleted with `force`: they're then taken out of it, not moved
- * anywhere, so nobody ends up counted in groups they weren't in. Otherwise it's refused
- * with the count, so the person can empty it first or confirm.
- */
-export async function deleteGroup(
-  slug: string,
-  user: User,
-  id: string,
-  force: boolean
-) {
-  const ctx = await context(slug, user)
-  const group = groupIn(ctx, id)
-  // Deleting needs the permission above the group, not just on it.
-  need(ctx, "org.groups.delete", group.parentId)
-  const doomed = ctx.groups
-    .filter((g) => chainOf(ctx, g.id).includes(id))
-    .map((g) => g.id)
-  await getDb().transaction(async (tx) => {
-    const people = await tx
-      .selectDistinct({ userId: groupMembers.userId })
-      .from(groupMembers)
-      .where(inArray(groupMembers.groupId, doomed))
-    if (people.length > 0 && !force) {
-      throw new ApiError(
-        409,
-        "group_not_empty",
-        `${group.name} has ${people.length} ${people.length === 1 ? "person" : "people"} in it. Empty it first, or delete it and take them out of it.`
-      )
-    }
-    // Their places in these groups go with the groups (the rows cascade).
-    await tx.delete(orgGroups).where(inArray(orgGroups.id, doomed))
-    await audit(
-      tx,
-      ctx,
-      "group.delete",
-      `Deleted group ${group.name}${doomed.length > 1 ? ` and ${doomed.length - 1} inside it` : ""}${
-        people.length
-          ? `; took ${people.length} ${people.length === 1 ? "person" : "people"} out of it`
-          : ""
-      }`
-    )
-  })
-}
-
 /* ---------- roles ---------- */
 
 export async function listRoles(slug: string, user: User) {
   const ctx = await context(slug, user)
   // Role names and what they allow: whoever sees members anywhere (a class teacher their
   // class's) needs them to read the members list; changing roles is checked on change.
-  if (!canAnywhere(ctx, "org.roles.manage") && !canAnywhere(ctx, "org.members.view"))
+  if (
+    !canAnywhere(ctx, "org.roles.manage") &&
+    !canAnywhere(ctx, "org.members.view")
+  )
     need(ctx, "org.members.view")
   const db = getDb()
   const [roles, counts] = await Promise.all([
@@ -2122,7 +1471,12 @@ export async function suggestedRoles(slug: string, user: User) {
         /** A role of this name exists already (made by hand): adding needs a rename first. */
         nameTaken: names.has(t.name.toLowerCase()),
         /** Whether this person may give everything it holds. */
-        allowed: ctx.platformAdmin || isOwner(ctx) || t.permissions.every((p) => grantsPermission([...heldFor(ctx, null)], p)),
+        allowed:
+          ctx.platformAdmin ||
+          isOwner(ctx) ||
+          t.permissions.every((p) =>
+            grantsPermission([...heldFor(ctx, null)], p)
+          ),
       })),
   }
 }
@@ -2131,16 +1485,27 @@ export async function suggestedRoles(slug: string, user: User) {
 export async function addSuggestedRole(slug: string, user: User, key: string) {
   const ctx = await context(slug, user)
   need(ctx, "org.roles.manage")
-  const template = (await kindRoleTemplates())[ctx.org.type].find((t) => t.key === key)
+  const template = (await kindRoleTemplates())[ctx.org.type].find(
+    (t) => t.key === key
+  )
   if (!template) throw notFound("No such suggested role")
   needSubset(ctx, template.permissions, null)
   return getDb().transaction(async (tx) => {
     const [taken] = await tx
       .select({ id: orgRoles.id })
       .from(orgRoles)
-      .where(and(eq(orgRoles.orgId, ctx.org.id), sql.sql`lower(${orgRoles.name}) = ${template.name.toLowerCase()}`))
+      .where(
+        and(
+          eq(orgRoles.orgId, ctx.org.id),
+          sql.sql`lower(${orgRoles.name}) = ${template.name.toLowerCase()}`
+        )
+      )
     if (taken)
-      throw new ApiError(409, "name_taken", `There's already a role called ${template.name}. Rename it first.`)
+      throw new ApiError(
+        409,
+        "name_taken",
+        `There's already a role called ${template.name}. Rename it first.`
+      )
     const [role] = await tx
       .insert(orgRoles)
       .values({
@@ -2152,7 +1517,13 @@ export async function addSuggestedRole(slug: string, user: User, key: string) {
         permissions: [...template.permissions],
       })
       .returning()
-    await audit(tx, ctx, "role.create", `Added the suggested role ${template.name}`, { permissions: template.permissions })
+    await audit(
+      tx,
+      ctx,
+      "role.create",
+      `Added the suggested role ${template.name}`,
+      { permissions: template.permissions }
+    )
     return role!
   })
 }
@@ -2265,82 +1636,6 @@ export async function exportAudit(
   await audit(getDb(), ctx, "org.audit_export", "Downloaded the activity log")
   return auditCsv(ctx.org.id, filters, `${ctx.org.slug}-activity.csv`)
 }
-
-/* ---------- for organization content (contests, assignments, problems, notices) ---------- */
-
-export type { OrgContext }
-
-/** Loads an organization and what this person may do in it. */
-export async function orgContext(slug: string, user: User) {
-  const ctx = await context(slug, user)
-  if (!ctx.org.active && !ctx.platformViewer) {
-    if (ctx.org.signupStatus === "pending")
-      throw new ApiError(
-        403,
-        "pending_approval",
-        `${ctx.org.name} is waiting for the platform's approval. You'll be told when it's ready.`
-      )
-    throw forbidden("This organization is suspended.")
-  }
-  return ctx
-}
-
-/** Groups must belong to this organization. */
-export function checkAudience(ctx: OrgContext, audience: Audience) {
-  for (const id of audienceGroups(audience)) groupIn(ctx, id)
-}
-
-/**
- * Allowed for content with this audience: covering all groups of any one condition is
- * enough, since everyone reached is in every condition. Organization-wide content needs
- * an organization-wide grant.
- */
-export function canFor(
-  ctx: OrgContext,
-  permission: Permission,
-  audience: Audience
-) {
-  if (ctx.platformAdmin) return true
-  const conditions = audience.filter((c) => c.length > 0)
-  return conditions.length === 0
-    ? can(ctx, permission)
-    : conditions.some((c) => c.every((id) => can(ctx, permission, id)))
-}
-
-export function needFor(
-  ctx: OrgContext,
-  permission: Permission,
-  audience: Audience
-) {
-  if (!canFor(ctx, permission, audience)) {
-    throw forbidden(
-      audience.length === 0
-        ? `"${PERMISSIONS[permission].label}" for the whole organization is needed for this.`
-        : `"${PERMISSIONS[permission].label}" is needed for all the groups of one of its conditions.`
-    )
-  }
-}
-
-/** Whether this person has a permission anywhere in the organization. */
-export function canAnywhere(ctx: OrgContext, permission: Permission) {
-  const scope = scopeOf(ctx, permission)
-  return scope === "all" || scope.size > 0
-}
-
-/** Ids of groups this person may act on with a permission, or "all". */
-export const groupsFor = (ctx: OrgContext, permission: Permission) =>
-  scopeOf(ctx, permission)
-
-export async function writeAudit(
-  ctx: OrgContext,
-  action: string,
-  summary: string,
-  detail?: Record<string, unknown>
-) {
-  await audit(getDb(), ctx, action, summary, detail)
-}
-
-export { chainOf as groupChain }
 
 /* ---------- bulk import ---------- */
 
@@ -2591,350 +1886,6 @@ export async function importMembers(
   return { committed: true, counts, rows: visible }
 }
 
-/* ---------- a group's people, and who an audience reaches ---------- */
-
-/** Everyone in a group or a group inside it, with where each sits. */
-export async function groupPeople(slug: string, user: User, groupId: string) {
-  const ctx = await context(slug, user)
-  const group = groupIn(ctx, groupId)
-  need(ctx, "org.members.view", groupId)
-  const inside = ctx.groups
-    .filter((g) => chainOf(ctx, g.id).includes(groupId))
-    .map((g) => g.id)
-  const rows = await getDb()
-    .select({
-      userId: groupMembers.userId,
-      groupId: groupMembers.groupId,
-      name: users.name,
-      email: users.email,
-    })
-    .from(groupMembers)
-    .innerJoin(users, eq(groupMembers.userId, users.id))
-    .where(inArray(groupMembers.groupId, inside))
-  const pathFrom = (id: string) =>
-    chainOf(ctx, id)
-      .slice(0, chainOf(ctx, id).indexOf(groupId))
-      .reverse()
-      .map((x) => groupIn(ctx, x).name)
-      .join(" › ")
-  const people = new Map<
-    string,
-    {
-      userId: string
-      name: string | null
-      email: string
-      direct: boolean
-      in: string[]
-    }
-  >()
-  for (const r of rows) {
-    const p = people.get(r.userId) ?? {
-      userId: r.userId,
-      name: r.name,
-      email: r.email,
-      direct: false,
-      in: [],
-    }
-    if (r.groupId === groupId) p.direct = true
-    else p.in.push(pathFrom(r.groupId))
-    people.set(r.userId, p)
-  }
-  const leaf = isLeaf(ctx, groupId)
-  return {
-    group: { id: group.id, name: group.name },
-    /** Last-level groups inside this one, to place people into. */
-    places: leaf
-      ? []
-      : inside
-          .filter((id) => id !== groupId && isLeaf(ctx, id))
-          .map((id) => ({
-            id,
-            path: chainOf(ctx, id)
-              .slice(0, chainOf(ctx, id).indexOf(groupId))
-              .reverse()
-              .map((x) => groupIn(ctx, x).name)
-              .join(" › "),
-          })),
-    /** Everyone can be added here; a group with groups inside spreads them into its last level. */
-    canAdd: true,
-    canManage: can(ctx, "org.members.manage", groupId),
-    people: [...people.values()]
-      .map((p) => ({ ...p, notPlaced: p.direct && !leaf }))
-      .sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email)),
-  }
-}
-
-export async function addToGroup(
-  slug: string,
-  user: User,
-  groupId: string,
-  userIds: string[]
-) {
-  const ctx = await context(slug, user)
-  const group = groupIn(ctx, groupId)
-  need(ctx, "org.members.groups", groupId)
-  const targets = leavesUnder(ctx, groupId)
-  const members = await getDb()
-    .select({ userId: orgMembers.userId })
-    .from(orgMembers)
-    .where(
-      and(
-        eq(orgMembers.orgId, ctx.org.id),
-        eq(orgMembers.status, "active"),
-        inArray(orgMembers.userId, userIds.length ? userIds : [NO_GROUP])
-      )
-    )
-  if (members.length !== new Set(userIds).size) {
-    throw new ApiError(
-      400,
-      "not_member",
-      "Only active members can be added to a group."
-    )
-  }
-  await getDb().transaction(async (tx) => {
-    await tx
-      .insert(groupMembers)
-      .values(
-        targets.flatMap((target) =>
-          userIds.map((userId) => ({ groupId: target, userId }))
-        )
-      )
-      .onConflictDoNothing()
-    for (const userId of userIds) {
-      for (const target of targets) await settleBelow(tx, ctx, userId, target)
-    }
-    await audit(
-      tx,
-      ctx,
-      "member.groups",
-      `Added ${userIds.length} ${userIds.length === 1 ? "person" : "people"} to ${group.name}`
-    )
-  })
-}
-
-/**
- * Takes people out of a group and every group inside it: removing someone from 3rd Year
- * means from its sections too. Their membership of the organization stays.
- */
-export async function removeFromGroup(
-  slug: string,
-  user: User,
-  groupId: string,
-  userIds: string[]
-) {
-  const ctx = await context(slug, user)
-  const group = groupIn(ctx, groupId)
-  need(ctx, "org.members.groups", groupId)
-  if (userIds.length === 0) return { removed: 0 }
-  return getDb().transaction(async (tx) => {
-    const removed = await tx
-      .delete(groupMembers)
-      .where(
-        and(
-          inArray(groupMembers.groupId, insideIds(ctx, groupId)),
-          inArray(groupMembers.userId, userIds)
-        )
-      )
-      .returning({ userId: groupMembers.userId })
-    const people = new Set(removed.map((r) => r.userId)).size
-    await audit(
-      tx,
-      ctx,
-      "member.groups",
-      `Took ${people} ${people === 1 ? "person" : "people"} out of ${group.name}`
-    )
-    return { removed: people }
-  })
-}
-
-/** How many members an audience reaches, and a few names, while it's being chosen. */
-export async function previewAudience(
-  slug: string,
-  user: User,
-  audience: Audience
-) {
-  const ctx = await context(slug, user)
-  if (
-    !["assignments.manage", "contests.manage", "notices.manage"].some((p) =>
-      canAnywhere(ctx, p as Permission)
-    )
-  ) {
-    throw forbidden()
-  }
-  checkAudience(ctx, audience)
-  const db = getDb()
-  const [members, memberships] = await Promise.all([
-    db
-      .select({ id: users.id, name: users.name, email: users.email })
-      .from(orgMembers)
-      .innerJoin(users, eq(orgMembers.userId, users.id))
-      .where(
-        and(eq(orgMembers.orgId, ctx.org.id), eq(orgMembers.status, "active"))
-      ),
-    db
-      .select({ userId: groupMembers.userId, groupId: groupMembers.groupId })
-      .from(groupMembers)
-      .where(
-        inArray(groupMembers.groupId, [
-          ...ctx.groups.map((g) => g.id),
-          NO_GROUP,
-        ])
-      ),
-  ])
-  const reached = members.filter((m) =>
-    inAudience(
-      memberships.filter((x) => x.userId === m.id).map((x) => x.groupId),
-      audience,
-      (id) => chainOf(ctx, id)
-    )
-  )
-  return {
-    count: reached.length,
-    sample: reached.slice(0, 6).map((m) => m.name ?? m.email),
-  }
-}
-
-/** Moves people sitting directly in a group into one of the last-level groups inside it. */
-export async function placeInGroup(
-  slug: string,
-  user: User,
-  groupId: string,
-  into: string,
-  userIds: string[]
-) {
-  const ctx = await context(slug, user)
-  const group = groupIn(ctx, groupId)
-  need(ctx, "org.members.groups", groupId)
-  if (!chainOf(ctx, into).includes(groupId) || into === groupId) {
-    throw new ApiError(
-      400,
-      "not_inside",
-      `Choose a group inside ${group.name}.`
-    )
-  }
-  needLeaf(ctx, into)
-  await getDb().transaction(async (tx) => {
-    const waiting = (
-      await tx
-        .select({ userId: groupMembers.userId })
-        .from(groupMembers)
-        .where(
-          and(
-            eq(groupMembers.groupId, groupId),
-            inArray(groupMembers.userId, userIds.length ? userIds : [NO_GROUP])
-          )
-        )
-    ).map((r) => r.userId)
-    if (waiting.length === 0) return
-    await tx
-      .insert(groupMembers)
-      .values(waiting.map((userId) => ({ groupId: into, userId })))
-      .onConflictDoNothing()
-    for (const userId of waiting) await settleBelow(tx, ctx, userId, into)
-    await audit(
-      tx,
-      ctx,
-      "member.groups",
-      `Placed ${waiting.length} ${waiting.length === 1 ? "person" : "people"} from ${group.name} into ${groupIn(ctx, into).name}`
-    )
-  })
-}
-
-/** Everyone in a group and the groups inside it. */
-function insideIds(ctx: OrgContext, id: string) {
-  return ctx.groups
-    .filter((g) => chainOf(ctx, g.id).includes(id))
-    .map((g) => g.id)
-}
-
-/** Takes everyone out of a group and the groups inside it; the groups stay. */
-export async function emptyGroup(slug: string, user: User, id: string) {
-  const ctx = await context(slug, user)
-  const group = groupIn(ctx, id)
-  need(ctx, "org.members.groups", id)
-  return getDb().transaction(async (tx) => {
-    const removed = await tx
-      .delete(groupMembers)
-      .where(inArray(groupMembers.groupId, insideIds(ctx, id)))
-      .returning({ userId: groupMembers.userId })
-    const people = new Set(removed.map((r) => r.userId)).size
-    await audit(
-      tx,
-      ctx,
-      "member.groups",
-      `Emptied ${group.name} (${people} ${people === 1 ? "person" : "people"})`
-    )
-    return { removed: people }
-  })
-}
-
-/**
- * Moves everyone in a group (and the groups inside it) into another group, which as
- * always means its last-level groups. Used before deleting a group.
- */
-export async function moveGroupPeople(
-  slug: string,
-  user: User,
-  id: string,
-  into: string,
-  /** Only these people; everyone in the group when left out. */
-  only?: string[]
-) {
-  const ctx = await context(slug, user)
-  const group = groupIn(ctx, id)
-  const target = groupIn(ctx, into)
-  need(ctx, "org.members.groups", id)
-  need(ctx, "org.members.groups", into)
-  const inside = insideIds(ctx, id)
-  // Emptying a whole group (before deleting it) must send people outside it. Moving chosen
-  // people can go anywhere else, like from Lab 1 to Lab 2 of the same section.
-  if (into === id || (!only && inside.includes(into))) {
-    throw new ApiError(
-      400,
-      "inside_itself",
-      `Choose a group outside ${group.name}.`
-    )
-  }
-  const targets = leavesUnder(ctx, into)
-  return getDb().transaction(async (tx) => {
-    const people = [
-      ...new Set(
-        (
-          await tx
-            .select({ userId: groupMembers.userId })
-            .from(groupMembers)
-            .where(inArray(groupMembers.groupId, inside))
-        ).map((r) => r.userId)
-      ),
-    ].filter((userId) => !only || only.includes(userId))
-    if (people.length) {
-      // Out of where they were first, so a target inside the same group keeps them.
-      await tx
-        .delete(groupMembers)
-        .where(
-          and(
-            inArray(groupMembers.groupId, inside),
-            inArray(groupMembers.userId, people)
-          )
-        )
-      await tx
-        .insert(groupMembers)
-        .values(
-          targets.flatMap((t) =>
-            people.map((userId) => ({ groupId: t, userId }))
-          )
-        )
-        .onConflictDoNothing()
-      for (const userId of people) {
-        for (const t of targets) await settleBelow(tx, ctx, userId, t)
-      }
-    }
-    await audit(
-      tx,
-      ctx,
-      "member.groups",
-      `Moved ${people.length} ${people.length === 1 ? "person" : "people"} from ${group.name} to ${target.name}`
-    )
-    return { moved: people.length }
-  })
-}
+// Everything an organization feature needs comes from here, as before the split.
+export * from "./core"
+export * from "./groups"
