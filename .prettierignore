@@ -4,4 +4,7 @@ node_modules/
 .turbo/
 coverage/
 pnpm-lock.yaml
-.pnpm-store/apps/web/lib/pdf/fonts.ts
+.pnpm-store/
+apps/web/lib/pdf/fonts.ts
+# Installed agent skills: kept exactly as published (skills-lock.json hashes them).
+.agents/
