@@ -11,6 +11,7 @@ import { platformCan } from "@/features/platform/access"
 import { clientIp } from "./client-ip"
 import { ApiError } from "./errors"
 import { withRequest } from "./request-context"
+import { reportError } from "../report-error"
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024
 
@@ -186,10 +187,20 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
           { status: 409 }
         )
       }
-      // Internals go to the server log, never to the caller.
-      console.error("[api] unhandled error:", error)
+      // Internals go to the server log, never to the caller: they get a reference to quote.
+      const ref = reportError(error, {
+        where: "api",
+        method: request.method,
+        path: request.nextUrl.pathname,
+      })
       return NextResponse.json(
-        { error: { code: "internal", message: "Something went wrong." } },
+        {
+          error: {
+            code: "internal",
+            message: `Something went wrong. If it keeps happening, quote ${ref}.`,
+            ref,
+          },
+        },
         { status: 500 }
       )
     }
