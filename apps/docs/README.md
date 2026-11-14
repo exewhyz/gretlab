@@ -19,4 +19,14 @@ pnpm --filter docs build      # static site in apps/docs/dist
 pnpm --filter docs typecheck  # astro check
 ```
 
-`DOCS_SITE_URL` sets the site's address for the sitemap and links when it's deployed.
+Live at https://docs.gretlab.grettech.com (the default `site` in `astro.config.mjs`;
+`DOCS_SITE_URL` overrides it).
+
+## Deploying on Vercel
+
+A separate Vercel project from the web app, on the same repository:
+
+- **Root Directory:** `apps/docs` (Vercel installs the pnpm workspace from the repository root).
+- **Framework Preset:** Astro. Build command `astro build`, output directory `dist` (the defaults).
+- **Domain:** `docs.gretlab.grettech.com`.
+- **Environment variables:** none needed.

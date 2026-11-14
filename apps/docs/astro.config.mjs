@@ -4,7 +4,8 @@ import { defineConfig } from "astro/config"
 
 // The documentation site. Its pages are the repository's docs/ folder (src/content.config.ts).
 export default defineConfig({
-  site: process.env.DOCS_SITE_URL ?? "http://localhost:4321",
+  // The live address; DOCS_SITE_URL overrides it (a preview deploy, a local build).
+  site: process.env.DOCS_SITE_URL ?? "https://docs.gretlab.grettech.com",
   integrations: [
     starlight({
       title: "Gretlab Docs",
