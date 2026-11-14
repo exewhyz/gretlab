@@ -656,7 +656,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - The platform has an open contest next week.
   - The school has an upcoming Unit test 2 with a paper a day.
   - The school, college and coaching centre have holidays: a break that just ended, one coming up, and the national days (`demo/holidays.ts`).
-- Every demo account signs in with email and the password "Gretlab demo 2026"; addresses are on `<org>.demo.invalid`, so no email is ever sent to them (`isUndeliverable` in `packages/judge/src/records.ts`; `isNoLoginEmail` is only the no-login students' domain). The script prints the accounts to try, one per role. Platform admins still come from ADMIN_EMAILS.
+- Every demo account signs in with its email and the demo password, which the script prints with the accounts (never write it in docs or commits); addresses are on `<org>.demo.invalid`, so no email is ever sent to them (`isUndeliverable` in `packages/judge/src/records.ts`; `isNoLoginEmail` is only the no-login students' domain). The script prints the accounts to try, one per role. Platform admins still come from ADMIN_EMAILS.
 
 ## Platform staff inside organizations
 
