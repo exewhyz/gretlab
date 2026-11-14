@@ -1,18 +1,21 @@
 import { route } from "@/lib/api/route"
+import { readPage } from "@/lib/api/paging"
 import { listMembers } from "@/features/orgs/server"
 
 export const GET = route({ access: "user" }, ({ user, params, query }) => {
+  const { page, q, perPage } = readPage(query)
   const filter = {
     groupId: query.get("group") ?? undefined,
     status: query.get("status") ?? undefined,
-    q: query.get("q") ?? undefined,
+    q,
   }
-  const page = query.get("page")
-  // With a page: one page of 100 and the counts by kind (the Members screen); without, everyone.
+  // With a page: one page of members, read from the database, and the counts by kind (the
+  // Members screen); without, everyone.
   return page
     ? listMembers(params.slug ?? "", user, {
         ...filter,
-        page: Number(page) || 1,
+        page,
+        perPage,
         kind: query.get("kind") ?? undefined,
       })
     : listMembers(params.slug ?? "", user, filter)

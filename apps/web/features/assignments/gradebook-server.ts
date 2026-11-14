@@ -222,7 +222,9 @@ export async function colleaguesOf(assignment: Assignment, exceptId?: string) {
 export async function getGradebook(
   id: string,
   orgId: string | null,
-  scope: "all" | Set<string> = "all"
+  scope: "all" | Set<string> = "all",
+  /** Only these students (a page of a report); left out, everyone in scope. */
+  only?: readonly string[]
 ) {
   const [assignment] = await getDb()
     .select()
@@ -230,23 +232,27 @@ export async function getGradebook(
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
   if (!assignment) throw notFound("Assignment not found")
   const items = await itemsOf([id])
+  const onlySet = only && new Set(only)
   const [students, attempts, marks] = await Promise.all([
-    studentsOf(assignment, scope),
+    studentsOf(assignment, scope).then((all) =>
+      onlySet ? all.filter((s) => onlySet.has(s.id)) : all
+    ),
     attemptsOn(
       items.map((i) => i.problemId),
-      assignment.opensAt
+      assignment.opensAt,
+      only
     ),
     // Teachers see rubric marks whether or not they're released yet.
-    marksOn([id]),
+    marksOn([id], only),
   ])
   const [sittings, warnings] = assignment.exam
-    ? await Promise.all([sittingsOn([id]), warningCounts(id)])
+    ? await Promise.all([sittingsOn([id], only), warningCounts(id)])
     : [new Map<string, Map<string, Sitting>>(), new Map<string, number>()]
-  const extensions = (await extensionsOn([id])).get(id)
+  const extensions = (await extensionsOn([id], only)).get(id)
   const [questions, responses, projectBook] = await Promise.all([
     questionsOf([id]),
-    responsesOn([id]).then((r) => r.get(id)),
-    projectGrades([id]),
+    responsesOn([id], only).then((r) => r.get(id)),
+    projectGrades([id], only),
   ])
 
   const rows: GradebookRow[] = students.map((student) => {

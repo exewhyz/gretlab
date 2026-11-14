@@ -1,6 +1,7 @@
 import {
   attendance,
   getDb,
+  groupMembers,
   guardians,
   orgMembers,
   organizations,
@@ -31,6 +32,7 @@ import {
 import { classTimetable } from "@/features/timetable/server"
 import { kindPolicies } from "@/features/orgs/kinds"
 import { ApiError, notFound } from "@/lib/api/route"
+import { likeTerm, paged } from "@/lib/api/paging"
 
 /*
  * Parent accounts (a module). A parent is linked to a student in one organization
@@ -42,7 +44,8 @@ import { ApiError, notFound } from "@/lib/api/route"
  * notifications (features/notifications/server.ts) and a note when the child is absent.
  */
 
-const { and, asc, desc, eq, inArray, or, ilike } = sql
+const { and, asc, count, desc, eq, exists, inArray, or, ilike } = sql
+const raw = sql.sql
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -81,17 +84,17 @@ function needModule(ctx: OrgContext) {
 
 /* ---------- managing links (staff) ---------- */
 
-/** Manage › Parents: every link for the students this person may see, and what they may do. */
 const LINKS_PER_PAGE = 100
 
 /**
- * Parents linked to the students this person may see. With `page`, a page of 100 matching
- * `q` (names, emails, classes) and the total; without, all of them.
+ * Manage › Parents: parents linked to the students this person may see, and what they may
+ * do. With `page`, a page of 100 (or `perPage`) matching `q` (names, emails, classes), read
+ * a page at a time from the database, with the total; without, all of them.
  */
 export async function listLinks(
   slug: string,
   user: User,
-  opts: { page?: number; q?: string } = {}
+  opts: { page?: number; q?: string; perPage?: number } = {}
 ) {
   const ctx = await orgContext(slug, user)
   needModule(ctx)
@@ -102,64 +105,143 @@ export async function listLinks(
   if (!can.view && !can.link) {
     throw forbidden("Parent accounts aren't part of your role.")
   }
-  const rows = await getDb()
-    .select({
-      id: guardians.id,
-      studentId: guardians.studentId,
-      relation: guardians.relation,
-      parentName: users.name,
-      parentEmail: users.email,
-      createdAt: guardians.createdAt,
-    })
-    .from(guardians)
-    .innerJoin(users, eq(guardians.parentId, users.id))
-    .where(eq(guardians.orgId, ctx.org.id))
-    .orderBy(asc(users.email))
-  const students = new Map(
-    (
-      await studentsWithGroups(ctx, [...new Set(rows.map((r) => r.studentId))])
-    ).map((s) => [s.id, s])
+  const db = getDb()
+  // The student sits in one of these groups (or this person sees the whole organization).
+  const studentIn = (groupIds: string[]) =>
+    groupIds.length
+      ? exists(
+          db
+            .select({ x: raw`1` })
+            .from(groupMembers)
+            .where(
+              and(
+                eq(groupMembers.userId, guardians.studentId),
+                inArray(groupMembers.groupId, groupIds)
+              )
+            )
+        )
+      : raw`false`
+  const wholeOrg =
+    covers(ctx, "parents.view", []) || covers(ctx, "parents.link", [])
+  const covered = ctx.groups
+    .filter(
+      (g) =>
+        covers(ctx, "parents.view", [g.id]) ||
+        covers(ctx, "parents.link", [g.id])
+    )
+    .map((g) => g.id)
+  const term = opts.q?.toLowerCase()
+  const where = and(
+    eq(guardians.orgId, ctx.org.id),
+    // Only students who are still members here.
+    exists(
+      db
+        .select({ x: raw`1` })
+        .from(orgMembers)
+        .where(
+          and(
+            eq(orgMembers.orgId, ctx.org.id),
+            eq(orgMembers.userId, guardians.studentId),
+            eq(orgMembers.status, "active")
+          )
+        )
+    ),
+    wholeOrg ? undefined : studentIn(covered),
+    term
+      ? or(
+          ilike(users.name, likeTerm(term)),
+          ilike(users.email, likeTerm(term)),
+          // The student's name or email (users here is the subquery's own, the student).
+          exists(
+            db
+              .select({ x: raw`1` })
+              .from(users)
+              .where(
+                and(
+                  eq(users.id, guardians.studentId),
+                  or(
+                    ilike(users.name, likeTerm(term)),
+                    ilike(users.email, likeTerm(term))
+                  )
+                )
+              )
+          ),
+          studentIn(
+            ctx.groups
+              .filter((g) => pathName(ctx, g.id).toLowerCase().includes(term))
+              .map((g) => g.id)
+          )
+        )
+      : undefined
   )
-  const links = rows.flatMap((r) => {
-    const student = students.get(r.studentId)
-    if (!student) return []
-    const view = covers(ctx, "parents.view", student.groupIds)
-    const link = covers(ctx, "parents.link", student.groupIds)
-    if (!view && !link) return []
-    return [
-      {
-        id: r.id,
-        relation: r.relation,
-        parent: { name: r.parentName, email: r.parentEmail },
-        student: {
-          id: student.id,
-          name: student.name ?? student.email,
-          email: student.email,
-          classes: student.groupIds.map((g) => pathName(ctx, g)),
+  const select = () =>
+    db
+      .select({
+        id: guardians.id,
+        studentId: guardians.studentId,
+        relation: guardians.relation,
+        parentName: users.name,
+        parentEmail: users.email,
+        createdAt: guardians.createdAt,
+      })
+      .from(guardians)
+      .innerJoin(users, eq(guardians.parentId, users.id))
+      .where(where)
+      .orderBy(asc(users.email), asc(guardians.id))
+  const decorate = async (rows: Awaited<ReturnType<typeof select>>) => {
+    const students = new Map(
+      (
+        await studentsWithGroups(ctx, [
+          ...new Set(rows.map((r) => r.studentId)),
+        ])
+      ).map((s) => [s.id, s])
+    )
+    return rows.flatMap((r) => {
+      const student = students.get(r.studentId)
+      if (!student) return []
+      return [
+        {
+          id: r.id,
+          relation: r.relation,
+          parent: { name: r.parentName, email: r.parentEmail },
+          student: {
+            id: student.id,
+            name: student.name ?? student.email,
+            email: student.email,
+            classes: student.groupIds.map((g) => pathName(ctx, g)),
+          },
+          canRemove: covers(ctx, "parents.link", student.groupIds),
         },
-        canRemove: link,
-      },
-    ]
-  })
-  const term = opts.q?.trim().toLowerCase() ?? ""
-  const matching = term
-    ? links.filter((l) =>
-        [l.student.name, l.student.email, l.parent.name ?? "", l.parent.email, ...l.student.classes]
-          .join(" ")
-          .toLowerCase()
-          .includes(term)
-      )
-    : links
-  if (!opts.page) return { can, links: matching, total: matching.length, page: 1, pages: 1 }
-  const pages = Math.max(1, Math.ceil(matching.length / LINKS_PER_PAGE))
-  const page = Math.min(Math.max(1, opts.page), pages)
-  return {
-    can,
-    links: matching.slice((page - 1) * LINKS_PER_PAGE, page * LINKS_PER_PAGE),
-    total: matching.length,
-    page,
-    pages,
+      ]
+    })
   }
+  if (!opts.page) {
+    const links = await decorate(await select())
+    return {
+      can,
+      items: links,
+      links,
+      total: links.length,
+      page: 1,
+      pages: 1,
+      perPage: links.length,
+    }
+  }
+  const page = await paged({
+    page: opts.page,
+    perPage: opts.perPage ?? LINKS_PER_PAGE,
+    count: async () =>
+      (
+        await db
+          .select({ n: count() })
+          .from(guardians)
+          .innerJoin(users, eq(guardians.parentId, users.id))
+          .where(where)
+      )[0]?.n ?? 0,
+    rows: (limit, offset) => select().limit(limit).offset(offset),
+  })
+  const links = await decorate(page.items)
+  return { can, ...page, items: links, links }
 }
 
 /** Students this person may link parents to, matching a search (for the Add parent dialog). */
@@ -396,7 +478,11 @@ export async function myChildren(user: User) {
     .orderBy(asc(users.name))
   const policies = await kindPolicies()
   return rows
-    .filter((r) => enabledModules(r.org.type, r.org.modules, policies[r.org.type]).has("parents"))
+    .filter((r) =>
+      enabledModules(r.org.type, r.org.modules, policies[r.org.type]).has(
+        "parents"
+      )
+    )
     .map((r) => ({
       id: r.studentId,
       name: r.name ?? r.email,

@@ -203,7 +203,8 @@ export function TeacherHome({
                 <CardHeader>
                   <CardTitle className="text-title-sm">{c.name}</CardTitle>
                   <CardDescription>{c.students} students</CardDescription>
-                  {data.attendanceOn && (
+                  {/* No register is due on a day off. */}
+                  {data.attendanceOn && !data.dayOff && (
                     <CardAction>
                       <Badge variant={c.taken ? "secondary" : "outline"}>
                         {c.taken ? "Taken today" : "Not taken"}
@@ -222,7 +223,7 @@ export function TeacherHome({
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    {data.attendanceOn && (
+                    {data.attendanceOn && !data.dayOff && (
                       <Link
                         href={`${manage}/attendance`}
                         className={buttonVariants({ size: "sm" })}

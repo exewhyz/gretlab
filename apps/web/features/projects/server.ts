@@ -1,3 +1,4 @@
+import { forUsers, type Who } from "@/lib/for-users"
 import {
   assignmentProjects,
   getDb,
@@ -29,15 +30,16 @@ export function projectsOf(assignmentIds: string[]) {
     .orderBy(asc(assignmentProjects.position))
 }
 
-export function projectSubmissionsOn(projectIds: string[], userId?: string) {
-  if (projectIds.length === 0) return Promise.resolve([] as (typeof projectSubmissions.$inferSelect)[])
+export function projectSubmissionsOn(projectIds: string[], userId?: Who) {
+  if (projectIds.length === 0)
+    return Promise.resolve([] as (typeof projectSubmissions.$inferSelect)[])
   return getDb()
     .select()
     .from(projectSubmissions)
     .where(
       and(
         inArray(projectSubmissions.projectId, projectIds),
-        userId ? eq(projectSubmissions.userId, userId) : undefined
+        forUsers(projectSubmissions.userId, userId)
       )
     )
 }
@@ -50,17 +52,20 @@ export interface ProjectGrade {
 }
 
 /** Per assignment and student: project marks, how many handed in, how many wait for marking. */
-export async function projectGrades(assignmentIds: string[], userId?: string) {
+export async function projectGrades(assignmentIds: string[], userId?: Who) {
   const projects = await projectsOf(assignmentIds)
   const subs = await projectSubmissionsOn(
     projects.map((p) => p.id),
     userId
   )
   const max = new Map<string, number>()
-  for (const p of projects) max.set(p.assignmentId, (max.get(p.assignmentId) ?? 0) + p.points)
+  for (const p of projects)
+    max.set(p.assignmentId, (max.get(p.assignmentId) ?? 0) + p.points)
   const grade = (assignmentId: string, student: string): ProjectGrade => {
     const own = projects.filter((p) => p.assignmentId === assignmentId)
-    const mine = subs.filter((s) => s.userId === student && own.some((p) => p.id === s.projectId))
+    const mine = subs.filter(
+      (s) => s.userId === student && own.some((p) => p.id === s.projectId)
+    )
     return {
       earned: mine.reduce((n, s) => n + (s.mark ?? 0), 0),
       max: max.get(assignmentId) ?? 0,
@@ -68,7 +73,12 @@ export async function projectGrades(assignmentIds: string[], userId?: string) {
       needsMarking: mine.filter((s) => s.mark === null).length,
     }
   }
-  return { projects, submissions: subs, max: (id: string) => max.get(id) ?? 0, grade }
+  return {
+    projects,
+    submissions: subs,
+    max: (id: string) => max.get(id) ?? 0,
+    grade,
+  }
 }
 
 /** Saves an assignment's projects, keeping ids (and so submissions) for ones still there. */
@@ -84,17 +94,31 @@ export async function saveProjects(
   const known = new Set(existing.map((p) => p.id))
   const kept = new Set<string>()
   for (const [position, p] of input.entries()) {
-    const values = { title: p.title, instructions: p.instructions, points: p.points, position }
+    const values = {
+      title: p.title,
+      instructions: p.instructions,
+      points: p.points,
+      position,
+    }
     if (p.id && known.has(p.id) && !kept.has(p.id)) {
-      await tx.update(assignmentProjects).set(values).where(eq(assignmentProjects.id, p.id))
+      await tx
+        .update(assignmentProjects)
+        .set(values)
+        .where(eq(assignmentProjects.id, p.id))
       kept.add(p.id)
     } else {
-      const [row] = await tx.insert(assignmentProjects).values({ ...values, assignmentId }).returning()
+      const [row] = await tx
+        .insert(assignmentProjects)
+        .values({ ...values, assignmentId })
+        .returning()
       kept.add(row!.id)
     }
   }
   const gone = [...known].filter((id) => !kept.has(id))
-  if (gone.length) await tx.delete(assignmentProjects).where(inArray(assignmentProjects.id, gone))
+  if (gone.length)
+    await tx
+      .delete(assignmentProjects)
+      .where(inArray(assignmentProjects.id, gone))
 }
 
 /**
@@ -110,7 +134,9 @@ async function resolveCommit(owner: string, repo: string, ref: string | null) {
       headers: {
         accept: "application/vnd.github+json",
         "user-agent": "gretlab",
-        ...(process.env.GITHUB_TOKEN ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+        ...(process.env.GITHUB_TOKEN
+          ? { authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+          : {}),
       },
       signal: AbortSignal.timeout(4000),
       redirect: "error",
@@ -128,7 +154,11 @@ async function resolveCommit(owner: string, repo: string, ref: string | null) {
 export async function checkRepository(link: string) {
   const repo = parseRepo(link)
   if (!repo) {
-    throw new ApiError(400, "bad_repository", "Use your GitHub repository's link, like https://github.com/you/project.")
+    throw new ApiError(
+      400,
+      "bad_repository",
+      "Use your GitHub repository's link, like https://github.com/you/project."
+    )
   }
   if (repo.commit) return { ...repo, sha: repo.commit }
   const sha = await resolveCommit(repo.owner, repo.repo, repo.ref)

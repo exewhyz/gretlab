@@ -16,6 +16,7 @@ import { Field, FormMessage, TextInput } from "@/components/form"
 import { ORG_TYPE, type OrgType } from "@/features/orgs/components/public"
 import { slugify } from "@/features/problems/schemas"
 import { api } from "@/lib/api/client"
+import { useDebounced } from "@/lib/use-debounced"
 import { formatDate } from "@/lib/format"
 import { KindPicker } from "@/features/orgs/components/kind-picker"
 
@@ -51,12 +52,14 @@ export function AdminOrganizations() {
   } | null>(null)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  // The server is asked once typing pauses.
+  const asked = useDebounced(search.trim())
   const {
     data: found,
     error,
     isPlaceholderData,
   } = useQuery({
-    queryKey: ["admin", "organizations", search.trim(), page],
+    queryKey: ["admin", "organizations", asked, page],
     queryFn: () =>
       api<{
         organizations: OrgRow[]
@@ -64,7 +67,7 @@ export function AdminOrganizations() {
         page: number
         pages: number
       }>(
-        `/admin/organizations?${new URLSearchParams({ q: search.trim(), page: String(page) })}`
+        `/admin/organizations?${new URLSearchParams({ q: asked, page: String(page) })}`
       ),
     placeholderData: keepPreviousData,
   })

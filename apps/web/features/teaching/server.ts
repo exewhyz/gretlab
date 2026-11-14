@@ -22,6 +22,7 @@ import { syllabusProgress, type Permission } from "@workspace/judge"
 import { z } from "zod"
 
 import { ApiError, notFound } from "@/lib/api/route"
+import { likeTerm, paged } from "@/lib/api/paging"
 import { getGradebook } from "@/features/assignments/server"
 import { today } from "@/features/catalog/server"
 import { rolePermissions } from "@/features/orgs/access"
@@ -36,7 +37,22 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 
-const { and, desc, eq, gte, inArray, lte } = sql
+const {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  gte,
+  ilike,
+  inArray,
+  lte,
+  not,
+  notExists,
+  or,
+} = sql
+const raw = sql.sql
 
 const NOBODY = "00000000-0000-0000-0000-000000000000"
 
@@ -399,7 +415,8 @@ export async function teacherHome(user: User) {
       can: {
         assignments:
           ctx.modules.has("coding") && canAnywhere(ctx, "assignments.manage"),
-        contests: ctx.modules.has("coding") && canAnywhere(ctx, "contests.manage"),
+        contests:
+          ctx.modules.has("coding") && canAnywhere(ctx, "contests.manage"),
         grades: canAnywhere(ctx, "gradebook.view"),
         reports: canAnywhere(ctx, "reports.view"),
       },
@@ -433,11 +450,19 @@ export async function teachesAnywhere(user: User) {
 
 /* ---------- organization reports ---------- */
 
-export async function orgReport(
-  slug: string,
-  user: User,
-  groupId: string | null
-) {
+/*
+ * Reports come in two parts, so the screen never rebuilds every student's figures to show
+ * a page of them:
+ * - the figures (`orgReportFigures`): the summary, assignments and teaching, worked out once
+ *   for the group chosen;
+ * - the student table (`orgReportStudents`), paged in SQL: the page's students are chosen in
+ *   the database (search and "no work this week" in the query), then figures are worked out
+ *   for those students only.
+ * `orgReport` is both at once, every student (the CSV and older callers).
+ */
+
+/** Who may see what: the person's reach, and the groups this report covers. */
+async function reportBase(slug: string, user: User, groupId: string | null) {
   const ctx = await orgContext(slug, user)
   if (!canAnywhere(ctx, "reports.view")) {
     throw new ApiError(
@@ -467,61 +492,16 @@ export async function orgReport(
       )
     : scope
   const db = getDb()
-  const day = await today()
-  const since30 = new Date(Date.now() - 30 * 86_400_000)
-  const since7 = new Date(Date.now() - 7 * 86_400_000)
-
-  const [members, memberships, grants] = await Promise.all([
+  const [roles, orgAssignments, orgContestIds] = await Promise.all([
     db
       .select({
-        id: users.id,
-        name: users.name,
-        email: users.email,
-        share: orgMembers.shareProgress,
-      })
-      .from(orgMembers)
-      .innerJoin(users, eq(orgMembers.userId, users.id))
-      .where(
-        and(eq(orgMembers.orgId, ctx.org.id), eq(orgMembers.status, "active"))
-      ),
-    db
-      .select({ userId: groupMembers.userId, groupId: groupMembers.groupId })
-      .from(groupMembers)
-      .innerJoin(orgGroups, eq(groupMembers.groupId, orgGroups.id))
-      .where(eq(orgGroups.orgId, ctx.org.id)),
-    db
-      .select({
-        userId: roleAssignments.userId,
+        id: orgRoles.id,
         systemKey: orgRoles.systemKey,
         permissions: orgRoles.permissions,
       })
-      .from(roleAssignments)
-      .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
-      .where(eq(roleAssignments.orgId, ctx.org.id)),
-  ])
-  // Students, as the organization's home counts them: members seated in a group who hold no
-  // role that grants anything. Parents, librarians and office staff are members too, but
-  // not students.
-  const staff = new Set(
-    grants.filter((g) => rolePermissions(g).length > 0).map((g) => g.userId)
-  )
-  const groupsOf = (userId: string) =>
-    memberships.filter((m) => m.userId === userId).map((m) => m.groupId)
-  const pathOf = (id: string) =>
-    groupChain(ctx, id)
-      .reverse()
-      .map((x) => ctx.groups.find((g) => g.id === x)!.name)
-      .join(" › ")
-  const students = members.filter(
-    (m) =>
-      !staff.has(m.id) &&
-      groupsOf(m.id).length > 0 &&
-      (reportScope === "all" || groupsOf(m.id).some((g) => reportScope.has(g)))
-  )
-  const ids = students.map((s) => s.id)
-
-  // The organization always sees work on its own assignments and contests.
-  const [orgAssignments, orgContestIds] = await Promise.all([
+      .from(orgRoles)
+      .where(eq(orgRoles.orgId, ctx.org.id)),
+    // The organization always sees work on its own assignments and contests.
     db
       .select()
       .from(assignments)
@@ -533,106 +513,253 @@ export async function orgReport(
       .from(contests)
       .where(eq(contests.orgId, ctx.org.id)),
   ])
-  const orgProblemIds = new Set(
-    orgAssignments.length
-      ? (
-          await db
-            .select({ problemId: assignmentProblems.problemId })
-            .from(assignmentProblems)
+  const orgProblemIds = orgAssignments.length
+    ? [
+        ...new Set(
+          (
+            await db
+              .select({ problemId: assignmentProblems.problemId })
+              .from(assignmentProblems)
+              .where(
+                inArray(
+                  assignmentProblems.assignmentId,
+                  orgAssignments.map((a) => a.id)
+                )
+              )
+          ).map((r) => r.problemId)
+        ),
+      ]
+    : []
+  const contestIds = orgContestIds.map((c) => c.id)
+  const since7 = new Date(Date.now() - 7 * 86_400_000)
+  const FALSE = raw`false`
+
+  // Students, as the organization's home counts them: active members seated in a group
+  // (here, one this report covers) who hold no role that grants anything. Parents,
+  // librarians and office staff are members too, but not students.
+  const granting = roles
+    .filter((r) => rolePermissions(r).length > 0)
+    .map((r) => r.id)
+  const coveredGroups = ctx.groups
+    .filter((g) => reportScope === "all" || reportScope.has(g.id))
+    .map((g) => g.id)
+  const isStudent = and(
+    eq(orgMembers.orgId, ctx.org.id),
+    eq(orgMembers.status, "active"),
+    coveredGroups.length
+      ? exists(
+          db
+            .select({ x: raw`1` })
+            .from(groupMembers)
             .where(
-              inArray(
-                assignmentProblems.assignmentId,
-                orgAssignments.map((a) => a.id)
+              and(
+                eq(groupMembers.userId, users.id),
+                inArray(groupMembers.groupId, coveredGroups)
               )
             )
-        ).map((r) => r.problemId)
-      : []
-  )
-  const contestIds = new Set(orgContestIds.map((c) => c.id))
-  const recent = ids.length
-    ? await db
-        .select({
-          userId: submissions.userId,
-          problemId: submissions.problemId,
-          contestId: submissions.contestId,
-          createdAt: submissions.createdAt,
-        })
-        .from(submissions)
-        .where(
-          and(
-            inArray(submissions.userId, ids),
-            gte(submissions.createdAt, since30)
+        )
+      : FALSE,
+    granting.length
+      ? notExists(
+          db
+            .select({ x: raw`1` })
+            .from(roleAssignments)
+            .where(
+              and(
+                eq(roleAssignments.orgId, ctx.org.id),
+                eq(roleAssignments.userId, users.id),
+                inArray(roleAssignments.roleId, granting)
+              )
+            )
+        )
+      : undefined
+  )!
+  // Work in the last week that the organization may see: practice from those who share
+  // it, and anyone's work on the organization's own assignments and contests.
+  const activeThisWeek = exists(
+    db
+      .select({ x: raw`1` })
+      .from(submissions)
+      .where(
+        and(
+          eq(submissions.userId, users.id),
+          gte(submissions.createdAt, since7),
+          or(
+            eq(orgMembers.shareProgress, true),
+            orgProblemIds.length
+              ? inArray(submissions.problemId, orgProblemIds)
+              : undefined,
+            contestIds.length
+              ? inArray(submissions.contestId, contestIds)
+              : undefined
           )
         )
-    : []
-  // Practice is only counted for students who agreed to share it.
-  const sharingIds = students.filter((s) => s.share).map((s) => s.id)
-  const solved = sharingIds.length
-    ? await db
-        .selectDistinct({
-          userId: submissions.userId,
-          problemId: submissions.problemId,
-        })
-        .from(submissions)
-        .where(
-          and(
-            inArray(
-              submissions.userId,
-              sharingIds.length ? sharingIds : [NOBODY]
-            ),
-            eq(submissions.kind, "submit"),
-            eq(submissions.verdict, "AC")
-          )
-        )
-    : []
-  const sharing = new Set(students.filter((s) => s.share).map((s) => s.id))
-  const visibleWork = recent.filter(
-    (r) =>
-      sharing.has(r.userId) ||
-      (r.problemId && orgProblemIds.has(r.problemId)) ||
-      (r.contestId && contestIds.has(r.contestId))
+      )
   )
+  const pathOf = (id: string) =>
+    groupChain(ctx, id)
+      .reverse()
+      .map((x) => ctx.groups.find((g) => g.id === x)!.name)
+      .join(" › ")
+  return {
+    ctx,
+    scope,
+    reportScope,
+    coveredGroups,
+    orgAssignments,
+    orgProblemIds: new Set(orgProblemIds),
+    contestIds: new Set(contestIds),
+    since7,
+    isStudent,
+    activeThisWeek,
+    pathOf,
+  }
+}
 
-  // Assignment results through the gradebook, so the same people and rules apply.
-  const books = await Promise.all(
-    orgAssignments
+type ReportBase = Awaited<ReturnType<typeof reportBase>>
+type ReportStudent = {
+  id: string
+  name: string | null
+  email: string
+  share: boolean
+}
+
+const studentFields = {
+  id: users.id,
+  name: users.name,
+  email: users.email,
+  share: orgMembers.shareProgress,
+}
+
+/** Every student in the report (who they are, not their figures). */
+function allStudents(base: ReportBase) {
+  return getDb()
+    .select(studentFields)
+    .from(orgMembers)
+    .innerJoin(users, eq(orgMembers.userId, users.id))
+    .where(base.isStudent)
+}
+
+/** Assignment results through the gradebook, so the same people and rules apply. */
+function gradebooks(base: ReportBase, only?: readonly string[]) {
+  return Promise.all(
+    base.orgAssignments
       .filter((a) => a.opensAt <= new Date())
       .map(async (a) => ({
         a,
-        book: await getGradebook(a.id, ctx.org.id, reportScope),
+        book: await getGradebook(a.id, base.ctx.org.id, base.reportScope, only),
       }))
   )
-  const studentRows = students.map((s) => {
-    const work = visibleWork.filter((w) => w.userId === s.id)
-    const last = work.reduce<Date | null>(
-      (m, w) => (!m || w.createdAt > m ? w.createdAt : m),
-      null
-    )
-    let earned = 0
-    let total = 0
-    for (const { book } of books) {
-      const row = book.rows.find((r) => r.email === s.email)
-      if (row) {
-        earned += row.earned
-        total += book.total
-      }
+}
+type Books = Awaited<ReturnType<typeof gradebooks>>
+
+/** A student's share of the marks across the assignments they're graded on. */
+function assignmentPercent(books: Books, email: string) {
+  let earned = 0
+  let total = 0
+  for (const { book } of books) {
+    const row = book.rows.find((r) => r.email === email)
+    if (row) {
+      earned += row.earned
+      total += book.total
     }
+  }
+  return total ? Math.round((100 * earned) / total) : null
+}
+
+/** The student table's rows, for these students only. */
+async function studentRows(
+  base: ReportBase,
+  students: ReportStudent[],
+  books: Books
+) {
+  const db = getDb()
+  const ids = students.map((s) => s.id)
+  if (ids.length === 0) return []
+  const since30 = new Date(Date.now() - 30 * 86_400_000)
+  const sharing = new Set(students.filter((s) => s.share).map((s) => s.id))
+  const [seats, recent, solved] = await Promise.all([
+    db
+      .select({ userId: groupMembers.userId, groupId: groupMembers.groupId })
+      .from(groupMembers)
+      .innerJoin(orgGroups, eq(groupMembers.groupId, orgGroups.id))
+      .where(
+        and(
+          eq(orgGroups.orgId, base.ctx.org.id),
+          inArray(groupMembers.userId, ids)
+        )
+      ),
+    db
+      .select({
+        userId: submissions.userId,
+        problemId: submissions.problemId,
+        contestId: submissions.contestId,
+        createdAt: submissions.createdAt,
+      })
+      .from(submissions)
+      .where(
+        and(
+          inArray(submissions.userId, ids),
+          gte(submissions.createdAt, since30)
+        )
+      ),
+    // Practice is only counted for students who agreed to share it.
+    sharing.size
+      ? db
+          .selectDistinct({
+            userId: submissions.userId,
+            problemId: submissions.problemId,
+          })
+          .from(submissions)
+          .where(
+            and(
+              inArray(submissions.userId, [...sharing]),
+              eq(submissions.kind, "submit"),
+              eq(submissions.verdict, "AC")
+            )
+          )
+      : [],
+  ])
+  const visibleWork = recent.filter(
+    (r) =>
+      sharing.has(r.userId) ||
+      (r.problemId && base.orgProblemIds.has(r.problemId)) ||
+      (r.contestId && base.contestIds.has(r.contestId))
+  )
+  return students.map((s) => {
+    const last = visibleWork
+      .filter((w) => w.userId === s.id)
+      .reduce<Date | null>(
+        (m, w) => (!m || w.createdAt > m ? w.createdAt : m),
+        null
+      )
     return {
       name: s.name,
       email: s.email,
-      groups: groupsOf(s.id).map(pathOf),
+      groups: seats
+        .filter((x) => x.userId === s.id)
+        .map((x) => base.pathOf(x.groupId)),
       lastActive: last,
-      activeThisWeek: Boolean(last && last >= since7),
-      assignmentPercent: total ? Math.round((100 * earned) / total) : null,
+      activeThisWeek: Boolean(last && last >= base.since7),
+      assignmentPercent: assignmentPercent(books, s.email),
       practiceSolved: sharing.has(s.id)
         ? solved.filter((x) => x.userId === s.id).length
         : null,
     }
   })
+}
 
-  const groupIds = ctx.groups
-    .filter((g) => reportScope === "all" || reportScope.has(g.id))
-    .map((g) => g.id)
+/** Everything but the student table: the summary, assignments and teaching. */
+async function reportFigures(
+  base: ReportBase,
+  students: ReportStudent[],
+  books: Books,
+  activeThisWeek: number
+) {
+  const { ctx, scope, pathOf } = base
+  const db = getDb()
+  const day = await today()
+  const groupIds = base.coveredGroups
   const [plans, sessions] = groupIds.length
     ? await Promise.all([
         db.select().from(syllabi).where(inArray(syllabi.groupId, groupIds)),
@@ -678,6 +805,9 @@ export async function orgReport(
     }
     teacherTotals.set(key, t)
   }
+  const scored = students
+    .map((s) => assignmentPercent(books, s.email))
+    .filter((p): p is number => p !== null)
 
   return {
     org: ctx.org.name,
@@ -692,18 +822,12 @@ export async function orgReport(
       }))
       .sort((a, b) => a.path.localeCompare(b.path)),
     summary: {
-      students: studentRows.length,
-      activeThisWeek: studentRows.filter((r) => r.activeThisWeek).length,
+      students: students.length,
+      activeThisWeek,
       sharing: students.filter((s) => s.share).length,
-      averageAssignment: (() => {
-        const scored = studentRows.filter((r) => r.assignmentPercent !== null)
-        return scored.length
-          ? Math.round(
-              scored.reduce((sum, r) => sum + r.assignmentPercent!, 0) /
-                scored.length
-            )
-          : null
-      })(),
+      averageAssignment: scored.length
+        ? Math.round(scored.reduce((sum, p) => sum + p, 0) / scored.length)
+        : null,
     },
     assignments: books.map(({ a, book }) => ({
       title: a.title,
@@ -741,7 +865,29 @@ export async function orgReport(
         ratings: t.ratings,
       })),
     },
-    students: studentRows.sort(
+  }
+}
+
+/** The whole report, every student (the CSV, and `GET /reports` without a page). */
+export async function orgReport(
+  slug: string,
+  user: User,
+  groupId: string | null
+) {
+  const base = await reportBase(slug, user, groupId)
+  const [students, books] = await Promise.all([
+    allStudents(base),
+    gradebooks(base),
+  ])
+  const rows = await studentRows(base, students, books)
+  return {
+    ...(await reportFigures(
+      base,
+      students,
+      books,
+      rows.filter((r) => r.activeThisWeek).length
+    )),
+    students: rows.sort(
       (a, b) =>
         Number(a.activeThisWeek) - Number(b.activeThisWeek) ||
         (a.name ?? a.email).localeCompare(b.name ?? b.email)
@@ -749,36 +895,80 @@ export async function orgReport(
   }
 }
 
+/** The report's figures, for the group chosen: no student table. */
+export async function orgReportFigures(
+  slug: string,
+  user: User,
+  groupId: string | null
+) {
+  const base = await reportBase(slug, user, groupId)
+  const db = getDb()
+  const [students, books, [active]] = await Promise.all([
+    allStudents(base),
+    gradebooks(base),
+    db
+      .select({ n: count() })
+      .from(orgMembers)
+      .innerJoin(users, eq(orgMembers.userId, users.id))
+      .where(and(base.isStudent, base.activeThisWeek)),
+  ])
+  return reportFigures(base, students, books, active?.n ?? 0)
+}
+
 const REPORT_STUDENTS_PER_PAGE = 100
 
 /**
- * The report with its student table a page at a time (the Reports screen): figures and the
- * other tables as before, students filtered (`inactive`: no work this week; `q`: name or
- * email) and paged on the server, with how many match.
+ * The student table a page at a time: the page's students chosen in the database (`q`:
+ * name or email; `inactive`: no work this week), those with no work this week first, then
+ * figures worked out for those students only.
  */
-export async function orgReportPage(
+export async function orgReportStudents(
   slug: string,
   user: User,
   groupId: string | null,
-  opts: { page: number; inactive?: boolean; q?: string }
+  opts: { page: number; perPage?: number; inactive?: boolean; q?: string }
 ) {
-  const report = await orgReport(slug, user, groupId)
-  const term = opts.q?.trim().toLowerCase() ?? ""
-  const matching = report.students.filter(
-    (s) =>
-      (!opts.inactive || !s.activeThisWeek) &&
-      (!term || `${s.name ?? ""} ${s.email}`.toLowerCase().includes(term))
+  const base = await reportBase(slug, user, groupId)
+  const db = getDb()
+  const where = and(
+    base.isStudent,
+    opts.inactive ? not(base.activeThisWeek) : undefined,
+    opts.q
+      ? or(
+          ilike(users.name, likeTerm(opts.q)),
+          ilike(users.email, likeTerm(opts.q))
+        )
+      : undefined
   )
-  const pages = Math.max(1, Math.ceil(matching.length / REPORT_STUDENTS_PER_PAGE))
-  const page = Math.min(Math.max(1, opts.page), pages)
-  return {
-    ...report,
-    students: matching.slice(
-      (page - 1) * REPORT_STUDENTS_PER_PAGE,
-      page * REPORT_STUDENTS_PER_PAGE
-    ),
-    studentsPage: { total: matching.length, page, pages },
-  }
+  const page = await paged({
+    page: opts.page,
+    perPage: opts.perPage ?? REPORT_STUDENTS_PER_PAGE,
+    count: async () =>
+      (
+        await db
+          .select({ n: count() })
+          .from(orgMembers)
+          .innerJoin(users, eq(orgMembers.userId, users.id))
+          .where(where)
+      )[0]?.n ?? 0,
+    rows: (limit, offset) =>
+      db
+        .select(studentFields)
+        .from(orgMembers)
+        .innerJoin(users, eq(orgMembers.userId, users.id))
+        .where(where)
+        .orderBy(
+          asc(base.activeThisWeek),
+          asc(raw`coalesce(${users.name}, ${users.email})`),
+          asc(users.id)
+        )
+        .limit(limit)
+        .offset(offset),
+  })
+  const ids = page.items.map((s) => s.id)
+  const books = ids.length ? await gradebooks(base, ids) : []
+  const items = await studentRows(base, page.items, books)
+  return { ...page, items, students: items }
 }
 
 /** The student table as CSV, defused against spreadsheet formulas. */

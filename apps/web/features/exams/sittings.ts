@@ -1,3 +1,4 @@
+import { forUsers, type Who } from "@/lib/for-users"
 import { examEvents, examSessions, getDb, sql } from "@workspace/db"
 import { sittingClosesAt, type ExamSitting } from "@workspace/judge"
 
@@ -9,7 +10,9 @@ const { and, asc, count, eq, inArray } = sql
  * started by one clock and judged by another would drop work done in it.
  */
 export async function dbNow(): Promise<Date> {
-  const [row] = (await getDb().execute(sql.sql`select now() as now`)) as unknown as {
+  const [row] = (await getDb().execute(
+    sql.sql`select now() as now`
+  )) as unknown as {
     now: Date | string
   }[]
   return new Date(row!.now)
@@ -18,7 +21,7 @@ export async function dbNow(): Promise<Date> {
 export type Sitting = ExamSitting & { ip: string | null }
 
 /** Sittings of these exams, by assignment then student; for one student or everyone. */
-export async function sittingsOn(assignmentIds: string[], userId?: string) {
+export async function sittingsOn(assignmentIds: string[], userId?: Who) {
   const byAssignment = new Map<string, Map<string, Sitting>>()
   if (assignmentIds.length === 0) return byAssignment
   const rows = await getDb()
@@ -27,7 +30,7 @@ export async function sittingsOn(assignmentIds: string[], userId?: string) {
     .where(
       and(
         inArray(examSessions.assignmentId, assignmentIds),
-        userId ? eq(examSessions.userId, userId) : undefined
+        forUsers(examSessions.userId, userId)
       )
     )
   for (const row of rows) {

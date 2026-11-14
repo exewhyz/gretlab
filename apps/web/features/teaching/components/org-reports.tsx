@@ -15,15 +15,20 @@ import {
   Pager,
 } from "@/features/admin/components/shell"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
-import type { orgReportPage } from "@/features/teaching/server"
+import type {
+  orgReportFigures,
+  orgReportStudents,
+} from "@/features/teaching/server"
 import { TextInput } from "@/components/form"
 import { api } from "@/lib/api/client"
+import { useDebounced } from "@/lib/use-debounced"
 import type { ApiResult } from "@/lib/api/types"
 import { formatDate } from "@/lib/format"
 import { ProgressBar } from "./teaching-parts"
 
 /** What the reports route answers (features/teaching/server.ts). */
-export type Report = ApiResult<typeof orgReportPage>
+export type Report = ApiResult<typeof orgReportFigures>
+type StudentsPage = ApiResult<typeof orgReportStudents>
 
 /** With `fixedGroup`, one class's insights: no title or group picker. */
 export function OrgReports({
@@ -38,35 +43,53 @@ export function OrgReports({
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
   const group = fixedGroup ?? chosen
-  // The figures cover everyone; the student table comes a page at a time from the server.
-  const { data, error, isFetching, isPlaceholderData } = useQuery({
+  // The server is asked once typing pauses.
+  const asked = useDebounced(search.trim())
+  // Two parts: the figures, once per group chosen; the student table, a page at a time,
+  // chosen and worked out on the server for that page only.
+  const figures = useQuery({
+    queryKey: ["org", slug, "reports", group, "figures"],
+    queryFn: () =>
+      api<Report>(
+        `/orgs/${slug}/reports?${new URLSearchParams({ group, part: "figures" })}`
+      ),
+    placeholderData: keepPreviousData,
+  })
+  const table = useQuery({
     queryKey: [
       "org",
       slug,
       "reports",
       group,
+      "students",
       onlyInactive,
-      search.trim(),
+      asked,
       page,
     ],
     queryFn: () =>
-      api<Report>(
+      api<StudentsPage>(
         `/orgs/${slug}/reports?${new URLSearchParams({
           group,
           page: String(page),
           inactive: String(onlyInactive),
-          q: search.trim(),
+          q: asked,
         })}`
       ),
     placeholderData: keepPreviousData,
   })
-  if (!data) return <Loading error={error} />
+  const data = figures.data
+  if (!data) return <Loading error={figures.error} />
+  const isFetching = figures.isFetching || table.isFetching
   const inactive = data.summary.students - data.summary.activeThisWeek
   const pct = (n: number) =>
     data.summary.students ? Math.round((100 * n) / data.summary.students) : 0
-  const students = data.students
+  const students = table.data?.items ?? []
   const show = (inactiveOnly: boolean) => {
     setOnlyInactive(inactiveOnly)
+    setPage(1)
+  }
+  const pick = (id: string) => {
+    setGroup(id)
     setPage(1)
   }
 
@@ -111,7 +134,7 @@ export function OrgReports({
           levels={data.levels}
           extra={[{ value: "", label: "Everyone you can see" }]}
           value={group}
-          onChange={setGroup}
+          onChange={pick}
         />
         {isFetching && (
           <span className="text-caption text-body">Updating…</span>
@@ -247,7 +270,14 @@ export function OrgReports({
           }}
         />
       </div>
-      <div className={isPlaceholderData ? "opacity-60" : undefined}>
+      {table.error && !table.data && <Loading error={table.error} />}
+      <div
+        className={
+          table.isPlaceholderData || figures.isPlaceholderData
+            ? "opacity-60"
+            : undefined
+        }
+      >
         <Table
           headers={[
             "Student",
@@ -284,12 +314,14 @@ export function OrgReports({
           ))}
         </Table>
       </div>
-      <Pager
-        page={data.studentsPage.page}
-        pages={data.studentsPage.pages}
-        total={data.studentsPage.total}
-        onPage={setPage}
-      />
+      {table.data && (
+        <Pager
+          page={table.data.page}
+          pages={table.data.pages}
+          total={table.data.total}
+          onPage={setPage}
+        />
+      )}
     </>
   )
 }

@@ -57,8 +57,23 @@ import type {
   roleSchema,
 } from "./schemas"
 import { orgPages } from "@/lib/paths"
+import { likeTerm, paged, type Page } from "@/lib/api/paging"
 
-const { and, asc, count, desc, eq, ilike, inArray, isNull, or } = sql
+const {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  ilike,
+  inArray,
+  isNull,
+  ne,
+  not,
+  or,
+} = sql
+const raw = sql.sql
 import {
   NO_GROUP,
   admitMember,
@@ -86,6 +101,7 @@ import {
   settleBelow,
   systemRole,
   userByEmail,
+  type OrgContext,
   type Tx,
 } from "./core"
 
@@ -98,55 +114,71 @@ async function requirePlatformAdmin(user: User) {
 
 const ORGS_PER_PAGE = 50
 
-/**
- * Every organization, for the platform. With `page`, 50 at a time matching `q` (name or
- * address), read a page at a time from the database, with the total; without, all.
- */
-export async function listAllOrganizations(
-  user: User,
-  opts: { page?: number; q?: string } = {}
-) {
-  await requirePlatformAdmin(user)
-  const db = getDb()
-  const term = opts.q?.trim().replaceAll("%", "")
-  const where = term
-    ? or(ilike(organizations.name, `%${term}%`), ilike(organizations.slug, `%${term}%`))
-    : undefined
-  const [[{ total } = { total: 0 }], rows] = await Promise.all([
-    db.select({ total: count() }).from(organizations).where(where),
-    opts.page
-      ? db
-          .select()
-          .from(organizations)
-          .where(where)
-          .orderBy(asc(organizations.name))
-          .limit(ORGS_PER_PAGE)
-          .offset((Math.max(1, opts.page) - 1) * ORGS_PER_PAGE)
-      : db.select().from(organizations).where(where).orderBy(asc(organizations.name)),
-  ])
+/** The platform's organizations, with how many active members each has. */
+async function withMemberCounts<T extends { id: string }>(rows: T[]) {
   const members = rows.length
-    ? await db
+    ? await getDb()
         .select({ orgId: orgMembers.orgId, total: count() })
         .from(orgMembers)
         .where(
           and(
             eq(orgMembers.status, "active"),
-            inArray(orgMembers.orgId, rows.map((r) => r.id))
+            inArray(
+              orgMembers.orgId,
+              rows.map((r) => r.id)
+            )
           )
         )
         .groupBy(orgMembers.orgId)
     : []
-  const list = rows.map((org) => ({
+  return rows.map((org) => ({
     ...org,
     members: members.find((m) => m.orgId === org.id)?.total ?? 0,
   }))
-  if (!opts.page) return list
-  return {
-    organizations: list,
-    total,
-    page: Math.max(1, opts.page),
-    pages: Math.max(1, Math.ceil(total / ORGS_PER_PAGE)),
+}
+
+/**
+ * Every organization, for the platform. With `page`, 50 at a time (or `perPage`) matching
+ * `q` (name or address), read a page at a time from the database; without, all.
+ */
+export async function listAllOrganizations(
+  user: User,
+  opts: { page?: number; q?: string; perPage?: number } = {}
+) {
+  await requirePlatformAdmin(user)
+  const db = getDb()
+  const where = opts.q
+    ? or(
+        ilike(organizations.name, likeTerm(opts.q)),
+        ilike(organizations.slug, likeTerm(opts.q))
+      )
+    : undefined
+  if (!opts.page) {
+    return withMemberCounts(
+      await db
+        .select()
+        .from(organizations)
+        .where(where)
+        .orderBy(asc(organizations.name))
+    )
   }
+  const page = await paged({
+    page: opts.page,
+    perPage: opts.perPage ?? ORGS_PER_PAGE,
+    count: async () =>
+      (await db.select({ n: count() }).from(organizations).where(where))[0]
+        ?.n ?? 0,
+    rows: (limit, offset) =>
+      db
+        .select()
+        .from(organizations)
+        .where(where)
+        .orderBy(asc(organizations.name), asc(organizations.id))
+        .limit(limit)
+        .offset(offset),
+  })
+  const items = await withMemberCounts(page.items)
+  return { ...page, items, organizations: items }
 }
 
 export async function createOrganization(
@@ -1069,100 +1101,202 @@ export type MemberKind = "staff" | "learner" | "parent" | "other"
 
 const MEMBERS_PER_PAGE = 100
 
+type MemberFilter = { groupId?: string; status?: string; q?: string }
+type Member = Awaited<ReturnType<typeof decorateMembers>>[number]
+
 /**
- * The members this person may see. With `page`, one page of 100 (filtered by `kind`) and
- * the counts of each kind, for the Members screen; without it, everyone, for pickers and
- * integrations.
+ * The members this person may see. With `page`, one page of 100 (or `perPage`) of `kind`,
+ * read a page at a time from the database, with the counts of each kind (the Members
+ * screen); without it, everyone, for pickers and integrations.
  */
 export async function listMembers(
   slug: string,
   user: User,
-  filter: { groupId?: string; status?: string; q?: string }
-): Promise<Awaited<ReturnType<typeof allMembers>>>
+  filter: MemberFilter
+): Promise<Member[]>
 export async function listMembers(
   slug: string,
   user: User,
-  filter: {
-    groupId?: string
-    status?: string
-    q?: string
-    kind?: string
-    page: number
+  filter: MemberFilter & { kind?: string; page: number; perPage?: number }
+): Promise<
+  Page<Member> & {
+    members: Member[]
+    counts: Record<MemberKind, number> & { all: number }
   }
-): Promise<{
-  members: Awaited<ReturnType<typeof allMembers>>
-  total: number
-  page: number
-  pages: number
-  counts: Record<MemberKind, number> & { all: number }
-}>
+>
 export async function listMembers(
   slug: string,
   user: User,
-  filter: {
-    groupId?: string
-    status?: string
-    q?: string
-    kind?: string
-    page?: number
-  }
+  filter: MemberFilter & { kind?: string; page?: number; perPage?: number }
 ) {
-  const all = await allMembers(slug, user, filter)
-  if (!filter.page) return all
-  const kindOf = (m: (typeof all)[number]): MemberKind =>
-    m.roles.some((r) => r.grants)
-      ? "staff"
-      : m.groupIds.length > 0
-        ? "learner"
-        : m.children.length > 0
-          ? "parent"
-          : "other"
-  const counts = { all: all.length, staff: 0, learner: 0, parent: 0, other: 0 }
-  for (const m of all) counts[kindOf(m)]++
-  const shown = filter.kind ? all.filter((m) => kindOf(m) === filter.kind) : all
-  const pages = Math.max(1, Math.ceil(shown.length / MEMBERS_PER_PAGE))
-  const page = Math.min(Math.max(1, filter.page), pages)
+  const ctx = await context(slug, user)
+  const q = await memberQuery(ctx, filter)
+  const db = getDb()
+  const base = () =>
+    db
+      .select({ member: orgMembers, user: users })
+      .from(orgMembers)
+      .innerJoin(users, eq(orgMembers.userId, users.id))
+  if (!filter.page) {
+    return decorateMembers(
+      ctx,
+      await base().where(q.where).orderBy(asc(users.name), asc(users.email))
+    )
+  }
+  const kind = (filter.kind && q.kinds[filter.kind as MemberKind]) || undefined
+  const where = and(q.where, kind)
+  const n = (cond: sql.SQL) =>
+    raw<number>`count(*) filter (where ${cond})`.mapWith(Number)
+  const [[counted], page] = await Promise.all([
+    db
+      .select({
+        all: count(),
+        staff: n(q.kinds.staff),
+        learner: n(q.kinds.learner),
+        parent: n(q.kinds.parent),
+        other: n(q.kinds.other),
+      })
+      .from(orgMembers)
+      .innerJoin(users, eq(orgMembers.userId, users.id))
+      .where(q.where),
+    paged({
+      page: filter.page,
+      perPage: filter.perPage ?? MEMBERS_PER_PAGE,
+      count: async () =>
+        (
+          await db
+            .select({ n: count() })
+            .from(orgMembers)
+            .innerJoin(users, eq(orgMembers.userId, users.id))
+            .where(where)
+        )[0]?.n ?? 0,
+      rows: (limit, offset) =>
+        base()
+          .where(where)
+          .orderBy(asc(users.name), asc(users.email), asc(users.id))
+          .limit(limit)
+          .offset(offset),
+    }),
+  ])
+  const items = await decorateMembers(ctx, page.items)
   return {
-    members: shown.slice(
-      (page - 1) * MEMBERS_PER_PAGE,
-      page * MEMBERS_PER_PAGE
-    ),
-    total: shown.length,
-    page,
-    pages,
-    counts,
+    ...page,
+    items,
+    members: items,
+    counts: counted ?? { all: 0, staff: 0, learner: 0, parent: 0, other: 0 },
   }
 }
 
-async function allMembers(
-  slug: string,
-  user: User,
-  filter: { groupId?: string; status?: string; q?: string }
-) {
-  const ctx = await context(slug, user)
+/**
+ * Who this person may see in the members list, as SQL over `org_members` joined to `users`:
+ * pending people if they approve, others in the groups they may see; and what kind each
+ * member is (staff hold a role that grants something; learners sit in a group; parents
+ * are linked to a student here).
+ */
+async function memberQuery(ctx: OrgContext, filter: MemberFilter) {
   const scope = scopeOf(ctx, "org.members.view")
   const canApprove = can(ctx, "org.members.invite")
   if (scope !== "all" && scope.size === 0 && !canApprove) throw forbidden()
   const db = getDb()
-  const rows = await db
-    .select({ member: orgMembers, user: users })
-    .from(orgMembers)
-    .innerJoin(users, eq(orgMembers.userId, users.id))
-    .where(
-      and(
-        eq(orgMembers.orgId, ctx.org.id),
-        filter.status === "pending"
-          ? eq(orgMembers.status, "pending")
-          : undefined,
-        filter.q
-          ? or(
-              ilike(users.email, `%${filter.q.replaceAll("%", "")}%`),
-              ilike(users.name, `%${filter.q.replaceAll("%", "")}%`)
+  const FALSE = raw`false`
+  const seatedIn = (groupIds: string[]) =>
+    groupIds.length
+      ? exists(
+          db
+            .select({ x: raw`1` })
+            .from(groupMembers)
+            .where(
+              and(
+                eq(groupMembers.userId, users.id),
+                inArray(groupMembers.groupId, groupIds)
+              )
             )
-          : undefined
+        )
+      : FALSE
+  const inScope =
+    scope === "all"
+      ? raw`true`
+      : seatedIn(
+          ctx.groups
+            .filter((g) => chainOf(ctx, g.id).some((x) => scope.has(x)))
+            .map((g) => g.id)
+        )
+  const roles = await db
+    .select({
+      id: orgRoles.id,
+      systemKey: orgRoles.systemKey,
+      permissions: orgRoles.permissions,
+    })
+    .from(orgRoles)
+    .where(eq(orgRoles.orgId, ctx.org.id))
+  const granting = roles
+    .filter((r) => rolePermissions(r).length > 0)
+    .map((r) => r.id)
+  const staff = granting.length
+    ? exists(
+        db
+          .select({ x: raw`1` })
+          .from(roleAssignments)
+          .where(
+            and(
+              eq(roleAssignments.orgId, ctx.org.id),
+              eq(roleAssignments.userId, users.id),
+              inArray(roleAssignments.roleId, granting)
+            )
+          )
       )
-    )
-    .orderBy(asc(users.name), asc(users.email))
+    : FALSE
+  const seated = seatedIn([...ctx.groups.map((g) => g.id), NO_GROUP])
+  const parent = exists(
+    db
+      .select({ x: raw`1` })
+      .from(guardians)
+      .where(
+        and(eq(guardians.orgId, ctx.org.id), eq(guardians.parentId, users.id))
+      )
+  )
+  return {
+    where: and(
+      eq(orgMembers.orgId, ctx.org.id),
+      filter.status === "pending"
+        ? eq(orgMembers.status, "pending")
+        : undefined,
+      filter.q
+        ? or(
+            ilike(users.email, likeTerm(filter.q)),
+            ilike(users.name, likeTerm(filter.q))
+          )
+        : undefined,
+      or(
+        canApprove ? eq(orgMembers.status, "pending") : FALSE,
+        and(ne(orgMembers.status, "pending"), inScope)
+      ),
+      filter.groupId
+        ? seatedIn(
+            ctx.groups
+              .filter((g) => chainOf(ctx, g.id).includes(filter.groupId!))
+              .map((g) => g.id)
+          )
+        : undefined
+    )!,
+    kinds: {
+      staff,
+      learner: and(not(staff), seated)!,
+      parent: and(not(staff), not(seated), parent)!,
+      other: and(not(staff), not(seated), not(parent))!,
+    } satisfies Record<MemberKind, sql.SQL>,
+  }
+}
+
+/** Members as the list shows them: their groups, roles and children, for these rows only. */
+async function decorateMembers(
+  ctx: OrgContext,
+  rows: {
+    member: typeof orgMembers.$inferSelect
+    user: typeof users.$inferSelect
+  }[]
+) {
+  const db = getDb()
   const ids = rows.map((r) => r.user.id)
   const [memberships, assignments, families] = ids.length
     ? await Promise.all([
@@ -1205,54 +1339,34 @@ async function allMembers(
           ),
       ])
     : [[], [], []]
-
-  const inScope = (userId: string) => {
-    if (scope === "all") return true
-    return memberships.some(
-      (m) =>
-        m.userId === userId && chainOf(ctx, m.groupId).some((g) => scope.has(g))
-    )
-  }
-  return rows
-    .filter(({ member, user: person }) =>
-      member.status === "pending" ? canApprove : inScope(person.id)
-    )
-    .filter(({ user: person }) => {
-      if (!filter.groupId) return true
-      return memberships.some(
-        (m) =>
-          m.userId === person.id &&
-          chainOf(ctx, m.groupId).includes(filter.groupId!)
-      )
-    })
-    .map(({ member, user: person }) => ({
-      userId: person.id,
-      name: person.name,
-      email: person.email,
-      handle: person.handle,
-      status: member.status,
-      joinedVia: member.joinedVia,
-      joinedAt: member.createdAt,
-      shareProgress: member.shareProgress,
-      groupIds: memberships
-        .filter((m) => m.userId === person.id)
-        .map((m) => m.groupId),
-      roles: assignments
-        .filter((a) => a.assignment.userId === person.id)
-        .map((a) => ({
-          assignmentId: a.assignment.id,
-          roleId: a.role.id,
-          name: a.role.name,
-          systemKey: a.role.systemKey,
-          groupId: a.assignment.groupId,
-          /** Whether the role grants anything (else it's the plain Member role). */
-          grants: rolePermissions(a.role).length > 0,
-        })),
-      /** The children they're a parent of here (names), if any. */
-      children: families
-        .filter((f) => f.parentId === person.id)
-        .map((f) => f.name ?? f.email),
-    }))
+  return rows.map(({ member, user: person }) => ({
+    userId: person.id,
+    name: person.name,
+    email: person.email,
+    handle: person.handle,
+    status: member.status,
+    joinedVia: member.joinedVia,
+    joinedAt: member.createdAt,
+    shareProgress: member.shareProgress,
+    groupIds: memberships
+      .filter((m) => m.userId === person.id)
+      .map((m) => m.groupId),
+    roles: assignments
+      .filter((a) => a.assignment.userId === person.id)
+      .map((a) => ({
+        assignmentId: a.assignment.id,
+        roleId: a.role.id,
+        name: a.role.name,
+        systemKey: a.role.systemKey,
+        groupId: a.assignment.groupId,
+        /** Whether the role grants anything (else it's the plain Member role). */
+        grants: rolePermissions(a.role).length > 0,
+      })),
+    /** The children they're a parent of here (names), if any. */
+    children: families
+      .filter((f) => f.parentId === person.id)
+      .map((f) => f.name ?? f.email),
+  }))
 }
 
 export async function updateMember(

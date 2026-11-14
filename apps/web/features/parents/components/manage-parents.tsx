@@ -29,6 +29,7 @@ import {
 } from "@/components/form"
 import { Loading, PageTitle, Pager } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import { useDebounced } from "@/lib/use-debounced"
 import type { ApiResult } from "@/lib/api/types"
 import type { importLinks, searchStudents } from "@/features/parents/server"
 import type { listLinks } from "@/features/parents/server"
@@ -51,11 +52,13 @@ export function ManageParents({ slug }: { slug: string }) {
   const key = ["org", slug, "parents"]
   const [filter, setFilter] = useState("")
   const [page, setPage] = useState(1)
+  // The server is asked once typing pauses.
+  const asked = useDebounced(filter.trim())
   const { data, error, isPlaceholderData } = useQuery({
-    queryKey: [...key, filter.trim(), page],
+    queryKey: [...key, asked, page],
     queryFn: () =>
       api<ApiResult<typeof listLinks>>(
-        `/orgs/${slug}/parents?${new URLSearchParams({ q: filter.trim(), page: String(page) })}`
+        `/orgs/${slug}/parents?${new URLSearchParams({ q: asked, page: String(page) })}`
       ),
     placeholderData: keepPreviousData,
   })

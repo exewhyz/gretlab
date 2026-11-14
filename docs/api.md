@@ -57,8 +57,20 @@ All under `/api/v1/orgs/<slug>`. Each needs the permission in brackets.
 | `GET /attendance/overview?month=2026-11` | Every class's month: days taken, share present, how many below the minimum [See attendance] |
 | `GET /attendance/month?groupId=…&month=2026-11` | One class's month, mark by mark [See attendance] |
 | `GET /holidays` | Days the organization is closed (anyone in it) |
-| `GET /reports` | Students' activity and assignment results [See reports] |
+| `GET /reports?part=figures` | The figures: summary, assignments, teaching [See reports] |
+| `GET /reports?page=1&inactive=true` | Students' activity and assignment results, 100 a page [See reports] |
+| `GET /reports` | The whole report at once [See reports] |
 | `GET /assignments/<id>/gradebook?format=csv` | A gradebook as CSV [See grades] |
+
+### Paged lists
+
+Lists that can grow long take `?page=` (from 1), with `?q=` to search and `?perPage=` (up to 200) to change the page size. A paged answer always has:
+
+```json
+{ "items": […], "total": 180, "page": 1, "pages": 2, "perPage": 100 }
+```
+
+A page past the end answers with the last page. Some lists also repeat `items` under an older name (`members`, `links`, `students`). Without `?page`, they answer the whole list. A `page` or `perPage` that isn't a number in range is a 400 `invalid_query`.
 
 The same paths change things too (POST, PUT, PATCH, DELETE), with the matching permissions. A key may change whatever its permissions allow.
 

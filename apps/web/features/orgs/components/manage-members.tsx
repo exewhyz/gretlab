@@ -33,6 +33,7 @@ import {
   Pager,
 } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import { useDebounced } from "@/lib/use-debounced"
 import type { ApiResult } from "@/lib/api/types"
 import type { listMembers } from "@/features/orgs/server"
 
@@ -82,11 +83,13 @@ export function ManageMembers({
     what: "groups" | "role"
   } | null>(null)
   const [message, setMessage] = useState<Message>(null)
+  // The server is asked once typing pauses.
+  const asked = useDebounced(q.trim())
   const members = useQuery({
-    queryKey: ["org", slug, "members", q, groupId, status, kind, page],
+    queryKey: ["org", slug, "members", asked, groupId, status, kind, page],
     queryFn: () =>
       api<MembersPage>(
-        `/orgs/${slug}/members?${new URLSearchParams({ q, group: groupId, status, kind, page: String(page) })}`
+        `/orgs/${slug}/members?${new URLSearchParams({ q: asked, group: groupId, status, kind, page: String(page) })}`
       ),
     placeholderData: keepPreviousData,
   })

@@ -1,3 +1,4 @@
+import { forUsers, type Who } from "@/lib/for-users"
 import {
   assignmentExtensions,
   assignmentProblems,
@@ -86,7 +87,7 @@ export type Attempt = GradedAttempt & { userId: string; problemId: string }
 export async function attemptsOn(
   problemIds: string[],
   since: Date,
-  userId?: string
+  userId?: Who
 ): Promise<Attempt[]> {
   if (problemIds.length === 0) return []
   const rows = await getDb()
@@ -105,7 +106,7 @@ export async function attemptsOn(
         eq(submissions.status, "done"),
         inArray(submissions.problemId, problemIds),
         gte(submissions.createdAt, since),
-        userId ? eq(submissions.userId, userId) : undefined
+        forUsers(submissions.userId, userId)
       )
     )
   return rows.filter((row): row is Attempt => row.problemId !== null)
@@ -203,7 +204,7 @@ export function quizResultsOut(
 }
 
 /** Extensions on these assignments, for one student or everyone, by assignment then student. */
-export async function extensionsOn(assignmentIds: string[], userId?: string) {
+export async function extensionsOn(assignmentIds: string[], userId?: Who) {
   const byAssignment = new Map<
     string,
     Map<string, Extension & { reason: string }>
@@ -215,7 +216,7 @@ export async function extensionsOn(assignmentIds: string[], userId?: string) {
     .where(
       and(
         inArray(assignmentExtensions.assignmentId, assignmentIds),
-        userId ? eq(assignmentExtensions.userId, userId) : undefined
+        forUsers(assignmentExtensions.userId, userId)
       )
     )
   for (const row of rows) {
@@ -233,7 +234,7 @@ export const personally = (assignment: Assignment, extension?: Extension) => ({
 })
 
 /** Rubric marks on these assignments, for one student or everyone, by student then problem. */
-export async function marksOn(assignmentIds: string[], userId?: string) {
+export async function marksOn(assignmentIds: string[], userId?: Who) {
   const byUser = new Map<string, Map<string, Marks>>()
   if (assignmentIds.length === 0) return byUser
   const rows = await getDb()
@@ -242,7 +243,7 @@ export async function marksOn(assignmentIds: string[], userId?: string) {
     .where(
       and(
         inArray(rubricMarks.assignmentId, assignmentIds),
-        userId ? eq(rubricMarks.userId, userId) : undefined
+        forUsers(rubricMarks.userId, userId)
       )
     )
   for (const row of rows) {
@@ -335,7 +336,7 @@ export function questionsOf(assignmentIds: string[]) {
 }
 
 /** Students' answers on these assignments, for one student or everyone, by assignment then student. */
-export async function responsesOn(assignmentIds: string[], userId?: string) {
+export async function responsesOn(assignmentIds: string[], userId?: Who) {
   const out = new Map<string, Map<string, typeof quizResponses.$inferSelect>>()
   if (assignmentIds.length === 0) return out
   const rows = await getDb()
@@ -344,7 +345,7 @@ export async function responsesOn(assignmentIds: string[], userId?: string) {
     .where(
       and(
         inArray(quizResponses.assignmentId, assignmentIds),
-        userId ? eq(quizResponses.userId, userId) : undefined
+        forUsers(quizResponses.userId, userId)
       )
     )
   for (const row of rows) {

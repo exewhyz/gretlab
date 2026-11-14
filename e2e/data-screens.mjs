@@ -124,21 +124,55 @@ check(
     ["ds-p@example.com", "ds-lib@example.com", "ds-t@example.com"].includes(e)
   )
 )
+// Reports in two parts: the figures once per group, the student table paged in SQL.
+const figures = (await owner(`${O}/reports?part=figures`)).json
+check(
+  "Reports' figures come without the student table",
+  figures?.summary?.students === 2 &&
+    !("students" in figures) &&
+    Array.isArray(figures.assignments),
+  JSON.stringify(figures?.summary)
+)
 const rp = (await owner(`${O}/reports?page=1&inactive=true`)).json
 check(
-  "Reports pages its students on the server",
-  rp?.studentsPage?.total === 2 &&
-    rp.studentsPage.pages === 1 &&
-    rp.students.length === 2 &&
-    rp.summary.students === 2,
-  JSON.stringify(rp?.studentsPage)
+  "Reports pages its students on the server, in the shared shape",
+  rp?.total === 2 &&
+    rp.pages === 1 &&
+    rp.page === 1 &&
+    rp.perPage === 100 &&
+    rp.items.length === 2 &&
+    rp.students.length === 2,
+  JSON.stringify({ total: rp?.total, pages: rp?.pages, perPage: rp?.perPage })
+)
+const r1 = (await owner(`${O}/reports?page=2&perPage=1`)).json
+check(
+  "...a page at a time, of any size up to the cap",
+  r1?.total === 2 &&
+    r1.pages === 2 &&
+    r1.page === 2 &&
+    r1.items.length === 1 &&
+    r1.items[0].email !==
+      (await owner(`${O}/reports?page=1&perPage=1`)).json?.items[0]?.email,
+  JSON.stringify({ total: r1?.total, pages: r1?.pages, page: r1?.page })
+)
+check(
+  "...a page past the end answers with the last",
+  (await owner(`${O}/reports?page=9&perPage=1`)).json?.page === 2
 )
 const rq = (await owner(`${O}/reports?page=1&inactive=true&q=ds-s1`)).json
 check(
   "...and searches them there",
-  rq?.studentsPage?.total === 1 &&
-    rq.students[0]?.email === "ds-s1@example.com",
-  JSON.stringify(rq?.studentsPage)
+  rq?.total === 1 && rq.items[0]?.email === "ds-s1@example.com",
+  JSON.stringify({ total: rq?.total })
+)
+check(
+  "...with % and _ taken literally",
+  (await owner(`${O}/reports?page=1&q=%25`)).json?.total === 0
+)
+check(
+  "a bad page or page size is refused",
+  (await owner(`${O}/reports?page=abc`)).status === 400 &&
+    (await owner(`${O}/members?page=1&perPage=5000`)).status === 400
 )
 
 // ---------- who's who on Members
@@ -172,6 +206,12 @@ check(
   JSON.stringify({ n: p1?.members.length, total: p1?.total, pages: p1?.pages })
 )
 check(
+  "...in the shared shape",
+  p1?.items.length === 100 &&
+    p1.perPage === 100 &&
+    p1.items[0]?.email === p1.members[0]?.email
+)
+check(
   "...and counts each kind across all of them",
   p1?.counts.all === p1?.total &&
     p1.counts.parent === 1 &&
@@ -200,6 +240,13 @@ check(
   JSON.stringify(parentsPage).slice(0, 200)
 )
 check(
+  "...in the shared shape, searched by class too",
+  parentsPage?.items.length === 1 &&
+    parentsPage.perPage === 100 &&
+    (await owner(`${O}/parents?page=1&q=ds%206`)).json?.total === 1 &&
+    (await owner(`${O}/parents?page=1&q=ds-p%40`)).json?.total === 1
+)
+check(
   "...and none for a search that matches nothing",
   (await owner(`${O}/parents?page=1&q=nobody-at-all`)).json?.total === 0
 )
@@ -214,6 +261,12 @@ check(
     orgsPage.total >= 1 &&
     orgsPage.page === 1,
   JSON.stringify(orgsPage).slice(0, 200)
+)
+check(
+  "...in the shared shape",
+  orgsPage?.items.some((o) => o.slug === "ds-school") &&
+    orgsPage.perPage === 50 &&
+    typeof orgsPage.items[0]?.members === "number"
 )
 check(
   "...and the whole list without a page, as before",
