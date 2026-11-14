@@ -5,8 +5,17 @@ import { PERMISSIONS, type Permission } from "@workspace/judge"
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@workspace/ui/components/sheet"
 import { Field, FormMessage, TextInput } from "@/components/form"
 import { ConfirmButton } from "@/components/confirm"
+import { EditorSheet } from "@/components/editor-sheet"
 import { Card, Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
@@ -16,20 +25,86 @@ import { PermissionPicker } from "./permission-picker"
 import { useRoles, useSummary, type Message, type Role } from "./manage-shared"
 import type { suggestedRoles } from "@/features/orgs/server"
 
-export function PermissionChips({ permissions }: { permissions: string[] }) {
+/** A role with more permissions than this shows the first few and the rest in a side sheet. */
+const CHIPS_SHOWN = 12
+
+/**
+ * What a role allows. A long list (an owner holds ninety) shows its first dozen, and
+ * "All 90 permissions" opens a side sheet listing every one by area, with what it allows.
+ */
+export function PermissionChips({
+  permissions,
+  name,
+}: {
+  permissions: string[]
+  /** The role, for the sheet's title. */
+  name?: string
+}) {
   if (permissions.length === 0) {
     return <span className="text-xs text-body">No management access</span>
   }
+  const entry = (p: string) =>
+    PERMISSIONS[p as Permission] as
+      { label: string; description?: string; module?: string } | undefined
+  const chip = (p: string) => (
+    <span
+      key={p}
+      className="rounded-full bg-muted px-2 py-0.5 text-xs text-ink"
+    >
+      {entry(p)?.label ?? p}
+    </span>
+  )
+  if (permissions.length <= CHIPS_SHOWN + 2) {
+    return <div className="flex flex-wrap gap-1">{permissions.map(chip)}</div>
+  }
+  // Areas in the catalogue's own order.
+  const areas = [
+    ...new Set(permissions.map((p) => entry(p)?.module ?? "Other")),
+  ]
   return (
-    <div className="flex flex-wrap gap-1">
-      {permissions.map((p) => (
-        <span
-          key={p}
-          className="rounded-full bg-muted px-2 py-0.5 text-xs text-ink"
-        >
-          {PERMISSIONS[p as Permission]?.label ?? p}
-        </span>
-      ))}
+    <div className="flex flex-wrap items-center gap-1">
+      {permissions.slice(0, CHIPS_SHOWN).map(chip)}
+      <Sheet>
+        <SheetTrigger render={<Button variant="outline" size="xs" />}>
+          All {permissions.length} permissions
+        </SheetTrigger>
+        <SheetContent className="overflow-y-auto [--sheet-max-width:28rem] [--sheet-width:100%]">
+          <SheetHeader>
+            <SheetTitle>
+              {name ? `${name}: ` : ""}
+              {permissions.length} permissions
+            </SheetTitle>
+            <SheetDescription>
+              Everything this role allows, by area.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="grid gap-5 px-4 pb-6" data-testid="role-permissions">
+            {areas.map((area) => (
+              <section key={area} className="grid gap-2">
+                <h3 className="text-caption font-medium text-muted-foreground">
+                  {area}
+                </h3>
+                <ul className="grid gap-2">
+                  {permissions
+                    .filter((p) => (entry(p)?.module ?? "Other") === area)
+                    .map((p) => (
+                      <li key={p} className="grid gap-0.5">
+                        <span className="text-body-sm font-medium text-ink">
+                          {entry(p)?.label ?? p}
+                        </span>
+                        {entry(p)?.description && (
+                          <span className="text-caption text-body">
+                            {entry(p)?.description}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
@@ -54,8 +129,7 @@ export function ManageRoles({ slug }: { slug: string }) {
     <>
       <PageTitle
         action={
-          canEdit &&
-          editing === null && (
+          canEdit && (
             <Button size="sm" onClick={() => setEditing("new")}>
               New role
             </Button>
@@ -113,7 +187,7 @@ export function ManageRoles({ slug }: { slug: string }) {
             {role.description && (
               <p className="text-caption text-body">{role.description}</p>
             )}
-            <PermissionChips permissions={role.permissions} />
+            <PermissionChips name={role.name} permissions={role.permissions} />
           </Card>
         ))}
       </div>
@@ -174,7 +248,7 @@ export function SuggestedRoles({
                 </span>
               </div>
               <p className="text-caption text-body">{s.description}</p>
-              <PermissionChips permissions={s.permissions} />
+              <PermissionChips name={s.name} permissions={s.permissions} />
             </div>
             <div>
               <Button
@@ -255,9 +329,20 @@ export function RoleEditor({
       onDone()
     },
   })
+  // A side sheet over the list: who the role is for at the top, what it allows scrolling
+  // in the middle (with search and a way to each area), and the buttons always in reach.
   return (
-    <Card className="mb-4 grid gap-4">
-      <div className="grid gap-3 min-[901px]:grid-cols-2">
+    <EditorSheet
+      title={role ? `Edit ${role.name}` : "New role"}
+      description="Choose what people with this role may do. You can only give permissions you hold."
+      error={save.error?.message}
+      submitLabel={role ? "Save role" : "Create role"}
+      submitDisabled={save.isPending || !name.trim()}
+      onSubmit={() => save.mutate()}
+      onClose={onDone}
+      testId="role-editor"
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Role name">
           <TextInput
             value={name}
@@ -267,6 +352,7 @@ export function RoleEditor({
         <Field label="Description">
           <TextInput
             value={description}
+            placeholder="What it's for"
             onChange={(event) => setDescription(event.target.value)}
           />
         </Field>
@@ -278,22 +364,6 @@ export function RoleEditor({
         value={permissions}
         onChange={setPermissions}
       />
-      <div className="flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
-        <span className="flex-1">
-          {save.error && (
-            <FormMessage message={{ text: save.error.message, kind: "err" }} />
-          )}
-        </span>
-        <Button variant="ghost" onClick={onDone}>
-          Cancel
-        </Button>
-        <Button
-          disabled={save.isPending || !name.trim()}
-          onClick={() => save.mutate()}
-        >
-          {role ? "Save role" : "Create role"}
-        </Button>
-      </div>
-    </Card>
+    </EditorSheet>
   )
 }

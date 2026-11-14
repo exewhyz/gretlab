@@ -3,18 +3,25 @@
 import * as React from "react"
 import { cn } from "cn"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+import { ScrollX } from "@workspace/ui/components/scroll-x"
+
+/** A table that scrolls sideways in its own box when it's wider than its column (ScrollX). */
+function Table({
+  className,
+  pinFirst,
+  ...props
+}: React.ComponentProps<"table"> & {
+  /** Keep the first column in view while the rest scrolls. */
+  pinFirst?: boolean
+}) {
   return (
-    <div
-      data-slot="table-container"
-      className="relative w-full overflow-x-auto"
-    >
+    <ScrollX data-slot="table-container" className="w-full" pinFirst={pinFirst}>
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />
-    </div>
+    </ScrollX>
   )
 }
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { ErrorView } from "@/components/error-view"
+import { ScrollX } from "@workspace/ui/components/scroll-x"
 import { Button } from "@workspace/ui/components/button"
 import {
   BellRingingIcon,
@@ -391,10 +392,20 @@ export function Pager({
         {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
       </span>
       <span className="flex gap-1.5">
-        <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+        >
           Previous
         </Button>
-        <Button size="sm" variant="outline" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={page >= pages}
+          onClick={() => onPage(page + 1)}
+        >
           Next
         </Button>
       </span>
@@ -441,7 +452,13 @@ export function Table({
   children: ReactNode
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl bg-card shadow-xs ring-1 ring-foreground/10">
+    // Scrolls sideways in its own box on narrow screens, the first column (who or what
+    // the row is) staying in view; the header's tint is opaque under the pinned cell.
+    // Cells stay on one line (scroll, don't squeeze); a cell of prose sets data-wrap.
+    <ScrollX
+      pinFirst
+      className="overflow-hidden rounded-xl bg-card shadow-xs ring-1 ring-foreground/10 [--pin-head:color-mix(in_oklab,var(--muted)_40%,var(--card))]"
+    >
       <table className="w-full text-left text-body-sm text-ink">
         <thead className="bg-muted/40">
           <tr className="border-b border-hairline text-caption font-medium text-muted-foreground">
@@ -453,11 +470,11 @@ export function Table({
             ))}
           </tr>
         </thead>
-        <tbody className="[&_td]:border-t [&_td]:border-hairline-soft [&_td]:px-3 [&_td]:py-2.5 [&_tr]:transition-colors [&_tr:hover]:bg-muted/40">
+        <tbody className="[&_td]:border-t [&_td]:border-hairline-soft [&_td]:px-3 [&_td]:py-2.5 [&_td:not([data-wrap])]:whitespace-nowrap [&_tr]:transition-colors [&_tr:hover]:bg-muted/40">
           {children}
         </tbody>
       </table>
-    </div>
+    </ScrollX>
   )
 }
 

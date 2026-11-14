@@ -4,6 +4,7 @@ import { CalendarCheckIcon } from "@phosphor-icons/react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 
+import { ScrollX } from "@workspace/ui/components/scroll-x"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { Loading } from "@/features/admin/components/shell"
@@ -41,7 +42,7 @@ export function ClassGrades({
     )
   }
   return (
-    <div className="overflow-x-auto rounded-lg border border-hairline bg-card">
+    <ScrollX className="overflow-hidden rounded-lg border border-hairline bg-card">
       <table data-testid="class-gradebook" className="w-full text-body-sm">
         <thead>
           <tr className="border-b border-hairline text-start text-caption text-body">
@@ -95,7 +96,7 @@ export function ClassGrades({
           </tr>
         </tbody>
       </table>
-    </div>
+    </ScrollX>
   )
 }
 
@@ -169,7 +170,10 @@ export function AttendanceTable({
           attendance shows here.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-hairline bg-card">
+        <ScrollX
+          pinFirst
+          className="overflow-hidden rounded-lg border border-hairline bg-card"
+        >
           <table data-testid="attendance-table" className="w-full text-body-sm">
             <thead>
               <tr className="border-b border-hairline text-caption text-body">
@@ -202,7 +206,7 @@ export function AttendanceTable({
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollX>
       )}
     </section>
   )

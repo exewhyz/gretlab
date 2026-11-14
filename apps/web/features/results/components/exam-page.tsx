@@ -288,9 +288,7 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Subject</TableHead>
-                        <TableHead className="hidden sm:table-cell">
-                          Teacher
-                        </TableHead>
+                        <TableHead>Teacher</TableHead>
                         <TableHead className="text-right">Marks</TableHead>
                         <TableHead className="text-right">In</TableHead>
                         <TableHead className="w-10">
@@ -315,7 +313,7 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                               p.subject
                             )}
                           </TableCell>
-                          <TableCell className="hidden text-muted-foreground sm:table-cell">
+                          <TableCell className="text-muted-foreground">
                             {p.teacher ?? "–"}
                           </TableCell>
                           <TableCell className="text-right tabular-nums">
@@ -788,7 +786,7 @@ export function ClassResults({
               </div>
             ))}
           </div>
-          <Card className="overflow-x-auto py-0">
+          <Card className="py-0">
             <Table data-testid="results">
               <TableHeader>
                 <TableRow>

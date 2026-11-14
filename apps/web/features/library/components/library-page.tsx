@@ -443,7 +443,7 @@ export function LibraryPage() {
                       ? (r as LibraryProblem).level
                       : KIND_LABEL[r.kind]}
                   </td>
-                  <td className="max-w-48 truncate text-caption">
+                  <td data-wrap className="max-w-56 min-w-40 text-caption">
                     {r.tags.join(", ")}
                   </td>
                   <td className="text-caption">

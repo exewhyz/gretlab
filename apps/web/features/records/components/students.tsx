@@ -189,8 +189,8 @@ export function Students({ slug }: { slug: string }) {
                 <TableHead>
                   Class{data.year ? ` (${data.year.name})` : ""}
                 </TableHead>
-                <TableHead className="hidden md:table-cell">Gender</TableHead>
-                <TableHead className="hidden md:table-cell">Sign-in</TableHead>
+                <TableHead>Gender</TableHead>
+                <TableHead>Sign-in</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -226,10 +226,8 @@ export function Students({ slug }: { slug: string }) {
                       <Badge variant="outline">Not placed</Badge>
                     )}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {GENDER[s.gender] ?? s.gender}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
+                  <TableCell>{GENDER[s.gender] ?? s.gender}</TableCell>
+                  <TableCell>
                     {s.login ? (
                       <span className="text-muted-foreground">Signs in</span>
                     ) : (

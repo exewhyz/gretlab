@@ -25,6 +25,7 @@ import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { Button } from "@workspace/ui/components/button"
 import { PERMISSIONS } from "@workspace/judge"
 
+import { EditorSheet } from "@/components/editor-sheet"
 import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
 import { PermissionPicker } from "@/features/orgs/components/permission-picker"
 import { api } from "@/lib/api/client"
@@ -290,7 +291,6 @@ function KindRoles({
         </div>
       )}
       {editing && (
-        <div className="border-t border-hairline px-6 py-4">
           <TemplateEditor
             role={editing === "new" ? null : editing}
             busy={save.isPending}
@@ -301,7 +301,6 @@ function KindRoles({
               )
             }
           />
-        </div>
       )}
       <Table>
         <TableHeader>
@@ -372,16 +371,19 @@ function TemplateEditor({
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_|_$/g, "")
       .slice(0, 40) || "role")
+  const submit = () =>
+    onSave({ key: key.length < 2 ? `${key}_role` : key, name, description, scope, permissions })
   return (
-    <form
-      className="grid gap-3"
-      data-testid="template-editor"
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSave({ key: key.length < 2 ? `${key}_role` : key, name, description, scope, permissions })
-      }}
+    <EditorSheet
+      title={role ? `Edit ${role.name}` : "Add a suggested role"}
+      description="Organizations of this kind start with it; it's theirs to change."
+      submitLabel={role ? "Save role" : "Add role"}
+      submitDisabled={busy || !name.trim()}
+      onSubmit={submit}
+      onClose={onCancel}
+      testId="template-editor"
     >
-      <div className="grid gap-3 md:grid-cols-[1fr_14rem]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_14rem]">
         <Field label="Role name">
           <TextInput value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
         </Field>
@@ -402,14 +404,6 @@ function TemplateEditor({
         value={permissions}
         onChange={setPermissions}
       />
-      <div className="flex gap-2">
-        <Button type="submit" disabled={busy || !name.trim()}>
-          {role ? "Save role" : "Add role"}
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+    </EditorSheet>
   )
 }

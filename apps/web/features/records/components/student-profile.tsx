@@ -125,7 +125,7 @@ export function StudentSheet({
   })
   return (
     <Sheet open onOpenChange={(open) => !open && onDone()}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent className="overflow-y-auto [--sheet-max-width:32rem] [--sheet-width:100%]">
         <SheetHeader>
           <SheetTitle>
             {student ? `Edit ${student.name}` : "Add student"}

@@ -23,6 +23,7 @@ import {
 } from "@workspace/ui/components/empty"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { EditorSheet } from "@/components/editor-sheet"
 import { ConfirmButton } from "@/components/confirm"
 import { Field, FormMessage, TextInput } from "@/components/form"
 import {
@@ -386,48 +387,33 @@ function NewKey({
       onMade(r.token)
     },
   })
+  if (!open) return null
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>New API key</DialogTitle>
-          <DialogDescription>
-            It may only do what you choose, from what you can do across the
-            organization.
-          </DialogDescription>
-        </DialogHeader>
-        <Field label="Name">
-          <TextInput
-            value={name}
-            placeholder="e.g. Student information system"
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field>
-        <PermissionPicker
-          catalog={PERMISSIONS}
-          order={Object.keys(PERMISSIONS)}
-          held={grantable}
-          value={permissions}
-          onChange={setPermissions}
+    <EditorSheet
+      title="New API key"
+      description="It may only do what you choose, from what you can do across the organization."
+      error={make.error?.message}
+      submitLabel="Make key"
+      submitDisabled={!name.trim() || permissions.length === 0 || make.isPending}
+      onSubmit={() => make.mutate()}
+      onClose={onClose}
+      testId="new-api-key"
+    >
+      <Field label="Name">
+        <TextInput
+          value={name}
+          placeholder="e.g. Student information system"
+          onChange={(e) => setName(e.target.value)}
         />
-        {make.error && (
-          <FormMessage message={{ text: make.error.message, kind: "err" }} />
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            disabled={
-              !name.trim() || permissions.length === 0 || make.isPending
-            }
-            onClick={() => make.mutate()}
-          >
-            Make key
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </Field>
+      <PermissionPicker
+        catalog={PERMISSIONS}
+        order={Object.keys(PERMISSIONS)}
+        held={grantable}
+        value={permissions}
+        onChange={setPermissions}
+      />
+    </EditorSheet>
   )
 }
 

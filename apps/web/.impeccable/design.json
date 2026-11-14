@@ -470,7 +470,8 @@
       "Do put a list's figures in one `Stats` line above it, each leading to the detail behind it.",
       "Do put a home's headline numbers in one `Figures` row, and fold a to-do kind with more than three items.",
       "Do use the named type scale and keep `text-body-sm` (14px) as the working size of app screens.",
-      "Do check new shadcn registry components in both themes; they sometimes arrive with forced colours."
+      "Do check new shadcn registry components in both themes; they sometimes arrive with forced colours.",
+      "Do put wide tables in `ScrollX` (or the shared tables), with the identifying column pinned."
     ],
     "donts": [
       "Don't use Tailwind's cool greys (`gray`, `slate`, `zinc`) or pure black; neutrals are warm.",
@@ -479,7 +480,10 @@
       "Don't give in-page surfaces shadows heavier than `shadow-xs`.",
       "Don't use native `<button>`, `<input>`, `<select>`, `<textarea>` or hand-made popups; use the `packages/ui` components.",
       "Don't use Tailwind's `text-sm`/`text-lg` or arbitrary pixel sizes where a named token exists.",
-      "Don't show the `>>>` prompt anywhere but the wordmark."
+      "Don't show the `>>>` prompt anywhere but the wordmark.",
+      "Don't hide table columns on small screens (`hidden md:table-cell`) or truncate data a person needs; scroll, wrap, or move it into a sheet or popover.",
+      "Don't open an editor inline at the top of a list page; use `EditorSheet` (or a Dialog for a short form).",
+      "Don't let a page scroll sideways; a grid whose items hold long unbreakable text uses `grid-cols-[minmax(0,1fr)]`."
     ]
   }
 }

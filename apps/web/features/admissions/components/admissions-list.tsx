@@ -180,14 +180,14 @@ export function Admissions({ slug }: { slug: string }) {
           </EmptyHeader>
         </Empty>
       ) : (
-        <Card className="overflow-x-auto py-0">
+        <Card className="py-0">
           <Table data-testid="applications">
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
                 <TableHead>Class</TableHead>
-                <TableHead className="hidden md:table-cell">Parent</TableHead>
-                <TableHead className="hidden sm:table-cell">Sent</TableHead>
+                <TableHead>Parent</TableHead>
+                <TableHead>Sent</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -206,15 +206,13 @@ export function Admissions({ slug }: { slug: string }) {
                     </div>
                   </TableCell>
                   <TableCell>{a.grade ?? "–"}</TableCell>
-                  <TableCell className="hidden md:table-cell">
+                  <TableCell>
                     {a.parentName}
                     <div className="text-caption text-muted-foreground">
                       {a.email}
                     </div>
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    {shortDate(a.createdAt)}
-                  </TableCell>
+                  <TableCell>{shortDate(a.createdAt)}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS[a.status].variant}>
                       {STATUS[a.status].label}

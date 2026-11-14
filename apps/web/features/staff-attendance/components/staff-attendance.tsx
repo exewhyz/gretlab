@@ -400,7 +400,7 @@ function MonthReport({ slug }: { slug: string }) {
           />
         </Field>
       </div>
-      <Card className="overflow-x-auto py-0">
+      <Card className="py-0">
         <Table data-testid="staff-month">
           <TableHeader>
             <TableRow>
@@ -601,7 +601,7 @@ export function MyAttendance({ slug }: { slug: string }) {
                 <TableHead>Day</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>In at</TableHead>
-                <TableHead className="hidden sm:table-cell">Note</TableHead>
+                <TableHead>Note</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -614,7 +614,7 @@ export function MyAttendance({ slug }: { slug: string }) {
                   <TableCell className="tabular-nums">
                     {d.checkIn ?? "–"}
                   </TableCell>
-                  <TableCell className="hidden text-muted-foreground sm:table-cell">
+                  <TableCell className="text-muted-foreground">
                     {d.note}
                   </TableCell>
                 </TableRow>

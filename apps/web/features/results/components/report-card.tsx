@@ -11,6 +11,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 
+import { ScrollX } from "@workspace/ui/components/scroll-x"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import {
@@ -219,7 +220,7 @@ export function ReportCard({
                     )}
                   </span>
                 </div>
-                <div className="overflow-x-auto">
+                <ScrollX pinFirst>
                   <table className="w-full border-collapse text-body-sm">
                     <thead>
                       <tr className="border-b border-hairline text-left text-caption text-muted-foreground">
@@ -264,7 +265,7 @@ export function ReportCard({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollX>
               </div>
             ))}
           </section>
@@ -274,7 +275,7 @@ export function ReportCard({
             No results published for {data.year.name} yet.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <ScrollX pinFirst>
             <table
               className="w-full border-collapse text-body-sm"
               data-testid="report-table"
@@ -430,7 +431,7 @@ export function ReportCard({
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </ScrollX>
         )}
         {data.exams.some((e) => e.remark || e.subjectRemarks.length > 0) && (
           <section className="grid gap-3" data-testid="report-remarks">

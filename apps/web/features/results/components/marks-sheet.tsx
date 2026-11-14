@@ -312,7 +312,7 @@ export function MarksSheet({
                 <TableHead>Student</TableHead>
                 <TableHead className="w-32">Marks</TableHead>
                 <TableHead className="w-20">Absent</TableHead>
-                <TableHead className="hidden md:table-cell">Remark</TableHead>
+                <TableHead>Remark</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -387,7 +387,7 @@ export function MarksSheet({
                         }
                       />
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
+                    <TableCell>
                       <TextInput
                         aria-label={`Remark for ${s.name}`}
                         maxLength={200}

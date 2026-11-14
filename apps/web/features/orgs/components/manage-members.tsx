@@ -1,5 +1,7 @@
 "use client"
 
+import { DotsThreeIcon } from "@phosphor-icons/react"
+
 import {
   keepPreviousData,
   useMutation,
@@ -10,9 +12,16 @@ import { type Permission } from "@workspace/judge"
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import { cn } from "@workspace/ui/lib/utils"
 import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
-import { ConfirmButton } from "@/components/confirm"
+import { ConfirmButton, ConfirmDialog } from "@/components/confirm"
 import {
   Dialog,
   DialogContent,
@@ -239,15 +248,23 @@ export function ManageMembers({
 /** Where someone sits: the first few groups, and the rest a click away. */
 export function GroupChips({ paths }: { paths: string[] }) {
   const SHOWN = 3
-  const chip = (path: string) => (
-    <span
-      key={path}
-      className="max-w-56 truncate rounded-full bg-muted px-2 py-0.5 text-xs text-ink"
-      title={path}
-    >
-      {path}
-    </span>
-  )
+  // The whole path, never cut off: the groups above muted, the group itself in ink,
+  // wrapping inside the chip when it's long.
+  const chip = (path: string) => {
+    const parts = path.split(" › ")
+    const leaf = parts.pop()
+    return (
+      <span
+        key={path}
+        className="w-max max-w-72 rounded-md bg-muted px-2 py-0.5 text-xs whitespace-normal"
+      >
+        {parts.length > 0 && (
+          <span className="text-muted-foreground">{parts.join(" › ")} › </span>
+        )}
+        <span className="font-medium text-ink">{leaf}</span>
+      </span>
+    )
+  }
   if (paths.length === 0) return <span className="text-xs">—</span>
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -322,6 +339,7 @@ export function MemberRow({
   }
   const [roleId, setRoleId] = useState("")
   const [scope, setScope] = useState("")
+  const [removing, setRemoving] = useState(false)
   const remove = () =>
     run(() => api(`/orgs/${slug}/members/${m.userId}`, { method: "DELETE" }))
   const base = `/orgs/${slug}/members/${m.userId}`
@@ -494,75 +512,94 @@ export function MemberRow({
         </Dialog>
       </td>
       <td className="text-right whitespace-nowrap">
-        {m.status === "pending" ? (
-          canApprove && (
-            <span className="flex justify-end gap-1.5">
-              <Button
-                size="xs"
-                disabled={busy}
-                onClick={() =>
-                  run(() =>
-                    api(base, { method: "PATCH", body: { status: "active" } })
-                  )
-                }
-              >
-                Approve
-              </Button>
-              <ConfirmButton
-                size="xs"
-                variant="outline"
-                disabled={busy}
-                title={`Decline ${m.name ?? m.email}?`}
-                description="Their request is dropped. They can ask again if the organization allows it."
-                confirmLabel="Decline"
-                onConfirm={remove}
-              >
-                Decline
-              </ConfirmButton>
-            </span>
-          )
-        ) : (
-          <span className="flex justify-end gap-1">
-            {canManage && (
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => {
-                  setPicked(placedIds)
-                  setEditing("groups")
-                }}
-              >
-                Groups
-              </Button>
+        {m.status === "pending"
+          ? canApprove && (
+              <span className="flex justify-end gap-1.5">
+                <Button
+                  size="xs"
+                  disabled={busy}
+                  onClick={() =>
+                    run(() =>
+                      api(base, { method: "PATCH", body: { status: "active" } })
+                    )
+                  }
+                >
+                  Approve
+                </Button>
+                <ConfirmButton
+                  size="xs"
+                  variant="outline"
+                  disabled={busy}
+                  title={`Decline ${m.name ?? m.email}?`}
+                  description="Their request is dropped. They can ask again if the organization allows it."
+                  confirmLabel="Decline"
+                  onConfirm={remove}
+                >
+                  Decline
+                </ConfirmButton>
+              </span>
+            )
+          : // The row's actions in one menu, so the table keeps its room for the data.
+            (canManage || canRoles) && (
+              <span className="flex justify-end">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Actions for ${m.name ?? m.email}`}
+                      />
+                    }
+                  >
+                    <DotsThreeIcon />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {canManage && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setPicked(placedIds)
+                          setEditing("groups")
+                        }}
+                      >
+                        Change groups
+                      </DropdownMenuItem>
+                    )}
+                    {canRoles && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setRoleId("")
+                          setScope("")
+                          setEditing("role")
+                        }}
+                      >
+                        Add role
+                      </DropdownMenuItem>
+                    )}
+                    {canManage && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={busy}
+                          onClick={() => setRemoving(true)}
+                        >
+                          Remove from organization
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <ConfirmDialog
+                  open={removing}
+                  onOpenChange={setRemoving}
+                  title={`Remove ${m.name ?? m.email} from the organization?`}
+                  description="They lose its groups, roles, assignments and contests. Their account and their own work stay; they'd need to join again."
+                  confirmLabel="Remove"
+                  onConfirm={remove}
+                />
+              </span>
             )}
-            {canRoles && (
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => {
-                  setRoleId("")
-                  setScope("")
-                  setEditing("role")
-                }}
-              >
-                Add role
-              </Button>
-            )}
-            {canManage && (
-              <ConfirmButton
-                size="xs"
-                variant="ghost"
-                disabled={busy}
-                title={`Remove ${m.name ?? m.email} from the organization?`}
-                description="They lose its groups, roles, assignments and contests. Their account and their own work stay; they'd need to join again."
-                confirmLabel="Remove"
-                onConfirm={remove}
-              >
-                Remove
-              </ConfirmButton>
-            )}
-          </span>
-        )}
       </td>
     </tr>
   )

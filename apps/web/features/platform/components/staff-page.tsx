@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { PLATFORM_PERMISSIONS, type PlatformPermission } from "@workspace/judge"
 
+import { EditorSheet } from "@/components/editor-sheet"
 import { PermissionPicker } from "@/features/orgs/components/permission-picker"
 import { useState } from "react"
 
@@ -316,65 +317,47 @@ function RoleDialog({
     onSuccess: onDone,
   })
   return (
-    <Dialog open onOpenChange={(open) => !open && onDone()}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{role ? `Edit ${role.name}` : "New role"}</DialogTitle>
-          <DialogDescription>
-            A role is a set of permissions. You can only include ones you hold
-            yourself.
-          </DialogDescription>
-        </DialogHeader>
-        <Field label="Name">
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
-        <Field label="Description">
-          <TextArea
-            rows={2}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </Field>
-        <PermissionPicker
-          catalog={PLATFORM_PERMISSIONS}
-          order={Object.keys(PLATFORM_PERMISSIONS)}
-          held={held}
-          value={permissions}
-          onChange={(next) => setPermissions(next as PlatformPermission[])}
-        />
-        {(save.error || remove.error) && (
-          <FormMessage
-            message={{
-              text: (save.error ?? remove.error)!.message,
-              kind: "err",
-            }}
-          />
-        )}
-        <DialogFooter>
-          {role && (
-            <ConfirmButton
-              variant="destructive"
-              className="mr-auto"
-              title={`Delete the ${role.name} role?`}
-              description="Only a role nobody holds can be deleted. This can't be undone."
-              confirmLabel="Delete role"
-              onConfirm={() => remove.mutate()}
-            >
-              Delete
-            </ConfirmButton>
-          )}
-          <Button variant="outline" onClick={onDone}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!name.trim() || save.isPending}
-            onClick={() => save.mutate()}
+    <EditorSheet
+      title={role ? `Edit ${role.name}` : "New role"}
+      description="A role is a set of permissions. You can only include ones you hold yourself."
+      error={(save.error ?? remove.error)?.message}
+      submitLabel="Save role"
+      submitDisabled={!name.trim() || save.isPending}
+      onSubmit={() => save.mutate()}
+      onClose={onDone}
+      testId="platform-role-editor"
+      extra={
+        role && (
+          <ConfirmButton
+            variant="destructive"
+            title={`Delete the ${role.name} role?`}
+            description="Only a role nobody holds can be deleted. This can't be undone."
+            confirmLabel="Delete role"
+            onConfirm={() => remove.mutate()}
           >
-            Save role
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            Delete
+          </ConfirmButton>
+        )
+      }
+    >
+      <Field label="Name">
+        <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="Description">
+        <TextArea
+          rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </Field>
+      <PermissionPicker
+        catalog={PLATFORM_PERMISSIONS}
+        order={Object.keys(PLATFORM_PERMISSIONS)}
+        held={held}
+        value={permissions}
+        onChange={(next) => setPermissions(next as PlatformPermission[])}
+      />
+    </EditorSheet>
   )
 }
 

@@ -23,6 +23,7 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
 
+import { DetailSheet } from "@/components/detail-sheet"
 import { ConfirmButton } from "@/components/confirm"
 import { Markdown } from "@/components/markdown"
 import { Field, FormMessage, TextInput } from "@/components/form"
@@ -461,19 +462,16 @@ export function StudentCode({
       method: "DELETE",
     }).then(refresh)
   return (
-    // Card doesn't pass extra attributes through, so the test id sits on a wrapper.
-    <div data-testid="student-code">
-      <Card className="mt-4 grid gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-title-sm text-ink">
-            {data
-              ? `${data.student.name ?? data.student.email}: ${data.problem.title}`
-              : "Code"}
-          </h2>
-          <Button size="sm" variant="ghost" onClick={onClose}>
-            Close
-          </Button>
-        </div>
+    // Beside the gradebook, not below it: it opens where the cell was clicked.
+    <DetailSheet
+      testId="student-code"
+      onClose={onClose}
+      title={
+        data
+          ? `${data.student.name ?? data.student.email}: ${data.problem.title}`
+          : "Code"
+      }
+    >
         {data?.exam && (
           <ExamRecord
             exam={data.exam}
@@ -575,8 +573,7 @@ export function StudentCode({
             ))}
           </TabsContent>
         </Tabs>
-      </Card>
-    </div>
+    </DetailSheet>
   )
 }
 
@@ -997,21 +994,22 @@ export function QuizMarking({
     return q.answer.trim() || "No answer"
   }
   return (
-    <div data-testid="quiz-marking">
-      <Card className="mt-4 grid gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-title-sm text-ink">
-            {data ? `${data.student.name ?? data.student.email}: quiz` : "Quiz"}
-            {data && (
-              <span className="ml-2 text-caption tabular-nums">
-                {data.earned} / {data.max}
-              </span>
-            )}
-          </h2>
-          <Button size="sm" variant="ghost" onClick={onClose}>
-            Close
-          </Button>
-        </div>
+    // Beside the gradebook, where the Quiz cell was clicked.
+    <DetailSheet
+      testId="quiz-marking"
+      onClose={onClose}
+      width="40rem"
+      title={
+        <>
+          {data ? `${data.student.name ?? data.student.email}: quiz` : "Quiz"}
+          {data && (
+            <span className="ml-2 text-caption tabular-nums">
+              {data.earned} / {data.max}
+            </span>
+          )}
+        </>
+      }
+    >
         {!data && <Loading error={error} />}
         {data?.questions.map((q, index) => (
           <div
@@ -1084,8 +1082,7 @@ export function QuizMarking({
             )}
           </div>
         )}
-      </Card>
-    </div>
+    </DetailSheet>
   )
 }
 

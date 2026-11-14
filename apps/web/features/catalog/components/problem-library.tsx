@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 
+import { ScrollX } from "@workspace/ui/components/scroll-x"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 import {
@@ -288,7 +289,7 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
           </div>
         )}
 
-        <div className="overflow-x-auto rounded-lg border border-hairline bg-card">
+        <ScrollX className="overflow-hidden rounded-lg border border-hairline bg-card">
           <table className="w-full text-left text-body-sm text-ink">
             <thead>
               <tr className="border-b border-hairline text-caption-upper text-body uppercase">
@@ -372,7 +373,7 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
               No problems match these filters.
             </p>
           )}
-        </div>
+        </ScrollX>
         {pages > 1 && (
           <div className="mt-3 flex items-center gap-2 text-caption">
             <Button

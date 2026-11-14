@@ -27,7 +27,8 @@ export function MemberLibrary({ slug }: { slug: string }) {
   const books = useBooks(slug, q)
   if (!mine.data) return <Loading error={mine.error} />
   return (
-    <div className="grid gap-5">
+    // One column that may shrink to the screen, so long titles wrap rather than widen it.
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       <header>
         <Link
           href={orgPages(slug).home}
@@ -52,7 +53,9 @@ export function MemberLibrary({ slug }: { slug: string }) {
           <ul className="grid gap-1 text-body-sm" data-testid="my-loans">
             {mine.data.loans.map((l) => (
               <li key={l.id} className="flex justify-between gap-2">
-                <span className="text-ink">{l.title}</span>
+                <span className="min-w-0 [overflow-wrap:anywhere] text-ink">
+                  {l.title}
+                </span>
                 <span
                   className={cn(
                     "text-xs",

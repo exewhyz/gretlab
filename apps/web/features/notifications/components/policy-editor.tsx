@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
+import { ScrollX } from "@workspace/ui/components/scroll-x"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 
@@ -136,76 +137,82 @@ export function PolicyEditor({
           return (
             <section
               key={group.audience}
-              className="overflow-x-auto rounded-lg border border-hairline bg-card"
+              className="overflow-hidden rounded-lg border border-hairline bg-card"
             >
-              <table className="w-full text-left text-body-sm text-ink">
-                <thead>
-                  <tr className="border-b border-hairline text-caption-upper text-body uppercase">
-                    <th className="px-3 py-2.5">{group.title}</th>
-                    {COLUMNS.map((column) => (
-                      <th
-                        key={column.key}
-                        className="w-28 px-3 py-2.5 text-center"
-                      >
-                        {column.title}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => {
-                    const own = edits[row.event] ?? row.own
-                    return (
-                      <tr
-                        key={row.event}
-                        data-testid={`policy-${row.event}`}
-                        className="border-b border-hairline last:border-0"
-                      >
-                        <td className="px-3 py-2.5">
-                          <div className="font-medium">{row.label}</div>
-                          <div className="text-caption">{row.description}</div>
-                        </td>
-                        {COLUMNS.map((column) => {
-                          const locked = row.locked[column.key]
-                          // No email, nothing to choose; an email-only event has no bell.
-                          const pointless =
-                            (column.key === "inApp" && row.emailOnly) ||
-                            (column.key === "userChoice" &&
-                              (!own.email || row.locked.email))
-                          return (
-                            <td
-                              key={column.key}
-                              className="px-3 py-2.5 text-center"
-                            >
-                              {column.key === "inApp" && row.emailOnly ? (
-                                <span className="text-caption">Email only</span>
-                              ) : (
-                                <span className="inline-flex flex-col items-center gap-1">
-                                  <Checkbox
-                                    aria-label={`${row.label}: ${column.title}`}
-                                    checked={
-                                      !locked && !pointless && own[column.key]
-                                    }
-                                    disabled={locked || pointless}
-                                    onCheckedChange={(on) =>
-                                      set(row, column.key, on)
-                                    }
-                                  />
-                                  {locked && (
-                                    <span className="text-xs text-muted-foreground">
-                                      Off for everyone
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <ScrollX pinFirst>
+                <table className="w-full text-left text-body-sm text-ink">
+                  <thead>
+                    <tr className="border-b border-hairline text-caption-upper text-body uppercase">
+                      <th className="px-3 py-2.5">{group.title}</th>
+                      {COLUMNS.map((column) => (
+                        <th
+                          key={column.key}
+                          className="w-28 px-3 py-2.5 text-center"
+                        >
+                          {column.title}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => {
+                      const own = edits[row.event] ?? row.own
+                      return (
+                        <tr
+                          key={row.event}
+                          data-testid={`policy-${row.event}`}
+                          className="border-b border-hairline last:border-0"
+                        >
+                          <td className="px-3 py-2.5">
+                            <div className="font-medium">{row.label}</div>
+                            <div className="text-caption">
+                              {row.description}
+                            </div>
+                          </td>
+                          {COLUMNS.map((column) => {
+                            const locked = row.locked[column.key]
+                            // No email, nothing to choose; an email-only event has no bell.
+                            const pointless =
+                              (column.key === "inApp" && row.emailOnly) ||
+                              (column.key === "userChoice" &&
+                                (!own.email || row.locked.email))
+                            return (
+                              <td
+                                key={column.key}
+                                className="px-3 py-2.5 text-center"
+                              >
+                                {column.key === "inApp" && row.emailOnly ? (
+                                  <span className="text-caption">
+                                    Email only
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex flex-col items-center gap-1">
+                                    <Checkbox
+                                      aria-label={`${row.label}: ${column.title}`}
+                                      checked={
+                                        !locked && !pointless && own[column.key]
+                                      }
+                                      disabled={locked || pointless}
+                                      onCheckedChange={(on) =>
+                                        set(row, column.key, on)
+                                      }
+                                    />
+                                    {locked && (
+                                      <span className="text-xs text-muted-foreground">
+                                        Off for everyone
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </ScrollX>
             </section>
           )
         })}

@@ -300,6 +300,21 @@ Plain and exact: a clear label, a 40px height, and the colour saying how importa
 - The header row is a faint muted fill with a hairline below, 13px Faded Pencil labels, 10px × 12px cells.
 - The body is `body-sm` in ink; rows are separated by hairlines. Numbers are tabular and right-aligned where they're compared.
 
+### Wide Tables and Scrolling
+A table wider than its column scrolls sideways inside its own box (`ScrollX` in `packages/ui`; the shadcn `Table` and the admin `Table` use it), never the page. The scrollbar is always drawn, in a strip of its own under the last row, so it never covers data; a soft shadow marks each side with more to see. The first column (who or what the row is) stays pinned, taking 45% of a phone's width and wrapping. Cells stay on one line and scroll rather than squeeze; a cell of prose opts out with `data-wrap`. No column is hidden on small screens: phones get the same data, scrolled.
+
+### Row Actions and Long Lists
+- A row with more than one action puts them in a "⋯" DropdownMenu (ghost icon button, `Actions for <name>`), destructive items last, in red, after a separator, and confirmed in an AlertDialog.
+- A list too long for its card (a role's ninety permissions) shows its first dozen and opens the rest, grouped and described, in a right-hand Sheet. Nothing is dropped, only moved one click away.
+- Chips show their whole value: a group path keeps its parents muted and the group in ink, wrapping inside the chip rather than truncating.
+
+### Editors (create and edit)
+- Creating or editing an item from a list opens a right-hand sheet over the list (`EditorSheet`, `components/editor-sheet.tsx`), never a form pushed into the top of the page. Its title says what's being edited; the form scrolls in the middle; the error, Cancel and the main action stay pinned at the bottom (a secondary action such as Delete sits at the start of that bar). Full width on phones, 42rem from sm up by default.
+- A short form (a few fields) is a Dialog; anything with a long list or several sections is a sheet.
+- What's behind a row (a student's work in the gradebook, their quiz) opens beside the list in `DetailSheet` (`components/detail-sheet.tsx`), not below the table, so it appears where the person clicked.
+- A long checklist inside (permissions) has a search bar, a count of what's chosen, and chips that jump to each area, stuck to the top while it scrolls; every option stays visible, never folded away by default.
+- A sheet's size is set with `--sheet-width` / `--sheet-max-width` on `SheetContent`; a plain `sm:max-w-*` class is ignored by the shadcn sheet.
+
 ### Inputs / Fields
 - **Style:** 36px tall, 8px radius, Strong Rule border, transparent on white (a faint ink tint in dark), 14px text, Erased placeholder.
 - **Focus:** the border turns ink with a soft 3px ring.
@@ -336,6 +351,7 @@ Progress bars (`Progress`, the homes' `Meter`) are 70% ink on a Rule track, red 
 - **Do** put a home's headline numbers in one `Figures` row, and fold a to-do kind with more than three items.
 - **Do** use the named type scale and keep `text-body-sm` (14px) as the working size of app screens.
 - **Do** check new shadcn registry components in both themes; they sometimes arrive with forced colours.
+- **Do** put wide tables in `ScrollX` (or the shared tables), with the identifying column pinned.
 
 ### Don't:
 - **Don't** use Tailwind's cool greys (`gray`, `slate`, `zinc`) or pure black; neutrals are warm.
@@ -345,3 +361,6 @@ Progress bars (`Progress`, the homes' `Meter`) are 70% ink on a Rule track, red 
 - **Don't** use native `<button>`, `<input>`, `<select>`, `<textarea>` or hand-made popups; use the `packages/ui` components.
 - **Don't** use Tailwind's `text-sm`/`text-lg` or arbitrary pixel sizes where a named token exists.
 - **Don't** show the `>>>` prompt anywhere but the wordmark.
+- **Don't** hide table columns on small screens (`hidden md:table-cell`) or truncate data a person needs; scroll, wrap, or move it into a sheet or popover.
+- **Don't** open an editor inline at the top of a list page; use `EditorSheet` (or a Dialog for a short form).
+- **Don't** let a page scroll sideways; a grid whose items hold long unbreakable text uses `grid-cols-[minmax(0,1fr)]`.

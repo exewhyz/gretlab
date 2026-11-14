@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { WEEKDAYS } from "@workspace/judge"
 import { useEffect, useState } from "react"
 
+import { ScrollX } from "@workspace/ui/components/scroll-x"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
@@ -168,8 +169,9 @@ export function WeekGrid({
   if (narrow && !edit && days.length > 0)
     return <DayList days={days} periods={periods} cells={cells} show={show} />
   return (
-    <div
-      className="overflow-x-auto rounded-lg border border-hairline bg-card"
+    <ScrollX
+      pinFirst
+      className="overflow-hidden rounded-lg border border-hairline bg-card"
       data-testid="week-grid"
     >
       <table className="w-full min-w-[640px] text-left text-body-sm text-ink">
@@ -259,7 +261,7 @@ export function WeekGrid({
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollX>
   )
 }
 

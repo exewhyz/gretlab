@@ -49,7 +49,8 @@ export function Loans({
     onSuccess: onChange,
   })
   return (
-    <div className="grid gap-3">
+    // One column that may shrink to the screen: a long line wraps instead of widening the page.
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
       <div className="flex flex-wrap items-end gap-2">
         <SelectInput
           aria-label="Show"
@@ -91,8 +92,10 @@ export function Loans({
               className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-body-sm"
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium text-ink">{l.title}</div>
-                <div className="truncate text-xs text-body">
+                <div className="font-medium [overflow-wrap:anywhere] text-ink">
+                  {l.title}
+                </div>
+                <div className="text-xs [overflow-wrap:anywhere] text-body">
                   {l.name} · {l.email}
                 </div>
               </div>

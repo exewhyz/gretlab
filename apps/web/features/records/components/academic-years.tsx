@@ -124,7 +124,7 @@ export function AcademicYears({ slug }: { slug: string }) {
               <TableRow>
                 <TableHead>Year</TableHead>
                 <TableHead>Starts</TableHead>
-                <TableHead className="hidden sm:table-cell">Ends</TableHead>
+                <TableHead>Ends</TableHead>
                 <TableHead className="text-right">Students</TableHead>
                 {can && (
                   <TableHead className="w-10">
@@ -141,9 +141,7 @@ export function AcademicYears({ slug }: { slug: string }) {
                     {y.isCurrent && <Badge className="ml-1">Current</Badge>}
                   </TableCell>
                   <TableCell>{longDate(y.startsOn)}</TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    {longDate(y.endsOn)}
-                  </TableCell>
+                  <TableCell>{longDate(y.endsOn)}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {y.enrolled}
                   </TableCell>
