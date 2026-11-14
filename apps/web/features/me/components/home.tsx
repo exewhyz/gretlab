@@ -7,7 +7,7 @@ import {
   LightningIcon,
   TrophyIcon,
 } from "@phosphor-icons/react"
-import { useQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { ORG_TYPE_CONFIG, type OrgType } from "@workspace/judge"
 import Link from "next/link"
 
@@ -31,6 +31,9 @@ import { Progress } from "@workspace/ui/components/progress"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { useContentScope } from "@/features/account/scope"
+import { ScopeNote } from "@/features/account/scope-switcher"
+import { SourceTag } from "@/features/account/source-tag"
 import { Figure, Figures } from "@/components/figures"
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
@@ -120,9 +123,16 @@ function Heatmap({ days }: { days: { day: string; count: number }[] }) {
 
 /** /home: a signed-in person's day across their schools, work, contests and practice. */
 export function MemberHome() {
+  // Work, contests and organizations follow the header's switcher.
+  const { scope } = useContentScope()
+  const param = scope?.join(",") ?? ""
   const { data, error } = useQuery({
-    queryKey: ["me", "dashboard"],
-    queryFn: () => api<Dashboard>("/me/dashboard"),
+    queryKey: ["me", "dashboard", param],
+    queryFn: () =>
+      api<Dashboard>(
+        `/me/dashboard${param ? `?scope=${encodeURIComponent(param)}` : ""}`
+      ),
+    placeholderData: keepPreviousData,
   })
   if (error)
     return (
@@ -291,6 +301,8 @@ export function MemberHome() {
           )}
         </div>
       </div>
+      {/* Narrowed by the header's switcher: say so, with the way back to everything. */}
+      <ScopeNote hidden={0} />
 
       {!nothingYet && orgsSection}
 
@@ -425,11 +437,9 @@ export function MemberHome() {
                                       : `${Math.round(pct)}%`}
                                   </span>
                                 </div>
-                                {a.org && (
-                                  <span className="text-caption text-muted-foreground">
-                                    {a.org}
-                                  </span>
-                                )}
+                                <span>
+                                  <SourceTag name={a.org} />
+                                </span>
                               </Link>
                             </li>
                           )
@@ -471,8 +481,8 @@ export function MemberHome() {
                             {c.phase === "live"
                               ? "On now"
                               : `Starts ${when(c.startsAt)}`}
-                            {c.org && ` · ${c.org}`}
                           </span>
+                          <SourceTag name={c.org} className="mt-1" />
                         </span>
                         {c.phase === "live" ? (
                           <Badge>Live</Badge>

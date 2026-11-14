@@ -1,10 +1,12 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
 
+import { useContentScope } from "@/features/account/scope"
+import { ScopeNote } from "@/features/account/scope-switcher"
 import { useViewer } from "@/features/account/use-viewer"
 import { Card, Loading, Stats, Table } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
@@ -160,62 +162,83 @@ export function ProfileView({ handle }: { handle: string }) {
   )
 }
 
+/**
+ * The leaderboard for the header's organization switcher: everything, the chosen
+ * organizations' members who share their practice with them. Rows never name anyone's
+ * organization.
+ */
 export function GlobalLeaderboard() {
   const { data: viewer } = useViewer()
-  const { data, error } = useQuery({
-    queryKey: ["leaderboard", "global"],
-    queryFn: () => api<ApiResult<typeof getLeaderboard>>("/leaderboard"),
+  const { scope } = useContentScope()
+  const param = scope?.join(",") ?? ""
+  const { data, error, isPlaceholderData } = useQuery({
+    queryKey: ["leaderboard", "global", param],
+    queryFn: () =>
+      api<ApiResult<typeof getLeaderboard>>(
+        `/leaderboard${param ? `?scope=${encodeURIComponent(param)}` : ""}`
+      ),
+    placeholderData: keepPreviousData,
   })
   if (!data) return <Loading error={error} />
+  const rows = data.rows
   const me = viewer?.user?.handle
-  const mine = data.find((r) => r.handle === me)
+  const mine = rows.find((r) => r.handle === me)
   return (
     <>
       <h1 className="mb-1 text-display-lg text-ink">Leaderboard</h1>
       <p className="mb-4 text-caption text-body">
-        Students ranked by problems solved. Updates every minute.
+        {data.scope
+          ? "Members who share their practice with the organizations chosen in the header, ranked by problems solved, those organizations' own problems included."
+          : "Students ranked by problems solved."}{" "}
+        Updates every minute.
       </p>
-      {data.length > 0 && (
+      <ScopeNote hidden={0} />
+      {rows.length > 0 && (
         <Stats
           items={[
-            { label: "On the board", value: data.length },
+            { label: "On the board", value: rows.length },
             {
               label: "Your rank",
               value: mine ? `#${mine.rank}` : "—",
               hint: mine ? `${mine.solved} solved` : "Solve a problem to join",
             },
-            { label: "Most solved", value: data[0]!.solved },
+            { label: "Most solved", value: rows[0]!.solved },
           ]}
         />
       )}
-      {data.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="text-body-sm text-body">
-          Nobody has solved a problem yet.
+          {data.scope
+            ? "Nobody here is on the board yet. It lists members who chose to share their practice with their organization, from its page."
+            : "Nobody has solved a problem yet."}
         </p>
       ) : (
-        <Table headers={["#", "Student", "Solved"]}>
-          {data.map((row) => (
-            <tr
-              key={row.handle}
-              aria-current={row.handle === me ? "true" : undefined}
-              className={cn(row.handle === me && "bg-primary/10 font-medium")}
-            >
-              <td className="w-12 tabular-nums">{row.rank}</td>
-              <td>
-                <Link href={`/u/${row.handle}`} className="hover:underline">
-                  {row.name}
-                </Link>{" "}
-                <span className="text-xs text-body">@{row.handle}</span>
-                {row.handle === me && (
-                  <span className="ml-2 rounded-full bg-primary px-1.5 py-px text-xs text-primary-foreground">
-                    You
-                  </span>
-                )}
-              </td>
-              <td className="tabular-nums">{row.solved}</td>
-            </tr>
-          ))}
-        </Table>
+        <div className={cn(isPlaceholderData && "opacity-60")}>
+          <Table headers={["#", "Student", "Solved"]}>
+            {rows.map((row) => (
+              <tr
+                key={row.handle}
+                data-testid="leaderboard-row"
+                aria-current={row.handle === me ? "true" : undefined}
+                className={cn(row.handle === me && "bg-primary/10 font-medium")}
+              >
+                <td className="w-12 tabular-nums">{row.rank}</td>
+                <td>
+                  <Link href={`/u/${row.handle}`} className="hover:underline">
+                    {row.name}
+                  </Link>{" "}
+                  <span className="text-xs text-body">@{row.handle}</span>
+                  {row.handle === me && (
+                    <span className="ml-2 rounded-full bg-primary px-1.5 py-px text-xs text-primary-foreground">
+                      You
+                    </span>
+                  )}
+                </td>
+                <td className="tabular-nums">{row.solved}</td>
+              </tr>
+            ))}
+          </Table>
+        </div>
       )}
     </>
   )

@@ -6,6 +6,7 @@ import { listContests } from "@/features/contests/server"
 import { myOrganizations } from "@/features/orgs/server"
 import { myChildren } from "@/features/parents/server"
 import { getSettings } from "@/features/settings/server"
+import { readServerScope } from "@/features/account/scope-server"
 
 /*
  * A signed-in person's home across everything they belong to: their schools and classes
@@ -17,7 +18,11 @@ import { getSettings } from "@/features/settings/server"
 const DAY_MS = 86_400_000
 const quiet = <T>(p: Promise<T>, fallback: T) => p.catch(() => fallback)
 
-export async function memberDashboard(user: User) {
+/**
+ * `scopeParam` is the header's organization switcher: work, contests and the
+ * organizations shown narrow to it (practice is the person's own and always shows).
+ */
+export async function memberDashboard(user: User, scopeParam?: string | null) {
   const settings = await getSettings()
   const practice = settings["practice.enabled"]
   const [day, orgs, children, work, contests, profile, daily] =
@@ -36,8 +41,13 @@ export async function memberDashboard(user: User) {
         ? quiet(getDaily(user), null)
         : Promise.resolve(null),
     ])
+  const scope = readServerScope(
+    scopeParam,
+    orgs.filter((o) => o.status === "active").map((o) => o.slug)
+  )
   const now = Date.now()
   const open = work
+    .filter((a) => scope.includes(a.org?.slug))
     .filter(
       (a) =>
         a.published &&
@@ -46,6 +56,7 @@ export async function memberDashboard(user: User) {
     )
     .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
   const coming = contests
+    .filter((c) => scope.includes(c.org?.slug))
     .filter(
       (c) =>
         c.phase === "live" ||
@@ -71,8 +82,13 @@ export async function memberDashboard(user: User) {
       contests: settings["contests.enabled"],
       profiles: settings["profiles.enabled"],
     },
+    /** What the switcher narrowed to (null: everything). */
+    scope: scope.everything
+      ? null
+      : [...(scope.personal ? ["personal"] : []), ...scope.slugs],
     orgs: orgs
       .filter((o) => o.status === "active")
+      .filter((o) => scope.everything || scope.slugs.includes(o.slug))
       .map((o) => ({
         slug: o.slug,
         name: o.name,
@@ -92,6 +108,7 @@ export async function memberDashboard(user: User) {
       ).length,
       overdue: work.filter(
         (a) =>
+          scope.includes(a.org?.slug) &&
           a.published &&
           a.phase === "late" &&
           !(a.total > 0 && a.earned >= a.total)

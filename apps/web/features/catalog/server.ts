@@ -1,5 +1,6 @@
 import {
   organizations,
+  orgMembers,
   contestParticipants,
   contests,
   dailyChallenges,
@@ -37,7 +38,7 @@ import { marksItself } from "@/features/questions/schemas"
 import { usableQuestions } from "@/features/questions/server"
 import { getSettings, requireFeature } from "@/features/settings/server"
 
-const { and, asc, count, desc, eq, gte, inArray, isNull, sql: raw } = sql
+const { and, asc, count, desc, eq, gte, inArray, isNull, or, sql: raw } = sql
 
 /* ---------- the problem library ---------- */
 
@@ -587,10 +588,68 @@ export async function getProfile(handleOrId: string) {
   }
 }
 
-export async function getLeaderboard() {
+/**
+ * The leaderboard for the header's organization switcher (`scope`: "personal" and
+ * organization slugs, comma-separated; empty is everything). Only the viewer's own active
+ * organizations count; anything else in `scope` is ignored, and if nothing is left it's
+ * everything.
+ *
+ * - Everything, or anything with Personal in it: every student on the platform, ranked by
+ *   public library problems solved (as before). Personal doesn't mean "people in no
+ *   organization": listing those would reveal who belongs nowhere.
+ * - Organizations only: their active members who chose to share their practice with the
+ *   organization (`share_progress`, off by default, as in Reports), counting public
+ *   problems and those organizations' members-only problems.
+ *
+ * The ranking is cached a minute per scope. Rows carry no organization names: the board
+ * never says who belongs where.
+ */
+export async function getLeaderboard(viewer: User, scopeParam?: string | null) {
   await requireFeature("profiles.enabled")
-  return cached("global-leaderboard", 60_000, async () => {
-    const rows = await getDb()
+  const db = getDb()
+  const mine = await db
+    .select({
+      id: organizations.id,
+      slug: organizations.slug,
+      name: organizations.name,
+    })
+    .from(orgMembers)
+    .innerJoin(organizations, eq(orgMembers.orgId, organizations.id))
+    .where(
+      and(
+        eq(orgMembers.userId, viewer.id),
+        eq(orgMembers.status, "active"),
+        eq(organizations.active, true)
+      )
+    )
+  const asked = (scopeParam ?? "").split(",").filter(Boolean)
+  const personal = asked.includes("personal")
+  const chosen = mine.filter((o) => asked.includes(o.slug))
+  const everything = !personal && chosen.length === 0
+  const orgIds = chosen.map((o) => o.id).sort()
+
+  // People who share their practice with one of the chosen organizations.
+  const sharingWith = (ids: string[]) =>
+    raw`exists (select 1 from ${orgMembers} where ${orgMembers.userId} = ${users.id} and ${orgMembers.status} = 'active' and ${orgMembers.shareProgress} = true and ${inArray(orgMembers.orgId, ids)})`
+  const who = everything || personal ? undefined : sharingWith(orgIds)
+  // Organizations' own members-only problems count on their boards.
+  const which = orgIds.length
+    ? or(
+        isPublicProblem,
+        and(
+          eq(problems.published, true),
+          eq(problems.membersOnly, true),
+          inArray(problems.orgId, orgIds)
+        )
+      )
+    : isPublicProblem
+
+  const key =
+    everything || (personal && !orgIds.length)
+      ? "global-leaderboard"
+      : `leaderboard:${personal ? "everyone," : ""}${orgIds.join(",")}`
+  const ranked = await cached(key, 60_000, async () => {
+    const rows = await db
       .select({
         handle: users.handle,
         id: users.id,
@@ -605,9 +664,10 @@ export async function getLeaderboard() {
         and(
           eq(submissions.kind, "submit"),
           eq(submissions.verdict, "AC"),
-          isPublicProblem,
+          which,
           eq(users.disabled, false),
-          eq(users.role, "student")
+          eq(users.role, "student"),
+          who
         )
       )
       .groupBy(users.id)
@@ -624,12 +684,21 @@ export async function getLeaderboard() {
       previous = solved
       return {
         rank,
+        id: row.id,
         handle: row.handle ?? row.id,
         name: row.name ?? row.handle ?? "Student",
         solved,
       }
     })
   })
+
+  // No organization names about people: who belongs where isn't shown on the board.
+  return {
+    scope: everything
+      ? null
+      : [...(personal ? ["personal"] : []), ...chosen.map((o) => o.slug)],
+    rows: ranked.map(({ id: _id, ...row }) => row),
+  }
 }
 
 /* ---------- notes ---------- */

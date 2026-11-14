@@ -199,7 +199,7 @@ check("profile: heatmap has activity", Object.values(profile.heatmap).reduce((s,
 check("profiles need sign-in", (await anon("/users/feat-a")).status === 401)
 check("unknown profile 404", (await a("/users/nobody-here")).status === 404)
 await new Promise((r) => setTimeout(r, 200))
-const board = (await b("/leaderboard")).json
+const board = (await b("/leaderboard")).json?.rows ?? []
 check("leaderboard lists solvers by count", board.some((r) => r.handle === "feat-a" && r.solved >= 2), JSON.stringify(board.slice(0, 3)))
 check("leaderboard shows no emails", !JSON.stringify(board).includes("@"))
 
