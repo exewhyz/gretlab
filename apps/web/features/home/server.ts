@@ -57,6 +57,7 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 import { classTimetable, periodsOf, slotsOf } from "@/features/timetable/server"
+import { orgPages } from "@/lib/paths"
 
 /*
  * The school's home (/orgs/:slug): one page per organization whose content depends on who
@@ -713,7 +714,7 @@ async function adminHome(ctx: OrgContext) {
             tone: "plain",
             text: `${leaveWaiting} leave request${leaveWaiting === 1 ? "" : "s"} to decide`,
             action: "Decide",
-            href: `/orgs/${ctx.org.slug}/leave`,
+            href: orgPages(ctx.org.slug).leave,
           },
         ]
       : []),
@@ -944,7 +945,7 @@ async function teacherHome(ctx: OrgContext, user: User) {
               tone: "plain",
               text: `${leaveWaiting} leave request${leaveWaiting === 1 ? "" : "s"} to decide`,
               action: "Decide",
-              href: `/orgs/${ctx.org.slug}/leave`,
+              href: orgPages(ctx.org.slug).leave,
             },
           ]
         : []),
@@ -1090,7 +1091,7 @@ async function studentHome(ctx: OrgContext, user: User) {
       title: l.title,
       detail: l.status === "overdue" ? "Overdue" : "Due back",
       at: `${l.dueOn}T12:00:00.000Z`,
-      href: `/orgs/${slug}/books`,
+      href: orgPages(slug).books,
       action: "View",
     })),
   ].sort((a, b) => a.at.localeCompare(b.at))

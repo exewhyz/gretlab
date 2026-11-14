@@ -21,6 +21,7 @@ import {
 } from "@workspace/judge"
 
 import { orgReach } from "@/features/platform/access"
+import { orgPages } from "@/lib/paths"
 
 const { and, eq, inArray } = sql
 
@@ -207,6 +208,6 @@ export async function classLinks(
       .where(eq(organizations.id, content.orgId)),
   ])
   return rows
-    .map((g) => ({ name: g.name, href: `/orgs/${org!.slug}/classes/${g.id}` }))
+    .map((g) => ({ name: g.name, href: orgPages(org!.slug).cls(g.id) }))
     .sort((a, b) => a.name.localeCompare(b.name))
 }

@@ -25,6 +25,7 @@ import {
   type Scope,
   type ScopeOrg,
 } from "@/features/account/scope"
+import { orgPages } from "@/lib/paths"
 
 /** "Everything", "Personal", "GLA University", or "GLA University +2". */
 export function scopeLabel(scope: Scope, orgs: readonly ScopeOrg[]) {
@@ -152,7 +153,7 @@ export function ScopeSwitcher() {
               checked={ticked.has(o.slug)}
               onCheckedChange={(on) => toggle(o.slug, on)}
               onOnly={() => only(o.slug)}
-              href={`/orgs/${o.slug}`}
+              href={orgPages(o.slug).home}
               onOpen={() => setOpen(false)}
             />
           ))}

@@ -51,6 +51,7 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/errors"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Exams and report cards (a module). An exam belongs to an academic year; its papers are
@@ -1536,7 +1537,7 @@ export async function setPublished(
     kind: "results",
     title: `${exam.name} results are out`,
     body: `Your report card for ${exam.name} is ready.`,
-    href: `/orgs/${ctx.org.slug}/results/me`,
+    href: orgPages(ctx.org.slug).results("me"),
     orgId: ctx.org.id,
   })
   return { published: true, told: told.inApp }

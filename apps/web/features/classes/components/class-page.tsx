@@ -41,6 +41,7 @@ import {
 } from "@/features/teaching/components/teaching"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import { orgPages } from "@/lib/paths"
 
 /*
  * A class: one group someone teaches, with everything about it in tabs. Teachers see
@@ -214,7 +215,7 @@ export function ClassPage({
           aria-label="Where this class is"
           className="flex flex-wrap items-center gap-1 text-caption text-body"
         >
-          <Link href={`/orgs/${slug}`} className="hover:text-ink">
+          <Link href={orgPages(slug).home} className="hover:text-ink">
             {data.org.name}
           </Link>
           {data.group.path.slice(0, -1).map((p) => (
@@ -241,7 +242,7 @@ export function ClassPage({
             <div className="flex flex-wrap gap-2">
               {data.can.assignments && (
                 <Link
-                  href={`/orgs/${slug}/manage/assignments/new?for=${groupId}`}
+                  href={orgPages(slug).manage(`/assignments/new?for=${groupId}`)}
                   className={buttonVariants({ size: "sm" })}
                 >
                   New assignment
@@ -249,7 +250,7 @@ export function ClassPage({
               )}
               {data.can.contests && (
                 <Link
-                  href={`/orgs/${slug}/manage/contests/new?for=${groupId}`}
+                  href={orgPages(slug).manage(`/contests/new?for=${groupId}`)}
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   New contest
@@ -267,7 +268,7 @@ export function ClassPage({
             {data.children.map((c) => (
               <Link
                 key={c.id}
-                href={`/orgs/${slug}/classes/${c.id}`}
+                href={orgPages(slug).cls(c.id)}
                 className={cn(
                   buttonVariants({ variant: "outline", size: "xs" }),
                   "font-normal"
@@ -765,7 +766,7 @@ function TeacherPeople({
         groups={data.groups}
         levels={data.levels}
         onClose={() => {}}
-        onOpen={(id) => router.push(`/orgs/${slug}/classes/${id}?tab=people`)}
+        onOpen={(id) => router.push(orgPages(slug).cls(id, "people"))}
       />
     </div>
   )
@@ -880,7 +881,7 @@ function ClassGrades({ slug, groupId }: { slug: string; groupId: string }) {
             {data.assignments.map((a) => (
               <th key={a.id} className="px-3 py-2 text-end font-medium">
                 <Link
-                  href={`/orgs/${slug}/manage/assignments/${a.id}/grades`}
+                  href={orgPages(slug).manage(`/assignments/${a.id}/grades`)}
                   className="hover:text-ink hover:underline"
                 >
                   {a.title}

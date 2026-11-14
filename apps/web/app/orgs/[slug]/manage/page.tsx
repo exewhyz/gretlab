@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { orgPages } from "@/lib/paths"
 
 // The organization's home is its dashboard; there's no second overview to keep in step.
 export default async function Page({
@@ -7,5 +8,5 @@ export default async function Page({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  redirect(`/orgs/${slug}`)
+  redirect(orgPages(slug).home)
 }

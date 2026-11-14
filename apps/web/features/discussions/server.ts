@@ -5,6 +5,7 @@ import type { ClassContext } from "@/features/classes/server"
 import { notify } from "@/features/notifications/server"
 import { writeAudit } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/route"
+import { orgPages } from "@/lib/paths"
 
 /*
  * A class's discussion board. Everyone in the class (students sitting in it or a group
@@ -238,7 +239,7 @@ export async function postReply(
       kind: "discussion_reply",
       title: `New reply to "${t.title}"`,
       body: input.body.slice(0, 140),
-      href: `/orgs/${slug}/classes/${groupId}?tab=discussion&thread=${t.id}`,
+      href: orgPages(slug).cls(groupId, "discussion", { thread: t.id }),
       orgId: cc.ctx.org.id,
     })
   }

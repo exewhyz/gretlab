@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { orgPages } from "@/lib/paths"
 
 export const metadata: Metadata = { title: "Course not linked yet", robots: { index: false } }
 
@@ -19,7 +20,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
           Assignments
         </Link>
         {org && (
-          <Link href={`/orgs/${org}`} className="underline underline-offset-2">
+          <Link href={orgPages(org).home} className="underline underline-offset-2">
             Your college
           </Link>
         )}

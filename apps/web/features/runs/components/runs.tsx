@@ -13,6 +13,7 @@ import { Field, FormMessage, SelectInput } from "@/components/form"
 import { Card, Loading, PageTitle, Table } from "@/features/admin/components/shell"
 import { runLabel, runPercent, runStatus } from "@/features/runs/format"
 import { api } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Progress: a program's runs (cohorts, batches with dates) and, for one, each learner's
@@ -96,7 +97,7 @@ export function RunsList({ slug }: { slug: string }) {
               <>
                 {" "}
                 Give one its dates under{" "}
-                <Link className="text-primary underline" href={`/orgs/${slug}/manage/groups`}>
+                <Link className="text-primary underline" href={orgPages(slug).manage(`/groups`)}>
                   {data.terms.groups}
                 </Link>
                 .
@@ -111,7 +112,7 @@ export function RunsList({ slug }: { slug: string }) {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <Link
-                    href={`/orgs/${slug}/manage/progress/${r.id}`}
+                    href={orgPages(slug).manage(`/progress/${r.id}`)}
                     className="text-title-sm font-semibold text-ink hover:underline"
                   >
                     {r.name}
@@ -149,7 +150,7 @@ export function RunsList({ slug }: { slug: string }) {
                 </ul>
               )}
               <Link
-                href={`/orgs/${slug}/manage/progress/${r.id}`}
+                href={orgPages(slug).manage(`/progress/${r.id}`)}
                 className="text-body-sm font-medium text-primary hover:underline"
               >
                 See progress

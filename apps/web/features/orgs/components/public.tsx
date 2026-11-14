@@ -19,6 +19,7 @@ import { ApplyButton } from "@/features/admissions/components/admissions"
 import { SignupLink } from "@/features/orgs/components/signup"
 import { api } from "@/lib/api/client"
 import { formatDate, formatDateTime } from "@/lib/format"
+import { orgPages } from "@/lib/paths"
 
 export type { OrgType } from "@workspace/judge"
 
@@ -123,7 +124,7 @@ export function MyOrganizations() {
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Link
-                  href={`/orgs/${org.slug}`}
+                  href={orgPages(org.slug).home}
                   className="text-title-md text-ink hover:underline"
                 >
                   {org.name}
@@ -144,7 +145,7 @@ export function MyOrganizations() {
               )}
               {org.canManage && (
                 <Link
-                  href={`/orgs/${org.slug}`}
+                  href={orgPages(org.slug).home}
                   className={cn(
                     buttonVariants({ variant: "outline", size: "sm" }),
                     "justify-self-start"
@@ -197,7 +198,7 @@ export function MyOrganizations() {
           {directory.data?.map((org) => (
             <Link
               key={org.slug}
-              href={`/orgs/${org.slug}`}
+              href={orgPages(org.slug).home}
               className="grid gap-1.5 rounded-lg border border-hairline bg-card p-4 hover:border-hairline-strong"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -367,7 +368,7 @@ export function OrgProfileView({ slug }: { slug: string }) {
             <div className="flex flex-wrap gap-2">
               {data.canManage && (
                 <Link
-                  href={`/orgs/${slug}`}
+                  href={orgPages(slug).home}
                   className={cn(buttonVariants({ size: "sm" }))}
                 >
                   Manage
@@ -527,7 +528,7 @@ function OrgFeed({ slug }: { slug: string }) {
             {practice.data.summaries.map((p) => (
               <Link
                 key={p.id}
-                href={`/orgs/${slug}/practice/${p.id}`}
+                href={orgPages(slug).practice(p.id)}
                 data-testid="org-problem"
                 className="flex items-center justify-between gap-2 rounded-lg border border-hairline bg-card px-3 py-2 hover:border-hairline-strong"
               >
@@ -590,7 +591,7 @@ export function JoinInvite({ token }: { token: string }) {
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["me", "orgs"] })
       void queryClient.invalidateQueries({ queryKey: ["org", result.slug] })
-      router.push(`/orgs/${result.slug}`)
+      router.push(orgPages(result.slug).home)
     },
   })
   if (!data) return <Loading error={error} />

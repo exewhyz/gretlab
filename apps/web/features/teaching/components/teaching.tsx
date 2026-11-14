@@ -24,6 +24,7 @@ import { useContentScope } from "@/features/account/scope"
 import { ScopeNote } from "@/features/account/scope-switcher"
 import { api } from "@/lib/api/client"
 import { formatDate, formatDateTime } from "@/lib/format"
+import { orgPages } from "@/lib/paths"
 
 interface Progress {
   total: number
@@ -139,7 +140,7 @@ export function TeacherHome() {
             {dueSoon.slice(0, 6).map((a) => (
               <Link
                 key={a.id}
-                href={`/orgs/${a.org.slug}/manage/assignments/${a.id}/grades`}
+                href={orgPages(a.org.slug).manage(`/assignments/${a.id}/grades`)}
                 className="flex items-baseline justify-between gap-3 text-body-sm hover:underline"
               >
                 <span className="truncate text-ink">{a.title}</span>
@@ -157,7 +158,7 @@ export function TeacherHome() {
             {behind.slice(0, 6).map((g) => (
               <Link
                 key={g.id}
-                href={`/orgs/${g.org.slug}/classes/${g.id}?tab=classes`}
+                href={orgPages(g.org.slug).cls(g.id, "classes")}
                 className="flex items-baseline justify-between gap-3 text-body-sm hover:underline"
               >
                 <span className="truncate text-ink">{g.path}</span>
@@ -191,7 +192,7 @@ export function TeacherHome() {
               <div className="flex flex-wrap gap-1">
                 {manages(org.slug) && (
                   <Link
-                    href={`/orgs/${org.slug}`}
+                    href={orgPages(org.slug).home}
                     className={buttonVariants({
                       variant: "outline",
                       size: "sm",
@@ -293,7 +294,7 @@ function ClassTree({
             <span aria-hidden className="w-6" />
           )}
           <Link
-            href={`/orgs/${slug}/classes/${g.id}`}
+            href={orgPages(slug).cls(g.id)}
             className="min-w-32 text-body-sm text-ink hover:underline"
           >
             {q ? g.path : g.name}
@@ -309,7 +310,7 @@ function ClassTree({
           <span className="flex-1" />
           <ProgressBar progress={g.progress} />
           <Link
-            href={`/orgs/${slug}/classes/${g.id}?tab=classes`}
+            href={orgPages(slug).cls(g.id, "classes")}
             className="w-28 text-end text-xs text-body hover:underline"
           >
             {g.classesThisWeek} {g.classesThisWeek === 1 ? "class" : "classes"}{" "}

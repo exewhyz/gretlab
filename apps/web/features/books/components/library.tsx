@@ -31,6 +31,7 @@ import {
 } from "@/components/form"
 import { Card, Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 interface Book {
   id: string
@@ -881,7 +882,7 @@ export function MemberLibrary({ slug }: { slug: string }) {
     <div className="grid gap-5">
       <header>
         <Link
-          href={`/orgs/${slug}`}
+          href={orgPages(slug).home}
           className="text-caption text-body hover:text-ink"
         >
           ‹ {mine.data.org.name}

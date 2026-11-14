@@ -49,6 +49,7 @@ import {
 } from "@/components/form"
 import { Loading, PageTitle } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 type Status =
   | "submitted"
@@ -421,7 +422,7 @@ export function Admissions({ slug }: { slug: string }) {
               {data.applications.map((a) => (
                 <TableRow key={a.id} data-testid="application-row">
                   <TableCell>
-                    <Link href={`/orgs/${slug}/manage/admissions/${a.id}`} className="font-medium hover:underline">
+                    <Link href={orgPages(slug).manage(`/admissions/${a.id}`)} className="font-medium hover:underline">
                       {a.studentName}
                     </Link>
                     <div className="text-caption text-muted-foreground">{a.number}</div>
@@ -507,7 +508,7 @@ function SettingsDialog({ slug, onDone }: { slug: string; onDone: () => void }) 
             {data.years.length === 0 && (
               <p className="text-caption text-destructive">
                 Add an academic year first, in{" "}
-                <Link className="underline" href={`/orgs/${slug}/manage/academic-years`}>
+                <Link className="underline" href={orgPages(slug).manage(`/academic-years`)}>
                   Academic years
                 </Link>
                 .
@@ -608,7 +609,7 @@ export function ApplicationPage({ slug, id }: { slug: string; id: string }) {
   return (
     <>
       <div className="mb-1 text-body-sm text-muted-foreground">
-        <Link href={`/orgs/${slug}/manage/admissions`} className="hover:underline">
+        <Link href={orgPages(slug).manage(`/admissions`)} className="hover:underline">
           Admissions
         </Link>{" "}
         · {data.number}
@@ -649,7 +650,7 @@ export function ApplicationPage({ slug, id }: { slug: string; id: string }) {
       )}
       {data.student && (
         <p className="mb-3 text-body-sm">
-          <Link className="font-medium text-primary hover:underline" href={`/orgs/${slug}/manage/students/${data.student.id}`}>
+          <Link className="font-medium text-primary hover:underline" href={orgPages(slug).manage(`/students/${data.student.id}`)}>
             Open the student&apos;s record ›
           </Link>
         </p>
@@ -821,7 +822,7 @@ function AdmitDialog({
 /** The Apply button on a school's public page. */
 export function ApplyButton({ slug }: { slug: string }) {
   return (
-    <Link href={`/orgs/${slug}/apply`} className={buttonVariants()} data-testid="apply-button">
+    <Link href={orgPages(slug).apply} className={buttonVariants()} data-testid="apply-button">
       Apply for admission
     </Link>
   )

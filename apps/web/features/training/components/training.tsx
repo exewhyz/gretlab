@@ -23,6 +23,7 @@ import { Card, Loading, PageTitle, Table } from "@/features/admin/components/she
 import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { api } from "@/lib/api/client"
 import { formatDay } from "@/lib/format"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Training (the "training" module): courses assigned to departments and teams with due
@@ -195,7 +196,7 @@ export function TrainingList({ slug }: { slug: string }) {
                 <td>
                   <Link
                     className="font-medium text-ink hover:underline"
-                    href={`/orgs/${slug}/manage/training/${t.groupId}/${t.courseId}`}
+                    href={orgPages(slug).manage(`/training/${t.groupId}/${t.courseId}`)}
                   >
                     {t.course}
                   </Link>
@@ -250,7 +251,7 @@ function AssignDialog({
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ["org", slug, "training"] })
       onClose()
-      if (!initial) router.push(`/orgs/${slug}/manage/training/${groupId}/${courseId}`)
+      if (!initial) router.push(orgPages(slug).manage(`/training/${groupId}/${courseId}`))
     },
   })
   return (
@@ -354,7 +355,7 @@ export function TrainingDetail({ slug, groupId, courseId }: { slug: string; grou
     mutationFn: () => api(base, { method: "DELETE" }),
     onSuccess: () => {
       refresh()
-      router.push(`/orgs/${slug}/manage/training`)
+      router.push(orgPages(slug).manage(`/training`))
     },
   })
   if (!data) return <Loading error={error} />

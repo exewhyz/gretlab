@@ -10,6 +10,7 @@ import { ScopeNote } from "@/features/account/scope-switcher"
 import { Loading } from "@/features/admin/components/shell"
 import { CampusSummary, type CampusData } from "@/features/campus/components/campus"
 import { api } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 interface MyOrgClasses {
   slug: string
@@ -60,7 +61,7 @@ export function MyClasses() {
           data-testid="my-org-classes"
         >
           <h2 className="text-title-md text-ink">
-            <Link href={`/orgs/${org.slug}`} className="hover:underline">
+            <Link href={orgPages(org.slug).home} className="hover:underline">
               {org.name}
             </Link>
           </h2>
@@ -68,7 +69,7 @@ export function MyClasses() {
             {org.classes.map((c) => (
               <Link
                 key={c.id}
-                href={`/orgs/${org.slug}/classes/${c.id}`}
+                href={orgPages(org.slug).cls(c.id)}
                 data-testid="my-class"
                 className="grid gap-1 rounded-lg border border-hairline bg-card p-4 hover:border-hairline-strong"
               >

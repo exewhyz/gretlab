@@ -21,6 +21,7 @@ import { ConfirmButton } from "@/components/confirm"
 import { Field, FormMessage, SelectInput, TextArea, TextInput } from "@/components/form"
 import { Card, Loading, PageTitle, Table } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Events: the organization's meetups, workshops and talks. Members say they're going (or
@@ -93,7 +94,7 @@ export function MyAnswer({ e }: { e: EventView }) {
 export function EventCard({ slug, e }: { slug: string; e: EventView }) {
   return (
     <Link
-      href={`/orgs/${slug}/events/${e.id}`}
+      href={orgPages(slug).event(e.id)}
       data-testid="event-card"
       className={cn(
         "grid gap-1.5 rounded-xl bg-card p-4 shadow-xs ring-1 ring-foreground/10 transition-colors hover:bg-muted/40",
@@ -319,7 +320,7 @@ export function EventPage({ slug, id }: { slug: string; id: string }) {
   return (
     <div className="grid max-w-3xl gap-4" data-testid="event-page">
       <div>
-        <Link href={`/orgs/${slug}/events`} className="text-body-sm text-primary hover:underline">
+        <Link href={orgPages(slug).events} className="text-body-sm text-primary hover:underline">
           All events
         </Link>
         <h1 className={cn("mt-1 text-display-sm text-ink", data.cancelled && "line-through")}>{data.title}</h1>

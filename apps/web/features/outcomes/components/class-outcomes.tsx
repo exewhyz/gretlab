@@ -11,6 +11,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { FormMessage, SelectInput, TextInput } from "@/components/form"
 import { Loading, Table } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 interface Report {
   canEdit: boolean
@@ -244,7 +245,7 @@ function OutcomeEditor({
         <p className="text-caption">
           Your organization has no program outcomes yet, so there&apos;s nothing to map to.
           They&apos;re set under{" "}
-          <Link href={`/orgs/${slug}/manage/outcomes`} className="underline">
+          <Link href={orgPages(slug).manage(`/outcomes`)} className="underline">
             Manage › Outcomes
           </Link>
           .

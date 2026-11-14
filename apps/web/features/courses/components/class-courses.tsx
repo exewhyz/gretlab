@@ -32,6 +32,7 @@ import {
 import { KIND_LABEL } from "@/features/questions/components/question-editor"
 import { api } from "@/lib/api/client"
 import { formatDate, formatDay } from "@/lib/format"
+import { orgPages } from "@/lib/paths"
 
 /*
  * A class's Course tab. Teachers give it courses (each from a start day) and see how far
@@ -100,7 +101,7 @@ export function ClassCourses({ slug, groupId }: { slug: string; groupId: string 
           <Button size="sm" onClick={() => setAdding(true)}>
             Give a course
           </Button>
-          <Link href={`/orgs/${slug}/manage/courses`} className="text-caption underline-offset-2 hover:underline">
+          <Link href={orgPages(slug).manage(`/courses`)} className="text-caption underline-offset-2 hover:underline">
             Manage courses
           </Link>
         </div>

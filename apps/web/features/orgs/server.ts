@@ -77,6 +77,7 @@ import type {
   orgSettingsSchema,
   roleSchema,
 } from "./schemas"
+import { orgPages } from "@/lib/paths"
 
 const { and, asc, count, desc, eq, ilike, inArray, isNull, or } = sql
 
@@ -594,7 +595,7 @@ export async function setOrganizationActive(
         kind: "school_approved",
         title: `${org.name} is approved`,
         body: "It's ready to use: add your staff, classes and students.",
-        href: `/orgs/${org.slug}`,
+        href: orgPages(org.slug).home,
         orgId: org.id,
       }
     )
@@ -739,7 +740,7 @@ export async function joinOrganization(
       kind: "join_request",
       title: `${user.name ?? user.email} asked to join ${org.name}`,
       body: "Approve or decline them under Manage › Members.",
-      href: `/orgs/${org.slug}/manage/members?status=pending`,
+      href: orgPages(org.slug).manage(`/members?status=pending`),
       orgId: org.id,
     })
   }

@@ -14,6 +14,7 @@ import { z } from "zod"
 import { notify } from "@/features/notifications/server"
 import { canFor, groupChain, needFor, orgContext, writeAudit, type OrgContext } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/route"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Events (the "events" module; communities have it from the start): meetups, workshops
@@ -241,7 +242,7 @@ async function toldOfPlace(ctx: OrgContext, e: OrgEvent, userIds: string[]) {
     kind: "event_place",
     title: `You've got a place: ${e.title}`,
     body: "A place came free and you were next on the waitlist.",
-    href: `/orgs/${ctx.org.slug}/events/${e.id}`,
+    href: orgPages(ctx.org.slug).event(e.id),
     orgId: ctx.org.id,
   })
 }
@@ -254,7 +255,7 @@ async function tell(ctx: OrgContext, id: string, title: string, body: string) {
     .where(and(eq(eventRsvps.eventId, id), inArray(eventRsvps.status, ["going", "waitlist"])))
   await notify(
     people.map((p) => p.userId),
-    { kind: "event_update", title, body, href: `/orgs/${ctx.org.slug}/events/${id}`, orgId: ctx.org.id }
+    { kind: "event_update", title, body, href: orgPages(ctx.org.slug).event(id), orgId: ctx.org.id }
   )
 }
 

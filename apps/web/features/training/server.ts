@@ -21,6 +21,7 @@ import { usableBy } from "@/features/library/sharing"
 import { notify } from "@/features/notifications/server"
 import { canFor, groupChain, orgContext, writeAudit, type OrgContext } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/route"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Assigned training (the "training" module; companies have it from the start): a course
@@ -296,7 +297,7 @@ export async function remindTraining(slug: string, user: User, groupId: string, 
       body: p.needBy
         ? `${p.status === "overdue" || p.status === "expired" ? "It was needed by" : "Needed by"} ${p.needBy}. ${p.progress.done} of ${p.progress.total} done.`
         : `${p.progress.done} of ${p.progress.total} done.`,
-      href: `/orgs/${slug}/classes/${groupId}`,
+      href: orgPages(slug).cls(groupId),
       orgId: ctx.org.id,
     })
   }
@@ -355,7 +356,7 @@ export async function myTraining(ctx: OrgContext, user: User) {
       return {
         courseId: m.courseId,
         course: m.title,
-        href: `/orgs/${ctx.org.slug}/classes/${m.seat}`,
+        href: orgPages(ctx.org.slug).cls(m.seat),
         dueOn: m.dueOn,
         renewMonths: m.renewMonths,
         progress: { done: items.filter((i) => mine.has(i.id)).length, total: items.length },

@@ -52,6 +52,7 @@ import {
 } from "@/features/orgs/server"
 import { notFound } from "@/lib/api/route"
 import { notify } from "@/features/notifications/server"
+import { orgPages } from "@/lib/paths"
 
 /*
  * A class is a group someone teaches, at any level: "CSE", "CSE › 2026-A" or a lab. Its
@@ -518,7 +519,7 @@ export async function postClassNotice(
       kind: "notice",
       title: `New notice in ${nameOf(ctx, groupId)}`,
       body: text.slice(0, 300),
-      href: `/orgs/${slug}/classes/${groupId}`,
+      href: orgPages(slug).cls(groupId),
       orgId: ctx.org.id,
     }
   )

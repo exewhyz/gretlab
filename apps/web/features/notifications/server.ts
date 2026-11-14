@@ -30,6 +30,7 @@ import { modulesOf } from "@/features/orgs/kinds"
 import { mailEnabled } from "./mailer"
 import { drainOutbox, queueEmails } from "./outbox"
 import { policyFor } from "./policy"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Notifications. Events (new work, feedback released, an extension, a class notice) are
@@ -198,7 +199,7 @@ export async function tellParents(
     for (const [studentId, child] of byChild) {
       await notify(child.parentIds, {
         ...message(child.name),
-        href: `/orgs/${org.slug}/children/${studentId}`,
+        href: orgPages(org.slug).child(studentId),
         orgId,
       })
     }
@@ -286,7 +287,7 @@ async function remindersFor(user: User): Promise<Reminder[]> {
       kind: "attendance_low",
       title: `Your attendance in ${r.group} is ${percent}%`,
       body: "Below 75%. Talk to your teacher if something is getting in the way.",
-      href: `/orgs/${r.orgSlug}/classes/${r.groupId}`,
+      href: orgPages(r.orgSlug).cls(r.groupId),
       at: new Date().toISOString(),
     })
   }
@@ -299,7 +300,7 @@ async function remindersFor(user: User): Promise<Reminder[]> {
         ? `"${loan.title}" was due back on ${loan.dueOn}`
         : `"${loan.title}" is due back by ${loan.dueOn}`,
       body: "Return or renew it at the library.",
-      href: `/orgs/${loan.slug}/books`,
+      href: orgPages(loan.slug).books,
       at: `${loan.dueOn}T00:00:00.000Z`,
     })
   }
@@ -313,7 +314,7 @@ async function remindersFor(user: User): Promise<Reminder[]> {
       kind: "event_soon",
       title: `${r.e.title} starts ${inWords(until)}`,
       body: r.e.location || "Online: the link is on the event's page.",
-      href: `/orgs/${r.slug}/events/${r.e.id}`,
+      href: orgPages(r.slug).event(r.e.id),
       at: r.e.startsAt.toISOString(),
     })
   }

@@ -11,6 +11,7 @@ import {
 import { WeekGrid } from "@/features/timetable/components/timetable"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import { orgPages } from "@/lib/paths"
 
 interface Child {
   id: string
@@ -39,7 +40,7 @@ export function MyChildren() {
           {data.map((c) => (
             <li key={`${c.org.slug}/${c.id}`}>
               <Link
-                href={`/orgs/${c.org.slug}/children/${c.id}`}
+                href={orgPages(c.org.slug).child(c.id)}
                 className="block rounded-lg border border-hairline bg-card p-4 hover:border-ink/30"
               >
                 <div className="text-title-sm text-ink">{c.name}</div>
@@ -131,7 +132,7 @@ export function ChildPage({
         </p>
         {data.results && (
           <Link
-            href={`/orgs/${slug}/results/${studentId}`}
+            href={orgPages(slug).results(studentId)}
             className="mt-2 inline-block text-body-sm font-medium text-primary hover:underline"
           >
             Report card ›

@@ -14,6 +14,7 @@ import { groupsFor, needFor, writeAudit } from "@/features/orgs/server"
 import { ApiError } from "@/lib/api/route"
 
 import { classContext, classwork, studentsIn } from "./server"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Early warnings for a class: students who need attention and why (packages/judge
@@ -140,7 +141,7 @@ export async function nudgeStudents(
     kind: "teacher_note",
     title: `A note from ${user.name ?? "your teacher"} (${name})`,
     body: input.message,
-    href: `/orgs/${slug}/classes/${groupId}`,
+    href: orgPages(slug).cls(groupId),
     orgId: cc.ctx.org.id,
   })
   // The note's words stay between them; the log records that one was sent.

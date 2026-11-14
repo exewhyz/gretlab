@@ -26,6 +26,7 @@ import { myOrganizations, orgContext } from "@/features/orgs/server"
 import { myTraining } from "@/features/training/server"
 import { getSettings } from "@/features/settings/server"
 import { notFound } from "@/lib/api/route"
+import { orgPages } from "@/lib/paths"
 
 /*
  * A person's calendar: their assignments' due times (with their own extensions), exam
@@ -162,7 +163,7 @@ export async function eventsFor(user: User): Promise<Event[]> {
       title: r.e.title,
       start: r.e.startsAt.toISOString(),
       end: r.e.endsAt.toISOString(),
-      href: `/orgs/${r.slug}/events/${r.e.id}`,
+      href: orgPages(r.slug).event(r.e.id),
       detail: `${r.status === "waitlist" ? "On the waitlist" : "Going"}${r.e.location ? ` · ${r.e.location}` : r.e.link ? " · Online" : ""}`,
       done: r.e.endsAt < new Date(),
     })

@@ -71,6 +71,7 @@ import { CheckInCard } from "@/features/staff-attendance/components/staff-attend
 import { api } from "@/lib/api/client"
 
 import { useOrgReach, useShell } from "./org-shell"
+import { orgPages } from "@/lib/paths"
 
 type Tone = "bad" | "plain"
 
@@ -1050,7 +1051,7 @@ function TeacherHome({
                       </Link>
                     )}
                     <Link
-                      href={`/orgs/${slug}/classes/${c.id}`}
+                      href={orgPages(slug).cls(c.id)}
                       className={buttonVariants({
                         variant: "outline",
                         size: "sm",
@@ -1102,7 +1103,7 @@ function FindAGroup({ slug }: { slug: string }) {
       </CardHeader>
       <CardContent>
         <Link
-          href={`/orgs/${slug}/groups`}
+          href={orgPages(slug).groups}
           className="text-body-sm font-medium text-primary hover:underline"
         >
           Browse {terms.groups.toLowerCase()}
@@ -1125,7 +1126,7 @@ function UpcomingEvents({
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-title-md font-semibold text-ink">Events</h2>
         <Link
-          href={`/orgs/${slug}/events`}
+          href={orgPages(slug).events}
           className="text-body-sm font-medium text-primary hover:underline"
         >
           All events
@@ -1218,7 +1219,7 @@ function TeamTrainingCard({
         {data.trainings.map((t) => (
           <Link
             key={`${t.groupId}:${t.courseId}`}
-            href={`/orgs/${slug}/manage/training/${t.groupId}/${t.courseId}`}
+            href={orgPages(slug).manage(`/training/${t.groupId}/${t.courseId}`)}
             className="flex flex-wrap justify-between gap-2 text-body-sm hover:underline"
           >
             <span className="text-ink">
@@ -1237,7 +1238,7 @@ function TeamTrainingCard({
           </Link>
         ))}
         <Link
-          href={`/orgs/${slug}/manage/training`}
+          href={orgPages(slug).manage(`/training`)}
           className="text-body-sm font-medium text-primary hover:underline"
         >
           All training
@@ -1302,7 +1303,7 @@ function LeadingRuns({ slug, runs }: { slug: string; runs: Runs }) {
               className="flex flex-wrap items-baseline justify-between gap-2"
             >
               <Link
-                href={`/orgs/${slug}/manage/progress/${g.run.id}`}
+                href={orgPages(slug).manage(`/progress/${g.run.id}`)}
                 className="font-medium text-ink hover:underline"
               >
                 {g.name}
@@ -1430,7 +1431,7 @@ function StudentHome({
               {data.classes[0] && (
                 <CardAction>
                   <Link
-                    href={`/orgs/${slug}/classes/${data.classes[0].id}?tab=timetable`}
+                    href={orgPages(slug).cls(data.classes[0].id, "timetable")}
                     className="inline-flex items-center gap-1 text-body-sm font-medium hover:text-primary-active"
                   >
                     My week <ArrowRightIcon className="size-3.5" />
@@ -1671,7 +1672,7 @@ function ParentHome({ slug, data }: { slug: string; data: ParentData }) {
                 )}
                 <div className="flex flex-wrap gap-2">
                   <Link
-                    href={`/orgs/${slug}/children/${c.id}`}
+                    href={orgPages(slug).child(c.id)}
                     className={buttonVariants({ size: "sm" })}
                   >
                     Open
@@ -1751,7 +1752,7 @@ function StaffHome({
             value: String(data.waiting.leave),
             hint: data.waiting.leave ? "Waiting for you" : "Nothing waiting",
             tone: data.waiting.leave ? ("primary" as const) : undefined,
-            href: `/orgs/${slug}/leave`,
+            href: orgPages(slug).leave,
           },
         ]
       : []),
@@ -1762,7 +1763,7 @@ function StaffHome({
             value: String(data.waiting.applications),
             hint: "Admissions",
             tone: data.waiting.applications ? ("primary" as const) : undefined,
-            href: `/orgs/${slug}/manage/admissions`,
+            href: orgPages(slug).manage(`/admissions`),
           },
         ]
       : []),
@@ -1781,7 +1782,7 @@ function StaffHome({
                 .filter(Boolean)
                 .join(" · ") || "Everyone's in",
             tone: t.unmarked ? ("primary" as const) : undefined,
-            href: `/orgs/${slug}/manage/staff-attendance`,
+            href: orgPages(slug).manage(`/staff-attendance`),
           },
         ]
       : []),

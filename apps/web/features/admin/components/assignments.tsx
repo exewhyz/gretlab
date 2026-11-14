@@ -68,6 +68,7 @@ import { AudiencePicker } from "./audience"
 import { FieldError, ProblemPicker, toLocalInput } from "./contests"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle, Stats, Table } from "./shell"
+import { orgPages } from "@/lib/paths"
 
 interface AssignmentRow {
   id: string
@@ -548,7 +549,7 @@ function AssignmentEditor({
       if (template) {
         if (!id) router.push(owner.page(`/templates/${saved.id}`))
       } else if (!id && forClass && owner.orgSlug)
-        router.push(`/orgs/${owner.orgSlug}/classes/${forClass}?tab=classwork`)
+        router.push(orgPages(owner.orgSlug).cls(forClass, "classwork"))
       else if (!id) router.push(owner.page(`/assignments/${saved.id}`))
     },
     onError: (error) => {

@@ -77,6 +77,7 @@ import {
 import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { parseCsv } from "@/features/orgs/components/manage"
 import { api } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 /* ---------- academic years ---------- */
 
@@ -136,7 +137,7 @@ export function AcademicYears({ slug }: { slug: string }) {
             <div className="flex flex-wrap gap-2">
               {data.years.length > 1 && (
                 <Link
-                  href={`/orgs/${slug}/manage/academic-years/promote`}
+                  href={orgPages(slug).manage(`/academic-years/promote`)}
                   className={buttonVariants({ variant: "outline" })}
                 >
                   Promote students
@@ -560,7 +561,7 @@ export function Students({ slug }: { slug: string }) {
             a current year.{" "}
             {data.can.years && (
               <Link
-                href={`/orgs/${slug}/manage/academic-years`}
+                href={orgPages(slug).manage(`/academic-years`)}
                 className="font-medium underline"
               >
                 Add one
@@ -634,7 +635,7 @@ export function Students({ slug }: { slug: string }) {
                 <TableRow key={s.id} data-testid="student-row">
                   <TableCell>
                     <Link
-                      href={`/orgs/${slug}/manage/students/${s.id}`}
+                      href={orgPages(slug).manage(`/students/${s.id}`)}
                       className="font-medium hover:text-primary-active"
                     >
                       {s.name}
@@ -970,7 +971,7 @@ export function StudentProfile({ slug, id }: { slug: string; id: string }) {
   return (
     <div className="grid gap-5" data-testid="student-profile">
       <Link
-        href={`/orgs/${slug}/manage/students`}
+        href={orgPages(slug).manage(`/students`)}
         className="text-body-sm text-muted-foreground hover:text-ink"
       >
         ‹ Students
@@ -995,7 +996,7 @@ export function StudentProfile({ slug, id }: { slug: string; id: string }) {
         </div>
         {data.can.results && (
           <Link
-            href={`/orgs/${slug}/results/${id}`}
+            href={orgPages(slug).results(id)}
             className={buttonVariants({ variant: "outline" })}
           >
             Report card
@@ -1568,7 +1569,7 @@ export function Promotion({ slug }: { slug: string }) {
   return (
     <div className="grid gap-5" data-testid="promotion">
       <Link
-        href={`/orgs/${slug}/manage/academic-years`}
+        href={orgPages(slug).manage(`/academic-years`)}
         className="text-body-sm text-muted-foreground hover:text-ink"
       >
         ‹ Academic years

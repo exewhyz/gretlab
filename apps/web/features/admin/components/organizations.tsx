@@ -15,6 +15,7 @@ import { formatDate } from "@/lib/format"
 import { KindPicker } from "@/features/orgs/components/kind-picker"
 
 import { Card, Loading, PageTitle, Table } from "./shell"
+import { orgPages } from "@/lib/paths"
 
 interface OrgRow {
   id: string
@@ -136,7 +137,7 @@ export function AdminOrganizations() {
           <tr key={org.id} className={org.active ? "" : "opacity-60"}>
             <td>
               <Link
-                href={`/orgs/${org.slug}`}
+                href={orgPages(org.slug).home}
                 className="font-medium text-ink underline-offset-2 hover:underline"
               >
                 {org.name}

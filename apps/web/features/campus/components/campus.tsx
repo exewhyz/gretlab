@@ -3,6 +3,7 @@
 import Link from "next/link"
 
 import { cn } from "@workspace/ui/lib/utils"
+import { orgPages } from "@/lib/paths"
 
 export interface CampusLoan {
   id: string
@@ -124,7 +125,7 @@ function LibraryCard({
         <h3 className="text-title-sm text-ink">Library</h3>
         {own && (
           <Link
-            href={`/orgs/${slug}/books`}
+            href={orgPages(slug).books}
             className="text-caption text-body hover:text-ink"
           >
             Browse

@@ -32,6 +32,7 @@ import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { api } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 interface Dashboard {
   day: string
@@ -265,7 +266,7 @@ export function MemberHome() {
           {data.orgs.map((o) => (
             <Link
               key={o.slug}
-              href={`/orgs/${o.slug}`}
+              href={orgPages(o.slug).home}
               className="group/org"
               data-testid="member-org"
             >
@@ -294,7 +295,7 @@ export function MemberHome() {
           {data.children.map((c) => (
             <Link
               key={c.id}
-              href={`/orgs/${c.org.slug}/children/${c.id}`}
+              href={orgPages(c.org.slug).child(c.id)}
               className="group/org"
               data-testid="member-child"
             >

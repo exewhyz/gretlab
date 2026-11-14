@@ -30,6 +30,7 @@ import { QuestionPicker } from "@/features/questions/components/question-picker"
 import { ImportProblemsDialog } from "./problem-import"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle, Table } from "./shell"
+import { orgPages } from "@/lib/paths"
 
 interface ContestRow {
   id: string
@@ -550,7 +551,7 @@ function ContestEditor({
         kind: "ok",
       })
       if (!id && forClass && owner.orgSlug)
-        router.push(`/orgs/${owner.orgSlug}/classes/${forClass}?tab=classwork`)
+        router.push(orgPages(owner.orgSlug).cls(forClass, "classwork"))
       else if (!id) router.push(owner.page(`/contests/${saved.id}`))
     },
     onError: (error) => {

@@ -50,6 +50,7 @@ import type { ReactNode } from "react"
 
 import { AppFrame } from "@/components/app-frame"
 import { api } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 export interface Shell {
   org: { slug: string; name: string; type: OrgType; active: boolean }
@@ -312,7 +313,7 @@ export function OrgShell({
         subtitle: shell
           ? `${shell.role}${!shell.org.active ? " · Suspended" : ""}`
           : undefined,
-        href: `/orgs/${slug}`,
+        href: orgPages(slug).home,
         tooltip: shell?.org.name ?? "School",
       }}
       navLabel="Organization"

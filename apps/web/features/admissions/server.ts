@@ -37,6 +37,7 @@ import {
 } from "@/features/records/server"
 import { ApiError, notFound } from "@/lib/api/errors"
 import { seal, unseal } from "@/lib/sealed"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Admissions (a module; needs Student records). A signed-in applicant (a parent, or the
@@ -271,7 +272,7 @@ export async function apply(slug: string, user: User, input: z.infer<typeof appl
       kind: "admission_new",
       title: `New application: ${input.studentName} for ${pathName(ctx, input.gradeId)}`,
       body: `${row.number}, from ${input.parentName}.`,
-      href: `/orgs/${ctx.org.slug}/manage/admissions/${row.id}`,
+      href: orgPages(ctx.org.slug).manage(`/admissions/${row.id}`),
       orgId: ctx.org.id,
     }
   )
@@ -430,7 +431,7 @@ async function tellApplicant(ctx: OrgContext, row: Row, status: ApplicationStatu
     kind: "admission_update",
     title: `${row.studentName}'s application to ${ctx.org.name} is ${STATUS_WORDS[status]}`,
     body: message || undefined,
-    href: `/orgs/${ctx.org.slug}/apply`,
+    href: orgPages(ctx.org.slug).apply,
     orgId: ctx.org.id,
   })
 }

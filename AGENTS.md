@@ -690,6 +690,14 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 
 ## Conventions
 
+- **Page addresses.** Links to an organization's pages come from `orgPages(slug)` in `apps/web/lib/paths.ts`, never hand-built strings:
+  - pages: `.home`, `.leave`, `.event(id)`, `.cls(groupId, tab)`, `.child(id)`, `.results(id)`;
+  - management pages: `.manage("/exams")`.
+  - A page that moves changes there.
+  - API addresses stay with the `api()` calls that use them.
+- **Errors.** Unexpected server errors go through `reportError()` (`apps/web/lib/report-error.ts`): one JSON log line with a short `ref`. API 500s show that ref to the person, and `instrumentation.ts` reports page and server-action errors the same way.
+- **CI.** `.github/workflows/ci.yml` runs lint, typecheck, unit tests and `drizzle-kit check` on every push. The end-to-end regression stays local (`pnpm test:e2e`, Docker with gVisor).
+
 - Every new dashboard-controllable behaviour gets an entry in `packages/judge/src/features.ts` and is enforced with `requireFeature()` or `getSettings()` on the server. Hiding UI alone is not enforcement.
 - New language: add to `packages/judge/src/languages.ts` and `docker/sandbox/<id>/Dockerfile`, then run `docker/sandbox/build.sh`.
 - Schema change: edit `packages/db/src/schema.ts`, then `pnpm db:generate`. Commit the migration.

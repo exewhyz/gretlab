@@ -19,6 +19,7 @@ import { Check, Field, FormMessage, TextInput } from "@/components/form"
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { KindPicker } from "@/features/orgs/components/kind-picker"
+import { orgPages } from "@/lib/paths"
 
 const toSlug = (name: string) =>
   name
@@ -73,7 +74,7 @@ export function SchoolSignup() {
         },
       }),
     onSuccess: (r) => {
-      if (!r.pending) router.push(`/orgs/${r.slug}`)
+      if (!r.pending) router.push(orgPages(r.slug).home)
     },
   })
   if (!data) return <Loading error={error} />

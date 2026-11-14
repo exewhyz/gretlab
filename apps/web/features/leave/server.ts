@@ -39,6 +39,7 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/errors"
+import { orgPages } from "@/lib/paths"
 
 /*
  * Leave (a module). A request is for a student (asked by them or a parent) or for a staff
@@ -490,7 +491,7 @@ export async function requestLeave(
       kind: "leave_request",
       title: `${whoName} asks for leave: ${span}`,
       body: input.reason || undefined,
-      href: `/orgs/${ctx.org.slug}/leave`,
+      href: orgPages(ctx.org.slug).leave,
       orgId: ctx.org.id,
     }
   )
@@ -568,7 +569,7 @@ export async function decideLeave(
       kind: "leave_decision",
       title: `Leave ${input.status === "approved" ? "approved" : "refused"}: ${shown!.name}, ${row.startsOn}${row.endsOn !== row.startsOn ? ` to ${row.endsOn}` : ""}`,
       body: input.note || undefined,
-      href: `/orgs/${ctx.org.slug}/leave`,
+      href: orgPages(ctx.org.slug).leave,
       orgId: ctx.org.id,
     }
   )

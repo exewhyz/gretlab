@@ -71,6 +71,7 @@ import {
 } from "@/components/form"
 import { Loading, PageTitle, Stats } from "@/features/admin/components/shell"
 import { api, ApiRequestError } from "@/lib/api/client"
+import { orgPages } from "@/lib/paths"
 
 /* ---------- shared ---------- */
 
@@ -221,7 +222,7 @@ export function Exams({ slug }: { slug: string }) {
               Exams belong to a year. Add one in{" "}
               <Link
                 className="underline"
-                href={`/orgs/${slug}/manage/academic-years`}
+                href={orgPages(slug).manage(`/academic-years`)}
               >
                 Academic years
               </Link>
@@ -250,7 +251,7 @@ export function Exams({ slug }: { slug: string }) {
               <CardHeader>
                 <CardTitle>
                   <Link
-                    href={`/orgs/${slug}/manage/exams/${e.id}`}
+                    href={orgPages(slug).manage(`/exams/${e.id}`)}
                     className="hover:underline"
                   >
                     {e.name}
@@ -287,7 +288,7 @@ export function Exams({ slug }: { slug: string }) {
                     </Button>
                   )}
                   <Link
-                    href={`/orgs/${slug}/manage/exams/${e.id}`}
+                    href={orgPages(slug).manage(`/exams/${e.id}`)}
                     className={buttonVariants({
                       size: "sm",
                       variant: "outline",
@@ -822,7 +823,7 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
   const remove = useMutation({
     mutationFn: () =>
       api(`/orgs/${slug}/exams/${examId}`, { method: "DELETE" }),
-    onSuccess: () => router.push(`/orgs/${slug}/manage/exams`),
+    onSuccess: () => router.push(orgPages(slug).manage(`/exams`)),
   })
   if (!data) return <Loading error={error} />
   const { exam } = data
@@ -835,7 +836,7 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
   return (
     <>
       <div className="mb-1 text-body-sm text-muted-foreground">
-        <Link href={`/orgs/${slug}/manage/exams`} className="hover:underline">
+        <Link href={orgPages(slug).manage(`/exams`)} className="hover:underline">
           Exams
         </Link>{" "}
         · {data.year?.name}
@@ -969,7 +970,7 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                       <CardAction>
                         <Link
                           aria-label={`Remarks for ${c.name}`}
-                          href={`/orgs/${slug}/manage/exams/${examId}/remarks/${c.groupId}`}
+                          href={orgPages(slug).manage(`/exams/${examId}/remarks/${c.groupId}`)}
                           className={buttonVariants({
                             size: "sm",
                             variant: "outline",
@@ -1001,7 +1002,7 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                             {p.canMark || c.canSeeResults ? (
                               <Link
                                 className="hover:underline"
-                                href={`/orgs/${slug}/manage/exams/${examId}/papers/${p.id}`}
+                                href={orgPages(slug).manage(`/exams/${examId}/papers/${p.id}`)}
                               >
                                 {p.subject}
                               </Link>
@@ -1033,7 +1034,7 @@ export function ExamPage({ slug, examId }: { slug: string; examId: string }) {
                             {p.canMark && !exam.published ? (
                               <Link
                                 aria-label={`Enter marks for ${p.subject}, ${c.name}`}
-                                href={`/orgs/${slug}/manage/exams/${examId}/papers/${p.id}`}
+                                href={orgPages(slug).manage(`/exams/${examId}/papers/${p.id}`)}
                                 className={buttonVariants({
                                   size: "sm",
                                   variant: "ghost",
@@ -1545,7 +1546,7 @@ function ClassResults({
                     <TableCell className="font-medium">
                       <Link
                         className="hover:underline"
-                        href={`/orgs/${slug}/results/${r.id}`}
+                        href={orgPages(slug).results(r.id)}
                       >
                         {r.name}
                       </Link>
@@ -1739,12 +1740,12 @@ export function MarksSheet({
   return (
     <>
       <div className="mb-1 text-body-sm text-muted-foreground">
-        <Link href={`/orgs/${slug}/manage/exams`} className="hover:underline">
+        <Link href={orgPages(slug).manage(`/exams`)} className="hover:underline">
           Exams
         </Link>{" "}
         ·{" "}
         <Link
-          href={`/orgs/${slug}/manage/exams/${examId}`}
+          href={orgPages(slug).manage(`/exams/${examId}`)}
           className="hover:underline"
         >
           {data.exam.name}
@@ -2450,12 +2451,12 @@ export function RemarksSheet({
   return (
     <>
       <div className="mb-1 text-body-sm text-muted-foreground">
-        <Link href={`/orgs/${slug}/manage/exams`} className="hover:underline">
+        <Link href={orgPages(slug).manage(`/exams`)} className="hover:underline">
           Exams
         </Link>{" "}
         ·{" "}
         <Link
-          href={`/orgs/${slug}/manage/exams/${examId}`}
+          href={orgPages(slug).manage(`/exams/${examId}`)}
           className="hover:underline"
         >
           {data.exam.name}
