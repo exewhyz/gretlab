@@ -3,7 +3,10 @@
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 
-import { Card, Loading, Table } from "@/features/admin/components/shell"
+import { cn } from "@workspace/ui/lib/utils"
+
+import { useViewer } from "@/features/account/use-viewer"
+import { Card, Loading, Stats, Table } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { formatDate } from "@/lib/format"
 
@@ -169,6 +172,7 @@ export function ProfileView({ handle }: { handle: string }) {
 }
 
 export function GlobalLeaderboard() {
+  const { data: viewer } = useViewer()
   const { data, error } = useQuery({
     queryKey: ["leaderboard", "global"],
     queryFn: () =>
@@ -177,12 +181,29 @@ export function GlobalLeaderboard() {
       ),
   })
   if (!data) return <Loading error={error} />
+  const me = viewer?.user?.handle
+  const mine = data.find((r) => r.handle === me)
   return (
     <>
       <h1 className="mb-1 text-display-lg text-ink">Leaderboard</h1>
       <p className="mb-4 text-caption text-body">
         Students ranked by problems solved. Updates every minute.
       </p>
+      {data.length > 0 && (
+        <Stats
+          items={[
+            { label: "On the board", value: data.length },
+            {
+              label: "Your rank",
+              value: mine ? `#${mine.rank}` : "—",
+              hint: mine
+                ? `${mine.solved} solved`
+                : "Solve a problem to join",
+            },
+            { label: "Most solved", value: data[0]!.solved },
+          ]}
+        />
+      )}
       {data.length === 0 ? (
         <p className="text-body-sm text-body">
           Nobody has solved a problem yet.
@@ -190,13 +211,22 @@ export function GlobalLeaderboard() {
       ) : (
         <Table headers={["#", "Student", "Solved"]}>
           {data.map((row) => (
-            <tr key={row.handle}>
+            <tr
+              key={row.handle}
+              aria-current={row.handle === me ? "true" : undefined}
+              className={cn(row.handle === me && "bg-primary/10 font-medium")}
+            >
               <td className="w-12 tabular-nums">{row.rank}</td>
               <td>
                 <Link href={`/u/${row.handle}`} className="hover:underline">
                   {row.name}
                 </Link>{" "}
                 <span className="text-xs text-body">@{row.handle}</span>
+                {row.handle === me && (
+                  <span className="ml-2 rounded-full bg-primary px-1.5 py-px text-xs text-primary-foreground">
+                    You
+                  </span>
+                )}
               </td>
               <td className="tabular-nums">{row.solved}</td>
             </tr>
