@@ -20,7 +20,7 @@ A bare list of problems, or a single problem object, is accepted too. At most 10
 | Field | Required | What it is |
 | --- | --- | --- |
 | `title` | yes | Shown to students. |
-| `slug` | no | The address (`/problems/<slug>`). Made from the title; a number is added if it's taken. |
+| `slug` | no | The address (`/problems/<slug>`). Made from the title; a number is added if it's taken, including by a problem that used to have it. `topics` is reserved. |
 | `level` | no | `easy` (default), `medium` or `hard`. |
 | `statement` | yes | The problem in Markdown: GitHub tables, lists, code blocks. Raw HTML is shown as text. Images: upload them in the editor after importing. |
 | `input`, `output`, `constraints` | no | Input format, output format and constraints, shown under their own headings. A list of lines, or one string with a line each. Keep them out of the statement. |

@@ -79,5 +79,6 @@ The `coding` module: on for every kind from the start, and switchable off.
 ## Platform and security
 
 - [Sign-in and two-factor](/features/platform/two-factor/), [Activity log](/features/platform/activity-log/),
-  [Platform staff and organizations](/features/platform/platform-staff/) and [LTI 1.3](/features/platform/lti/).
+  [Platform staff and organizations](/features/platform/platform-staff/), [LTI 1.3](/features/platform/lti/)
+  and [Site settings, search and legal](/features/platform/site-settings/).
 - The [organization API](/api/) has its own guide.
