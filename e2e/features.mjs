@@ -189,7 +189,7 @@ await admin(`/lists/${plan.slug}`, { method: "PATCH", body: { description: "Star
 check("a draft plan is hidden from students", (await a(`/lists/${plan.slug}`)).status === 404)
 await admin(`/lists/${plan.slug}`, { method: "PATCH", body: { published: true } })
 const seen = (await a(`/lists/${plan.slug}`)).json
-check("a published plan is visible, in order", seen.items.map((i) => i.slug).join() === "p1,p2,p3")
+check("a published plan is visible, in order", seen.items.map((i) => i.slug).join() === [READABLE.p1, READABLE.p2, READABLE.p3].join())
 check("published plans appear in everyone's lists", (await b("/lists")).json.some((l) => l.slug === plan.slug))
 
 // ---------- profiles and leaderboard

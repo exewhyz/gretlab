@@ -1,6 +1,7 @@
 import { getDb, problemSlugHistory, problems, sql } from "@workspace/db"
 
 import { ApiError } from "@/lib/api/errors"
+import { cached } from "@/lib/ttl-cache"
 
 const { and, eq, inArray, ne, or } = sql
 
@@ -17,6 +18,20 @@ export const slugIs = (slug: string) =>
     eq(problems.slug, slug),
     sql.sql`exists (select 1 from ${problemSlugHistory} h where h.slug = ${slug} and h.problem_id = ${problems.id})`
   )!
+
+/**
+ * Every former slug and where it leads now ({ p2: "integer-operations" }), kept 5 minutes per
+ * server: proxy.ts answers old addresses from it with a real 308 before any page renders.
+ */
+export function formerSlugMap(): Promise<Map<string, string>> {
+  return cached("former-slug-map", 5 * 60 * 1000, async () => {
+    const rows = await getDb()
+      .select({ from: problemSlugHistory.slug, to: problems.slug })
+      .from(problemSlugHistory)
+      .innerJoin(problems, eq(problems.id, problemSlugHistory.problemId))
+    return new Map(rows.map((r) => [r.from, r.to]))
+  })
+}
 
 /** The current slug of the problem that used to be at `slug`, or null. */
 export async function currentSlug(slug: string): Promise<string | null> {

@@ -128,7 +128,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - **The docs** (`apps/docs`) have `public/robots.txt` pointing at their sitemap, a share card (`public/og.png`), WebSite structured data on every page and TechArticle plus BreadcrumbList on each page (`components/PageTitle.astro`).
 - **Readable problem addresses** (`/problems/integer-operations`). A problem's slug is its address, its id in the API and the key of saved browser progress. When it changes, the old one goes into `problem_slug_history` (migration 0071 moved the library's `p1`–`p30` there; the seed does the same on fresh databases, `packages/db/src/readable-slugs.ts`). `features/problems/slugs.ts` is the one rule:
   - look problems up with `slugIs(slug)` (or `idsForSlugs` for several), which matches current or former slugs; never `eq(problems.slug, …)`;
-  - the public page answers a former slug with a permanent (308) redirect;
+  - old addresses get a real 308 from `apps/web/proxy.ts` (a map of former slugs, 5 minutes per server), before any page renders; a redirect from inside the page would come after the layout started streaming, as a client-side one, so the page's own redirect is only the fallback for a just-renamed slug;
   - `claimSlug` refuses a slug another problem has or had (409 `slug_taken`), and `recordSlugChange` keeps the old one when a save changes it;
   - `topics` is reserved (`RESERVED_SLUGS`) for the topic pages;
   - visitors' saved progress, code and workspaces move to the new keys once (`CarryOverProgress` on the library and problem pages, from `movedSlugs()`).

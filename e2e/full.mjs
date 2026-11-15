@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 
+import { READABLE } from "./readable-slugs.mjs"
 const ROOT = new URL("../", import.meta.url).pathname
 const require = createRequire(ROOT + "apps/web/")
 const { encode } = require("next-auth/jwt")
@@ -111,7 +112,7 @@ if (phase === "all" || phase === "api") {
   check("other student cannot read it (404)", (await ben(`/submissions/${created.json.id}`)).status === 404)
   const asStaff = await teach(`/submissions/${created.json.id}`)
   check("staff can read hidden details", asStaff.json?.results?.find((r) => !r.isSample)?.input !== null)
-  check("progress shows solved", (await ana("/me/progress")).json?.p1 === "solved")
+  check("progress shows solved", (await ana("/me/progress")).json?.[READABLE.p1] === "solved")
   check("after solving, the solution unlocks", (await ana("/problems/p1/solution")).json?.solution?.includes("principal"))
 
   const ranOnly = await settle(ana, (await ana("/submissions", { body: { ...py("print(1)", { problemSlug: "p3" }), kind: "run", stdin: "" } })).json.id)
@@ -126,14 +127,14 @@ if (phase === "all" || phase === "api") {
   check("rows have runtime, memory and test counts", inList.every((row) => row.runtimeMs !== null && row.totalTests === 6), JSON.stringify(inList[0]))
   check("staff list hides Runs by default", (await admin("/admin/submissions")).json.rows.every((row) => row.kind === "submit"))
   check("staff can ask for Runs", (await admin("/admin/submissions?kind=run")).json.rows.every((row) => row.kind === "run"))
-  check("a plain Run never marks a problem solved", (await ana("/me/progress")).json?.p3 === "tried", (await ana("/me/progress")).json?.p3)
+  check("a plain Run never marks a problem solved", (await ana("/me/progress")).json?.[READABLE.p3] === "tried", (await ana("/me/progress")).json?.[READABLE.p3])
   const big = await fetch(BASE + "/api/v1/submissions", { method: "POST", headers: { cookie: `next-auth.session-token=${await cookieFor("ana@example.com")}`, "content-type": "application/json" }, body: JSON.stringify({ kind: "run", pad: "x".repeat(9 * 1024 * 1024) }) })
   check("oversized request refused", big.status === 413, big.status)
   const headers = (await fetch(BASE + "/problems/p1")).headers
   check("security headers", headers.get("x-frame-options") === "DENY" && headers.get("x-content-type-options") === "nosniff" && !headers.get("x-powered-by"))
   const wrong = await settle(ana, (await ana("/submissions", { body: py("print('nope')", { problemSlug: "p1" }) })).json.id)
   check("wrong answer: WA", wrong.verdict === "WA", wrong.verdict)
-  check("solved stays solved", (await ana("/me/progress")).json?.p1 === "solved")
+  check("solved stays solved", (await ana("/me/progress")).json?.[READABLE.p1] === "solved")
   const crash = await settle(ana, (await ana("/submissions", { body: py("raise ValueError('boom')", { problemSlug: "p1" }) })).json.id)
   check("exception: RE with traceback on sample", crash.verdict === "RE" && crash.results[0].stderr.includes("boom"), crash.verdict)
   const loop = await settle(ana, (await ana("/submissions", { body: { ...py("while True: pass"), kind: "run", stdin: "" } })).json.id)
