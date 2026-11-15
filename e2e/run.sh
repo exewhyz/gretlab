@@ -32,10 +32,10 @@ CODE=0
 # One suite by name, unless E2E_ONLY names others.
 suite() {
   local name=$1; shift
-  [[ -n "$E2E_ONLY" && ",$E2E_ONLY," != *",$name,"* ]] && return
+  [[ -n "${E2E_ONLY:-}" && ",${E2E_ONLY:-}," != *",$name,"* ]] && return
   node e2e/$name.mjs "$@"; [ $? -eq 0 ] || CODE=1
 }
-if [[ -z "$E2E_ONLY" || ",$E2E_ONLY," == *",sandbox,"* ]]; then
+if [[ -z "${E2E_ONLY:-}" || ",${E2E_ONLY:-}," == *",sandbox,"* ]]; then
   DOCKER_HOST=tcp://127.0.0.1:23750 SANDBOX_RUNTIME=runsc pnpm --filter runner test:sandbox || CODE=1
 fi
 suite full all

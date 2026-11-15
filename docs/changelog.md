@@ -10,8 +10,8 @@ aren't listed.
 
 ### Fixes
 
-- Pressing **d** no longer switches between light and dark. It fired while typing in the code
-  editor, menus and other fields. Use the theme button in the header instead.
+- The **d** shortcut for light and dark no longer fires while you type in the code editor or a
+  field, or choose from a menu or list. It still works anywhere else on the page.
 
 ### Readable problem addresses and topic pages
 
