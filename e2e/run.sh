@@ -6,6 +6,17 @@
 set -u
 ROOT=${0:a:h:h}; LOGS=${TMPDIR:-/tmp}/gretlab-e2e; mkdir -p $LOGS
 RIG=gretlab-gvisor-rig
+RUNNER=""
+# Stop what this run started however it ends (finished, failed or interrupted), so no
+# test judge or server is left to take the next run's jobs or hold port 3100.
+cleanup() {
+  [[ -n "$RUNNER" ]] && kill $RUNNER 2>/dev/null && wait $RUNNER 2>/dev/null
+  lsof -ti:3100 | xargs kill 2>/dev/null
+  docker rm -f -v $RIG >/dev/null 2>&1
+  docker compose -f $ROOT/docker-compose.yml exec -T postgres psql -U gretlab -d gretlab -c "drop database if exists gretlab_test with (force)" >/dev/null 2>&1
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
 export DATABASE_URL=postgres://gretlab:gretlab_dev_only@127.0.0.1:5433/gretlab_test
 
 docker build -q -t $RIG $ROOT/docker/gvisor-rig >/dev/null
@@ -92,9 +103,4 @@ suite access-links http://localhost:3100
 suite data-screens http://localhost:3100
 suite integrations http://localhost:3100
 
-kill $RUNNER 2>/dev/null
-lsof -ti:3100 | xargs kill 2>/dev/null
-wait $RUNNER 2>/dev/null
-docker rm -f -v $RIG >/dev/null
-docker compose -f $ROOT/docker-compose.yml exec -T postgres psql -U gretlab -d gretlab -c "drop database if exists gretlab_test with (force)" >/dev/null
 exit $CODE
