@@ -17,7 +17,16 @@ A coding lab a teacher or institution can run for their students: practice probl
 - **Commits.** Commit as `32168046+exewhyz@users.noreply.github.com`, with no "Co-Authored-By" or other AI attribution lines in commits or PRs.
 - **Branches and merging.**
   - Work on a branch; there's no PR review.
-  - Merge only after the full regression (`pnpm test:e2e`) is green, then fast-forward `main` and push `main` and the branch.
+  - Merge once the change has passed the testing its risk calls for, then fast-forward `main` and push `main` and the branch (`git push -u` for a new branch, so it's linked to its copy on GitHub):
+
+    | What changed | Before merging |
+    | --- | --- |
+    | The judge or sandbox, the queue, sign-in and two-factor, API routes, the database (schema, migrations, queries other features rely on), permissions and access | The full regression (`pnpm test:e2e`) |
+    | App pages and components only (UI) | Typecheck, lint, the suites for that area (`E2E_ONLY=…`), and a look in the browser |
+    | Docs, the changelog, AGENTS.md, DESIGN.md | The docs build |
+    | The test scripts themselves (`e2e/run.sh`) | One full run, to prove they still work |
+
+    When unsure which row a change is in, use the higher one.
   - Don't force-push.
   - A check that fails only under machine load counts as green if it passes when the suite is rerun on its own with the runner, and the report says so.
 - **The full regression owns port 3100 and the `gretlab_test` database.** Never run another suite, quick script or server on them while it runs; a clash corrupts both runs. Low free memory on the Mac causes timeouts (browsers that won't start); rerun those suites alone.
@@ -803,9 +812,9 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 ## Testing
 
 - `pnpm test`: unit tests of the pure rules in `packages/judge` (grading, quizzes, exams, outcomes, platform roles, course release, warnings, peer pairing, iCal, GitHub links, LTI launches, starter code, the judge).
-- `pnpm test:e2e` (`e2e/run.sh`): everything against a throwaway database (`gretlab_test`, recreated each run) and real gVisor in a Docker rig: queue guarantees, 16 hostile programs, API security, every seeded solution, then every suite below against a production build on :3100 (started with `PROXY_SECRET`, `GITHUB_LOOKUP=off`, `LTI_ALLOW_HTTP=true`, and `RESEND_API_KEY`, `RESEND_API_URL` and `CRON_SECRET` pointing email at the fake provider `e2e/notifications.mjs` runs; while it isn't running, other suites' emails just wait in the outbox). About 40 minutes; set `E2E_SCREENSHOTS` to keep screenshots. Run it before merging anything touching the sandbox, queue, auth or the API, and as an ordinary process (a backgrounded, low-priority run timed out browsers and looked like failures). It needs roughly 10 GB free disk: when Docker runs out of space builds fail with `ENOSPC` and Docker itself can get I/O errors (`docker builder prune` frees build cache; never prune volumes, which hold the data).
+- `pnpm test:e2e` (`e2e/run.sh`): everything against a throwaway database (`gretlab_test`, recreated each run) and real gVisor in a Docker rig: queue guarantees, 16 hostile programs, API security, every seeded solution, then every suite below against a production build on :3100 (started with `PROXY_SECRET`, `GITHUB_LOOKUP=off`, `LTI_ALLOW_HTTP=true`, and `RESEND_API_KEY`, `RESEND_API_URL` and `CRON_SECRET` pointing email at the fake provider `e2e/notifications.mjs` runs; while it isn't running, other suites' emails just wait in the outbox). About 40 minutes; set `E2E_SCREENSHOTS` to keep screenshots. When it's needed before merging is in the table under Working agreements. Run it as an ordinary process (a backgrounded, low-priority run timed out browsers and looked like failures). It needs roughly 10 GB free disk: when Docker runs out of space builds fail with `ENOSPC` and Docker itself can get I/O errors (`docker builder prune` frees build cache; never prune volumes, which hold the data).
 - `run.sh` stops its own judge, the :3100 server, the rig and `gretlab_test` however it ends (an exit trap). Before it had one, a run that stopped early left its judge running, which then took the next run's queue-test jobs.
-- While fixing, rerun only the suites a change touches, with the same setup: `E2E_ONLY=assignments,topics pnpm test:e2e` (add `sandbox` for the attack tests). Run the full regression once, when every fix is in, before merging; not after each fix.
+- While fixing, rerun only the suites a change touches, with the same setup: `E2E_ONLY=assignments,topics pnpm test:e2e` (add `sandbox` for the attack tests). When a change needs the full regression, run it once, when every fix is in; not after each fix.
 - One suite against your dev server and database: `E2E_DB=gretlab NEXTAUTH_SECRET=<your dev secret> node e2e/<suite>.mjs http://localhost:3000 /tmp/gretlab-e2e/<dir>/`. Suites make their own users and organizations with a prefix (`lib-`, `crs-`, `tpl-`…) and delete them at the end, so they don't touch real data.
 - `e2e/stack.sh` with `e2e/load.mjs` and `e2e/resilience.mjs`: load and failure tests on the production shape. See `docs/scaling.md`.
 - `e2e/topics.mjs`: readable addresses (old numbers redirect, the API and saved browser progress follow, renaming keeps the old address, nobody takes another's, `topics` reserved) and topic pages (listing, titles, structured data, sitemap, links, a phone).
