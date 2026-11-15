@@ -20,11 +20,10 @@ export const slugIs = (slug: string) =>
 
 /**
  * Where a problem's old address leads now ("p2" → "integer-operations"), or undefined, for
- * proxy.ts, which answers old addresses with a real 308 before any page renders. It keeps
- * every former slug and every current one in memory; a slug that's neither (a problem renamed
- * moments ago) reloads them, at most every 10 seconds, so a rename takes effect within
- * seconds without each unknown address costing a query. The proxy runs apart from the API,
- * so it can't be told about saves directly.
+ * proxy.ts, which answers old addresses with a real 308 before any page renders. Former and
+ * current slugs are kept in memory and reloaded every 5 minutes; a slug that's neither (a
+ * problem renamed moments ago, or an address that doesn't exist) is looked up on its own,
+ * one indexed query. The proxy runs apart from the API, so saves can't clear this directly.
  */
 let slugMaps: { former: Map<string, string>; current: Set<string>; at: number } | null = null
 let loading: Promise<void> | null = null
@@ -46,14 +45,16 @@ async function loadSlugMaps() {
 }
 
 export async function formerSlugTarget(slug: string): Promise<string | undefined> {
-  const stale = !slugMaps || Date.now() - slugMaps.at > 5 * 60 * 1000
-  const unknown =
-    slugMaps && !slugMaps.former.has(slug) && !slugMaps.current.has(slug) && Date.now() - slugMaps.at > 10_000
-  if (stale || unknown) {
+  if (!slugMaps || Date.now() - slugMaps.at > 5 * 60 * 1000) {
     loading ??= loadSlugMaps().finally(() => (loading = null))
     await loading
   }
-  return slugMaps?.former.get(slug)
+  const maps = slugMaps!
+  const known = maps.former.get(slug)
+  if (known !== undefined || maps.current.has(slug)) return known
+  const now = await currentSlug(slug)
+  if (now) maps.former.set(slug, now)
+  return now ?? undefined
 }
 
 /** The current slug of the problem that used to be at `slug`, or null. */
