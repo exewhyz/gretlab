@@ -208,6 +208,7 @@ export default defineConfig({
             { label: "Kinds and modules", link: "/reference/kinds-and-modules/" },
           ],
         },
+        { label: "Changelog", slug: "changelog" },
       ],
     }),
   ],

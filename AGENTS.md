@@ -45,7 +45,7 @@ Full diagram, measurements and sizing: `docs/scaling.md`.
 | `packages/ui` | Design tokens and shared components |
 | `docker/sandbox` | One image per language |
 | `e2e` | Whole-system tests (`run.sh` runs them all), plus load and failure tests |
-| `docs` | The guides, published by `apps/docs`: import formats, the API, exam deployment, scaling. Each needs a `title` in its frontmatter and an entry in the sidebar (`apps/docs/astro.config.mjs`); plain Markdown only |
+| `docs` | The guides, published by `apps/docs`; `docs/changelog.md` gets an entry (newest first, in users' words) for every change people would notice: import formats, the API, exam deployment, scaling. Each needs a `title` in its frontmatter and an entry in the sidebar (`apps/docs/astro.config.mjs`); plain Markdown only |
 | `deploy`, `docker-compose.*.yml` | Production: Caddy, web replicas, PgBouncer (`prod`), runner machines (`runner`), local Postgres (plain) |
 
 Where each feature lives (`apps/web/features/<name>`: UI in `components/`, rules in `server.ts`, browser-safe form schemas in `schemas.ts`; pure, unit-tested rules in `packages/judge/src/<name>.ts`):
