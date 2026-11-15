@@ -8,6 +8,11 @@ aren't listed.
 
 ## 15 November 2026
 
+### Fixes
+
+- Pressing **d** no longer switches between light and dark. It fired while typing in the code
+  editor, menus and other fields. Use the theme button in the header instead.
+
 ### Readable problem addresses and topic pages
 
 - Problems have addresses made from their titles: `/problems/integer-operations` instead of
