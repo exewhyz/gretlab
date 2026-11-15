@@ -425,9 +425,7 @@ export async function saveProblem(
   await setProblemTags(saved.id, tagNames)
   refreshCatalog()
   refreshPublicPages(saved.slug)
-  // Old addresses lead to the new one at once on this server (proxy.ts), within minutes elsewhere.
   invalidate("moved-slugs")
-  invalidate("former-slug-map")
   return saved
 }
 
@@ -440,7 +438,6 @@ export async function deleteProblem(id: string, orgId: string | null) {
   refreshPublicPages(row.slug)
   // Its old addresses went with it.
   invalidate("moved-slugs")
-  invalidate("former-slug-map")
 }
 
 export async function createUnit(name: string) {

@@ -1,7 +1,6 @@
 import { getDb, problemSlugHistory, problems, sql } from "@workspace/db"
 
 import { ApiError } from "@/lib/api/errors"
-import { cached } from "@/lib/ttl-cache"
 
 const { and, eq, inArray, ne, or } = sql
 
@@ -20,17 +19,41 @@ export const slugIs = (slug: string) =>
   )!
 
 /**
- * Every former slug and where it leads now ({ p2: "integer-operations" }), kept 5 minutes per
- * server: proxy.ts answers old addresses from it with a real 308 before any page renders.
+ * Where a problem's old address leads now ("p2" → "integer-operations"), or undefined, for
+ * proxy.ts, which answers old addresses with a real 308 before any page renders. It keeps
+ * every former slug and every current one in memory; a slug that's neither (a problem renamed
+ * moments ago) reloads them, at most every 10 seconds, so a rename takes effect within
+ * seconds without each unknown address costing a query. The proxy runs apart from the API,
+ * so it can't be told about saves directly.
  */
-export function formerSlugMap(): Promise<Map<string, string>> {
-  return cached("former-slug-map", 5 * 60 * 1000, async () => {
-    const rows = await getDb()
+let slugMaps: { former: Map<string, string>; current: Set<string>; at: number } | null = null
+let loading: Promise<void> | null = null
+
+async function loadSlugMaps() {
+  const db = getDb()
+  const [former, current] = await Promise.all([
+    db
       .select({ from: problemSlugHistory.slug, to: problems.slug })
       .from(problemSlugHistory)
-      .innerJoin(problems, eq(problems.id, problemSlugHistory.problemId))
-    return new Map(rows.map((r) => [r.from, r.to]))
-  })
+      .innerJoin(problems, eq(problems.id, problemSlugHistory.problemId)),
+    db.select({ slug: problems.slug }).from(problems),
+  ])
+  slugMaps = {
+    former: new Map(former.map((r) => [r.from, r.to])),
+    current: new Set(current.map((r) => r.slug)),
+    at: Date.now(),
+  }
+}
+
+export async function formerSlugTarget(slug: string): Promise<string | undefined> {
+  const stale = !slugMaps || Date.now() - slugMaps.at > 5 * 60 * 1000
+  const unknown =
+    slugMaps && !slugMaps.former.has(slug) && !slugMaps.current.has(slug) && Date.now() - slugMaps.at > 10_000
+  if (stale || unknown) {
+    loading ??= loadSlugMaps().finally(() => (loading = null))
+    await loading
+  }
+  return slugMaps?.former.get(slug)
 }
 
 /** The current slug of the problem that used to be at `slug`, or null. */
