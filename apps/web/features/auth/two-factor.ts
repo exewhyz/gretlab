@@ -67,7 +67,7 @@ const MAX_FAILURES = 5
 const LOCK_MS = 15 * 60_000
 const TRUST_DAYS = 30
 export const TRUST_COOKIE = "gl-2fa-trust"
-export const ISSUER = "Gretlab"
+export const ISSUER = "GretLab"
 
 type Row = typeof twoFactor.$inferSelect
 type Method = "app" | "email"

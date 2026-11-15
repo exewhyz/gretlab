@@ -19,7 +19,7 @@ Every role is a first-class user; no single audience outranks another. Each work
 
 ## Product Purpose
 
-Gretlab is one place where any kind of learning organization runs its day and its people learn, with a coding lab built in. Success means:
+GretLab is one place where any kind of learning organization runs its day and its people learn, with a coding lab built in. Success means:
 
 - each role finds today's work on its home and finishes it in a few clicks;
 - every number shown leads to the detail behind it;
@@ -55,7 +55,7 @@ One platform for every kind of organization: school, college, coaching institute
 
 ## Brand Commitments
 
-- The name is Gretlab (GretLab in the header mark).
+- The name is GretLab (capital L), everywhere people read it.
 - Primary colour #f54e00 (orange). The existing component library and type are kept.
 - UI work improves clarity, layout, navigation and data presentation within this look; it does not replace the visual identity.
 - Voice: plain, short, specific sentences that say what happens ("Registers to take", "Nothing due. Enjoy it.").

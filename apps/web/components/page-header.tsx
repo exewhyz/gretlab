@@ -16,7 +16,7 @@ import { Brand } from "@/features/lab/components/brand"
 import { ExamHeader, useExamLock } from "@/features/exams/components/exam-lock"
 import { NotificationBell } from "@/features/notifications/components/bell"
 
-const DEFAULT_TITLE = "Python Practice Lab"
+const DEFAULT_TITLE = "GretLab"
 
 /** The one header used on every page. `children` sit after the main sections. */
 export function PageHeader({ children }: { children?: ReactNode }) {

@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Run Gretlab on your own machine, with its database, the code judge's sandbox images and a first platform owner.
+description: Run GretLab on your own machine, with its database, the code judge's sandbox images and a first platform owner.
 ---
 
 You need **Node 20+**, **pnpm** and **Docker**.

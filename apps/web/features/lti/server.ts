@@ -28,7 +28,7 @@ import { ApiError, notFound } from "@/lib/api/route"
 import { decodeJwt, signJwt, toolKey, verifyJwt } from "./jwt"
 
 /*
- * LTI 1.3 for organizations: an LMS course opens Gretlab with the person signed in, placed
+ * LTI 1.3 for organizations: an LMS course opens GretLab with the person signed in, placed
  * in the class an admin linked to that course, and taken to the assignment the link is
  * for; teachers add assignments to their course (deep linking); grades go back to the
  * LMS's gradebook (Assignment and Grade Services). Launch checks: packages/judge lti.ts.
@@ -38,7 +38,7 @@ const { and, eq, gt, inArray, isNull } = sql
 
 const STATE_MINUTES = 10
 
-/** Where Gretlab is reached, for the addresses an LMS calls back. */
+/** Where GretLab is reached, for the addresses an LMS calls back. */
 export const siteOrigin = (fallback: string) => process.env.NEXTAUTH_URL?.replace(/\/$/, "") ?? fallback
 
 /** LMS addresses must be https in production (http for local testing only). */
@@ -86,7 +86,7 @@ export async function loginInit(params: URLSearchParams, origin: string) {
     .from(ltiPlatforms)
     .where(and(eq(ltiPlatforms.issuer, iss), clientId ? eq(ltiPlatforms.clientId, clientId) : undefined))
   if (candidates.length !== 1) {
-    throw new ApiError(400, "unknown_lms", "This LMS isn't registered with Gretlab (or it didn't say which registration).")
+    throw new ApiError(400, "unknown_lms", "This LMS isn't registered with GretLab (or it didn't say which registration).")
   }
   const platform = candidates[0]!
   const state = random()
@@ -158,7 +158,7 @@ export async function launch(idToken: string, state: string, cookieState: string
   if (context?.groupId) await placeInClass(org.id, context.groupId, user.id, teacher)
 
   if (checked.kind === "deep_link") {
-    if (!teacher) throw new ApiError(403, "not_instructor", "Only teachers add Gretlab assignments to a course.")
+    if (!teacher) throw new ApiError(403, "not_instructor", "Only teachers add GretLab assignments to a course.")
     const settings = claims[LTI.deepLinking] as { deep_link_return_url: string; data?: string }
     const [row] = await db
       .insert(ltiDeepLinks)
@@ -220,7 +220,7 @@ async function personFor(platformId: string, orgId: string, claims: Record<strin
   if (!user) {
     const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : ""
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new ApiError(400, "no_email", "Your LMS didn't share your email address, which Gretlab needs. Ask your admin to share it with this tool.")
+      throw new ApiError(400, "no_email", "Your LMS didn't share your email address, which GretLab needs. Ask your admin to share it with this tool.")
     }
     const name = typeof claims.name === "string" ? claims.name : [claims.given_name, claims.family_name].filter((x) => typeof x === "string").join(" ") || null
     ;[user] = await db.select().from(users).where(eq(users.email, email))
@@ -393,9 +393,9 @@ async function scoreToken(platform: typeof ltiPlatforms.$inferSelect) {
     signal: AbortSignal.timeout(8000),
     redirect: "error",
   })
-  if (!res.ok) throw new ApiError(502, "lms_token", `${platform.name} refused Gretlab's request to send grades (${res.status}).`)
+  if (!res.ok) throw new ApiError(502, "lms_token", `${platform.name} refused GretLab's request to send grades (${res.status}).`)
   const body = (await res.json()) as { access_token?: string }
-  if (!body.access_token) throw new ApiError(502, "lms_token", `${platform.name} didn't give Gretlab a token to send grades.`)
+  if (!body.access_token) throw new ApiError(502, "lms_token", `${platform.name} didn't give GretLab a token to send grades.`)
   return body.access_token
 }
 

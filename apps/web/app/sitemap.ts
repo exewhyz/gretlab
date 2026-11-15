@@ -4,7 +4,7 @@ import { getDb, problems } from "@workspace/db"
 import { sql } from "@workspace/db"
 
 import { isPublicProblem } from "@/features/problems/server"
-import { absolute } from "@/lib/site"
+import { absolute, siteSettings } from "@/lib/seo/config"
 import { cached } from "@/lib/ttl-cache"
 
 const { desc } = sql
@@ -18,6 +18,7 @@ export const dynamic = "force-dynamic"
  * sign-in, and no organization's or member's own pages.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const site = await siteSettings()
   const rows = await cached("sitemap-problems", 60 * 60 * 1000, () =>
     getDb()
       .select({ slug: problems.slug, updatedAt: problems.updatedAt })
@@ -28,18 +29,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const newest = rows[0]?.updatedAt ?? new Date()
   return [
     {
-      url: absolute("/problems"),
+      url: absolute(site, "/problems"),
       lastModified: newest,
       changeFrequency: "weekly",
       priority: 1,
     },
     ...rows.map((row) => ({
-      url: absolute(`/problems/${row.slug}`),
+      url: absolute(site, `/problems/${row.slug}`),
       lastModified: row.updatedAt,
       changeFrequency: "monthly" as const,
       priority: 0.8,
     })),
-    { url: absolute("/contests"), changeFrequency: "weekly", priority: 0.5 },
-    { url: absolute("/privacy"), changeFrequency: "yearly", priority: 0.2 },
+    { url: absolute(site, "/contests"), changeFrequency: "weekly", priority: 0.5 },
+    { url: absolute(site, "/privacy"), changeFrequency: "yearly", priority: 0.2 },
   ]
 }

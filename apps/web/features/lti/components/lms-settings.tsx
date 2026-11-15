@@ -78,13 +78,13 @@ export function LmsSettings({ slug }: { slug: string }) {
       </PageTitle>
       <p className="mb-3 max-w-3xl text-body-sm text-body">
         Connect Moodle, Canvas, Blackboard or another LMS. Links in its courses
-        open Gretlab with people signed in, in the class you link the course to,
+        open GretLab with people signed in, in the class you link the course to,
         and grades go back to its gradebook.
       </p>
       <Card className="mb-4 grid gap-2" data-testid="lti-tool">
         <h2 className="font-semibold text-ink">Give your LMS these</h2>
         <p className="text-caption">
-          Add Gretlab as an LTI 1.3 tool (in Moodle: Site administration ›
+          Add GretLab as an LTI 1.3 tool (in Moodle: Site administration ›
           Plugins › External tool › Manage tools; in Canvas: Developer Keys ›
           LTI Key). Share email and name, and turn on Deep Linking and
           Assignment and Grade Services.
@@ -125,7 +125,7 @@ export function LmsSettings({ slug }: { slug: string }) {
                     size="sm"
                     variant="destructive"
                     title={`Disconnect ${p.name}?`}
-                    description="Its links stop opening Gretlab and grades stop going back. People keep their accounts and work."
+                    description="Its links stop opening GretLab and grades stop going back. People keep their accounts and work."
                     confirmLabel="Disconnect"
                     onConfirm={() => remove.mutate(p.id)}
                   >

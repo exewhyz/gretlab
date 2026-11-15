@@ -151,7 +151,7 @@ export interface PreferenceRow {
   canChoose: boolean
   /** Organizations that send it to everyone, whatever they choose. */
   alwaysIn: string[]
-  /** Organizations (or "Gretlab") that don't email it at all. */
+  /** Organizations (or "GretLab") that don't email it at all. */
   offIn: string[]
 }
 
@@ -210,12 +210,12 @@ export async function myPreferences(user: User) {
       alwaysIn: !site.email
         ? []
         : !site.userChoice
-          ? ["Gretlab"]
+          ? ["GretLab"]
           : inOrgs
               .filter((o) => o.policy.email && !o.policy.userChoice)
               .map((o) => o.name),
       offIn: !site.email
-        ? ["Gretlab"]
+        ? ["GretLab"]
         : inOrgs.filter((o) => !o.policy.email).map((o) => o.name),
     }
   })

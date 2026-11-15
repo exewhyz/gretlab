@@ -119,7 +119,7 @@ check("the plain-text copy is shown too", (await p.getByTestId("preview-text").i
 await p.getByRole("tab", { name: "Email" }).click()
 await p.getByRole("navigation", { name: "Emails" }).getByRole("button", { name: /^Notification/ }).click()
 const frameText = await p.frameLocator("[data-testid=preview-html]").locator("body").innerText({ timeout: 10000 })
-check("the preview shows the branded email, with the site's own name", frameText.includes("Lab moves to Room 204") && frameText.includes("Python Practice Lab") && !frameText.includes("gretlab.example.com"), frameText.slice(0, 300))
+check("the preview shows the branded email, with the site's own name", frameText.includes("Lab moves to Room 204") && frameText.includes("GretLab") && !frameText.includes("gretlab.grettech.com"), frameText.slice(0, 300))
 await p.screenshot({ path: SHOTS + "admin-emails.png", fullPage: true })
 await browser.close()
 

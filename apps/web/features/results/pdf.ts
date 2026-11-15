@@ -41,7 +41,7 @@ export async function reportCardsPdf(
         ? `Report card: ${first.student.name}, ${first.year.name}`
         : `Report cards: ${first.year.class ?? ""}, ${first.year.name}`
       : "Report cards",
-    author: first?.org.name ?? "Gretlab",
+    author: first?.org.name ?? "GretLab",
   })
   for (const card of cards) {
     const w = new Writer(doc, fonts)
@@ -227,6 +227,6 @@ export async function reportCardsPdf(
     signature(w, "Principal", 1, 3)
     signature(w, "Parent or guardian", 2, 3)
   }
-  footers(doc, fonts, `Printed ${printedOn} from Gretlab`)
+  footers(doc, fonts, `Printed ${printedOn} from GretLab`)
   return doc
 }

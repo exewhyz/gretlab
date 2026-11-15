@@ -1,5 +1,5 @@
 ---
-name: Gretlab
+name: GretLab
 description: A coding lab and a school's working day on warm paper, with one orange for action.
 colors:
   primary: "#f54e00"
@@ -174,15 +174,15 @@ components:
     padding: "10px 12px"
 ---
 
-# Design System: Gretlab
+# Design System: GretLab
 
 ## Overview
 
 **Creative North Star: "The Lab Notebook"**
 
-Gretlab looks like a well-kept notebook. The page is cream paper, ruled with hairlines rather than raised in layers. Writing is in warm ink. One orange marks the place to act: the primary button, the wordmark's `>>>` prompt, the first chart series. The same pages serve a principal reading the day's registers on a laptop and a parent checking attendance on a phone, so the system relies on clear rules and steady density, not decoration.
+GretLab looks like a well-kept notebook. The page is cream paper, ruled with hairlines rather than raised in layers. Writing is in warm ink. One orange marks the place to act: the primary button, the check in the mark, the first chart series. The same pages serve a principal reading the day's registers on a laptop and a parent checking attendance on a phone, so the system relies on clear rules and steady density, not decoration.
 
-It's an Operate product almost everywhere: registers, gradebooks, marks entry, timetables, an editor. The design shows in exact things: tabular numbers that line up, a type scale with few steps used consistently, hairline tables, and status colours that mean one thing each. Expression stays small: the cream and ink warmth, the orange, and the mono prompt in the mark. Anything louder would compete with the data.
+It's an Operate product almost everywhere: registers, gradebooks, marks entry, timetables, an editor. The design shows in exact things: tabular numbers that line up, a type scale with few steps used consistently, hairline tables, and status colours that mean one thing each. Expression stays small: the cream and ink warmth, the orange, and the check in the mark. Anything louder would compete with the data.
 
 The look is decided. New work keeps this identity and improves layout, hierarchy and how data is shown inside it.
 
@@ -199,7 +199,7 @@ The look is decided. New work keeps this identity and improves layout, hierarchy
 A warm paper-and-ink neutral range with one saturated orange, plus three status colours that each mean one thing.
 
 ### Primary
-- **Signal Orange** (`primary`): the primary button, the `>>>` in the wordmark, the first chart series, selected and current markers, and links that are the main action. It's the same in both themes.
+- **Signal Orange** (`primary`): the primary button, the check in the mark, the first chart series, selected and current markers, and links that are the main action. It's the same in both themes.
 - **Pressed Orange** (`primary-active`): hover and pressed state of orange surfaces, and orange text that has to read on cream (`text-primary-active`).
 
 ### Neutral
@@ -231,7 +231,7 @@ Status colours appear mainly as text, or as a 5–10% tint behind text (`bg-succ
 ## Typography
 
 **Body and Display Font:** Inter (with ui-sans-serif, system-ui). It stands in for the licensed CursorGothic.
-**Mono Font:** JetBrains Mono (with ui-monospace). Used for code, the editor, and the wordmark's prompt. Ligatures are off, so `!=` reads as typed.
+**Mono Font:** JetBrains Mono (with ui-monospace). Used for code and the editor. Ligatures are off, so `!=` reads as typed.
 
 **Character:** a neutral sans with light-weight displays and semibold titles. The contrast in weight, not size, sets the hierarchy, which keeps dense screens calm. Mono appears only where something is code.
 
@@ -322,11 +322,11 @@ A table wider than its column scrolls sideways inside its own box (`ScrollX` in 
 - Always the shadcn controls from `packages/ui` (through `components/form.tsx` in forms), never native elements.
 
 ### Navigation
-- **Header:** sticky, 56px, cream with a hairline below: the wordmark, the organization switcher, the Learn/Teach toggle, the current mode's sections, then the bell, theme and account menu. Phones get a menu.
+- **Header:** sticky, 56px, cream with a hairline below: the mark and site name, the organization switcher, the Learn/Teach toggle, the current mode's sections, then the bell, theme and account menu. Phones get a menu.
 - **Sidebar:** Margin Cream, 14px medium items with 16px Phosphor icons, 8px radius. Hover and the active item fill Soft Rule, and the active item turns medium weight. Groups fold, and the choice is remembered.
 
-### The Wordmark
-A JetBrains Mono `>>>` in Signal Orange, then the site name in `title-sm` ink. It's the only place the prompt appears.
+### The Mark
+Code braces holding a check, on a rounded ink tile (radius 14 of 64): cream braces, a Signal Orange check. It says what GretLab does: code goes in, and it comes out judged and graded (the Accepted verdict, the gradebook, the report card). In the header it sits at 28px beside the site name in `title-sm` semibold ink. The tile follows the text colour and the braces the page colour, so it inverts in dark mode while the check stays orange. The shapes live in `components/logo.tsx` (`MARK`, `LogoMark`) and draw the favicon (`app/icon.svg`), the Apple icon, `public/logo.png` (512px, for structured data), the share cards and the docs' logo. Don't redraw it elsewhere; import `MARK`.
 
 ### Stats Line
 The summary above a list: a hairline above and below, items spaced 32px apart. Each item has a caption label over a `title-md` tabular figure, which turns Ledger Green or Correction Red when it's good or bad. A figure with a link underlines on hover and leads to the detail behind it.
@@ -361,7 +361,7 @@ Progress bars (`Progress`, the homes' `Meter`) are 70% ink on a Rule track, red 
 - **Don't** give in-page surfaces shadows heavier than `shadow-xs`.
 - **Don't** use native `<button>`, `<input>`, `<select>`, `<textarea>` or hand-made popups; use the `packages/ui` components.
 - **Don't** use Tailwind's `text-sm`/`text-lg` or arbitrary pixel sizes where a named token exists.
-- **Don't** show the `>>>` prompt anywhere but the wordmark.
+- **Don't** redraw the mark or recolour its check; import `MARK` from `components/logo.tsx`.
 - **Don't** hide table columns on small screens (`hidden md:table-cell`) or truncate data a person needs; scroll, wrap, or move it into a sheet or popover.
 - **Don't** open an editor inline at the top of a list page; use `EditorSheet` (or a Dialog for a short form).
 - **Don't** let a page scroll sideways; a grid whose items hold long unbreakable text uses `grid-cols-[minmax(0,1fr)]`.

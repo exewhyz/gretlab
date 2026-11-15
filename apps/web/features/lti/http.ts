@@ -18,9 +18,9 @@ const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)}
 export function errorPage(error: unknown) {
   const known = error instanceof ApiError
   if (!known) console.error("[lti]", error)
-  const message = known ? error.message : "Something went wrong opening Gretlab from your course."
+  const message = known ? error.message : "Something went wrong opening GretLab from your course."
   return new NextResponse(
-    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Couldn't open Gretlab</title></head><body style="font-family:system-ui;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5"><h1 style="font-size:1.25rem">Couldn't open Gretlab</h1><p data-testid="lti-error">${escape(message)}</p><p style="color:#666">Go back to your course and try the link again. If it keeps happening, tell your teacher.</p></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Couldn't open GretLab</title></head><body style="font-family:system-ui;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5"><h1 style="font-size:1.25rem">Couldn't open GretLab</h1><p data-testid="lti-error">${escape(message)}</p><p style="color:#666">Go back to your course and try the link again. If it keeps happening, tell your teacher.</p></body></html>`,
     { status: known ? error.status : 500, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } }
   )
 }

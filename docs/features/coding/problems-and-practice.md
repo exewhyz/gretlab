@@ -32,7 +32,7 @@ solve, with the daily challenge, personal lists and a leaderboard around it.
   that uses them, once it opens.
 - **Statements are Markdown**, with input format, output format and constraints kept as their own
   fields and samples taken from the tests. Raw HTML is shown as text, never run, so organizations can
-  write problems safely. Images are uploaded and served by Gretlab itself.
+  write problems safely. Images are uploaded and served by GretLab itself.
 
 ## Around the library
 

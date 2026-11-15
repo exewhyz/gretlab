@@ -1,15 +1,15 @@
 ---
 title: Introduction
-description: What Gretlab is, who it's for, what it does, and how these docs are organized.
+description: What GretLab is, who it's for, what it does, and how these docs are organized.
 ---
 
-**Gretlab** is one place where a learning organization runs its day and its people learn, with a
+**GretLab** is one place where a learning organization runs its day and its people learn, with a
 coding lab built in. A school takes registers, sets timetables, approves leave, keeps student
 records and prints report cards. A college does the same by course and semester. A coaching
 institute, a cohort program, a company's training team or a community runs its own way. And all of
 them can set programming work that's judged by running students' code in a sandbox.
 
-Many organizations share one Gretlab, but each only ever sees its own data. A person keeps one
+Many organizations share one GretLab, but each only ever sees its own data. A person keeps one
 account and can belong to several organizations: a college, a company and a club, say.
 
 ## Who it's for
@@ -49,18 +49,18 @@ discussion together.
 
 ## How these docs are organized
 
-- **Start here** explains Gretlab: how it works, the roles, the kinds of organization, the words.
+- **Start here** explains GretLab: how it works, the roles, the kinds of organization, the words.
 - **Features** is a page per feature: who uses it, where it is, the permissions behind it, how it
   works and how to do each thing.
 - **Guides** are formats and integrations: importing problems and questions, and the organization
   API.
-- **Setup & operations** is for the people who install and run Gretlab.
+- **Setup & operations** is for the people who install and run GretLab.
 - **Reference** lists roles, permissions, kinds and modules, read from the app itself, so always
   current.
 
 ## Try it with the demo data
 
-The quickest way to understand Gretlab is to build the demo on your own machine. One command makes an
+The quickest way to understand GretLab is to build the demo on your own machine. One command makes an
 organization of each kind (a school, a college, a coaching institute, a cohort program, a company and a
 community) with a few months of realistic activity, and prints an account to try for every role. See
 [Demo data](/setup/demo-data/).

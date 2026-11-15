@@ -96,7 +96,7 @@ export async function transferCertificatePdf(
   signature(w, `Prepared by${tc.issuedBy ? `: ${tc.issuedBy}` : ""}`, 0, 3)
   signature(w, "Checked by", 1, 3)
   signature(w, "Principal (with seal)", 2, 3)
-  footers(doc, fonts, `${tc.number} · printed from Gretlab`)
+  footers(doc, fonts, `${tc.number} · printed from GretLab`)
   return doc
 }
 
@@ -254,7 +254,7 @@ export async function idCardsPdf(
   footers(
     doc,
     fonts,
-    `${data.class}, ${data.year} · printed ${printedOn} from Gretlab`
+    `${data.class}, ${data.year} · printed ${printedOn} from GretLab`
   )
   return doc
 }

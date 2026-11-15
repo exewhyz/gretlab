@@ -1,13 +1,10 @@
 import type { Metadata } from "next"
 
 import { Playground } from "@/features/lab/components/playground"
+import { pageMetadata } from "@/lib/seo/metadata"
 
-export const metadata: Metadata = {
-  title: "Code playground",
-  description:
-    "Write and run Python, JavaScript, C, C++ or Java in your browser, with multiple files and a real compiler, no setup needed.",
-  alternates: { canonical: "/playground" },
-}
+// Title and description: lib/seo/config.ts.
+export const generateMetadata = (): Promise<Metadata> => pageMetadata("playground")
 
 export default function PlaygroundPage() {
   return (

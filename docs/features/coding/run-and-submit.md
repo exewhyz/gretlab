@@ -11,7 +11,7 @@ glance:
   module: coding
 ---
 
-Gretlab keeps two buttons, the same model as LeetCode and HackerRank, and keeps them distinct
+GretLab keeps two buttons, the same model as LeetCode and HackerRank, and keeps them distinct
 everywhere.
 
 ## How it works

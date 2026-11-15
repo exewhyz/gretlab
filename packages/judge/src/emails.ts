@@ -38,7 +38,7 @@ export interface TemplateDefinition {
 
 /** Placeholders every template may use. */
 export const COMMON_VARS: readonly TemplateVar[] = [
-  { key: "site", description: "The site's name", example: "Gretlab" },
+  { key: "site", description: "The site's name", example: "GretLab" },
   { key: "siteUrl", description: "The site's address", example: "https://gretlab.example.com" },
 ]
 

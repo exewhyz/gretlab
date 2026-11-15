@@ -3,7 +3,7 @@ title: The organization API
 description: API keys for an organization's own API, the endpoints to start with, paged lists, and signed webhooks.
 ---
 
-Gretlab's web app and other systems use the same API, at `/api/v1`. This guide covers what another system needs:
+GretLab's web app and other systems use the same API, at `/api/v1`. This guide covers what another system needs:
 
 - a key to call an organization's API;
 - the endpoints it's most likely to want;
@@ -16,7 +16,7 @@ Keys and webhooks are under **Manage › Integrations**. Only people who manage 
 - **One system, one key.** Make a key for each system that connects, so you can revoke one without the others. A key:
   - belongs to one organization, and only works on its addresses (`/api/v1/orgs/<slug>/…`);
   - acts as the person who made it, but only with the permissions chosen for it, and only those that person holds across the organization;
-  - is shown once, when made. Gretlab keeps only a fingerprint (SHA-256), so a lost key can't be recovered: make a new one;
+  - is shown once, when made. GretLab keeps only a fingerprint (SHA-256), so a lost key can't be recovered: make a new one;
   - can be revoked at any time, and stops working at once;
   - appears in the activity log by name, for every change it makes. Its maker's name is there too ("Name <email>, API key "SIS"").
 - **Sending it.** Every request carries it as a bearer token:
@@ -45,7 +45,7 @@ Every error is JSON:
 { "error": { "code": "forbidden", "message": "This needs the \"See members\" permission." } }
 ```
 
-An unexpected failure is a 500 with a short `ref`. Quote it to the people who run Gretlab: the same `ref` is in the server log.
+An unexpected failure is a 500 with a short `ref`. Quote it to the people who run GretLab: the same `ref` is in the server log.
 
 ### Endpoints to start with
 
@@ -105,7 +105,7 @@ Gretlab-Signature: t=1794631200,v1=9e2b…
 ```
 
 - **Answering.** Answer with any 2xx within 10 seconds; do slow work afterwards.
-- **Retries.** Anything else, or no answer, is tried again after 1, 5 and 15 minutes, then 1, 3, 8 and 24 hours. After eight tries Gretlab gives up and shows "Gave up".
+- **Retries.** Anything else, or no answer, is tried again after 1, 5 and 15 minutes, then 1, 3, 8 and 24 hours. After eight tries GretLab gives up and shows "Gave up".
 - **Duplicates.** A delivery can arrive more than once. Use `Gretlab-Delivery` (the same as `id`) to skip one you've already handled.
 - **Checking the setup.** "Send a test" on the Integrations page sends an `event: "ping"` delivery.
 

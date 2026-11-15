@@ -23,10 +23,62 @@ export const SETTINGS = {
   },
   "site.title": {
     label: "Site title",
-    description: "Shown in the top bar.",
+    description:
+      "The site's name: in the top bar, page titles, search results and link previews.",
     group: "Site",
     schema: z.string().trim().min(1).max(80),
-    default: "Python Practice Lab" as string,
+    default: "GretLab" as string,
+  },
+  "seo.site_url": {
+    label: "Site address",
+    description:
+      "The public address search engines and link previews use: canonical links, the sitemap, structured data and share cards. Without a slash at the end.",
+    group: "Search engines",
+    schema: z
+      .string()
+      .trim()
+      .regex(/^https?:\/\/[^\s/]+(\/[^\s]*[^\s/])?$/, "A full address such as https://gretlab.grettech.com, without a slash at the end"),
+    default: "https://gretlab.grettech.com" as string,
+  },
+  "seo.description": {
+    label: "Site description",
+    description:
+      "What search results and link previews say about the site, for pages without their own. About 150 characters reads best.",
+    group: "Search engines",
+    schema: z.string().trim().min(20).max(300),
+    default:
+      "GretLab runs a school, college or training program's day (attendance, timetables, leave, records, exams and report cards) with a coding lab built in: practice problems, graded assignments, lab exams and contests judged in a secure sandbox." as string,
+  },
+  "seo.tagline": {
+    label: "Tagline",
+    description: "One line: the home page's title and the share card's headline.",
+    group: "Search engines",
+    schema: z.string().trim().min(3).max(80),
+    default: "The coding lab and the school day, in one place" as string,
+  },
+  "seo.indexing": {
+    label: "Let search engines index the site",
+    description:
+      "Off: every page asks search engines not to index it and robots.txt turns crawlers away. For a staging or private copy.",
+    group: "Search engines",
+    schema: z.boolean(),
+    default: true,
+  },
+  "seo.google_verification": {
+    label: "Google Search Console code",
+    description:
+      "The content of the HTML tag Search Console gives you to verify the site (google-site-verification). Empty: none.",
+    group: "Search engines",
+    schema: z.string().trim().max(100),
+    default: "" as string,
+  },
+  "seo.bing_verification": {
+    label: "Bing Webmaster Tools code",
+    description:
+      "The content of the msvalidate.01 tag Bing gives you to verify the site. Empty: none.",
+    group: "Search engines",
+    schema: z.string().trim().max(100),
+    default: "" as string,
   },
   "server_execution.enabled": {
     label: "Server execution",

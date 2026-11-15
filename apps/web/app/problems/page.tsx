@@ -5,13 +5,10 @@ import { PageHeader } from "@/components/page-header"
 import { ProblemLibrary } from "@/features/catalog/components/problem-library"
 import { getCatalog } from "@/features/catalog/server"
 import { getSettings } from "@/features/settings/server"
+import { pageMetadata } from "@/lib/seo/metadata"
 
-export const metadata: Metadata = {
-  title: "Coding problems",
-  description:
-    "Free programming practice problems by topic and difficulty, in Python, JavaScript, C, C++ and Java, with hints, editorials and a judge that runs your code in the browser.",
-  alternates: { canonical: "/problems" },
-}
+// Title and description: lib/seo/config.ts.
+export const generateMetadata = (): Promise<Metadata> => pageMetadata("problems")
 
 export const revalidate = 60
 

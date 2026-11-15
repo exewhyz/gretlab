@@ -2551,7 +2551,7 @@ export const projectSubmissions = pgTable(
 
 /*
  * LTI 1.3: learning platforms (Moodle, Canvas, Blackboard) an organization connects, so
- * their courses open Gretlab with people signed in and grades go back. features/lti.
+ * their courses open GretLab with people signed in and grades go back. features/lti.
  */
 
 /** An LMS registration: what the LMS gave the organization's admin. */
@@ -2652,7 +2652,7 @@ export const ltiDeepLinks = pgTable("lti_deep_links", {
   usedAt: timestamp("used_at", { withTimezone: true }),
 })
 
-/** Gretlab's own signing keys (deep linking responses, grade service tokens). */
+/** GretLab's own signing keys (deep linking responses, grade service tokens). */
 export const ltiKeys = pgTable("lti_keys", {
   kid: text("kid").primaryKey(),
   privateKey: text("private_key").notNull(),

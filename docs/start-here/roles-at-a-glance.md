@@ -1,6 +1,6 @@
 ---
 title: Roles at a glance
-description: Who does what in Gretlab, from platform staff to parents, and where each one starts.
+description: Who does what in GretLab, from platform staff to parents, and where each one starts.
 ---
 
 What someone can do comes from their **roles**. Inside an organization, a role is given across the

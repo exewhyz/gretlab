@@ -6,7 +6,7 @@ import { NOTO_SANS_BOLD, NOTO_SANS_REGULAR } from "./fonts"
 /*
  * A small layout layer over pdf-lib for the school's documents (report cards, transfer
  * certificates, ID cards): A4 pages, wrapped text, tables that continue on the next page,
- * and Gretlab's colours. Measurements are PDF points (1/72 inch); mm() converts.
+ * and GretLab's colours. Measurements are PDF points (1/72 inch); mm() converts.
  */
 
 export const A4 = { width: 595.28, height: 841.89 }
@@ -47,8 +47,8 @@ export async function newDocument(meta: { title: string; author: string }) {
   ])
   doc.setTitle(meta.title)
   doc.setAuthor(meta.author)
-  doc.setCreator("Gretlab")
-  doc.setProducer("Gretlab")
+  doc.setCreator("GretLab")
+  doc.setProducer("GretLab")
   return { doc, fonts: { regular, bold } satisfies Fonts }
 }
 
@@ -378,7 +378,7 @@ export function signature(
   })
 }
 
-/** "Printed on 12 Nov 2026 by Gretlab" at the bottom of every page. */
+/** "Printed on 12 Nov 2026 by GretLab" at the bottom of every page. */
 export function footers(doc: PDFDocument, fonts: Fonts, text: string) {
   const pages = doc.getPages()
   pages.forEach((p, i) => {

@@ -1,4 +1,4 @@
-# Gretlab docs
+# GretLab docs
 
 The documentation site, built with [Astro](https://astro.build) and
 [Starlight](https://starlight.astro.build).
@@ -10,7 +10,7 @@ this site publishes it.
 - **Add a page:** a Markdown file in `docs/` with a `title` (and `description`) in its
   frontmatter, and an entry in the sidebar in `astro.config.mjs`. Plain Markdown only:
   files in `docs/` can't import this app's packages.
-- **Look:** Gretlab's tokens on Starlight's variables, in `src/styles/theme.css`
+- **Look:** GretLab's tokens on Starlight's variables, in `src/styles/theme.css`
   (`apps/web/DESIGN.md` is the source).
 
 ```sh

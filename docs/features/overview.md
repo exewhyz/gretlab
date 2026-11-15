@@ -1,9 +1,9 @@
 ---
 title: Features overview
-description: Everything Gretlab does, grouped the way the app groups it, with where each part lives.
+description: Everything GretLab does, grouped the way the app groups it, with where each part lives.
 ---
 
-Gretlab's features come in two halves: **the day**, switched on as modules to suit each kind of
+GretLab's features come in two halves: **the day**, switched on as modules to suit each kind of
 organization, and **the lab**, the coding judge. This page maps them; each has its own page.
 
 ## Coding lab

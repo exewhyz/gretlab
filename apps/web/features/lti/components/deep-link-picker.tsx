@@ -44,7 +44,7 @@ export function DeepLinkPicker({ id }: { id: string }) {
     <div className="grid gap-3" data-testid="deep-link-picker">
       <div>
         <h1 className="text-display-sm text-ink">
-          Add a Gretlab assignment to your course
+          Add a GretLab assignment to your course
         </h1>
         <p className="text-body-sm text-body">
           It appears in {data.lms} as a link with a gradebook column; students

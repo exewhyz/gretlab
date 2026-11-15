@@ -4,7 +4,7 @@ import { getDb, ltiKeys, sql } from "@workspace/db"
 
 /*
  * The JWTs LTI needs, with Node's crypto: RS256 only. Verifying takes the LMS's published
- * keys (JWKS); signing uses Gretlab's own key, made on first use and published at
+ * keys (JWKS); signing uses GretLab's own key, made on first use and published at
  * /api/v1/lti/jwks. LTI_PRIVATE_KEY (PEM) with LTI_KEY_ID replaces the stored key.
  */
 
@@ -51,7 +51,7 @@ export function signJwt(payload: Record<string, unknown>, privateKey: string, ki
   return `${head}.${body}.${b64(signature)}`
 }
 
-/** Gretlab's signing key: from the environment, or made once and kept in the database. */
+/** GretLab's signing key: from the environment, or made once and kept in the database. */
 export async function toolKey(): Promise<{ kid: string; privateKey: string; publicJwk: JsonWebKey }> {
   if (process.env.LTI_PRIVATE_KEY) {
     const privateKey = process.env.LTI_PRIVATE_KEY.replace(/\\n/g, "\n")

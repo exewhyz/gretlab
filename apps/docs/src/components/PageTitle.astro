@@ -50,7 +50,7 @@ const structured = JSON.stringify({
     {
       "@type": "BreadcrumbList",
       itemListElement: [
-        { "@type": "ListItem", position: 1, name: "Gretlab Docs", item: `${site}/` },
+        { "@type": "ListItem", position: 1, name: "GretLab Docs", item: `${site}/` },
         ...crumbs.map((name, i) => ({ "@type": "ListItem", position: i + 2, name })),
         { "@type": "ListItem", position: crumbs.length + 2, name: data.title, item: here },
       ],

@@ -1,18 +1,20 @@
-import { OG_SIZE, ogCard } from "@/lib/og-card"
-import { SITE_URL } from "@/lib/site"
+import { host, siteSettings } from "@/lib/seo/config"
+import { OG_SIZE, ogCard } from "@/lib/seo/og-card"
 
-// The share card for every page that doesn't have its own.
-export const alt = "Gretlab: the coding lab and the school day in one place"
+// The share card for every page that doesn't have its own. Name, tagline and address come
+// from Dashboard › Settings.
+export const alt = "GretLab: coding practice, graded work and contests, with the school day around them"
 export const size = OG_SIZE
 export const contentType = "image/png"
+export const revalidate = 300
 
-export default function Image() {
+export default async function Image() {
+  const site = await siteSettings()
   return ogCard({
-    title: "The coding lab and the school day, in one place",
-    lines: [
-      "Attendance, timetables, leave, records, exams and report cards,",
-      "with practice, assignments and lab exams judged in a sandbox.",
-    ],
-    footer: SITE_URL.replace(/^https?:\/\//, ""),
+    site: site.name,
+    title: site.tagline,
+    lines: ["Practice, assignments, lab exams and contests, judged in a sandbox and graded automatically."],
+    footer: host(site),
+    editor: true,
   })
 }

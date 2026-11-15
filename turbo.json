@@ -35,7 +35,8 @@
         "PROXY_SECRET",
         "CLIENT_IP_HEADER",
         "RESEND_*",
-        "CRON_SECRET"
+        "CRON_SECRET",
+        "SITE_URL"
       ]
     },
     "lint": {

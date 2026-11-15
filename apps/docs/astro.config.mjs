@@ -12,10 +12,10 @@ export default defineConfig({
   site: SITE,
   integrations: [
     starlight({
-      title: "Gretlab Docs",
+      title: "GretLab Docs",
       description:
-        "Guides for running Gretlab: importing problems and questions, the organization API, lab exams and scaling.",
-      logo: { src: "./src/assets/mark.svg", alt: "Gretlab" },
+        "Guides for running GretLab: importing problems and questions, the organization API, lab exams and scaling.",
+      logo: { src: "./src/assets/mark.svg", alt: "GretLab" },
       favicon: "/favicon.svg",
       // Every page: a share card (public/og.png), the large card on X, and who publishes the
       // site as structured data. Pages add their own breadcrumbs (components/PageTitle).
@@ -25,7 +25,7 @@ export default defineConfig({
         { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
         {
           tag: "meta",
-          attrs: { property: "og:image:alt", content: "Gretlab documentation" },
+          attrs: { property: "og:image:alt", content: "GretLab documentation" },
         },
         { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
         { tag: "meta", attrs: { name: "twitter:image", content: `${SITE}/og.png` } },
@@ -36,12 +36,12 @@ export default defineConfig({
             "@context": "https://schema.org",
             "@type": "WebSite",
             "@id": `${SITE}/#website`,
-            name: "Gretlab Docs",
+            name: "GretLab Docs",
             url: SITE,
             inLanguage: "en",
             publisher: {
               "@type": "Organization",
-              name: "Gretlab",
+              name: "GretLab",
               url: APP,
               logo: `${APP}/icon.svg`,
             },
@@ -74,7 +74,7 @@ export default defineConfig({
           label: "Start here",
           items: [
             { label: "Introduction", slug: "start-here/introduction" },
-            { label: "How Gretlab works", slug: "start-here/how-gretlab-works" },
+            { label: "How GretLab works", slug: "start-here/how-gretlab-works" },
             { label: "Roles at a glance", slug: "start-here/roles-at-a-glance" },
             { label: "Kinds of organization", slug: "start-here/kinds-of-organization" },
             { label: "Glossary", slug: "start-here/glossary" },

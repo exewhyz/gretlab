@@ -232,7 +232,7 @@ export function AppFrame({
             <Link
               href="/"
               className="font-mono text-sm font-bold tracking-tighter text-primary"
-              aria-label="Gretlab home"
+              aria-label="GretLab home"
             >
               &gt;&gt;&gt;
             </Link>

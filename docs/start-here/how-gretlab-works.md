@@ -1,5 +1,5 @@
 ---
-title: How Gretlab works
+title: How GretLab works
 description: Accounts and organizations, groups and roles, modules, the switcher, and what happens when someone runs code.
 ---
 

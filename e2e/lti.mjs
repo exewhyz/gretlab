@@ -1,7 +1,7 @@
 /**
  * LTI 1.3 against a fake LMS run here (its own keys, token and grades endpoints): login
  * initiation, signed launches (and every way one is refused), accounts, classes and roles,
- * deep linking (Gretlab's signature checked like an LMS would), sending grades, the pages.
+ * deep linking (GretLab's signature checked like an LMS would), sending grades, the pages.
  * The server needs LTI_ALLOW_HTTP=true (the fake LMS is http) and GITHUB_LOOKUP=off.
  *   node e2e/lti.mjs [base-url] [screenshot-dir]
  */
@@ -70,7 +70,7 @@ const server = createServer(async (req, res) => {
 })
 await new Promise((r) => server.listen(LMS_PORT, r))
 
-// ---------- Gretlab side
+// ---------- GretLab side
 const cleanup = () => {
   psql(`delete from assignments where title like 'lti %'`)
   psql(`delete from organizations where slug = 'ltitest'`)
@@ -196,7 +196,7 @@ check("it lists the college's assignments", choices?.assignments?.some((a) => a.
 const answer = (await tedApi(`/lti/deep-link/${pickId}`, { body: { assignmentId: assignment.id } })).json
 const reply = answer?.jwt ? await verifyWithTool(answer.jwt) : null
 const item = reply?.["https://purl.imsglobal.org/spec/lti-dl/claim/content_items"]?.[0]
-check("the answer is signed by Gretlab and checks out", reply?.iss === "gl-client" && reply.aud === LMS && reply[`${C}message_type`] === "LtiDeepLinkingResponse" && reply[`${C}deployment_id`] === "dep-1" && reply["https://purl.imsglobal.org/spec/lti-dl/claim/data"] === "abc")
+check("the answer is signed by GretLab and checks out", reply?.iss === "gl-client" && reply.aud === LMS && reply[`${C}message_type`] === "LtiDeepLinkingResponse" && reply[`${C}deployment_id`] === "dep-1" && reply["https://purl.imsglobal.org/spec/lti-dl/claim/data"] === "abc")
 check("with the assignment as a link and a gradebook column", item?.type === "ltiResourceLink" && item.custom.assignment === "lti-project" && item.lineItem.scoreMaximum === 10 && answer.returnUrl === `${LMS}/dl-return`)
 check("a choice is used once", (await tedApi(`/lti/deep-link/${pickId}`, { body: { assignmentId: assignment.id } })).status === 404)
 

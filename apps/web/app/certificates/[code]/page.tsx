@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Certificate", robots: { index: false
 export default async function Page({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
   const [c, settings] = await Promise.all([verifyCertificate(code), getSettings()])
-  const site = settings["site.title"] || "Gretlab"
+  const site = settings["site.title"] || "GretLab"
   if (!c) {
     return (
       <main className="mx-auto grid min-h-dvh max-w-xl content-center gap-2 p-6 text-center">

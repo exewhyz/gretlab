@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Turns a fresh Ubuntu 22.04 or 24.04 server into a Gretlab code judge (a runner):
+# Turns a fresh Ubuntu 22.04 or 24.04 server into a GretLab code judge (a runner):
 # Docker, gVisor, the sandbox images and the runner, then proves sandboxes run under gVisor
 # with the 16 hostile-program tests. Safe to run again (it updates and restarts).
 #

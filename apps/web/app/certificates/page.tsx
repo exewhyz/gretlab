@@ -36,7 +36,7 @@ export default async function Page() {
                 >
                   <span className="font-semibold text-ink">{c.title}</span>
                   <span className="text-caption">
-                    {c.org ?? "Gretlab"} · {formatDate(c.issuedAt)}
+                    {c.org ?? "GretLab"} · {formatDate(c.issuedAt)}
                     {c.revoked
                       ? " · Revoked"
                       : c.expired

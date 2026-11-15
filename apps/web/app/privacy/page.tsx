@@ -1,12 +1,9 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { pageMetadata } from "@/lib/seo/metadata"
 
-export const metadata: Metadata = {
-  title: "Privacy",
-  description:
-    "What Gretlab keeps of your code and your account, who can read it, and how its ads use cookies.",
-  alternates: { canonical: "/privacy" },
-}
+// Title and description: lib/seo/config.ts.
+export const generateMetadata = (): Promise<Metadata> => pageMetadata("privacy")
 
 const LINK = "underline underline-offset-2 hover:text-ink"
 

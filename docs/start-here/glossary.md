@@ -1,6 +1,6 @@
 ---
 title: Glossary
-description: The words Gretlab uses, in one place.
+description: The words GretLab uses, in one place.
 ---
 
 ## Accepted
@@ -30,12 +30,12 @@ other). Chosen once, never changed. See [Kinds of organization](/start-here/kind
 
 ## Module
 
-A part of Gretlab an organization can switch on or off (attendance, exams, the library, the coding
+A part of GretLab an organization can switch on or off (attendance, exams, the library, the coding
 lab). Limited by the kind and by the platform's policy for it.
 
 ## Organization
 
-One school, college, company or community on Gretlab, with its own members, groups, roles and data.
+One school, college, company or community on GretLab, with its own members, groups, roles and data.
 
 ## Permission
 
@@ -44,7 +44,7 @@ One thing a role allows, such as "Take attendance". Some have finer actions unde
 
 ## Platform
 
-Gretlab itself, run by platform staff: the library, the platform's own contests and assignments, and
+GretLab itself, run by platform staff: the library, the platform's own contests and assignments, and
 the organizations. "Personal" content is the platform's.
 
 ## Role

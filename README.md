@@ -1,4 +1,4 @@
-# Gretlab
+# GretLab
 
 A coding lab and LMS for colleges: practice problems, graded assignments and lab exams judged in a secure sandbox, quizzes, contests and courses, run by many colleges from one deployment.
 

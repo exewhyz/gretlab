@@ -222,7 +222,7 @@ export async function pingWebhook(slug: string, user: User, id: string) {
   await getDb().insert(webhookDeliveries).values({
     webhookId: hook.id,
     event: "ping",
-    payload: { event: "ping", at: new Date().toISOString(), organization: ctx.org.id, summary: "A test from Gretlab" },
+    payload: { event: "ping", at: new Date().toISOString(), organization: ctx.org.id, summary: "A test from GretLab" },
   })
   await deliverDueWebhooks()
 }

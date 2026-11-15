@@ -419,7 +419,7 @@ export async function feedFor(token: string, origin: string) {
     .where(eq(users.calendarToken, token))
   if (!user || user.disabled) throw notFound("Not found")
   const events = await eventsFor(user)
-  const site = (await getSettings())["site.title"] || "Gretlab"
+  const site = (await getSettings())["site.title"] || "GretLab"
   const items: CalendarEvent[] = events.map((e) => ({
     uid: `${e.id}@${new URL(origin).host}`,
     title: e.title,
