@@ -18,6 +18,12 @@ colors:
   destructive: "#cf2d56"
   amber: "#c98a1b"
 typography:
+  display-xl:
+    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "60px"
+    fontWeight: 400
+    lineHeight: 1.04
+    letterSpacing: "-1.8px"
   display-lg:
     fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
     fontSize: "36px"
@@ -236,6 +242,7 @@ Status colours appear mainly as text, or as a 5–10% tint behind text (`bg-succ
 **Character:** a neutral sans with light-weight displays and semibold titles. The contrast in weight, not size, sets the hierarchy, which keeps dense screens calm. Mono appears only where something is code.
 
 ### Hierarchy
+- **Display XL** (400; 60px; 1.04; -1.8px): the landing page's headline and closing line only, from `sm` up (phones use `display-lg`). Never in the app.
 - **Display** (400; 36 / 26 / 22px; line-height 1.2–1.3; slightly negative tracking): page titles. `display-lg` for the main heading of a home or landing view, `display-sm` for most page titles.
 - **Title** (600; 18px and 16px; 1.4): section and card headings, figures in `Stats`. `title-sm` is the most common heading inside cards.
 - **Body** (400; 16px and 14px; 1.5): `body-sm` (14px) is the working size for app screens, tables and forms; `body-md` for longer reading such as problem statements. Keep prose to about 65–75ch.
@@ -327,6 +334,14 @@ A table wider than its column scrolls sideways inside its own box (`ScrollX` in 
 
 ### The Mark
 Code braces holding a check, on a rounded ink tile (radius 14 of 64): cream braces, a Signal Orange check. It says what GretLab does: code goes in, and it comes out judged and graded (the Accepted verdict, the gradebook, the report card). In the header it sits at 28px beside the site name in `title-sm` semibold ink. The tile follows the text colour and the braces the page colour, so it inverts in dark mode while the check stays orange. The shapes live in `components/logo.tsx` (`MARK`, `LogoMark`) and draw the favicon (`app/icon.svg`), the Apple icon, `public/logo.png` (512px, for structured data), the share cards and the docs' logo. Don't redraw it elsewhere; import `MARK`.
+
+### The Landing Page
+The one Persuade surface (`features/landing`, at `/` for visitors), built from the notebook's own materials rather than a marketing kit:
+- **The week as the hero.** A ruled timetable (white cells on cream, mono period times, a hatched lunch band) carries the first viewport; the headline is set into merged cells. A title bar above it holds the College / Cohort switch (ink when chosen) and names the class and week. Periods are a single-select `ToggleGroup`, so arrow keys move between them.
+- **The selection box.** The chosen period wears a 1.5px Signal Orange ring with a small orange mono tab (`Mon · P3`), like a selected layer: the page's one orange device besides the main button; it marks "now", never a status. The framed words "grades itself." in the headline use the same box in ink, with a Ledger Green "Accepted · 12/12" tab, since it shows a result.
+- **One stepped motion.** On load the selection walks a few periods (1.1s steps) and rests on the lab exam; touching the grid stops it; reduced motion starts at rest. The lab's test cells fill one by one when scrolled into view. Buttons press in to 98%. No other motion.
+- **Frame.** Content sits between two hairline guide rails with small ringed dots at the top corners. Sections are separated by full-width hairlines, headings left with a lede beside them; lists are ruled rows, never rows of equal cards.
+- **Honest demo content.** The example school, people and numbers are labelled as an example under the week.
 
 ### Stats Line
 The summary above a list: a hairline above and below, items spaced 32px apart. Each item has a caption label over a `title-md` tabular figure, which turns Ledger Green or Correction Red when it's good or bad. A figure with a link underlines on hover and leads to the detail behind it.

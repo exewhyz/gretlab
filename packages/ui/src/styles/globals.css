@@ -152,6 +152,11 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
 
+  /* The landing page's headline (and nothing else): one size above display-lg. */
+  --text-display-xl: 60px;
+  --text-display-xl--line-height: 1.04;
+  --text-display-xl--letter-spacing: -1.8px;
+  --text-display-xl--font-weight: 400;
   --text-display-lg: 36px;
   --text-display-lg--line-height: 1.2;
   --text-display-lg--letter-spacing: -0.72px;

@@ -143,6 +143,15 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - visitors' saved progress, code and workspaces move to the new keys once (`CarryOverProgress` on the library and problem pages, from `movedSlugs()`).
 - **Topic pages** (`/problems/topics`, `/problems/topics/<tag>`; `features/catalog/topics.ts`, `components/topics.tsx`): every tag with a public problem gets a page listing them easiest first with their openings, from the library's own catalog, so nothing extra is written or kept up. Each has its title and description, `CollectionPage` + `ItemList` + `BreadcrumbList` data, and is in the sitemap. The library links to them ("Browse by topic") and a library problem's tags link to their topic.
 
+## The landing page
+
+- Visitors at `/` get the landing page (`features/landing`); signed-in people still go to `/home`. It speaks to colleges and cohort programs (schools and other kinds get one line), and says one thing first: the coding lab that grades itself. Its first viewport is a week (`components/timetable-hero.tsx`) with a College / Cohort switch: a CSE batch's semester week or a pod's week 6 of 12 (`WEEKS` in `content.ts`), the headline set into merged cells and each period showing what GretLab does there. Below it: the coding lab as one submission followed to the student's mark, what sits around the lab for each audience (`AROUND`), one line of what's under the hood, and a close. Kept short on purpose: the owner found a longer version text-heavy and unclear. Design notes: DESIGN.md › The Landing Page; the direction contract: `apps/web/.impeccable/surfaces/app-page-tsx.md`.
+- **The main button follows the settings** (`landingFacts()` in `server.ts`): School sign-up open or reviewed gives "Register your college"; otherwise "Talk to us", the page's contact form (`#contact`). "Try the coding lab" follows the practice switch.
+- **Enquiries** (`enquiries`, migration 0072; `features/landing/enquiries.ts`): the contact form posts to `POST /api/v1/enquiries` (public; rules in `schemas.ts`, shared with the form). A hidden `website` field catches bots (answered as fine, nothing kept); at most 3 an hour per address and per email (429 `too_many_enquiries`). Each is kept and emailed to `landing.contact_email` when set; the legal contact (a privacy inbox) is never used. Dashboard › Landing page lists them for "Manage organizations" (`platform.orgs.manage`), paged and searched, with Mark handled (audited `landing.enquiry`). The privacy policy says what's kept.
+- **Proof only when real** (`landing_partners`, `landing_testimonials`): partner institutions and quotes are entered on Dashboard › Landing page by "Platform settings" (`platform.settings.manage`), audited (`landing.partner_*`, `landing.testimonial_*`); each section renders only when it has entries. Never seed or invent them.
+- **FAQ** (`components/faq.tsx`): answers must stay true of the code, like everything else on the page.
+- **Every line must stay true.** What each period, module and fact says lives in `content.ts`; change it with the feature. The example school and its numbers are demo content, labelled as such on the page. Never add customers, testimonials, usage figures or prices.
+
 ## Privacy policy and terms
 
 - `/privacy` and `/terms` (`features/legal`): the text of each is a component (`components/privacy-policy.tsx`, `components/terms.tsx`) in one Read-page frame (`legal-page.tsx`: contents beside the text, "In short", sections with anchors). The operator's details come from Dashboard › Settings › Legal (`legal.*`: who runs the site, contact email, grievance officer, postal address, governing law), read by `legalFacts()`.
@@ -817,6 +826,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - While fixing, rerun only the suites a change touches, with the same setup: `E2E_ONLY=assignments,topics pnpm test:e2e` (add `sandbox` for the attack tests). When a change needs the full regression, run it once, when every fix is in; not after each fix.
 - One suite against your dev server and database: `E2E_DB=gretlab NEXTAUTH_SECRET=<your dev secret> node e2e/<suite>.mjs http://localhost:3000 /tmp/gretlab-e2e/<dir>/`. Suites make their own users and organizations with a prefix (`lib-`, `crs-`, `tpl-`…) and delete them at the end, so they don't touch real data.
 - `e2e/stack.sh` with `e2e/load.mjs` and `e2e/resilience.mjs`: load and failure tests on the production shape. See `docs/scaling.md`.
+- `e2e/landing.mjs`: the contact form (bad input, the hidden field, kept and emailed, the hourly limit), who sees enquiries and edits partners and quotes, proof hidden until added and gone when removed, the activity log, the form and the dashboard in a browser, the FAQ on a phone.
 - `e2e/topics.mjs`: readable addresses (old numbers redirect, the API and saved browser progress follow, renaming keeps the old address, nobody takes another's, `topics` reserved) and topic pages (listing, titles, structured data, sitemap, links, a phone).
 - `e2e/features.mjs`: library, daily (problem and question), streaks, notes, lists, study plans, profiles, leaderboard, hints, editorials, integrity, editor extras and their switches.
 - `e2e/orgs.mjs`: joining, invites, groups, scoped roles, no-escalation, owners, the activity log, several organizations; organization content aimed at groups (contests, assignments, problems, notices, gradebooks, import); teaching logs, teacher home and reports; outcomes (POs, COs, tagging, attainment); and the pages.
@@ -955,7 +965,6 @@ Status is updated as items ship; anything not ticked has not been built.
 **On hold (the owner's decision, November 2026), don't start without asking:**
 - fees and payments (the `finance` module is listed but not ready);
 - using Google's sign-in strength (amr/auth_time) in two-factor;
-- the public landing page.
 
 **Open follow-ups:**
 - A flaky check in `e2e/assignments.mjs`: "locked: drafts from before the exam don't come back". It fails now and then and passes when rerun alone; the cause isn't found yet (the clocks of the app and the database agreed).

@@ -6,6 +6,7 @@ import { Button } from "@workspace/ui/components/button"
 import {
   BellRingingIcon,
   BooksIcon,
+  BrowserIcon,
   BuildingsIcon,
   CalendarStarIcon,
   ChalkboardIcon,
@@ -189,6 +190,12 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         icon: BellRingingIcon,
         label: "Notifications",
         needs: ["platform.notifications.manage"],
+      },
+      {
+        href: "/admin/landing",
+        icon: BrowserIcon,
+        label: "Landing page",
+        needs: ["platform.orgs.manage", "platform.settings.manage"],
       },
       {
         href: "/admin/emails",

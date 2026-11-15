@@ -8,6 +8,21 @@ aren't listed.
 
 ## 15 November 2026
 
+### A landing page
+
+- Visitors to the site now land on a page for colleges and cohort programs: the coding lab that
+  grades itself, shown inside a week you can switch between a college's semester and a cohort's
+  run. Each period shows what GretLab does in it, from lab exams and grade cards to mentors,
+  GitHub projects and graduation.
+- Its main button follows your settings: **Register your college** when sign-up is open, otherwise
+  **Talk to us**, a short contact form on the page.
+- **Enquiries** from that form are listed on **Dashboard › Landing page** to follow up and mark
+  handled, and emailed to the contact email for organizations (Dashboard › Settings › Landing page).
+- **Questions, answered:** an FAQ on the page.
+- **Partners and testimonials:** add real institutions and quotes on Dashboard › Landing page; each
+  section appears only once it has some.
+- Signed-in people still go straight to their home.
+
 ### Fixes
 
 - The **d** shortcut for light and dark no longer fires while you type in the code editor or a

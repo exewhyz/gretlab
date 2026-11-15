@@ -29,11 +29,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   )
   const newest = rows[0]?.updatedAt ?? new Date()
   return [
+    { url: absolute(site, "/"), lastModified: newest, changeFrequency: "weekly", priority: 1 },
     {
       url: absolute(site, "/problems"),
       lastModified: newest,
       changeFrequency: "weekly",
-      priority: 1,
+      priority: 0.9,
     },
     ...rows.map((row) => ({
       url: absolute(site, `/problems/${row.slug}`),

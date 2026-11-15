@@ -80,6 +80,14 @@ export const SETTINGS = {
     schema: z.string().trim().max(100),
     default: "" as string,
   },
+  "landing.contact_email": {
+    label: "Contact email for organizations",
+    description:
+      "Where the landing page's \"Talk to us\" button writes to when school sign-up is off: whoever answers schools and colleges asking to join. Empty: the button offers to create an account instead.",
+    group: "Landing page",
+    schema: z.union([z.literal(""), z.string().trim().email().max(200)]),
+    default: "" as string,
+  },
   "legal.operator": {
     label: "Who runs the site",
     description:

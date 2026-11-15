@@ -51,7 +51,7 @@ One platform for every kind of organization: school, college, coaching institute
 - **Permissions:** access is per permission and per group (a class teacher sees their class). The sidebar (`ORG_NAV`), home cards and APIs follow one rule, and a link appears only where its page opens.
 - **Modules:** switched per organization within the kind's policy. A switched-off module leaves no trace in the UI.
 - **Wording:** follows the kind's terms everywhere.
-- **Undecided or on hold:** fees and payments, the public landing page, and Google's sign-in strength in two-factor.
+- **Undecided or on hold:** fees and payments, and Google's sign-in strength in two-factor.
 
 ## Brand Commitments
 

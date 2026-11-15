@@ -89,6 +89,11 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               the network address and browser of actions recorded in an organization&apos;s
               or the platform&apos;s activity log, and failed sign-in attempts.
             </Item>
+            <Item term="The contact form">
+              if you write to us from the front page: your name and email, your organization, its
+              kind and roughly how many learners it has, your message, and the network address it
+              came from, which is used only to limit how often one address can send.
+            </Item>
             <Item term="Without an account">
               nothing on our servers about your code: it stays in your browser, and Python
               runs on your own device.
@@ -146,6 +151,10 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
           </Item>
           <Item term="Parents and guardians">
             what their linked child can see about themselves, read only.
+          </Item>
+          <Item term="Enquiries">
+            what you send through the contact form is read by the people who run {site} and look
+            after new organizations, and emailed to them. It isn't shared with anyone else.
           </Item>
           <Item term="Our staff">
             people who run {site} may see data to support an organization or keep the
@@ -221,6 +230,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
           <List>
             <li>Emailed sign-in codes last 10 minutes, and password and confirmation links an hour or a day; each works once.</li>
             <li>Records of emails sent are deleted after 7 days, and of emails that failed after 30.</li>
+            <li>An enquiry from the contact form is kept so we can follow it up; write to us to have yours deleted.</li>
             <li>Your working copy keeps its latest 2,000 changes per problem and language.</li>
             <li>Exam network addresses are kept until the teacher removes them, which they can do once they no longer need them.</li>
           </List>

@@ -1513,6 +1513,55 @@ export const orgHolidays = pgTable(
   (table) => [index("org_holidays_org_day").on(table.orgId, table.startsOn)]
 )
 
+/**
+ * A request from the landing page's contact form: someone at a college, cohort program or
+ * school asking about GretLab. Emailed to the organizations contact and listed on
+ * Dashboard › Landing page for follow-up. `ip` only limits how often one address can send.
+ */
+export const enquiries = pgTable(
+  "enquiries",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    organization: text("organization").notNull(),
+    /** college, cohort, school or other. */
+    kind: text("kind").notNull(),
+    /** Roughly how many learners: "under 100", "100–500", "500–2,000", "over 2,000". */
+    learners: text("learners").notNull(),
+    message: text("message").notNull().default(""),
+    /** new or handled. */
+    status: text("status").notNull().default("new"),
+    handledAt: timestamp("handled_at", { withTimezone: true }),
+    handledBy: uuid("handled_by").references(() => users.id, { onDelete: "set null" }),
+    ip: text("ip"),
+    createdAt: createdAt(),
+  },
+  (table) => [index("enquiries_created").on(table.createdAt), index("enquiries_ip").on(table.ip, table.createdAt)]
+)
+
+/** An institution that runs on GretLab, named on the landing page (only real ones, added by staff). */
+export const landingPartners = pgTable("landing_partners", {
+  id: id(),
+  name: text("name").notNull(),
+  /** college, cohort, school or other: shown beside the name. */
+  kind: text("kind").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+})
+
+/** A quote from someone who uses GretLab, shown on the landing page (only real ones, with permission). */
+export const landingTestimonials = pgTable("landing_testimonials", {
+  id: id(),
+  quote: text("quote").notNull(),
+  name: text("name").notNull(),
+  /** Their role, such as "Head of CSE". */
+  role: text("role").notNull(),
+  institution: text("institution").notNull(),
+  position: integer("position").notNull().default(0),
+  createdAt: createdAt(),
+})
+
 /** A student's marks in a paper (halves allowed), or that they missed it. */
 export const examMarks = pgTable(
   "exam_marks",

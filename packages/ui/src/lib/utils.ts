@@ -8,6 +8,7 @@ export const cn: CnFunction = createCn({
       "font-size": [
         {
           text: [
+            "display-xl",
             "display-lg",
             "display-md",
             "display-sm",

@@ -505,6 +505,13 @@
       "when": 1794725932780,
       "tag": "0071_medical_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1794759955055,
+      "tag": "0072_calm_sauron",
+      "breakpoints": true
     }
   ]
 }

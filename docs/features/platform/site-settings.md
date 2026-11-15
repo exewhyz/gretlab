@@ -47,6 +47,19 @@ Changes reach every page within five minutes. `robots.txt` and `sitemap.xml` fol
 4. In Bing Webmaster Tools, **Import from Google Search Console** (no code needed), or use the Bing code
    setting the same way.
 
+## Landing page
+
+The front page's contact form and its proof are managed on **Dashboard › Landing page**:
+
+- **Enquiries:** every request sent from the form, newest first, with search and a New / Handled
+  filter. Mark one handled once you've replied. Shown to staff who manage organizations.
+- **Partners and testimonials:** institutions that use GretLab, and quotes from people there. Add
+  only real ones, with their permission. Each section appears on the page only once it has an
+  entry, and disappears again when the last is removed. Shown to staff with Platform settings.
+
+In **Dashboard › Settings › Landing page**, **Contact email for organizations** is where each new
+enquiry is also emailed. Leave it empty and enquiries are still listed on the dashboard.
+
 ## Legal
 
 The privacy policy (`/privacy`) and terms of use (`/terms`) are written into the app and name whoever

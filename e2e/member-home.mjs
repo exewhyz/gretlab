@@ -55,7 +55,11 @@ const [student, fresh, parent] = await Promise.all(["mh-s", "mh-new", "mh-p"].ma
 
 // ---------- where / leads
 const root = async (cookie) => (await fetch(BASE + "/", { redirect: "manual", headers: cookie ? { cookie } : {} })).headers.get("location") ?? ""
-check("a visitor still goes from / to the problems", (await root(null)).endsWith("/problems"), await root(null))
+{
+  const visit = await fetch(BASE + "/", { redirect: "manual" })
+  const html = await visit.text()
+  check("a visitor gets the landing page at /, not a redirect", visit.status === 200 && html.includes('id="landing-title"') && html.includes("grades itself"), visit.status)
+}
 check("someone signed in goes from / to their home", (await root(await cookieFor("mh-s@example.com"))).endsWith("/home"))
 
 // ---------- what it gathers
