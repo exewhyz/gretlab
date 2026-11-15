@@ -1,6 +1,8 @@
 #!/bin/zsh
 # Fresh test database, production web build, a runner on real gVisor, then every check.
 # Needs Docker, built sandbox images, and Playwright's Chromium. Run: pnpm test:e2e
+# Only some suites, with the same setup (while fixing; the full run is for before merging):
+#   E2E_ONLY=assignments,topics pnpm test:e2e     (add "sandbox" for the attack tests)
 set -u
 ROOT=${0:a:h:h}; LOGS=${TMPDIR:-/tmp}/gretlab-e2e; mkdir -p $LOGS
 RIG=gretlab-gvisor-rig
@@ -26,60 +28,69 @@ RUNNER=$!
 sleep 3
 
 cd $ROOT
-DOCKER_HOST=tcp://127.0.0.1:23750 SANDBOX_RUNTIME=runsc pnpm --filter runner test:sandbox; CODE=$?
-node e2e/full.mjs all; [ $? -eq 0 ] || CODE=1
-node e2e/flows.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/features.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/topics.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/assignments.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/orgs.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/platform.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/library.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/courses.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/templates.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/warnings.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/discussions.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/peer.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/calendar.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/certificates.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/projects.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/lti.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/notifications.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/permissions.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/org-types.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/attendance.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/subjects.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/timetable.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/parents.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/books.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/transport.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/hostel.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/audit.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/two-factor.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/home.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/records.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/promotion.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/exams.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/leave.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/staff-attendance.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/admissions.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/signup.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/pdfs.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/member-home.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/links.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/org-kinds.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/college.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/cohort.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/training.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/community.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/password-auth.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/emails.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/roles.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/teach-mode.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/platform-reach.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/access-links.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/data-screens.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
-node e2e/integrations.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+CODE=0
+# One suite by name, unless E2E_ONLY names others.
+suite() {
+  local name=$1; shift
+  [[ -n "$E2E_ONLY" && ",$E2E_ONLY," != *",$name,"* ]] && return
+  node e2e/$name.mjs "$@"; [ $? -eq 0 ] || CODE=1
+}
+if [[ -z "$E2E_ONLY" || ",$E2E_ONLY," == *",sandbox,"* ]]; then
+  DOCKER_HOST=tcp://127.0.0.1:23750 SANDBOX_RUNTIME=runsc pnpm --filter runner test:sandbox || CODE=1
+fi
+suite full all
+suite flows http://localhost:3100
+suite features http://localhost:3100
+suite topics http://localhost:3100
+suite assignments http://localhost:3100
+suite orgs http://localhost:3100
+suite platform http://localhost:3100
+suite library http://localhost:3100
+suite courses http://localhost:3100
+suite templates http://localhost:3100
+suite warnings http://localhost:3100
+suite discussions http://localhost:3100
+suite peer http://localhost:3100
+suite calendar http://localhost:3100
+suite certificates http://localhost:3100
+suite projects http://localhost:3100
+suite lti http://localhost:3100
+suite notifications http://localhost:3100
+suite permissions http://localhost:3100
+suite org-types http://localhost:3100
+suite attendance http://localhost:3100
+suite subjects http://localhost:3100
+suite timetable http://localhost:3100
+suite parents http://localhost:3100
+suite books http://localhost:3100
+suite transport http://localhost:3100
+suite hostel http://localhost:3100
+suite audit http://localhost:3100
+suite two-factor http://localhost:3100
+suite home http://localhost:3100
+suite records http://localhost:3100
+suite promotion http://localhost:3100
+suite exams http://localhost:3100
+suite leave http://localhost:3100
+suite staff-attendance http://localhost:3100
+suite admissions http://localhost:3100
+suite signup http://localhost:3100
+suite pdfs http://localhost:3100
+suite member-home http://localhost:3100
+suite links http://localhost:3100
+suite org-kinds http://localhost:3100
+suite college http://localhost:3100
+suite cohort http://localhost:3100
+suite training http://localhost:3100
+suite community http://localhost:3100
+suite password-auth http://localhost:3100
+suite emails http://localhost:3100
+suite roles http://localhost:3100
+suite teach-mode http://localhost:3100
+suite platform-reach http://localhost:3100
+suite access-links http://localhost:3100
+suite data-screens http://localhost:3100
+suite integrations http://localhost:3100
 
 kill $RUNNER 2>/dev/null
 lsof -ti:3100 | xargs kill 2>/dev/null
