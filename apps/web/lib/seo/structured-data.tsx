@@ -61,6 +61,43 @@ export function breadcrumbs(site: Site, items: { name: string; path: string }[])
   }
 }
 
+/** A topic page: a collection of practice problems, listed in order, with where it sits. */
+export function topicData(
+  site: Site,
+  topic: { slug: string; name: string },
+  problems: { slug: string; title: string }[]
+) {
+  const path = `/problems/topics/${topic.slug}`
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "@id": `${absolute(site, path)}#page`,
+        name: `${topic.name} coding problems`,
+        url: absolute(site, path),
+        inLanguage: "en",
+        isPartOf: { "@id": websiteId(site) },
+        mainEntity: {
+          "@type": "ItemList",
+          numberOfItems: problems.length,
+          itemListElement: problems.map((p, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            url: absolute(site, `/problems/${p.slug}`),
+            name: p.title,
+          })),
+        },
+      },
+      breadcrumbs(site, [
+        { name: "Problems", path: "/problems" },
+        { name: "Topics", path: "/problems/topics" },
+        { name: topic.name, path },
+      ]),
+    ],
+  }
+}
+
 /** A practice problem: a free learning resource, with where it sits. */
 export function problemData(
   site: Site,

@@ -30,6 +30,7 @@ DOCKER_HOST=tcp://127.0.0.1:23750 SANDBOX_RUNTIME=runsc pnpm --filter runner tes
 node e2e/full.mjs all; [ $? -eq 0 ] || CODE=1
 node e2e/flows.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/features.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
+node e2e/topics.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/assignments.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/orgs.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1
 node e2e/platform.mjs http://localhost:3100; [ $? -eq 0 ] || CODE=1

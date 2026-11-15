@@ -29,6 +29,7 @@ import { contestFor } from "@/features/contests/server"
 import { accessTo, orgPolicy, viewpoint } from "@/features/orgs/access"
 import { cached } from "@/lib/ttl-cache"
 import { examScope, guardExamSubmission } from "@/features/exams/server"
+import { slugIs } from "@/features/problems/slugs"
 
 const { and, asc, count, desc, eq, gte, inArray, lt, ne } = sql
 
@@ -327,7 +328,7 @@ export async function createSubmission(
     ;[problem] = await db
       .select()
       .from(problems)
-      .where(eq(problems.slug, input.problemSlug))
+      .where(slugIs(input.problemSlug))
     if (!problem) throw notFound("Problem not found")
   }
   if (input.kind === "submit" && !problem) {
@@ -588,7 +589,7 @@ export async function listSubmissionsFor(
     eq(submissions.kind, "submit"),
   ]
   if (filters.problemSlug) {
-    conditions.push(eq(problems.slug, filters.problemSlug))
+    conditions.push(slugIs(filters.problemSlug))
   }
   if (filters.contestSlug) {
     conditions.push(eq(contests.slug, filters.contestSlug))

@@ -1,7 +1,7 @@
 import { LANGUAGES } from "@workspace/judge"
 import { z } from "zod"
 
-import { problemInputSchema, slugify, type ProblemInput } from "./schemas"
+import { problemInputSchema, RESERVED_SLUGS, slugify, type ProblemInput } from "./schemas"
 
 /*
  * The problem file: one format for every import (the problem library, and problems
@@ -146,4 +146,7 @@ export function readProblemFile(raw: unknown) {
   return { problems, errors }
 }
 
-export const slugFor = (p: ImportedProblem) => slugify(p.slug || p.title) || "problem"
+export const slugFor = (p: ImportedProblem) => {
+  const slug = slugify(p.slug || p.title) || "problem"
+  return RESERVED_SLUGS.has(slug) ? `${slug}-problem` : slug
+}

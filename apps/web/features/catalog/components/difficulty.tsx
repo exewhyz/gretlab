@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { cn } from "@workspace/ui/lib/utils"
 import { Button } from "@workspace/ui/components/button"
 
@@ -26,17 +27,27 @@ export function Difficulty({
 export function TagChip({
   name,
   onClick,
+  href,
   active,
 }: {
   name: string
   onClick?: () => void
+  /** Makes the chip a link (a topic page). */
+  href?: string
   active?: boolean
 }) {
   const classes = cn(
     "inline-flex items-center rounded-full border border-hairline bg-canvas-soft px-2 py-0.5 text-xs text-body",
-    onClick && "cursor-pointer hover:border-hairline-strong hover:text-ink",
+    (onClick || href) && "cursor-pointer hover:border-hairline-strong hover:text-ink",
     active && "border-ink bg-ink text-canvas hover:text-canvas"
   )
+  if (href) {
+    return (
+      <Link href={href} className={classes}>
+        {name}
+      </Link>
+    )
+  }
   return onClick ? (
     <Button
       type="button"

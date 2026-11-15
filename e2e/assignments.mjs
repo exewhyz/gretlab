@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 
+import { READABLE } from "./readable-slugs.mjs"
 const ROOT = new URL("../", import.meta.url).pathname
 const { chromium } = createRequire(ROOT + "package.json")("playwright")
 const { encode } = createRequire(ROOT + "apps/web/")("next-auth/jwt")
@@ -56,7 +57,7 @@ const SI = 'principal = float(input())\nrate = float(input())\ntime = float(inpu
 const WRONG = 'print("no")\n'
 
 const problems = (await t("/admin/problems")).json.problems
-const id = (slug) => problems.find((p) => p.slug === slug).id
+const id = (slug) => problems.find((p) => p.slug === (READABLE[slug] ?? slug)).id
 const hours = (h) => new Date(Date.now() + h * 3_600_000).toISOString()
 const body = (over) => ({ title: "Week 1", slug: "asg-week-1", description: "Do both.", opensAt: hours(-1), dueAt: hours(24), allowLate: true, latePenaltyPercent: 50, published: false, problems: [{ problemId: id("p1"), points: 100 }, { problemId: id("p2"), points: 50 }], ...over })
 
@@ -116,7 +117,7 @@ await t(`/admin/assignments/${reopen.json.id}/extensions`, { method: "PUT", body
 const leap = 'year = int(input())\nif year % 400 == 0 or (year % 4 == 0 and year % 100 != 0):\n    print("Leap year")\n    print("February has 29 days")\nelse:\n    print("Not a leap year")\n    print("February has 28 days")\n'
 check("a reopened problem can be resubmitted", (await submit(a, "p10", leap)).verdict === "AC")
 const reopened = (await a("/assignments/asg-reopen")).json
-check("only the reopened problem counts after the due time", reopened.earned === 10 && reopened.problems.find((p) => p.slug === "p10").earned === 10 && reopened.problems.find((p) => p.slug === "p1").earned === 0 && reopened.extension.problems.join() === "Q2 Leap Year", JSON.stringify(reopened.extension))
+check("only the reopened problem counts after the due time", reopened.earned === 10 && reopened.problems.find((p) => p.slug === "leap-year").earned === 10 && reopened.problems.find((p) => p.slug === "p1").earned === 0 && reopened.extension.problems.join() === "Q2 Leap Year", JSON.stringify(reopened.extension))
 
 // Opens tomorrow: students learn when, not what.
 await t("/admin/assignments", { body: body({ title: "Later", slug: "asg-later", opensAt: hours(20), dueAt: hours(40), published: true }) })

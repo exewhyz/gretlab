@@ -37,6 +37,7 @@ import { slugify } from "@/features/problems/schemas"
 import { marksItself } from "@/features/questions/schemas"
 import { usableQuestions } from "@/features/questions/server"
 import { getSettings, requireFeature } from "@/features/settings/server"
+import { idsForSlugs, slugIs } from "@/features/problems/slugs"
 
 const { and, asc, count, desc, eq, gte, inArray, isNull, or, sql: raw } = sql
 
@@ -378,7 +379,7 @@ export async function scheduleDaily(
     const [problem] = await db
       .select({ id: problems.id })
       .from(problems)
-      .where(eq(problems.slug, problemSlug))
+      .where(slugIs(problemSlug))
     if (!problem) throw notFound("Problem not found")
     problemId = problem.id
   }
@@ -707,7 +708,7 @@ async function problemIdOf(slug: string) {
   const [problem] = await getDb()
     .select({ id: problems.id })
     .from(problems)
-    .where(eq(problems.slug, slug))
+    .where(slugIs(slug))
   if (!problem) throw notFound("Problem not found")
   return problem.id
 }
@@ -965,13 +966,8 @@ export async function updateList(
         .where(eq(problemLists.id, list.id))
     }
     if (problemSlugs) {
-      const found = problemSlugs.length
-        ? await tx
-            .select({ id: problems.id, slug: problems.slug })
-            .from(problems)
-            .where(inArray(problems.slug, problemSlugs))
-        : []
-      const idOf = new Map(found.map((row) => [row.slug, row.id]))
+      // Current or former slugs (problems/slugs.ts).
+      const idOf = await idsForSlugs(tx, problemSlugs)
       await tx
         .delete(problemListItems)
         .where(eq(problemListItems.listId, list.id))

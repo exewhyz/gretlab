@@ -4,6 +4,8 @@ import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
 import { ProblemLibrary } from "@/features/catalog/components/problem-library"
 import { getCatalog } from "@/features/catalog/server"
+import { CarryOverProgress } from "@/features/lab/components/carry-over-progress"
+import { movedSlugs } from "@/features/problems/server"
 import { getSettings } from "@/features/settings/server"
 import { pageMetadata } from "@/lib/seo/metadata"
 
@@ -18,6 +20,7 @@ export default async function ProblemsPage() {
   return (
     <div className="min-h-dvh">
       <PageHeader />
+      <CarryOverProgress moved={await movedSlugs()} />
       <ProblemLibrary initial={await getCatalog()} />
     </div>
   )

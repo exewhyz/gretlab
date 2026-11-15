@@ -3,6 +3,7 @@ import type { MetadataRoute } from "next"
 import { getDb, problems } from "@workspace/db"
 import { sql } from "@workspace/db"
 
+import { listTopics } from "@/features/catalog/topics"
 import { isPublicProblem } from "@/features/problems/server"
 import { absolute, siteSettings } from "@/lib/seo/config"
 import { cached } from "@/lib/ttl-cache"
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic"
  * sign-in, and no organization's or member's own pages.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const site = await siteSettings()
+  const [site, topics] = await Promise.all([siteSettings(), listTopics()])
   const rows = await cached("sitemap-problems", 60 * 60 * 1000, () =>
     getDb()
       .select({ slug: problems.slug, updatedAt: problems.updatedAt })
@@ -39,6 +40,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: row.updatedAt,
       changeFrequency: "monthly" as const,
       priority: 0.8,
+    })),
+    {
+      url: absolute(site, "/problems/topics"),
+      lastModified: newest,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    ...topics.map((t) => ({
+      url: absolute(site, `/problems/topics/${t.slug}`),
+      lastModified: newest,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
     })),
     { url: absolute(site, "/contests"), changeFrequency: "weekly", priority: 0.5 },
     { url: absolute(site, "/privacy"), changeFrequency: "yearly", priority: 0.2 },

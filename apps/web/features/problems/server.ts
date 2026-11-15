@@ -3,6 +3,7 @@ import {
   contests,
   getDb,
   notes,
+  problemSlugHistory,
   problems,
   sql,
   problemTags,
@@ -21,6 +22,7 @@ import {
 import { revalidatePath } from "next/cache"
 
 import { ApiError, notFound } from "@/lib/api/route"
+import { cached, invalidate } from "@/lib/ttl-cache"
 import {
   getProblemTagNames,
   refreshCatalog,
@@ -31,6 +33,7 @@ import type { ProblemInput } from "./schemas"
 import { readProblemFile, slugFor, toProblemInput } from "./import"
 import { usableBy } from "@/features/library/sharing"
 import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
+import { claimSlug, currentSlug, formerSlugsLike, recordSlugChange, slugIs } from "./slugs"
 
 const { and, asc, count, desc, eq, gt, inArray, isNull, lte, or } = sql
 
@@ -208,10 +211,34 @@ export async function buildDetail(
   }
 }
 
+/**
+ * Public problems' former slugs and where they moved ({ p2: "integer-operations" }), for
+ * carrying saved browser progress over (features/lab/lib/moved-slugs.ts). Kept an hour.
+ */
+export function movedSlugs(): Promise<Record<string, string>> {
+  return cached("moved-slugs", 60 * 60 * 1000, async () => {
+    const rows = await getDb()
+      .select({ from: problemSlugHistory.slug, to: problems.slug })
+      .from(problemSlugHistory)
+      .innerJoin(problems, eq(problems.id, problemSlugHistory.problemId))
+      .where(isPublicProblem)
+    return Object.fromEntries(rows.map((r) => [r.from, r.to]))
+  })
+}
+
+/**
+ * A public problem by its slug, or by one it used to have (its `id` is then the current
+ * slug, which the page redirects to).
+ */
 export async function getPublicProblem(
   slug: string
 ): Promise<ProblemDetail | null> {
-  const row = (await numbered()).find((item) => item.problem.slug === slug)
+  const list = await numbered()
+  let row = list.find((item) => item.problem.slug === slug)
+  if (!row) {
+    const now = await currentSlug(slug)
+    row = now ? list.find((item) => item.problem.slug === now) : undefined
+  }
   return row ? buildDetail(row.problem, row.summary) : null
 }
 
@@ -247,7 +274,7 @@ export async function getProblemBySlug(slug: string) {
   const [problem] = await getDb()
     .select()
     .from(problems)
-    .where(eq(problems.slug, slug))
+    .where(slugIs(slug))
   return problem ?? null
 }
 
@@ -354,6 +381,14 @@ export async function saveProblem(
           }),
   }
   const saved = await getDb().transaction(async (tx) => {
+    // The address it had, so a change keeps old links working (slugs.ts).
+    const [before] = id
+      ? await tx
+          .select({ slug: problems.slug })
+          .from(problems)
+          .where(and(eq(problems.id, id), ownedBy(orgId)))
+      : []
+    if (!before || before.slug !== values.slug) await claimSlug(tx, values.slug, id)
     const [row] = id
       ? await tx
           .update(problems)
@@ -376,6 +411,7 @@ export async function saveProblem(
         : []
       throw exists ? editedElsewhere() : notFound("Problem not found")
     }
+    if (before) await recordSlugChange(tx, row.id, before.slug, row.slug)
     await tx.delete(testCases).where(eq(testCases.problemId, row.id))
     await tx.insert(testCases).values(
       tests.map((test, position) => ({
@@ -389,6 +425,7 @@ export async function saveProblem(
   await setProblemTags(saved.id, tagNames)
   refreshCatalog()
   refreshPublicPages(saved.slug)
+  invalidate("moved-slugs")
   return saved
 }
 
@@ -620,7 +657,10 @@ export async function importProblems(
         .select({ slug: problems.slug })
         .from(problems)
         .where(or(...wanted.map((s) => sql.like(problems.slug, `${s}%`))))
-    ).map((r) => r.slug)
+    )
+      .map((r) => r.slug)
+      // Former addresses too: they still lead to their problem.
+      .concat(await formerSlugsLike(wanted))
   )
   const inputs = found.map((p, index) => {
     const base = wanted[index]!.slice(0, 56)

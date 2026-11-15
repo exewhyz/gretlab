@@ -68,7 +68,13 @@ export function ProblemView({
       {(question.tags.length > 0 || question.unitNo > 0) && (
         <div className="-mt-2 mb-4 flex flex-wrap items-center gap-1.5">
           {question.tags.map((tag) => (
-            <TagChip key={tag.slug} name={tag.name} />
+            <TagChip
+              key={tag.slug}
+              name={tag.name}
+              // Library problems link to their topic's page; assignment and contest
+              // problems (no unit number) keep plain labels.
+              href={question.unitNo > 0 ? `/problems/topics/${tag.slug}` : undefined}
+            />
           ))}
           {question.unitNo > 0 && (
             <span className="ml-auto">

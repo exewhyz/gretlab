@@ -170,7 +170,7 @@ await api.admin(`/admin/organizations/${psql("select id from organizations where
 // ================= part 2: content belongs to organizations and is aimed at groups =================
 const C = O
 const platformProblems = (await api.admin("/admin/problems")).json.problems
-const P1 = platformProblems.find((p) => p.slug === "p1").id
+const P1 = platformProblems.find((p) => p.slug === "simple-interest").id
 const hours = (h) => new Date(Date.now() + h * 3_600_000).toISOString()
 const groupsNow = (await api.owner(`${C}/groups`)).json.groups
 const gid = (name) => groupsNow.find((g) => g.name === name).id

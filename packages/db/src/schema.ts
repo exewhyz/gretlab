@@ -145,7 +145,11 @@ export const problems = pgTable(
   "problems",
   {
     id: id(),
-    /** Stable, public id used in URLs and by saved browser progress. */
+    /**
+     * The problem's address (`/problems/<slug>`) and its id in the API and saved browser
+     * progress. Readable, from the title. When it changes, the old one goes into
+     * problem_slug_history so links keep working.
+     */
     slug: text("slug").notNull().unique(),
     unitId: uuid("unit_id").references(() => units.id, {
       onDelete: "set null",
@@ -227,6 +231,24 @@ export const testCases = pgTable(
     points: integer("points").notNull().default(1),
   },
   (table) => [index("test_cases_problem").on(table.problemId, table.position)]
+)
+
+/**
+ * Addresses a problem used to have (`/problems/p2` before it became `/problems/integer-operations`).
+ * Old links, saved browser progress and API callers still find the problem by them, and the
+ * public pages answer them with a permanent redirect. A slug here can't be given to another
+ * problem. The problem's current slug is never listed.
+ */
+export const problemSlugHistory = pgTable(
+  "problem_slug_history",
+  {
+    slug: text("slug").primaryKey(),
+    problemId: uuid("problem_id")
+      .notNull()
+      .references(() => problems.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("problem_slug_history_problem_idx").on(t.problemId)]
 )
 
 export const tags = pgTable("tags", {

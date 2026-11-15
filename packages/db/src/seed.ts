@@ -1,13 +1,16 @@
 /**
  * Imports questions from the original content.json. Safe to re-run: existing problems
- * (matched by slug) are left alone, so dashboard edits are never overwritten.
+ * (matched by slug, current or former) are left alone, so dashboard edits are never
+ * overwritten. The content's ids (p1, p2…) become each problem's former slug: at the end
+ * every number-addressed problem gets a readable slug from its title (readable-slugs.ts).
  */
 import { readFileSync } from "node:fs"
 
 import { statementToMarkdown, type ProblemCode } from "@workspace/judge"
 import { eq, sql } from "drizzle-orm"
 
-import { getDb, problems, tags, testCases, units } from "./index.ts"
+import { getDb, problemSlugHistory, problems, tags, testCases, units } from "./index.ts"
+import { READABLE_SLUGS_SQL } from "./readable-slugs.ts"
 
 interface RawQuestion {
   id: string
@@ -53,6 +56,12 @@ for (const [unitIndex, unit] of content.units.entries()) {
   if (!unitRow) throw new Error(`Could not create unit ${unit.name}`)
 
   for (const [position, question] of unit.questions.entries()) {
+    // Imported before and since given a readable slug.
+    const [moved] = await db
+      .select({ slug: problemSlugHistory.slug })
+      .from(problemSlugHistory)
+      .where(eq(problemSlugHistory.slug, question.id))
+    if (moved) continue
     const [problem] = await db
       .insert(problems)
       .values({
@@ -124,6 +133,9 @@ for (const unit of content.units) {
       AND NOT EXISTS (SELECT 1 FROM problem_tags pt WHERE pt.problem_id = p.id)
   `)
 }
+
+// Readable addresses (p2 becomes integer-operations), as migration 0071 does for older data.
+await db.execute(sql.raw(READABLE_SLUGS_SQL))
 
 // The platform's first course follows its units (as migration 0031 does for older data).
 await db.execute(sql.raw(`INSERT INTO "courses" ("id", "org_id", "title", "description", "published", "sharing")

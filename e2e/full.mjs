@@ -432,7 +432,7 @@ if (phase === "all" || phase === "ui") {
 
   // Navigation keeps the shell
   await s.getByRole("link", { name: /Integer Operations/ }).click()
-  await s.waitForURL("**/problems/p2")
+  await s.waitForURL("**/problems/integer-operations")
   check("question navigation works", await s.getByRole("heading", { name: /P2\. Integer Operations/ }).isVisible())
 
   // ---- anonymous: browser Python, multi-file, no ads requests in test

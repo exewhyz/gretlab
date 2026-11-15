@@ -498,6 +498,13 @@
       "when": 1794631613375,
       "tag": "0070_integrations",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1794725932780,
+      "tag": "0071_medical_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

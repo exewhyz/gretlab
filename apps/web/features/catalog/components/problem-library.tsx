@@ -287,6 +287,12 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
                 onClick={() => toggleTag(tag.slug)}
               />
             ))}
+            <Link
+              href="/problems/topics"
+              className="ml-1 self-center text-caption text-body underline underline-offset-2 hover:text-ink"
+            >
+              Browse by topic
+            </Link>
           </div>
         )}
 

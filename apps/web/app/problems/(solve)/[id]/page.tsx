@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import { cache } from "react"
 
 import { AdSlot } from "@/features/ads/ad-slot"
@@ -58,6 +58,8 @@ export default async function QuestionPage({ params }: QuestionPageProps) {
     siteSettings(),
   ])
   if (!question) notFound()
+  // An address the problem used to have (p2): one permanent redirect to its address now.
+  if (question.id !== id) permanentRedirect(`/problems/${question.id}`)
 
   return (
     <>

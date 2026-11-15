@@ -4,9 +4,11 @@ import type { ReactNode } from "react"
 import { AdScript } from "@/features/ads/ad-script"
 import { AdSlot } from "@/features/ads/ad-slot"
 import { PublishedWorkbench } from "@/features/lab/components/published-workbench"
+import { CarryOverProgress } from "@/features/lab/components/carry-over-progress"
 import {
   getGeneralNotices,
   listPublicProblems,
+  movedSlugs,
 } from "@/features/problems/server"
 import { getSettings } from "@/features/settings/server"
 
@@ -18,10 +20,11 @@ export const revalidate = 60
 export default async function QuestionsLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const [settings, questions, notices] = await Promise.all([
+  const [settings, questions, notices, moved] = await Promise.all([
     getSettings(),
     listPublicProblems(),
     getGeneralNotices(),
+    movedSlugs(),
   ])
   if (!settings["practice.enabled"]) redirect("/contests")
   const ads = settings["ads.enabled"]
@@ -29,6 +32,7 @@ export default async function QuestionsLayout({
   return (
     <>
       {ads && <AdScript />}
+      <CarryOverProgress moved={moved} />
       <PublishedWorkbench
         questions={questions}
         notices={notices.map(({ id, text }) => ({ id, text }))}

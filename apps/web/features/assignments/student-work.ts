@@ -54,6 +54,7 @@ import {
   responsesOn,
   round,
 } from "./grading"
+import { slugIs } from "@/features/problems/slugs"
 
 const { and, asc, eq } = sql
 
@@ -544,7 +545,7 @@ export async function assignmentsForProblem(slug: string, viewer: User) {
         eq(assignmentProblems.assignmentId, assignments.id)
       )
       .innerJoin(problems, eq(assignmentProblems.problemId, problems.id))
-      .where(and(eq(problems.slug, slug), eq(assignments.published, true))),
+      .where(and(slugIs(slug), eq(assignments.published, true))),
     viewpoint(viewer),
   ])
   const sittings = await sittingsOn(

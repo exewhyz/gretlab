@@ -31,6 +31,9 @@ export function slugify(title: string) {
     .slice(0, 63)
 }
 
+/** Addresses under /problems that belong to pages, never to a problem. */
+export const RESERVED_SLUGS = new Set(["topics"])
+
 const slug = z
   .string()
   .trim()
@@ -38,6 +41,7 @@ const slug = z
     /^[a-z0-9][a-z0-9-]{0,62}$/,
     "Use lowercase letters, numbers and dashes"
   )
+  .refine((s) => !RESERVED_SLUGS.has(s), "That address is used by the site. Choose another.")
 
 export const problemInputSchema = z.object({
   /** The version the form was opened at; see lib/api/conflict.ts. */

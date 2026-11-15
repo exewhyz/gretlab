@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync } from "node:fs"
 import { createRequire } from "node:module"
 
+import { READABLE } from "./readable-slugs.mjs"
 const ROOT = new URL("../", import.meta.url).pathname
 const { chromium } = createRequire(ROOT + "package.json")("playwright")
 const { encode } = createRequire(ROOT + "apps/web/")("next-auth/jwt")
@@ -30,7 +31,7 @@ psql(`delete from settings where key in ('lists.enabled','profiles.enabled','sit
 for (const [email, role, handle] of PEOPLE) {
   psql(`insert into users(email,name,role,handle) values ('${email}','${handle}','${role}','${handle}') on conflict (email) do update set role='${role}', handle='${handle}', disabled=false`)
 }
-psql(`update problems set hints='[]', editorial='' where slug='p2'`)
+psql(`update problems set hints='[]', editorial='' where slug='${READABLE.p2}'`)
 
 const client = async (email) => {
   const cookie = `next-auth.session-token=${await encode({ token: { email }, secret: SECRET })}`
@@ -55,7 +56,7 @@ const SI_RENAMED = '# done by myself\np = float(input())\nr = float(input())\nt 
 const SI_OTHER = 'vals = [float(input()) for _ in range(3)]\nfrom functools import reduce\nprod = reduce(lambda x, y: x * y, vals) / 100\nfor label, v in (("Simple Interest", prod), ("Total Amount", vals[0] + prod)):\n    print(label + ": " + format(v, ".2f"))\n'
 
 // ---------- admin authors hints, tags and an editorial
-const p2 = (await admin("/admin/problems")).json.problems.find((p) => p.slug === "p2")
+const p2 = (await admin("/admin/problems")).json.problems.find((p) => p.slug === "integer-operations")
 const full = (await admin(`/admin/problems/${p2.id}`)).json
 const saved = await admin(`/admin/problems/${p2.id}`, { method: "PUT", body: { ...full, tests: full.tests.map(({ input, expected, isSample, points }) => ({ input, expected, isSample, points })), hints: ["Python has an operator for each one.", "Watch out: `//` rounds toward negative infinity."], editorial: "Use each operator once.\n\n```\nprint(a // b)\n```", tags: ["Operators", "Math"] } })
 check("admin saves hints, tags and an editorial", saved.status === 200, JSON.stringify(saved.json).slice(0, 120))
@@ -92,7 +93,7 @@ check("older callers' statement blocks become markdown, the format stays separat
 
 // ---------- library
 const catalog = (await anon("/catalog")).json
-check("library lists published problems with stats", catalog.problems.length >= 30 && catalog.problems.find((p) => p.id === "p2").acceptance !== undefined)
+check("library lists published problems with stats", catalog.problems.length >= 30 && catalog.problems.find((p) => p.id === "integer-operations").acceptance !== undefined)
 check("library has topic tags with counts", catalog.tags.some((t) => t.name === "Math" && t.count >= 1))
 check("acceptance reflects submissions", (await (async () => { await new Promise((r) => setTimeout(r, 100)); return true })()))
 
@@ -102,14 +103,14 @@ check("a daily challenge is picked automatically", Boolean(today?.slug), JSON.st
 const schedule = await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: "p1" } })
 check("admin schedules today's challenge", schedule.status === 200)
 await new Promise((r) => setTimeout(r, 300))
-check("the schedule takes effect", (await a("/daily")).json.slug === "p1")
+check("the schedule takes effect", (await a("/daily")).json.slug === "simple-interest")
 check("students can't schedule", (await a("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: "p3" } })).status === 403)
 check("not solved yet today", (await a("/daily")).json.solvedToday === false)
 check("SI solved", (await submit(a, "p1", SI)).verdict === "AC")
 const after = (await a("/daily")).json
 check("solving it marks today done and starts a streak", after.solvedToday === true && after.streak === 1, JSON.stringify(after))
 const yesterday = new Date(Date.parse(today.day + "T12:00:00Z") - 86_400_000).toISOString().slice(0, 10)
-psql(`update submissions set created_at = '${yesterday}T12:00:00Z' where id = (select id from submissions where user_id=(select id from users where email='feat-a@example.com') and verdict='AC' and problem_id=(select id from problems where slug='p2') limit 1)`)
+psql(`update submissions set created_at = '${yesterday}T12:00:00Z' where id = (select id from submissions where user_id=(select id from users where email='feat-a@example.com') and verdict='AC' and problem_id=(select id from problems where slug='${READABLE.p2}') limit 1)`)
 check("a solve yesterday extends the streak to 2", (await a("/daily")).json.streak === 2, (await a("/daily")).json.streak)
 // Questions for the day, several, beside the problem or alone.
 const mkq = async (title, kind, extra) => (await admin("/admin/questions", { body: { title, kind, prompt: `${title}?`, points: 1, explanation: "Count them.", ...extra } })).json
@@ -120,7 +121,7 @@ check("daily questions must mark themselves", (await admin("/admin/daily", { met
 check("at most ten a day", (await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: "p1", questionIds: Array(11).fill(dq1.id).map((_, i) => `00000000-0000-4000-8000-00000000000${i % 10}`) } })).status === 400)
 await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: "p1", questionIds: [dq1.id, dq2.id] } })
 const withQ = (await b("/daily")).json
-check("a day can have a problem and several questions", withQ.problem?.slug === "p1" && withQ.questions.map((q) => q.title).join() === "feat daily q1,feat daily q2" && withQ.questions.every((q) => q.solution === null))
+check("a day can have a problem and several questions", withQ.problem?.slug === "simple-interest" && withQ.questions.map((q) => q.title).join() === "feat daily q1,feat daily q2" && withQ.questions.every((q) => q.solution === null))
 const dailyAnswer = (await b("/daily/answer", { body: { questionId: dq1.id, answer: ["b"] } })).json
 check("answering shows right or wrong and why, at once", dailyAnswer.correct === true && dailyAnswer.solution.explanation === "Count them.")
 check("once per question", (await b("/daily/answer", { body: { questionId: dq1.id, answer: ["a"] } })).json?.error?.code === "already_answered")
@@ -339,7 +340,7 @@ await s.screenshot({ path: SHOTS + "study-plan.png" })
 const t = await open("admin@example.com")
 await t.goto(`${BASE}/admin/integrity`)
 await t.getByRole("heading", { name: "Plagiarism check" }).waitFor({ timeout: 15000 })
-await t.locator("select").first().selectOption("p1")
+await t.locator("select").first().selectOption(READABLE.p1)
 await t.getByRole("button", { name: "Check" }).click()
 await t.getByText(/pair\(s\) to review/).waitFor({ timeout: 15000 })
 check("integrity page lists the pair", await t.getByRole("row").filter({ hasText: "feat-a@example.com" }).filter({ hasText: "feat-b@example.com" }).first().isVisible())

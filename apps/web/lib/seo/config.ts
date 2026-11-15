@@ -71,6 +71,12 @@ export const PAGES = {
     description:
       "Free programming practice problems by topic and difficulty, in Python, JavaScript, C, C++ and Java, with hints, editorials and a judge that runs your code in the browser.",
   },
+  topics: {
+    path: "/problems/topics",
+    title: "Coding problems by topic",
+    description:
+      "Practice problems grouped by topic, from strings, lists and loops to functions and file handling, each from easy to hard and solvable in Python, JavaScript, C, C++ or Java.",
+  },
   contests: {
     path: "/contests",
     title: "Coding contests",

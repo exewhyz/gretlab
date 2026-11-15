@@ -21,6 +21,7 @@ import { ApiError, notFound } from "@/lib/api/route"
 import { saveProblem } from "@/features/problems/server"
 
 import { sourceOf, usableBy, usableIds, type ShareKind } from "./sharing"
+import { formerSlugsLike } from "@/features/problems/slugs"
 
 const tableOf = (kind: ShareKind) =>
   kind === "problem" ? problems : kind === "question" ? questions : kind === "course" ? courses : templates
@@ -297,7 +298,8 @@ export async function copyToLibrary(
         .where(eq(problemTags.problemId, p.id)),
       db.select({ slug: problems.slug }).from(problems).where(sql.like(problems.slug, `${p.slug}%`)),
     ])
-    const used = new Set(taken.map((t) => t.slug))
+    // Former addresses too: they still lead to their problem (problems/slugs.ts).
+    const used = new Set([...taken.map((t) => t.slug), ...(await formerSlugsLike([p.slug]))])
     let slug = `${p.slug}-copy`.slice(0, 60)
     for (let n = 2; used.has(slug); n++) slug = `${p.slug.slice(0, 54)}-copy-${n}`
     const saved = await saveProblem(
