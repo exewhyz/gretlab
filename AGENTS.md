@@ -128,6 +128,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - **The docs** (`apps/docs`) have `public/robots.txt` pointing at their sitemap, a share card (`public/og.png`), WebSite structured data on every page and TechArticle plus BreadcrumbList on each page (`components/PageTitle.astro`).
 - **Not yet:** problem addresses are `/problems/p2`; readable slugs need a data migration with permanent redirects from the old addresses.
 
+## Privacy policy and terms
+
+- `/privacy` and `/terms` (`features/legal`): the text of each is a component (`components/privacy-policy.tsx`, `components/terms.tsx`) in one Read-page frame (`legal-page.tsx`: contents beside the text, "In short", sections with anchors). The operator's details come from Dashboard › Settings › Legal (`legal.*`: who runs the site, contact email, grievance officer, postal address, governing law), read by `legalFacts()`.
+- **They must stay true of the code.** When a feature changes what's kept, for how long, who sees it, which providers handle it, or a cookie, change the policy in the same change and bump `LEGAL_UPDATED` in `features/legal/server.ts`.
+- Sign-in and sign-up say that continuing accepts both (`AuthCard agree`); every auth page and the problem workbench link them (`LegalLinks`).
+- There is no self-service account deletion (the owner's decision): people ask by email from their account's address, as the policy says.
+
 ## Problem statements are markdown
 
 - A problem's `description` is its statement in markdown. Input format, output format and constraints stay separate fields (one bullet each, shown under their own headings), and samples come from its test cases. Keep them out of the statement. Editorials and hints are markdown too.

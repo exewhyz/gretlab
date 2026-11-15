@@ -80,6 +80,45 @@ export const SETTINGS = {
     schema: z.string().trim().max(100),
     default: "" as string,
   },
+  "legal.operator": {
+    label: "Who runs the site",
+    description:
+      "The person or company responsible for the site, as the privacy policy and terms name it. Empty: the site's name.",
+    group: "Legal",
+    schema: z.string().trim().max(120),
+    default: "" as string,
+  },
+  "legal.email": {
+    label: "Contact email",
+    description:
+      "Where people send privacy requests, complaints and questions about the terms. Shown on both pages.",
+    group: "Legal",
+    schema: z.union([z.literal(""), z.string().trim().email().max(200)]),
+    default: "" as string,
+  },
+  "legal.grievance_officer": {
+    label: "Grievance officer",
+    description:
+      "The name of the person who answers privacy complaints (India's DPDP Act and IT Rules ask for one). Empty: not named.",
+    group: "Legal",
+    schema: z.string().trim().max(120),
+    default: "" as string,
+  },
+  "legal.address": {
+    label: "Postal address",
+    description: "Where letters reach whoever runs the site. Empty: not shown.",
+    group: "Legal",
+    schema: z.string().trim().max(300),
+    default: "" as string,
+  },
+  "legal.jurisdiction": {
+    label: "Governing law",
+    description:
+      "Whose laws the terms follow and whose courts hear disputes, such as India or Bengaluru, India.",
+    group: "Legal",
+    schema: z.string().trim().min(2).max(120),
+    default: "India" as string,
+  },
   "server_execution.enabled": {
     label: "Server execution",
     description:

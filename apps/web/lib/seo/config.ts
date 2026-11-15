@@ -85,9 +85,15 @@ export const PAGES = {
   },
   privacy: {
     path: "/privacy",
-    title: "Privacy",
+    title: "Privacy policy",
     description:
-      "What GretLab keeps of your code and your account, who can read it, and how its ads use cookies.",
+      "What GretLab keeps about you, why, who can see it, how long it's kept, and how to see, correct or delete your data.",
+  },
+  terms: {
+    path: "/terms",
+    title: "Terms of use",
+    description:
+      "The rules for using GretLab: your account and content, acceptable use, grades, exams and contests, and how disputes are handled.",
   },
 } as const
 

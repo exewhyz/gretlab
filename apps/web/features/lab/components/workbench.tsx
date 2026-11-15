@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import { LegalLinks } from "@/features/legal/components/legal-page"
 import { useRef, useState, type CSSProperties, type ReactNode } from "react"
 
 import { Button } from "@workspace/ui/components/button"
@@ -153,7 +153,7 @@ export function Workbench({
               {sidebarAd}
               <div className={styles.listFoot}>
                 <span />
-                <Link href="/privacy">Privacy</Link>
+                <LegalLinks />
               </div>
             </>
           ) : (
@@ -262,7 +262,7 @@ export function Workbench({
 
       {pageEndAd}
       <footer className={styles.mobileFooter}>
-        <Link href="/privacy">Privacy</Link>
+        <LegalLinks />
       </footer>
     </div>
   )

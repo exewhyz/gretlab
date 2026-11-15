@@ -14,7 +14,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
   const session = await readSession()
   if (session.user) redirect(safePath(callbackUrl))
   return (
-    <AuthCard title="Create an account" intro="Practise, submit solutions and join your school or club.">
+    <AuthCard agree title="Create an account" intro="Practise, submit solutions and join your school or club.">
       <SignUpForm next={safePath(callbackUrl)} />
     </AuthCard>
   )

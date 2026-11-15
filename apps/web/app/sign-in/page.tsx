@@ -29,7 +29,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   }
 
   return (
-    <AuthCard title="Sign in" intro="Welcome back. Sign in to practise, submit and join contests.">
+    <AuthCard agree title="Sign in" intro="Welcome back. Sign in to practise, submit and join contests.">
       {error && (
         <p role="alert" className="text-destructive">
           {error === "AccessDenied"
