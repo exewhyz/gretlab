@@ -84,8 +84,8 @@ check("solve p1", (await submit(a, "p1", SI)).verdict === "AC")
 check("fail p2", (await submit(a, "p2", WRONG)).verdict !== "AC")
 const mine = (await a("/assignments/asg-week-1")).json
 const byProblem = Object.fromEntries(mine.problems.map((p) => [p.slug, p]))
-check("solved on time earns full marks", byProblem.p1.status === "solved" && byProblem.p1.earned === 100)
-check("a failing submission earns nothing", byProblem.p2.status === "attempted" && byProblem.p2.earned === 0)
+check("solved on time earns full marks", byProblem[READABLE.p1].status === "solved" && byProblem[READABLE.p1].earned === 100)
+check("a failing submission earns nothing", byProblem[READABLE.p2].status === "attempted" && byProblem[READABLE.p2].earned === 0)
 check("totals add up", mine.earned === 100 && mine.total === 150 && mine.solved === 1, `${mine.earned}/${mine.total}`)
 check("the problem page knows its assignment", (await a("/problems/p1/assignments")).json.some((x) => x.slug === "asg-week-1"))
 
@@ -117,7 +117,7 @@ await t(`/admin/assignments/${reopen.json.id}/extensions`, { method: "PUT", body
 const leap = 'year = int(input())\nif year % 400 == 0 or (year % 4 == 0 and year % 100 != 0):\n    print("Leap year")\n    print("February has 29 days")\nelse:\n    print("Not a leap year")\n    print("February has 28 days")\n'
 check("a reopened problem can be resubmitted", (await submit(a, "p10", leap)).verdict === "AC")
 const reopened = (await a("/assignments/asg-reopen")).json
-check("only the reopened problem counts after the due time", reopened.earned === 10 && reopened.problems.find((p) => p.slug === "leap-year").earned === 10 && reopened.problems.find((p) => p.slug === "p1").earned === 0 && reopened.extension.problems.join() === "Q2 Leap Year", JSON.stringify(reopened.extension))
+check("only the reopened problem counts after the due time", reopened.earned === 10 && reopened.problems.find((p) => p.slug === "leap-year").earned === 10 && reopened.problems.find((p) => p.slug === READABLE.p1).earned === 0 && reopened.extension.problems.join() === "Q2 Leap Year", JSON.stringify(reopened.extension))
 
 // Opens tomorrow: students learn when, not what.
 await t("/admin/assignments", { body: body({ title: "Later", slug: "asg-later", opensAt: hours(20), dueAt: hours(40), published: true }) })
