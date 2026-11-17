@@ -44,7 +44,7 @@ import type { classCourses } from "@/features/courses/classes"
  */
 
 interface CourseItem {
-  kind: "problem" | "question"
+  kind: "problem" | "question" | "reading"
   id: string
   title: string
   detail: string
@@ -352,10 +352,12 @@ function ModuleRow({
                     <span className="text-ink">{item.title}</span>
                   )}
                   <span className="text-xs text-body capitalize">
-                    {item.kind === "problem"
-                      ? item.detail
-                      : (KIND_LABEL[item.detail as keyof typeof KIND_LABEL] ??
-                        item.detail)}
+                    {item.kind === "reading"
+                      ? "Reading"
+                      : item.kind === "problem"
+                        ? item.detail
+                        : (KIND_LABEL[item.detail as keyof typeof KIND_LABEL] ??
+                          item.detail)}
                   </span>
                 </li>
               )

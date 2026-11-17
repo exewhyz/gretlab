@@ -11,10 +11,21 @@ export const courseSchema = z.object({
   published: z.boolean().default(false),
 })
 
-export const courseItemSchema = z.object({
-  kind: z.enum(["problem", "question"]),
-  id: z.uuid(),
-})
+/** A library problem or question, or a reading written in the course (no id when new). */
+export const courseItemSchema = z.union([
+  z.object({ kind: z.enum(["problem", "question"]), id: z.uuid() }),
+  z.object({
+    kind: z.literal("reading"),
+    id: z.uuid().optional(),
+    title: z.string().trim().min(1, "Name every reading").max(200),
+    body: z
+      .string()
+      .max(100_000, "A reading is at most 100,000 characters")
+      .default(""),
+  }),
+])
+
+export const readingDoneSchema = z.object({ done: z.boolean() })
 
 /**
  * A module's quiz (questions that mark themselves), lab (problems) or project (a GitHub

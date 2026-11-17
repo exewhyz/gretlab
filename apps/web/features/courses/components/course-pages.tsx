@@ -16,6 +16,7 @@ import {
 } from "@workspace/ui/components/dialog"
 
 import { ConfirmButton } from "@/components/confirm"
+import { MarkdownEditor } from "@/components/markdown-editor"
 import {
   Check,
   Field,
@@ -51,11 +52,18 @@ type Sharing = "everyone" | "selected" | "owner"
 type CourseRow = ApiResult<typeof orgCourses>[number]
 
 interface Item {
-  kind: "problem" | "question"
+  kind: "problem" | "question" | "reading"
+  /** Empty for a reading not saved yet. */
   id: string
   title: string
   detail: string
+  /** A reading's markdown. */
+  body?: string
+  /** Tells new readings apart before they have ids. */
+  key?: string
 }
+
+const itemKey = (item: Item) => item.key ?? `${item.kind}:${item.id}`
 
 interface Module {
   id?: string
@@ -88,9 +96,11 @@ const SHARING_LABEL: Record<Sharing, string> = {
 }
 
 const itemDetail = (item: Item) =>
-  item.kind === "problem"
-    ? `Problem · ${item.detail}`
-    : `Question · ${KIND_LABEL[item.detail as keyof typeof KIND_LABEL] ?? item.detail}`
+  item.kind === "reading"
+    ? "Reading"
+    : item.kind === "problem"
+      ? `Problem · ${item.detail}`
+      : `Question · ${KIND_LABEL[item.detail as keyof typeof KIND_LABEL] ?? item.detail}`
 
 const releaseLabel = (m: Pick<Module, "openAfterDays" | "afterPrevious">) =>
   [
@@ -304,7 +314,16 @@ export function CourseEditor({ id }: { id: string }) {
             summary: m.summary,
             openAfterDays: m.openAfterDays,
             afterPrevious: m.afterPrevious,
-            items: m.items.map(({ kind, id }) => ({ kind, id })),
+            items: m.items.map((i) =>
+              i.kind === "reading"
+                ? {
+                    kind: i.kind,
+                    id: i.id || undefined,
+                    title: i.title,
+                    body: i.body ?? "",
+                  }
+                : { kind: i.kind, id: i.id }
+            ),
             checkpoints: m.checkpoints.map((c) => ({
               kind: c.kind,
               title: c.title.trim(),
@@ -385,6 +404,14 @@ export function CourseEditor({ id }: { id: string }) {
                   Share…
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={copy.isPending}
+                onClick={() => copy.mutate()}
+              >
+                Make a copy
+              </Button>
               <ConfirmButton
                 variant="destructive"
                 size="sm"
@@ -437,6 +464,8 @@ export function CourseEditor({ id }: { id: string }) {
                 {m.title}
               </span>
               <span className="block truncate text-caption">
+                {m.items.filter((i) => i.kind === "reading").length > 0 &&
+                  `${m.items.filter((i) => i.kind === "reading").length} readings · `}
                 {m.items.filter((i) => i.kind === "problem").length} problems ·{" "}
                 {m.items.filter((i) => i.kind === "question").length} questions
                 {m.checkpoints.length > 0 &&
@@ -583,6 +612,7 @@ function ModuleDialog({
     module?.afterPrevious ?? false
   )
   const [items, setItems] = useState<Item[]>(module?.items ?? [])
+  const [writing, setWriting] = useState<number | "new" | null>(null)
   const [checkpoints, setCheckpoints] = useState<CheckpointDraft[]>(
     module?.checkpoints ?? []
   )
@@ -706,7 +736,7 @@ function ModuleDialog({
           >
             {items.map((item, index) => (
               <li
-                key={`${item.kind}:${item.id}`}
+                key={itemKey(item)}
                 className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 hover:bg-muted"
               >
                 <span className="w-6 text-caption tabular-nums">
@@ -720,6 +750,16 @@ function ModuleDialog({
                 </span>
                 {!readOnly && (
                   <>
+                    {item.kind === "reading" && (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        aria-label={`Edit ${item.title}`}
+                        onClick={() => setWriting(index)}
+                      >
+                        Edit
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon-xs"
@@ -756,7 +796,41 @@ function ModuleDialog({
               <li className="px-1.5 py-1 text-caption">Nothing yet.</li>
             )}
           </ol>
+          {!readOnly && (
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWriting("new")}
+              >
+                Write a reading
+              </Button>
+            </div>
+          )}
         </div>
+        {writing !== null && (
+          <ReadingDialog
+            reading={writing === "new" ? null : items[writing]!}
+            onCancel={() => setWriting(null)}
+            onSave={(r) => {
+              setItems(
+                writing === "new"
+                  ? [
+                      ...items,
+                      {
+                        ...r,
+                        kind: "reading",
+                        id: "",
+                        detail: "reading",
+                        key: `new-reading-${nextKey++}`,
+                      },
+                    ]
+                  : items.map((x, i) => (i === writing ? { ...x, ...r } : x))
+              )
+              setWriting(null)
+            }}
+          />
+        )}
         {!readOnly && (
           <div className="grid gap-1">
             <div className="text-caption font-medium text-ink">
@@ -801,9 +875,9 @@ function ModuleDialog({
               )}
             </ul>
             <p className="text-caption">
-              Courses hold ready library problems and questions that mark
-              themselves (choice, and short answers with accepted answers):
-              practice nobody has to mark.
+              Courses hold readings you write here, ready library problems and
+              questions that mark themselves (choice, and short answers with
+              accepted answers): practice nobody has to mark.
             </p>
           </div>
         )}
@@ -837,6 +911,62 @@ function ModuleDialog({
               Done
             </Button>
           )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Writing a reading: a lesson page in markdown, saved with the outline. */
+function ReadingDialog({
+  reading,
+  onCancel,
+  onSave,
+}: {
+  reading: Item | null
+  onCancel: () => void
+  onSave: (r: { title: string; body: string }) => void
+}) {
+  const [title, setTitle] = useState(reading?.title ?? "")
+  const [body, setBody] = useState(reading?.body ?? "")
+  return (
+    <Dialog open onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent
+        className="max-h-[92dvh] overflow-y-auto sm:max-w-3xl"
+        data-testid="reading-dialog"
+      >
+        <DialogHeader>
+          <DialogTitle>
+            {reading ? `Edit ${reading.title}` : "Write a reading"}
+          </DialogTitle>
+          <DialogDescription>
+            A lesson page students read in the module, in markdown: headings,
+            lists, tables, code and images. It&apos;s saved with the outline.
+          </DialogDescription>
+        </DialogHeader>
+        <Field label="Title">
+          <TextInput
+            aria-label="Reading title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </Field>
+        <MarkdownEditor
+          label="Reading"
+          value={body}
+          onChange={setBody}
+          rows={16}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!title.trim()}
+            onClick={() => onSave({ title: title.trim(), body })}
+          >
+            Done
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

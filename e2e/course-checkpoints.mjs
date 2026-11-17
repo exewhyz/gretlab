@@ -1,7 +1,8 @@
 /**
  * Course checkpoints: a module's quiz, lab and project, attached while writing the course,
  * taken by a class's students (one attempt, timed or not), lab problems scored by graded
- * submissions during the attempt, projects handed in and marked, and the course grade.
+ * submissions during the attempt, projects handed in and marked, and the course grade; and
+ * readings: lesson pages written in the course, read in order and marked as completed.
  *   node e2e/course-checkpoints.mjs [base-url] [screenshot-dir]
  */
 import { execFileSync } from "node:child_process"
@@ -74,10 +75,15 @@ const project = { kind: "project", title: "Project – Basics", instructions: "B
 check("a quiz takes only questions that mark themselves", (await outline([{ title: "M", checkpoints: [{ ...quiz, items: [{ id: essay, points: 2 }] }] }])).json?.error?.code === "needs_marking")
 check("a quiz or lab needs items", (await outline([{ title: "M", checkpoints: [{ ...quiz, items: [] }] }])).status === 400)
 check("one of each kind per module", (await outline([{ title: "M", checkpoints: [quiz, quiz] }])).status === 400)
-const saved = await outline([{ title: "Basics", items: [{ kind: "question", id: q1 }], checkpoints: [quiz, labCp, project] }])
+const intro = { kind: "reading", title: "ckp Intro", body: "## What a program is\n\nA list of steps." }
+check("a reading needs a title", (await outline([{ title: "M", items: [{ ...intro, title: " " }] }])).status === 400)
+const saved = await outline([{ title: "Basics", items: [intro, { kind: "question", id: q1 }], checkpoints: [quiz, labCp, project] }])
+const R = saved.json?.modules?.[0]?.items?.[0]
+check("a module holds a reading written in the course", R?.kind === "reading" && !!R.id && R.body === intro.body, JSON.stringify(R).slice(0, 150))
 const cps = saved.json?.modules?.[0]?.checkpoints ?? []
 check("a module carries a quiz, a lab and a project", saved.status === 200 && cps.map((c) => c.kind).join() === "quiz,lab,project" && cps[0].max === 10 && cps[2].max === 20, JSON.stringify(saved.json).slice(0, 200))
-const resaved = await outline([{ id: saved.json.modules[0].id, title: "Basics", items: [{ kind: "question", id: q1 }], checkpoints: [{ ...quiz, title: "Quiz – renamed" }, labCp, project] }])
+const resaved = await outline([{ id: saved.json.modules[0].id, title: "Basics", items: [{ ...intro, id: R.id, body: intro.body + "\n\nAnd more." }, { kind: "question", id: q1 }], checkpoints: [{ ...quiz, title: "Quiz – renamed" }, labCp, project] }])
+check("editing a reading keeps its id", resaved.json?.modules?.[0]?.items?.[0]?.id === R.id && resaved.json.modules[0].items[0].body.endsWith("And more."))
 check("checkpoints keep their ids across saves", resaved.json?.modules?.[0]?.checkpoints?.[0]?.id === cps[0].id && resaved.json.modules[0].checkpoints[0].title === "Quiz – renamed")
 const [QZ, LB, PJ] = cps.map((c) => c.id)
 
@@ -86,7 +92,18 @@ await a(`${A}/classes/${lab.id}/courses`, { body: { courseId: C, startsOn: day(-
 const cp = (api, id) => api(`${A}/classes/${lab.id}/courses/${C}/checkpoints/${id}`)
 const act = (api, id, what, opts) => api(`${A}/classes/${lab.id}/courses/${C}/checkpoints/${id}/${what}`, opts ?? { body: {} })
 let mod = (await s1(`${A}/classes/${lab.id}/courses`)).json.courses[0].modules[0]
-check("the module shows its checkpoints and counts them", mod.checkpoints.length === 3 && mod.total === 4 && mod.checkpoints[0].state === "not_started")
+check("the module shows its checkpoints and counts them", mod.checkpoints.length === 3 && mod.total === 5 && mod.checkpoints[0].state === "not_started")
+const readingPath = `${A}/classes/${lab.id}/courses/${C}/readings/${R.id}`
+check("the Course tab links the reading to its page", mod.items[0]?.href === `/orgs/ckptest-a/classes/${lab.id}/courses/${C}/readings/${R.id}` && mod.items[0].body === undefined)
+const reading = (await s1(readingPath)).json
+check("a student reads it, with the next step", reading?.reading?.body?.includes("What a program is") && reading.next?.id === q1 && reading.previous === null && reading.done === false)
+check("outsiders can't read it", (await b(readingPath)).status === 404)
+await s1(`${readingPath}/done`, { method: "PUT", body: { done: true } })
+let afterRead = (await s1(`${A}/classes/${lab.id}/courses`)).json.courses[0].modules[0]
+check("marking it read counts toward the module", afterRead.done === 1 && afterRead.items[0].done === true)
+await s1(`${readingPath}/done`, { method: "PUT", body: { done: false } })
+check("and it can be unmarked", (await s1(readingPath)).json?.done === false)
+await s1(`${readingPath}/done`, { method: "PUT", body: { done: true } })
 const before = await cp(s1, QZ)
 check("before starting, the questions aren't sent", before.status === 200 && before.json.quiz === null && before.json.state === "not_started")
 check("answers can't be saved before starting", (await act(s1, QZ, "answers", { method: "PUT", body: { answers: { [q1]: ["a"] } } })).json?.error?.code === "not_started")
@@ -146,12 +163,18 @@ const reset = await a(`${A}/classes/${lab.id}/courses/${C}/checkpoints/${QZ}/stu
 check("a teacher lets a student take a quiz again", reset.status === 200 && (await cp(s1, QZ)).json?.state === "not_started" && psql(`select count(*) from course_quiz_answers where checkpoint_id='${QZ}' and user_id='${ids.s1}'`) === "0")
 check("marking and resets are in the activity log", psql(`select count(*) from audit_log where org_id='${orgA}' and action in ('course.project_mark','course.attempt_reset')`) === "2")
 mod = (await s2(`${A}/classes/${lab.id}/courses`)).json.courses[0].modules[0]
-check("finished checkpoints count toward the module", mod.done === 2 && mod.checkpoints[1].earned === 100, `${mod.done} of ${mod.total}`)
+check("finished checkpoints count toward the module", mod.done === 2 && mod.checkpoints[1].earned === 100 && mod.total === 5, `${mod.done} of ${mod.total}`)
 
 // A copy keeps them.
 const copy = (await a(`${A}/courses/${C}/copy`, { body: {} })).json
 const copied = (await a(`${A}/courses/${copy?.id}`)).json
 check("a copied course keeps its checkpoints", copied?.modules?.[0]?.checkpoints?.length === 3 && copied.modules[0].checkpoints[0].id !== QZ)
+check("and its readings, as its own", copied?.modules?.[0]?.items?.[0]?.kind === "reading" && copied.modules[0].items[0].id !== R.id && copied.modules[0].items[0].body.endsWith("And more."))
+const again = (await a(`${A}/courses/${copy?.id}/copy`, { body: {} })).json
+check("a college copies its own course for a new round", (await a(`${A}/courses/${again?.id}`)).json?.title === "ckp Course (copy)")
+// Taking a reading out of the outline deletes it, with who read it.
+await outline([{ id: saved.json.modules[0].id, title: "Basics", items: [{ kind: "question", id: q1 }], checkpoints: [{ ...quiz, title: "Quiz – renamed" }, labCp, project] }])
+check("a reading taken out goes, with its progress", psql(`select count(*) from course_readings where id='${R.id}'`) === "0" && psql(`select count(*) from course_reading_progress where reading_id='${R.id}'`) === "0")
 
 // ---------- the pages
 const browser = await chromium.launch()
@@ -167,6 +190,11 @@ check("the outline lists the module's checkpoints", (await editor.getByTestId("c
 await editor.getByRole("button", { name: "Edit Basics" }).click()
 const dialog = editor.getByTestId("module-dialog")
 await dialog.getByTestId("checkpoint-quiz").waitFor({ timeout: 15000 })
+await dialog.getByRole("button", { name: "Write a reading" }).click()
+const writer = editor.getByTestId("reading-dialog")
+await writer.getByLabel("Reading title").fill("ckp Loops")
+await writer.getByRole("textbox", { name: "Reading", exact: true }).fill("## Loops\n\nRepeat steps.")
+await writer.getByRole("button", { name: "Done" }).click()
 await dialog.getByRole("checkbox", { name: "Add a project" }).click()
 await dialog.getByRole("checkbox", { name: "Add a lab" }).click()
 await dialog.getByRole("checkbox", { name: "Add a lab" }).click()
@@ -180,8 +208,26 @@ await editor.getByRole("button", { name: "Save outline" }).click()
 await editor.getByText("Outline saved.").waitFor({ timeout: 15000 }).catch(() => {})
 const edited = (await a(`${A}/courses/${copy.id}`)).json?.modules?.[0]?.checkpoints ?? []
 check("adding a project and a timed lab from the page", edited.map((c) => c.kind).join() === "quiz,lab" && edited[1].timeLimit === 45 && edited[1].items.length === 1, JSON.stringify(edited).slice(0, 200))
+const writtenItems = (await a(`${A}/courses/${copy.id}`)).json?.modules?.[0]?.items ?? []
+check("writing a reading from the page", writtenItems.some((i) => i.kind === "reading" && i.title === "ckp Loops" && i.body.includes("Repeat steps")), writtenItems.map((i) => i.title).join(" | "))
 
+const withReading = await outline([{ id: saved.json.modules[0].id, title: "Basics", items: [{ kind: "reading", title: "ckp Variables", body: "## Variables\n\nNames for values.\n\n```python\nx = 1\n```" }, { kind: "question", id: q1 }], checkpoints: [{ ...quiz, title: "Quiz – renamed" }, labCp, project] }])
+const R2 = withReading.json?.modules?.[0]?.items?.[0]?.id
 const student = await open("ckp-s1@example.com")
+await student.goto(`${BASE}${A}/classes/${lab.id}/courses/${C}/readings/${R2}`)
+await student.getByTestId("reading-body").waitFor({ timeout: 30000 })
+check("the reading page shows the lesson and the module beside it", (await student.getByRole("heading", { name: "Variables", exact: true }).isVisible()) && (await student.getByTestId("reading-module-items").innerText()).includes("ckp One"))
+await student.getByRole("button", { name: "Mark as completed" }).click()
+await student.getByTestId("reading-done").waitFor({ timeout: 15000 })
+check("marking it completed from the page", psql(`select count(*) from course_reading_progress where reading_id='${R2}' and user_id='${ids.s1}'`) === "1")
+await student.screenshot({ path: SHOTS + "course-reading.png", fullPage: true })
+{
+  const small = await open("ckp-s1@example.com", 390)
+  await small.goto(`${BASE}${A}/classes/${lab.id}/courses/${C}/readings/${R2}`)
+  await small.getByTestId("reading-body").waitFor({ timeout: 30000 })
+  check("the reading on a phone, without sideways scrolling", await small.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+  await small.screenshot({ path: SHOTS + "course-reading-phone.png", fullPage: true })
+}
 await student.goto(`${BASE}${A}/classes/${lab.id}/courses/${C}/checkpoints/${QZ}`)
 await student.getByRole("button", { name: "Start quiz" }).click()
 await student.getByTestId("quiz-question").first().waitFor({ timeout: 15000 })

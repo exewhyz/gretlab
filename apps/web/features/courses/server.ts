@@ -3,6 +3,7 @@ import {
   courseCheckpoints,
   courseClasses,
   courseItems,
+  courseReadings,
   courseModules,
   courses,
   getDb,
@@ -27,8 +28,8 @@ import type { CheckpointInput, CourseInput, OutlineInput } from "./schemas"
 
 const { and, asc, count, eq, inArray, isNull } = sql
 
-type Kind = "problem" | "question"
-export type ItemRef = { kind: Kind; id: string }
+type Kind = "problem" | "question" | "reading"
+export type ItemRef = { kind: "problem" | "question"; id: string }
 
 const ownedBy = (orgId: string | null) =>
   orgId === null ? isNull(courses.orgId) : eq(courses.orgId, orgId)
@@ -110,7 +111,9 @@ export async function getCourse(
   return {
     ...course,
     editable: course.orgId === orgId,
-    modules: await outlineOf([id]).then((m) => m.get(id) ?? []),
+    modules: await outlineOf([id], { bodies: true }).then(
+      (m) => m.get(id) ?? []
+    ),
   }
 }
 
@@ -123,6 +126,8 @@ export interface OutlineItem {
   slug: string | null
   membersOnly: boolean
   points: number
+  /** A reading's markdown, only when asked for (the course editor). */
+  body?: string
 }
 
 export interface OutlineCheckpoint {
@@ -151,7 +156,10 @@ export interface OutlineModule {
 }
 
 /** The modules of several courses, in order, with their items and checkpoints resolved. */
-export async function outlineOf(courseIds: string[]) {
+export async function outlineOf(
+  courseIds: string[],
+  opts: { bodies?: boolean } = {}
+) {
   const db = getDb()
   const out = new Map<string, OutlineModule[]>()
   if (courseIds.length === 0) return out
@@ -197,6 +205,19 @@ export async function outlineOf(courseIds: string[]) {
       all.filter((i) => i.itemType === "question").map((i) => i.itemId)
     ),
   ]
+  const readingIds = items
+    .filter((i) => i.itemType === "reading")
+    .map((i) => i.itemId)
+  const rs = readingIds.length
+    ? await db
+        .select({
+          id: courseReadings.id,
+          title: courseReadings.title,
+          body: opts.bodies ? courseReadings.body : sql.sql<string>`''`,
+        })
+        .from(courseReadings)
+        .where(inArray(courseReadings.id, readingIds))
+    : []
   const [ps, qs] = await Promise.all([
     problemIds.length
       ? db
@@ -226,6 +247,23 @@ export async function outlineOf(courseIds: string[]) {
     i: { itemType: Kind; itemId: string },
     points?: number
   ): OutlineItem[] => {
+    if (i.itemType === "reading") {
+      const r = rs.find((x) => x.id === i.itemId)
+      return r
+        ? [
+            {
+              kind: "reading",
+              id: r.id,
+              title: r.title,
+              detail: "reading",
+              slug: null,
+              membersOnly: false,
+              points: 0,
+              ...(opts.bodies ? { body: r.body } : {}),
+            },
+          ]
+        : []
+    }
     if (i.itemType === "problem") {
       const p = ps.find((x) => x.id === i.itemId)
       return p
@@ -474,17 +512,15 @@ export async function writeCheckpoints(
       .map((ref, n) => ({ ...ref, points: c.items[n]!.points }))
       .filter((i) => !seen.has(i.id) && Boolean(seen.add(i.id)))
     if (own.length) {
-      await tx
-        .insert(courseCheckpointItems)
-        .values(
-          own.map((i, position) => ({
-            checkpointId,
-            itemType: i.kind,
-            itemId: i.id,
-            points: i.points,
-            position,
-          }))
-        )
+      await tx.insert(courseCheckpointItems).values(
+        own.map((i, position) => ({
+          checkpointId,
+          itemType: i.kind,
+          itemId: i.id,
+          points: i.points,
+          position,
+        }))
+      )
     }
   }
 }
@@ -507,13 +543,50 @@ export async function saveOutline(
   await checkItems(
     orgId,
     input.modules.flatMap((m) => [
-      ...m.items,
+      ...m.items.filter((i): i is ItemRef => i.kind !== "reading"),
       ...m.checkpoints.flatMap(checkpointRefs),
     ]),
     userId
   )
   const db = getDb()
   await db.transaction(async (tx) => {
+    // Readings belong to the course: those still in the outline keep their id (and who read
+    // them), new ones are written, and ones taken out go.
+    const ownReadings = await tx
+      .select({
+        id: courseReadings.id,
+        title: courseReadings.title,
+        body: courseReadings.body,
+      })
+      .from(courseReadings)
+      .where(eq(courseReadings.courseId, id))
+    const keptReadings = new Set<string>()
+    const readingIds = new Map<object, string>()
+    for (const item of input.modules.flatMap((m) => m.items)) {
+      if (item.kind !== "reading") continue
+      const before = item.id
+        ? ownReadings.find((r) => r.id === item.id)
+        : undefined
+      if (before && !keptReadings.has(before.id)) {
+        if (before.title !== item.title || before.body !== item.body) {
+          await tx
+            .update(courseReadings)
+            .set({ title: item.title, body: item.body, updatedAt: new Date() })
+            .where(eq(courseReadings.id, before.id))
+        }
+        readingIds.set(item, before.id)
+        keptReadings.add(before.id)
+      } else {
+        const [row] = await tx
+          .insert(courseReadings)
+          .values({ courseId: id, title: item.title, body: item.body })
+          .returning({ id: courseReadings.id })
+        readingIds.set(item, row!.id)
+        keptReadings.add(row!.id)
+      }
+    }
+    const itemId = (i: OutlineInput["modules"][number]["items"][number]) =>
+      i.kind === "reading" ? readingIds.get(i)! : i.id
     const existing = await tx
       .select({ id: courseModules.id })
       .from(courseModules)
@@ -546,24 +619,30 @@ export async function saveOutline(
       await tx.delete(courseItems).where(eq(courseItems.moduleId, moduleId))
       const seen = new Set<string>()
       const items = m.items.filter((i) => {
-        const key = `${i.kind}:${i.id}`
+        const key = `${i.kind}:${itemId(i)}`
         if (seen.has(key)) return false
         seen.add(key)
         return true
       })
       if (items.length) {
-        await tx
-          .insert(courseItems)
-          .values(
-            items.map((i, n) => ({
-              moduleId,
-              itemType: i.kind,
-              itemId: i.id,
-              position: n,
-            }))
-          )
+        await tx.insert(courseItems).values(
+          items.map((i, n) => ({
+            moduleId,
+            itemType: i.kind,
+            itemId: itemId(i),
+            position: n,
+          }))
+        )
       }
       await writeCheckpoints(tx, moduleId, m.checkpoints)
+    }
+    const droppedReadings = ownReadings
+      .filter((r) => !keptReadings.has(r.id))
+      .map((r) => r.id)
+    if (droppedReadings.length) {
+      await tx
+        .delete(courseReadings)
+        .where(inArray(courseReadings.id, droppedReadings))
     }
     const gone = [...known].filter((m) => !kept.has(m))
     if (gone.length)
@@ -592,24 +671,40 @@ export async function deleteCourse(orgId: string | null, id: string) {
   await getDb().delete(courses).where(eq(courses.id, id))
 }
 
-/** A college's own copy of a course shared with it, to change. Items stay the shared ones. */
+/**
+ * A copy of a course to change: a shared one becomes the college's own, and a college's own
+ * course gets a second copy ("… (copy)"), for example a new round of renewed training whose
+ * students start afresh while the old round's work stays. Library items stay the shared
+ * ones; readings, quizzes, labs and projects are copied (without anyone's work).
+ */
 export async function copyCourse(orgId: string, id: string, userId?: string) {
   const source = await getCourse(orgId, id, userId)
-  if (source.orgId === orgId)
-    throw new ApiError(400, "already_ours", "This course is already yours.")
+  const own = source.orgId === orgId
   const db = getDb()
   return db.transaction(async (tx) => {
     const [copy] = await tx
       .insert(courses)
       .values({
         orgId,
-        title: source.title,
+        title: own ? `${source.title} (copy)`.slice(0, 200) : source.title,
         description: source.description,
         published: false,
         sharing: "owner",
         copiedFrom: source.id,
       })
       .returning()
+    // Readings are the course's own, so the copy gets its own.
+    const readingCopy = new Map<string, string>()
+    for (const r of source.modules
+      .flatMap((m) => m.items)
+      .filter((i) => i.kind === "reading")) {
+      if (readingCopy.has(r.id)) continue
+      const [row] = await tx
+        .insert(courseReadings)
+        .values({ courseId: copy!.id, title: r.title, body: r.body ?? "" })
+        .returning({ id: courseReadings.id })
+      readingCopy.set(r.id, row!.id)
+    }
     for (const [position, m] of source.modules.entries()) {
       const [row] = await tx
         .insert(courseModules)
@@ -623,16 +718,14 @@ export async function copyCourse(orgId: string, id: string, userId?: string) {
         })
         .returning()
       if (m.items.length) {
-        await tx
-          .insert(courseItems)
-          .values(
-            m.items.map((i, n) => ({
-              moduleId: row!.id,
-              itemType: i.kind,
-              itemId: i.id,
-              position: n,
-            }))
-          )
+        await tx.insert(courseItems).values(
+          m.items.map((i, n) => ({
+            moduleId: row!.id,
+            itemType: i.kind,
+            itemId: i.kind === "reading" ? readingCopy.get(i.id)! : i.id,
+            position: n,
+          }))
+        )
       }
       await writeCheckpoints(
         tx,

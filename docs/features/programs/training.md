@@ -33,6 +33,11 @@ compliance, **renewal every N months**.
 With renewal, work older than the renewal period stops counting, so the person redoes it. It's valid
 until their oldest item's last completion plus the renewal.
 
+Renewal covers a course's problems, questions and readings. A module's quiz, lab and project are
+one attempt each and aren't asked again. For a new round with fresh quizzes, labs and projects,
+open the course and press **Make a copy**, rename the copy (for example "Safety training 2027"),
+mark it ready and assign it. The old round's attempts, marks and certificates stay as they were.
+
 ## Step by step
 
 1. **Academics › Training:** each training with how many are done, late or due soon.

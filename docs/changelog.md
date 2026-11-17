@@ -8,7 +8,7 @@ aren't listed.
 
 ## 17 November 2026
 
-### Quizzes, labs and projects in courses
+### Readings, quizzes, labs and projects in courses
 
 - A course module can now have a **quiz**, a **lab** and a **project**, each optional. Tick them
   while writing the module, then choose questions or problems, points, a time limit and a weight.
@@ -17,6 +17,11 @@ aren't listed.
   by a teacher, with feedback.
 - **Grades** on a class's course shows each student's scores and their **course grade**. Click a
   score to mark a project or let a student try a quiz or lab again.
+- **Readings:** write lesson pages in a module (**Write a reading**, in markdown). Students read
+  them on their own page with the module beside it, Previous and Next, and **Mark as completed**,
+  which counts toward finishing the module.
+- **Make a copy** now copies your own courses too, for example to run a new round of renewed
+  training with fresh quizzes, labs and projects.
 
 ### The landing page and the logo
 

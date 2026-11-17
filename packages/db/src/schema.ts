@@ -2356,14 +2356,14 @@ export const courseModules = pgTable(
   (table) => [index("course_modules_by_course").on(table.courseId, table.position)]
 )
 
-/** A problem or question in a module, in order. */
+/** A problem, question or reading in a module, in order. */
 export const courseItems = pgTable(
   "course_items",
   {
     moduleId: uuid("module_id")
       .notNull()
       .references(() => courseModules.id, { onDelete: "cascade" }),
-    itemType: text("item_type").$type<"problem" | "question">().notNull(),
+    itemType: text("item_type").$type<"problem" | "question" | "reading">().notNull(),
     itemId: uuid("item_id").notNull(),
     position: integer("position").notNull().default(0),
   },
@@ -2371,6 +2371,42 @@ export const courseItems = pgTable(
     primaryKey({ columns: [table.moduleId, table.itemType, table.itemId] }),
     index("course_items_by_item").on(table.itemType, table.itemId),
   ]
+)
+
+/**
+ * A lesson page written for a course: markdown read on its own page, in the module's order
+ * (a `course_items` row of type "reading" points at it). It belongs to its course; a copy of
+ * the course copies its readings.
+ */
+export const courseReadings = pgTable(
+  "course_readings",
+  {
+    id: id(),
+    courseId: uuid("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    /** Markdown. */
+    body: text("body").notNull().default(""),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("course_readings_by_course").on(table.courseId)]
+)
+
+/** A student marked a reading as read. */
+export const courseReadingProgress = pgTable(
+  "course_reading_progress",
+  {
+    readingId: uuid("reading_id")
+      .notNull()
+      .references(() => courseReadings.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    doneAt: timestamp("done_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.readingId, table.userId] })]
 )
 
 /**

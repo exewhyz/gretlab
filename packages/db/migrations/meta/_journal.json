@@ -519,6 +519,13 @@
       "when": 1794894397115,
       "tag": "0073_gray_magus",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1794896608299,
+      "tag": "0074_majestic_human_cannonball",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import {
   courseClasses,
+  courseReadingProgress,
   courses,
   getDb,
   practiceAnswers,
@@ -16,6 +17,7 @@ import { classContext, studentsIn } from "@/features/classes/server"
 import { usableBy, usableIds } from "@/features/library/sharing"
 import { canFor, groupChain, needFor, writeAudit } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/route"
+import { orgPages } from "@/lib/paths"
 
 import { checkpointResults } from "./checkpoint-results"
 import { outlineOf, type OutlineItem } from "./server"
@@ -46,8 +48,9 @@ export async function finished(
   const questionIds = items
     .filter((i) => i.kind === "question")
     .map((i) => i.id)
+  const readingIds = items.filter((i) => i.kind === "reading").map((i) => i.id)
   const db = getDb()
-  const [solved, answered] = await Promise.all([
+  const [solved, answered, read] = await Promise.all([
     problemIds.length && userIds.length
       ? db
           .select({
@@ -84,6 +87,21 @@ export async function finished(
             )
           )
       : [],
+    readingIds.length && userIds.length
+      ? db
+          .select({
+            userId: courseReadingProgress.userId,
+            id: courseReadingProgress.readingId,
+            at: courseReadingProgress.doneAt,
+          })
+          .from(courseReadingProgress)
+          .where(
+            and(
+              inArray(courseReadingProgress.userId, userIds),
+              inArray(courseReadingProgress.readingId, readingIds)
+            )
+          )
+      : [],
   ])
   const stale = (id: string, at: Date | null) => {
     const cut = cutoffs?.get(id)
@@ -92,7 +110,7 @@ export async function finished(
   const done = new Map<string, Set<string>>()
   /** When each item was last done, per person (only items that count). */
   const latest = new Map<string, Map<string, Date>>()
-  for (const r of [...solved, ...answered.filter((a) => a.correct)]) {
+  for (const r of [...solved, ...answered.filter((a) => a.correct), ...read]) {
     if (!r.userId || !r.id || !r.at || stale(r.id, r.at)) continue
     const set = done.get(r.userId) ?? new Set<string>()
     set.add(r.id)
@@ -232,11 +250,13 @@ export async function classCourses(slug: string, user: User, groupId: string) {
             ? m.items.map((item) => ({
                 ...item,
                 href:
-                  item.kind === "problem" && item.slug
-                    ? item.membersOnly
-                      ? `/orgs/${slug}/practice/${item.slug}`
-                      : `/problems/${item.slug}`
-                    : null,
+                  item.kind === "reading"
+                    ? orgPages(slug).reading(groupId, course.id, item.id)
+                    : item.kind === "problem" && item.slug
+                      ? item.membersOnly
+                        ? `/orgs/${slug}/practice/${item.slug}`
+                        : `/problems/${item.slug}`
+                      : null,
                 done: mine.has(item.id),
               }))
             : [],

@@ -41,6 +41,9 @@ export function orgPages(slug: string) {
     /** A course's quiz, lab or project in a class. */
     checkpoint: (groupId: string, courseId: string, checkpointId: string) =>
       `${base}/classes/${groupId}/courses/${courseId}/checkpoints/${checkpointId}`,
+    /** A course's reading (lesson page) in a class. */
+    reading: (groupId: string, courseId: string, readingId: string) =>
+      `${base}/classes/${groupId}/courses/${courseId}/readings/${readingId}`,
     /** A class's grade sheet for one course's quizzes, labs and projects. */
     courseGrades: (groupId: string, courseId: string) =>
       `${base}/classes/${groupId}/courses/${courseId}/grades`,
