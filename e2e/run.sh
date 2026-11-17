@@ -59,6 +59,7 @@ suite orgs http://localhost:3100
 suite platform http://localhost:3100
 suite library http://localhost:3100
 suite courses http://localhost:3100
+suite course-checkpoints http://localhost:3100
 suite templates http://localhost:3100
 suite warnings http://localhost:3100
 suite discussions http://localhost:3100

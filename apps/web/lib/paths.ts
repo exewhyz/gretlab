@@ -32,9 +32,18 @@ export function orgPages(slug: string) {
     results: (studentId: string | "me") => `${base}/results/${studentId}`,
     /** A class (group) page, optionally on one tab. */
     cls: (groupId: string, tab?: ClassTab, extra?: Record<string, string>) => {
-      const q = new URLSearchParams({ ...(tab ? { tab } : {}), ...extra }).toString()
+      const q = new URLSearchParams({
+        ...(tab ? { tab } : {}),
+        ...extra,
+      }).toString()
       return `${base}/classes/${groupId}${q ? `?${q}` : ""}`
     },
+    /** A course's quiz, lab or project in a class. */
+    checkpoint: (groupId: string, courseId: string, checkpointId: string) =>
+      `${base}/classes/${groupId}/courses/${courseId}/checkpoints/${checkpointId}`,
+    /** A class's grade sheet for one course's quizzes, labs and projects. */
+    courseGrades: (groupId: string, courseId: string) =>
+      `${base}/classes/${groupId}/courses/${courseId}/grades`,
     /** A management page ("/exams", "/students/<id>"); "" is not a page of its own. */
     manage: (page: string) => `${base}/manage${page}`,
   }

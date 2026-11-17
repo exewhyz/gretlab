@@ -33,6 +33,7 @@ const cleanup = () => {
   psql(`delete from users where email like 'crs-%'`)
 }
 cleanup()
+psql(`insert into users(email,name,role) values ('admin@example.com','Admin','admin') on conflict (email) do nothing`)
 for (const email of ["crs-a@example.com", "crs-b@example.com", "crs-s1@example.com"]) {
   const h = email.split("@")[0]
   psql(`insert into users(email,name,role,handle) values ('${email}','${h}','student','${h}')`)

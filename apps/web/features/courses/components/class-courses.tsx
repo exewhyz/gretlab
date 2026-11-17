@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useState } from "react"
 
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
   Collapsible,
@@ -29,6 +30,7 @@ import {
   DailyQuestion,
   type DailyQuestionData,
 } from "@/features/catalog/components/daily-question"
+import { KIND_NAME } from "@/features/courses/components/checkpoint-page"
 import { KIND_LABEL } from "@/features/questions/components/question-editor"
 import { api } from "@/lib/api/client"
 import { formatDate, formatDay } from "@/lib/format"
@@ -72,10 +74,28 @@ interface ClassCourse {
     done: number
     finishedBy: number | null
     items: CourseItem[]
+    checkpoints: {
+      id: string
+      kind: "quiz" | "lab" | "project"
+      title: string
+      timeLimit: number | null
+      count: number
+      max: number
+      state: "not_started" | "running" | "finished" | "handed_in" | "marked"
+      earned: number | null
+    }[]
   }[]
 }
 
 type View = ApiResult<typeof classCourses>
+
+const CHECKPOINT_STATUS = {
+  not_started: "Not started",
+  running: "In progress",
+  finished: "Finished",
+  handed_in: "Handed in, waiting for a mark",
+  marked: "Marked",
+} as const
 
 export function ClassCourses({
   slug,
@@ -150,18 +170,34 @@ export function ClassCourses({
                   </p>
                 )}
               </div>
-              {course.canRemove && (
-                <ConfirmButton
-                  variant="ghost"
-                  size="sm"
-                  title={`Take ${course.title} off this class?`}
-                  description="Students stop seeing it here. Their solved problems and answers stay."
-                  confirmLabel="Take it off"
-                  onConfirm={() => remove.mutate(course.id)}
-                >
-                  Take off
-                </ConfirmButton>
-              )}
+              <span className="flex flex-wrap items-center gap-2">
+                {data.teacher &&
+                  course.modules.some((m) => m.checkpoints.length > 0) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      render={
+                        <Link
+                          href={orgPages(slug).courseGrades(groupId, course.id)}
+                        />
+                      }
+                    >
+                      Grades
+                    </Button>
+                  )}
+                {course.canRemove && (
+                  <ConfirmButton
+                    variant="ghost"
+                    size="sm"
+                    title={`Take ${course.title} off this class?`}
+                    description="Students stop seeing it here. Their solved problems and answers stay."
+                    confirmLabel="Take it off"
+                    onConfirm={() => remove.mutate(course.id)}
+                  >
+                    Take off
+                  </ConfirmButton>
+                )}
+              </span>
             </div>
             <ol className="grid gap-1.5">
               {course.modules.map((m, index) => (
@@ -174,6 +210,9 @@ export function ClassCourses({
                   questions={data.questions}
                   practice={`${base}/practice`}
                   queryKey={key}
+                  checkpointHref={(id) =>
+                    orgPages(slug).checkpoint(groupId, course.id, id)
+                  }
                 />
               ))}
             </ol>
@@ -209,6 +248,7 @@ function ModuleRow({
   questions,
   practice,
   queryKey,
+  checkpointHref,
 }: {
   index: number
   module: ClassCourse["modules"][number]
@@ -217,6 +257,7 @@ function ModuleRow({
   questions: Record<string, DailyQuestionData>
   practice: string
   queryKey: unknown[]
+  checkpointHref: (id: string) => string
 }) {
   const [open, setOpen] = useState(false)
   const locked = !teacher && !m.open
@@ -319,10 +360,50 @@ function ModuleRow({
                 </li>
               )
             })}
-            {m.items.length === 0 && (
+            {m.items.length === 0 && m.checkpoints.length === 0 && (
               <li className="text-caption">Nothing in this module yet.</li>
             )}
           </ul>
+          {m.checkpoints.length > 0 && (
+            <ul
+              className="grid gap-1 border-t border-hairline pt-2"
+              data-testid="module-checkpoints"
+            >
+              {m.checkpoints.map((c) => (
+                <li
+                  key={c.id}
+                  data-testid="module-checkpoint"
+                  className="flex flex-wrap items-center gap-2 text-body-sm"
+                >
+                  <Badge variant="secondary">{KIND_NAME[c.kind]}</Badge>
+                  <Link
+                    href={checkpointHref(c.id)}
+                    className="font-medium text-ink underline-offset-2 hover:underline"
+                  >
+                    {c.title}
+                  </Link>
+                  <span className="text-caption">
+                    {c.kind === "quiz" && `${c.count} questions · `}
+                    {c.kind === "lab" && `${c.count} problems · `}
+                    {c.kind !== "project" && c.timeLimit
+                      ? `${c.timeLimit} min · `
+                      : ""}
+                    out of {c.max}
+                  </span>
+                  {!teacher && (
+                    <span
+                      className="ml-auto text-caption tabular-nums"
+                      data-testid="checkpoint-status"
+                    >
+                      {c.earned !== null
+                        ? `${c.earned} / ${c.max}`
+                        : CHECKPOINT_STATUS[c.state]}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </CollapsibleContent>
       </Collapsible>
     </li>

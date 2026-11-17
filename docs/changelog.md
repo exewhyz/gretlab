@@ -8,6 +8,18 @@ aren't listed.
 
 ## 17 November 2026
 
+### Quizzes, labs and projects in courses
+
+- A course module can now have a **quiz**, a **lab** and a **project**, each optional. Tick them
+  while writing the module, then choose questions or problems, points, a time limit and a weight.
+- Students take a quiz or lab in **one attempt**, timed if you set a limit. A lab counts graded
+  submissions made during the attempt. A project is handed in as a GitHub repository and marked
+  by a teacher, with feedback.
+- **Grades** on a class's course shows each student's scores and their **course grade**. Click a
+  score to mark a project or let a student try a quiz or lab again.
+
+### The landing page and the logo
+
 - The landing page at the site's address now opens for signed-in people too, with **Your home**
   in its header. Signing in still takes you to your home.
 - The logo takes you to your home when you're signed in, and to the landing page when you're not.

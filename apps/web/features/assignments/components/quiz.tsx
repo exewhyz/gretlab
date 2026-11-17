@@ -4,7 +4,10 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
 import { Checkbox } from "@workspace/ui/components/checkbox"
-import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group"
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@workspace/ui/components/radio-group"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { TextArea, TextInput } from "@/components/form"
@@ -41,20 +44,32 @@ export function QuizSection({
   open,
   resultsOut,
   held,
+  endpoint,
+  queryKey,
+  closedText,
 }: {
   slug: string
   questions: QuizQuestionView[]
   open: boolean
   resultsOut: boolean
   held: boolean
+  /** Where answers are PUT; an assignment's by default. */
+  endpoint?: string
+  /** What to refresh when a save is refused. */
+  queryKey?: unknown[]
+  /** What it says when closed with no results yet. */
+  closedText?: string
 }) {
   const client = useQueryClient()
-  const [answers, setAnswers] = useState<Record<string, string[] | string>>(() =>
-    Object.fromEntries(
-      questions.filter((q) => q.answer !== null).map((q) => [q.id, q.answer!])
-    )
+  const [answers, setAnswers] = useState<Record<string, string[] | string>>(
+    () =>
+      Object.fromEntries(
+        questions.filter((q) => q.answer !== null).map((q) => [q.id, q.answer!])
+      )
   )
-  const [state, setState] = useState<"saved" | "saving" | "edited" | "error">("saved")
+  const [state, setState] = useState<"saved" | "saving" | "edited" | "error">(
+    "saved"
+  )
   const [error, setError] = useState<string | null>(null)
   const pending = useRef<Record<string, string[] | string> | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -66,13 +81,18 @@ export function QuizSection({
     pending.current = null
     setState("saving")
     try {
-      await api(`/assignments/${slug}/answers`, { method: "PUT", body: { answers: body } })
+      await api(endpoint ?? `/assignments/${slug}/answers`, {
+        method: "PUT",
+        body: { answers: body },
+      })
       setState(pending.current ? "edited" : "saved")
       setError(null)
     } catch (e) {
       setState("error")
       setError(e instanceof Error ? e.message : "Couldn't save your answers.")
-      void client.invalidateQueries({ queryKey: ["assignment", slug] })
+      void client.invalidateQueries({
+        queryKey: queryKey ?? ["assignment", slug],
+      })
     }
   }
 
@@ -98,7 +118,9 @@ export function QuizSection({
 
   const answered = questions.filter((q) => {
     const a = answers[q.id]
-    return a !== undefined && (Array.isArray(a) ? a.length > 0 : a.trim() !== "")
+    return (
+      a !== undefined && (Array.isArray(a) ? a.length > 0 : a.trim() !== "")
+    )
   }).length
 
   return (
@@ -116,15 +138,17 @@ export function QuizSection({
                   : `Saved · ${answered} of ${questions.length} answered`
             : resultsOut
               ? "Results"
-              : held
-                ? "Closed. Results come when your teacher releases them."
-                : "Closed. Results come after the due time."}
+              : closedText
+                ? closedText
+                : held
+                  ? "Closed. Results come when your teacher releases them."
+                  : "Closed. Results come after the due time."}
         </span>
       </div>
       {open && (
         <p className="text-caption">
-          Your answers save as you go and can be changed until your time is up; what&apos;s
-          saved then counts.
+          Your answers save as you go and can be changed until your time is up;
+          what&apos;s saved then counts.
         </p>
       )}
       {questions.map((q, index) => {
@@ -139,8 +163,13 @@ export function QuizSection({
             className="grid gap-2 rounded-lg border border-hairline bg-card p-4"
           >
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-body-sm font-semibold text-ink">Q{index + 1}</span>
-              <span className="text-caption tabular-nums" data-testid="quiz-mark">
+              <span className="text-body-sm font-semibold text-ink">
+                Q{index + 1}
+              </span>
+              <span
+                className="text-caption tabular-nums"
+                data-testid="quiz-mark"
+              >
                 {r
                   ? r.needsMarking
                     ? `Being marked · ${q.points} pts`
@@ -174,7 +203,9 @@ export function QuizSection({
                       onCheckedChange={(checked) =>
                         answer(
                           q.id,
-                          checked ? [...chosen, o.id] : chosen.filter((x) => x !== o.id)
+                          checked
+                            ? [...chosen, o.id]
+                            : chosen.filter((x) => x !== o.id)
                         )
                       }
                     />
@@ -224,6 +255,9 @@ function optionTone(
   return cn(
     "inline-flex items-center gap-2 rounded-md px-2 py-1 text-body-sm text-ink",
     result?.correct.includes(id) && "bg-success/10 text-success",
-    result && !result.correct.includes(id) && chosen.includes(id) && "bg-destructive/10 text-destructive"
+    result &&
+      !result.correct.includes(id) &&
+      chosen.includes(id) &&
+      "bg-destructive/10 text-destructive"
   )
 }

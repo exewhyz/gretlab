@@ -2373,6 +2373,111 @@ export const courseItems = pgTable(
   ]
 )
 
+/**
+ * A module's graded checkpoint, at most one of each kind per module: a quiz (questions that
+ * mark themselves), a lab (problems scored by graded submissions made during the attempt)
+ * or a project (a GitHub repository a teacher marks out of `points`). Each counts toward
+ * the course grade by `weight`. Ids follow the module and kind across outline saves, so
+ * attempts and marks stay.
+ */
+export const courseCheckpoints = pgTable(
+  "course_checkpoints",
+  {
+    id: id(),
+    moduleId: uuid("module_id")
+      .notNull()
+      .references(() => courseModules.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"quiz" | "lab" | "project">().notNull(),
+    title: text("title").notNull(),
+    /** Markdown. */
+    instructions: text("instructions").notNull().default(""),
+    /** Minutes from starting, for quizzes and labs; null for no limit. */
+    timeLimit: integer("time_limit"),
+    weight: integer("weight").notNull().default(1),
+    /** A project's mark is out of this. */
+    points: integer("points").notNull().default(100),
+  },
+  (table) => [uniqueIndex("course_checkpoints_module_kind").on(table.moduleId, table.kind)]
+)
+
+/** A quiz's questions or a lab's problems, in order, each worth `points`. */
+export const courseCheckpointItems = pgTable(
+  "course_checkpoint_items",
+  {
+    checkpointId: uuid("checkpoint_id")
+      .notNull()
+      .references(() => courseCheckpoints.id, { onDelete: "cascade" }),
+    itemType: text("item_type").$type<"problem" | "question">().notNull(),
+    itemId: uuid("item_id").notNull(),
+    points: integer("points").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.checkpointId, table.itemType, table.itemId] }),
+    index("course_checkpoint_items_by_item").on(table.itemType, table.itemId),
+  ]
+)
+
+/** A student's one attempt at a quiz or lab: from starting until finished or out of time. */
+export const courseAttempts = pgTable(
+  "course_attempts",
+  {
+    checkpointId: uuid("checkpoint_id")
+      .notNull()
+      .references(() => courseCheckpoints.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Null when the checkpoint has no time limit. */
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.checkpointId, table.userId] })]
+)
+
+/** A student's saved answer to a quiz checkpoint's question. */
+export const courseQuizAnswers = pgTable(
+  "course_quiz_answers",
+  {
+    checkpointId: uuid("checkpoint_id")
+      .notNull()
+      .references(() => courseCheckpoints.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    questionId: uuid("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    answer: jsonb("answer").$type<string[] | string>().notNull(),
+    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.checkpointId, table.userId, table.questionId] })]
+)
+
+/** A project checkpoint handed in: a repository pinned to a commit, and its mark. */
+export const courseProjectSubmissions = pgTable(
+  "course_project_submissions",
+  {
+    checkpointId: uuid("checkpoint_id")
+      .notNull()
+      .references(() => courseCheckpoints.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    repoUrl: text("repo_url").notNull(),
+    ref: text("ref"),
+    commitSha: text("commit_sha"),
+    note: text("note").notNull().default(""),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    mark: integer("mark"),
+    feedback: text("feedback").notNull().default(""),
+    markedBy: uuid("marked_by").references(() => users.id, { onDelete: "set null" }),
+    markedAt: timestamp("marked_at", { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.checkpointId, table.userId] })]
+)
+
 /** A course taught to a class, starting on a day (module release counts from it). */
 export const courseClasses = pgTable(
   "course_classes",

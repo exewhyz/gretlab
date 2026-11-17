@@ -256,6 +256,15 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - A class gets a course from a start day (`course_classes`) on its Course tab, by whoever may set assignments for it; groups inside the class get it too. Release rules (`packages/judge/src/course.ts`, unit-tested): a module opens `openAfterDays` after the start, and with `afterPrevious` only once the student finished the module before. Teachers see every module and how many students finished each; students see modules as they open.
 - Progress is computed: a problem is done with an accepted graded submission, a question with a right practice answer (`practice_answers`, one row per student and question; tries again allowed, a right answer stays right; the answer and explanation show once right or after 3 tries). Practice is never graded. A course in use can't be deleted (`course_in_use`); taking it off a class keeps students' work.
 - The platform's units became its first course, "Programming fundamentals" (migration 0031 and the seed).
+- **Checkpoints** (`course_checkpoints`, migration 0073; `features/courses/checkpoints.ts`, `checkpoint-results.ts`; rules `judge/course.ts`): a module may have a quiz, a lab and a project, at most one of each (unique per module and kind, so a checkpoint keeps its id, and students' work, across outline saves; unticking one deletes it). Each has a title, markdown instructions and a weight in the course grade; items (`course_checkpoint_items`) carry their own points.
+  - A **quiz** holds questions that mark themselves; a **lab** holds problems a course may hold (`checkItems`); a **project** is marked out of `points`.
+  - Quizzes and labs are one attempt per student (`course_attempts`), started on the checkpoint's page, ending at the time limit (from `dbNow`) or **Finish**; untimed ones run until Finish. Running out of time allows `ATTEMPT_GRACE_MS`; finishing early allows none (`duringAttempt`, `finishedEarly`).
+  - Quiz answers (`course_quiz_answers`) save while the attempt runs and are marked when read; a short answer matching nothing is wrong (nobody marks course work). Questions are sent only once started; right answers only once over (teachers always).
+  - A lab problem scores by the best graded submission made during the attempt (`labPoints`, IOI scores give partial credit); students solve them on the problems' own pages.
+  - Projects (`course_project_submissions`) are GitHub links pinned to a commit (`checkRepository`, shared with assignment projects); handing in again clears the mark. Teachers can't hand in.
+  - Scores are computed, never stored. The course grade (`courseGrade`) weighs each checkpoint's share; what isn't final (attempt not over, project not marked) counts 0, and "so far" leaves it out.
+  - Finishing a module, and the course (certificates), includes its checkpoints: a quiz or lab once its attempt is over, a project once handed in. Training renewal doesn't redo checkpoints.
+  - Pages: `/orgs/:slug/classes/:group/courses/:course/checkpoints/:id` (`orgPages().checkpoint`) and the grade sheet `.../grades` (`orgPages().courseGrades`, teachers of the class). Marking a project and resetting an attempt need `assignments.grade` for the class and are audited (`course.project_mark`, `course.attempt_reset`).
 
 ## Kinds of organization, modules and the sidebar
 
@@ -906,6 +915,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/discussions.mjs`: who can read and post, anonymity, replies and their notification, votes, moderation (pin, lock, hide, answer, delete), and the pages.
 - `e2e/warnings.mjs`: who needs attention and why (missed, low marks, quiet, attendance), who may see it, notes to students, and the page.
 - `e2e/templates.mjs`: writing templates, sharing them, using one for several classes with their own dates, edits reaching unopened uses only, stale saves, a college's own and copied templates, saving an assignment as a template, deleting, and the pages.
+- `e2e/course-checkpoints.mjs`: writing a module's quiz, lab and project (what each may hold, one of a kind, ids kept), one attempt (questions only once started, answers only while it runs, none after Finish or the time limit), lab scores from submissions during the attempt only, handing in and marking projects (limits, who may), the course grade and "so far", resets, the activity log, module progress, copies, and the pages (the editor, a quiz with its clock, the grade sheet, a project on a phone).
 - `e2e/courses.mjs`: writing outlines (what a course may hold, stale saves), sharing courses, a college's own and copied courses, giving one to a class, release by day and by the module before, practice answers, teacher progress, deleting, and the pages.
 - `e2e/platform.mjs`: platform roles, custom roles, the no-escalation rules, ADMIN_EMAILS owners, blocking, the activity log and the menu per role.
 - `e2e/flows.mjs`: Run vs Submit, history and creating a contest, as a person uses them. Included in `pnpm test:e2e`.
@@ -944,7 +954,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Class discussions: threads and replies per class, anonymous to classmates, votes, teacher moderation and answers, reply notifications
 - [x] Early warnings: students who need attention per class (missed work, low marks, gone quiet, attendance) with reasons, and notes to them
 - [x] Templates: assignments and exams written once, shared from the platform or a college's own, used for many classes with their own dates; edits reach uses until they open
-- [x] Courses: modules of library problems and questions with release rules, shared from the platform or a college's own, given to classes from a start day, practice and progress on the class's Course tab
+- [x] Courses: modules of library problems and questions with release rules, shared from the platform or a college's own, given to classes from a start day, practice and progress on the class's Course tab; an optional graded quiz, lab and project per module with a course grade
 - [x] One library with sharing: per-owner Library pages, collections, sharing platform content with all or chosen colleges and teachers, copying to adapt
 - [x] Notifications: in-app bell with stored events and computed reminders, optional email
 - [x] Extensions and resubmission: a later due time for one student, whole assignment or reopened problems; lets an absent student sit an exam later

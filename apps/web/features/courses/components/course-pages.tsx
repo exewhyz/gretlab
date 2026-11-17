@@ -34,6 +34,13 @@ import type { orgCourses } from "@/features/courses/org"
 import type { orgLibrary } from "@/features/library/org"
 import type { orgCopyCourse, orgSaveCourse } from "@/features/courses/org"
 
+import {
+  checkpointProblem,
+  CheckpointsEditor,
+  type CheckpointDraft,
+} from "./checkpoint-editor"
+import { KIND_NAME } from "./checkpoint-page"
+
 /*
  * Courses as their owner writes them: a list, and one course's outline of modules. Each
  * module is edited in a dialog; the outline is saved as a whole.
@@ -59,6 +66,7 @@ interface Module {
   openAfterDays: number | null
   afterPrevious: boolean
   items: Item[]
+  checkpoints: CheckpointDraft[]
 }
 
 interface Course {
@@ -297,6 +305,15 @@ export function CourseEditor({ id }: { id: string }) {
             openAfterDays: m.openAfterDays,
             afterPrevious: m.afterPrevious,
             items: m.items.map(({ kind, id }) => ({ kind, id })),
+            checkpoints: m.checkpoints.map((c) => ({
+              kind: c.kind,
+              title: c.title.trim(),
+              instructions: c.instructions,
+              timeLimit: c.kind === "project" ? null : c.timeLimit,
+              weight: c.weight,
+              points: c.points,
+              items: c.items.map(({ id, points }) => ({ id, points })),
+            })),
           })),
         },
       }),
@@ -422,6 +439,8 @@ export function CourseEditor({ id }: { id: string }) {
               <span className="block truncate text-caption">
                 {m.items.filter((i) => i.kind === "problem").length} problems ·{" "}
                 {m.items.filter((i) => i.kind === "question").length} questions
+                {m.checkpoints.length > 0 &&
+                  ` · ${m.checkpoints.map((c) => KIND_NAME[c.kind]).join(", ")}`}{" "}
                 · {releaseLabel(m)}
               </span>
             </span>
@@ -564,6 +583,10 @@ function ModuleDialog({
     module?.afterPrevious ?? false
   )
   const [items, setItems] = useState<Item[]>(module?.items ?? [])
+  const [checkpoints, setCheckpoints] = useState<CheckpointDraft[]>(
+    module?.checkpoints ?? []
+  )
+  const checkpointsOk = checkpoints.every((c) => checkpointProblem(c) === null)
   const [search, setSearch] = useState("")
   const { data: library } = useQuery({
     queryKey: owner.key("library"),
@@ -784,13 +807,20 @@ function ModuleDialog({
             </p>
           </div>
         )}
+        <CheckpointsEditor
+          value={checkpoints}
+          onChange={setCheckpoints}
+          moduleTitle={title.trim()}
+          library={library}
+          readOnly={readOnly}
+        />
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
             {readOnly ? "Close" : "Cancel"}
           </Button>
           {!readOnly && (
             <Button
-              disabled={!title.trim() || !daysOk}
+              disabled={!title.trim() || !daysOk || !checkpointsOk}
               onClick={() =>
                 onSave({
                   id: module?.id,
@@ -800,6 +830,7 @@ function ModuleDialog({
                   openAfterDays: daysValue || null,
                   afterPrevious,
                   items,
+                  checkpoints,
                 })
               }
             >
