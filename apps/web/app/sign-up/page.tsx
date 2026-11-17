@@ -7,7 +7,7 @@ import { readSession } from "@/features/auth/current-user"
 
 export const metadata: Metadata = { title: "Create an account", robots: { index: false } }
 
-const safePath = (path: string | undefined) => (path?.startsWith("/") && !path.startsWith("//") ? path : "/")
+const safePath = (path: string | undefined) => (path?.startsWith("/") && !path.startsWith("//") ? path : "/home")
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ callbackUrl?: string }> }) {
   const { callbackUrl } = await searchParams

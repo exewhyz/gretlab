@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import { redirect } from "next/navigation"
 
 import { getCurrentUser } from "@/features/auth/current-user"
 import { Landing } from "@/features/landing/components/landing"
@@ -22,10 +21,9 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-/** Signed in: your home. Visitors: the landing page (features/landing). */
+/** The landing page (features/landing), for visitors and signed-in people alike. */
 export default async function HomePage() {
-  if (await getCurrentUser()) redirect("/home")
-  const [facts, site, proof] = await Promise.all([landingFacts(), siteSettings(), landingProof()])
+  const [user, facts, site, proof] = await Promise.all([getCurrentUser(), landingFacts(), siteSettings(), landingProof()])
   return (
     <>
       <JsonLd
@@ -40,7 +38,7 @@ export default async function HomePage() {
           publisher: { "@id": `${site.url}/#organization` },
         }}
       />
-      <Landing facts={facts} proof={proof} />
+      <Landing facts={facts} proof={proof} signedIn={!!user} />
     </>
   )
 }

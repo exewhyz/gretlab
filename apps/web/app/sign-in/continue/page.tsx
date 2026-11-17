@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Sign in", robots: { index: false } }
 
 /** Only same-site paths, so a crafted link can't send someone elsewhere. */
 function safePath(path: string | undefined) {
-  return path?.startsWith("/") && !path.startsWith("//") ? path : "/"
+  return path?.startsWith("/") && !path.startsWith("//") ? path : "/home"
 }
 
 /**

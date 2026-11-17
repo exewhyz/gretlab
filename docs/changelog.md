@@ -6,6 +6,11 @@ description: What's new in GretLab, newest first.
 What changed for the people using GretLab, newest first. Fixes and changes that don't show to anyone
 aren't listed.
 
+## 17 November 2026
+
+- The landing page at the site's address now opens for signed-in people too, with **Your home**
+  in its header. Signing in still takes you to your home.
+
 ## 15 November 2026
 
 ### A landing page

@@ -18,7 +18,7 @@ import { Partners, Testimonials } from "./proof"
 import { TimetableHero } from "./timetable-hero"
 
 /*
- * The public landing page (/), for colleges and cohort programs: a week with the headline
+ * The landing page (/), shown to visitors and signed-in people alike, for colleges and cohort programs: a week with the headline
  * set into it (switchable between a college and a cohort), the coding lab as one
  * submission followed to the gradebook, what sits around the lab for each audience, a line
  * of what's under the hood, and a close. Short on purpose: the screens do the explaining.
@@ -50,10 +50,19 @@ function Lab({ facts }: { facts: LandingFacts }) {
   )
 }
 
-export function Landing({ facts, proof }: { facts: LandingFacts; proof: Awaited<ReturnType<typeof landingProof>> }) {
+export function Landing({
+  facts,
+  proof,
+  signedIn = false,
+}: {
+  facts: LandingFacts
+  proof: Awaited<ReturnType<typeof landingProof>>
+  /** Signed-in people get a link to their home instead of "Sign in". */
+  signedIn?: boolean
+}) {
   return (
     <div className="min-h-dvh bg-canvas text-body">
-      <Header facts={facts} />
+      <Header facts={facts} signedIn={signedIn} />
       <div className="mx-auto max-w-[80rem] lg:px-6">
         <div className="relative border-hairline lg:border-x">
           <Corners />
@@ -79,7 +88,7 @@ export function Landing({ facts, proof }: { facts: LandingFacts; proof: Awaited<
   )
 }
 
-function Header({ facts }: { facts: LandingFacts }) {
+function Header({ facts, signedIn }: { facts: LandingFacts; signedIn: boolean }) {
   const links: [string, string][] = [
     ["The coding lab", "#lab"],
     ["Colleges and cohorts", "#around"],
@@ -104,8 +113,11 @@ function Header({ facts }: { facts: LandingFacts }) {
         </nav>
         <div className="ml-auto flex items-center gap-1.5">
           <ThemeToggle />
-          <Link href="/sign-in" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "hidden sm:inline-flex")}>
-            Sign in
+          <Link
+            href={signedIn ? "/home" : "/sign-in"}
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), !signedIn && "hidden sm:inline-flex")}
+          >
+            {signedIn ? "Your home" : "Sign in"}
           </Link>
           <Primary facts={facts} size="sm" />
         </div>

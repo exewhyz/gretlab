@@ -1,5 +1,6 @@
 /**
- * The member's home (/home): signed-in people land there from /, visitors still go to the
+ * The member's home (/home): signed-in people land there after signing in (/ is the landing
+ * page for everyone), visitors still go to the
  * problems; it gathers their schools (and requests waiting), children, work due, contests,
  * practice with the streak and activity, and the daily challenge, leaving out what's
  * switched off; the page on a laptop and a phone, and Home in the header.
@@ -54,13 +55,16 @@ await owner(`/orgs/mh-school/parents`, { body: { studentId: kid.id, email: "mh-p
 const [student, fresh, parent] = await Promise.all(["mh-s", "mh-new", "mh-p"].map((h) => client(`${h}@example.com`)))
 
 // ---------- where / leads
-const root = async (cookie) => (await fetch(BASE + "/", { redirect: "manual", headers: cookie ? { cookie } : {} })).headers.get("location") ?? ""
 {
   const visit = await fetch(BASE + "/", { redirect: "manual" })
   const html = await visit.text()
   check("a visitor gets the landing page at /, not a redirect", visit.status === 200 && html.includes('id="landing-title"') && html.includes("grades itself"), visit.status)
 }
-check("someone signed in goes from / to their home", (await root(await cookieFor("mh-s@example.com"))).endsWith("/home"))
+{
+  const signedIn = await fetch(BASE + "/", { redirect: "manual", headers: { cookie: await cookieFor("mh-s@example.com") } })
+  const html = await signedIn.text()
+  check("someone signed in also gets the landing page at /, with a link to their home", signedIn.status === 200 && html.includes('id="landing-title"') && html.includes('href="/home"') && !html.includes(">Sign in<"), signedIn.status)
+}
 
 // ---------- what it gathers
 const d = (await student("/me/dashboard")).json
@@ -84,7 +88,7 @@ const view = async (email, width) => {
   return ctx.newPage()
 }
 const p = await view("mh-s@example.com", 1440)
-await p.goto(`${BASE}/`)
+await p.goto(`${BASE}/sign-in/continue`)
 await p.getByTestId("member-home").waitFor({ timeout: 30000 })
 check("signing in lands on the home page", p.url().endsWith("/home"))
 check("the header has Home, marked current", (await p.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Home" }).getAttribute("aria-current")) === "page")
