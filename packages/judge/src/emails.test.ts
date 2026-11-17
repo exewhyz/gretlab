@@ -54,3 +54,14 @@ test("a list placeholder renders as a list", () => {
   const r = renderEmail(EMAIL_TEMPLATES["digest.weekly"], { org: "Demo", lines: "- 4 new\n- 2 due", reportsLink: "https://g.example/r" }, layout)
   assert.ok(r.html.includes("<li style=\"margin:4px 0\">4 new</li>"))
 })
+
+test("example links lead to the site's own address", () => {
+  for (const key of EMAIL_TEMPLATE_KEYS) {
+    const values = exampleValues(key, "https://gretlab.grettech.com/")
+    for (const [name, value] of Object.entries(values)) {
+      assert.ok(!value.includes("gretlab.example.com"), `${key}.${name}: ${value}`)
+      if (/link$/i.test(name)) assert.ok(value.startsWith("https://gretlab.grettech.com/"), `${key}.${name}: ${value}`)
+    }
+  }
+  assert.equal(exampleValues("account.reset", "https://x.test").link, "https://x.test/reset-password?token=…")
+})

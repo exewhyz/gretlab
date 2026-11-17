@@ -36,6 +36,14 @@ written together, then sent just after the response, in batches, with retries (1
 30 minutes, 2 hours, 6 hours, then failed). A scheduler calling the outbox route finishes big batches
 and retries. Sign-in codes and security notices jump the queue.
 
+## The emails' wording
+
+Platform staff with "Manage email templates" change any email's subject and body, and the footer
+every email shares, on **Dashboard › Emails**. Each has clickable placeholders, a live preview and
+**Send me a test**, which fills in sample values. Links in the preview and the test lead to the
+site's own address (where the site runs), so you can click them. A test's confirmation and reset
+links carry sample tokens, so those two won't work. **Reset** brings the default wording back.
+
 ## Reminders
 
 Work due within a day, a contest starting within a day, low attendance, books due: worked out when the

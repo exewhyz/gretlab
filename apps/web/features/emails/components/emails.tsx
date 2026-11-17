@@ -283,7 +283,7 @@ function Editor({
               <button
                 key={v.key}
                 type="button"
-                title={`${v.description}${v.required ? " (must stay)" : ""}. For example: ${v.example}`}
+                title={`${v.description}${v.required ? " (must stay)" : ""}. For example: ${v.key === "siteUrl" ? data.layout.siteUrl : v.example.startsWith("/") ? `${data.layout.siteUrl}${v.example}` : v.example}`}
                 onClick={() => insert(v.key)}
                 className={cn(
                   "rounded-md border px-1.5 py-0.5 font-mono text-xs",

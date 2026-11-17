@@ -19,6 +19,7 @@ import { platformCan } from "@/features/platform/access"
 import { writePlatformAudit } from "@/features/platform/staff"
 import { getSettings } from "@/features/settings/server"
 import { ApiError, notFound } from "@/lib/api/errors"
+import { siteSettings } from "@/lib/seo/config"
 import { cached, invalidate } from "@/lib/ttl-cache"
 
 /*
@@ -45,7 +46,8 @@ async function layout() {
   const [settings, rows] = await Promise.all([getSettings(), stored()])
   return {
     site: settings["site.title"],
-    siteUrl: process.env.NEXTAUTH_URL ?? "",
+    // Where the site runs (the links in every email); the dashboard's site address if unset.
+    siteUrl: (process.env.NEXTAUTH_URL || (await siteSettings()).url).replace(/\/+$/, ""),
     footer: rows.layout?.body ?? DEFAULT_FOOTER,
   }
 }
@@ -88,7 +90,7 @@ export async function listTemplates(user: User) {
         why: def.why ?? null,
         defaults: { subject: def.subject, body: def.body },
         vars: varsOf(key),
-        examples: exampleValues(key),
+        examples: exampleValues(key, frame.siteUrl),
         changed: Boolean(rows[key]),
         updatedAt: rows[key]?.updatedAt ?? null,
       }
@@ -141,7 +143,8 @@ export async function resetTemplate(user: User, rawKey: string) {
 export async function sendTest(user: User, rawKey: string) {
   await need(user)
   const key = keyOf(rawKey)
-  const email = await composeEmail(key === "layout" ? "notification" : key, exampleValues(key === "layout" ? "notification" : key))
+  const template = key === "layout" ? "notification" : key
+  const email = await composeEmail(template, exampleValues(template, (await layout()).siteUrl))
   await queueEmails(getDb(), [{ to: user.email, subject: `[Test] ${email.subject}`, text: email.text, html: email.html }], {
     urgent: true,
   })

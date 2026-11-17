@@ -39,7 +39,7 @@ export interface TemplateDefinition {
 /** Placeholders every template may use. */
 export const COMMON_VARS: readonly TemplateVar[] = [
   { key: "site", description: "The site's name", example: "GretLab" },
-  { key: "siteUrl", description: "The site's address", example: "https://gretlab.example.com" },
+  { key: "siteUrl", description: "The site's address", example: "/" },
 ]
 
 export const EMAIL_TEMPLATES = {
@@ -54,7 +54,7 @@ export const EMAIL_TEMPLATES = {
       "The link works once, for 24 hours. If you didn't sign up, ignore this email and no account will be made.",
     vars: [
       { key: "name", description: "Their name", example: "Priya" },
-      { key: "link", description: "The confirmation link", example: "https://gretlab.example.com/verify-email?token=…", required: true },
+      { key: "link", description: "The confirmation link", example: "/verify-email?token=…", required: true },
     ],
   },
   "account.exists": {
@@ -69,8 +69,8 @@ export const EMAIL_TEMPLATES = {
       "If this wasn't you, you can ignore this email.",
     vars: [
       { key: "email", description: "The address", example: "priya@example.com" },
-      { key: "signInLink", description: "The sign-in page", example: "https://gretlab.example.com/sign-in", required: true },
-      { key: "resetLink", description: "The forgotten-password page", example: "https://gretlab.example.com/forgot-password" },
+      { key: "signInLink", description: "The sign-in page", example: "/sign-in", required: true },
+      { key: "resetLink", description: "The forgotten-password page", example: "/forgot-password" },
     ],
   },
   "account.reset": {
@@ -84,7 +84,7 @@ export const EMAIL_TEMPLATES = {
     vars: [
       { key: "name", description: "Their name", example: "Priya" },
       { key: "email", description: "The address", example: "priya@example.com" },
-      { key: "link", description: "The reset link", example: "https://gretlab.example.com/reset-password?token=…", required: true },
+      { key: "link", description: "The reset link", example: "/reset-password?token=…", required: true },
     ],
   },
   "account.security": {
@@ -101,7 +101,7 @@ export const EMAIL_TEMPLATES = {
       { key: "what", description: "What changed", example: "Your password was changed", required: true },
       { key: "email", description: "The account's address", example: "priya@example.com" },
       { key: "when", description: "When it happened", example: "Fri, 13 Nov 2026 10:24:00 GMT" },
-      { key: "link", description: "Security settings", example: "https://gretlab.example.com/account/security" },
+      { key: "link", description: "Security settings", example: "/account/security" },
     ],
   },
   "auth.code": {
@@ -127,7 +127,7 @@ export const EMAIL_TEMPLATES = {
     vars: [
       { key: "title", description: "The notification's title", example: "New notice in CSE 2nd year", required: true },
       { key: "body", description: "Its text", example: "Lab moves to Room 204 on Friday." },
-      { key: "link", description: "Where it leads", example: "https://gretlab.example.com/orgs/demo/classes/…" },
+      { key: "link", description: "Where it leads", example: "/orgs/demo/classes/…" },
       { key: "org", description: "The organization it's from (may be empty)", example: "Demo College" },
     ],
     why: "You get this because of your notification settings on {{site}}. [Change them]({{settingsLink}}).",
@@ -141,7 +141,7 @@ export const EMAIL_TEMPLATES = {
     vars: [
       { key: "org", description: "The organization", example: "Demo College", required: true },
       { key: "lines", description: "The week, as a list", example: "- 42 submissions\n- 3 assignments due\n- Attendance 91%", required: true },
-      { key: "reportsLink", description: "Its reports page", example: "https://gretlab.example.com/orgs/demo/manage/reports" },
+      { key: "reportsLink", description: "Its reports page", example: "/orgs/demo/manage/reports" },
     ],
     why: "You get this as someone who runs {{org}}. [Change it]({{settingsLink}}).",
   },
@@ -163,7 +163,7 @@ export function varsOf(key: EmailTemplateKey | "layout"): readonly TemplateVar[]
   if (key === "layout") return COMMON_VARS
   const own: TemplateDefinition = EMAIL_TEMPLATES[key]
   const settings: TemplateVar[] = own.why
-    ? [{ key: "settingsLink", description: "Their notification settings", example: "https://gretlab.example.com/notifications" }]
+    ? [{ key: "settingsLink", description: "Their notification settings", example: "/notifications" }]
     : []
   return [...own.vars, ...COMMON_VARS, ...settings]
 }
@@ -295,9 +295,18 @@ export function renderEmail(
   return { subject, text, html }
 }
 
-/** Example values for a template's placeholders, for previews and test emails. */
-export function exampleValues(key: EmailTemplateKey | "layout") {
+/**
+ * Example values for a template's placeholders, for previews and test emails. Example links
+ * are written as paths ("/sign-in") and put on `siteUrl`, the site's real address, so a test
+ * email's links lead to the site itself.
+ */
+export function exampleValues(key: EmailTemplateKey | "layout", siteUrl = "") {
   // The site's own name and address are real, never examples.
   const common = new Set(COMMON_VARS.map((v) => v.key))
-  return Object.fromEntries(varsOf(key).filter((v) => !common.has(v.key)).map((v) => [v.key, v.example]))
+  const site = siteUrl.replace(/\/+$/, "")
+  return Object.fromEntries(
+    varsOf(key)
+      .filter((v) => !common.has(v.key))
+      .map((v) => [v.key, v.example.startsWith("/") ? `${site}${v.example}` : v.example])
+  )
 }

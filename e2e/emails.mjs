@@ -89,6 +89,9 @@ check("...what people wrote is escaped, not markup", note.html.includes("&lt;b&g
 check("...with the button, the footer and why they got it", note.html.includes("See it</a>") && note.html.includes('href="mailto:help@example.com"') && note.html.includes("notification settings"))
 
 // ---------- tests, defaults, log
+const tl = await admin("/admin/emails/account.reset/test", { body: {} })
+const testHtml = psql(`select html from email_outbox where to_address='admin@example.com' order by created_at desc limit 1`)
+check("a test email's links lead to the site itself", tl.status === 200 && testHtml.includes(`${BASE}/reset-password?token=`) && !testHtml.includes("gretlab.example.com"), testHtml.slice(0, 120))
 const t = await admin("/admin/emails/auth.code/test", { body: {} })
 check("a test goes to the editor, with example values", t.json?.to === "admin@example.com" && psql(`select subject from email_outbox where to_address='admin@example.com' order by created_at desc limit 1`).startsWith("[Test] Your") && psql(`select subject from email_outbox where to_address='admin@example.com' order by created_at desc limit 1`).includes("482913"))
 await admin("/admin/emails/account.reset", { method: "DELETE" })
