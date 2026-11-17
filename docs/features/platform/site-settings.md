@@ -49,7 +49,11 @@ Changes reach every page within five minutes. `robots.txt` and `sitemap.xml` fol
 
 ## Landing page
 
-The front page's contact form and its proof are managed on **Dashboard › Landing page**:
+The front page (the site's address, `/`) is the landing page for everyone, signed in or not;
+signed-in people see **Your home** in its header instead of **Sign in**. Search engines index it as
+the site's front page.
+
+Its contact form and its proof are managed on **Dashboard › Landing page**:
 
 - **Enquiries:** every request sent from the form, newest first, with search and a New / Handled
   filter. Mark one handled once you've replied. Shown to staff who manage organizations.
@@ -81,6 +85,9 @@ links them. There is no button to delete an account: people write to the contact
 GretLab's mark is code braces holding a check: code goes in and comes back judged and graded. It's the
 site's icon, the home-screen icon on phones, the logo search engines show, and the share cards. It
 isn't a setting; changing it is a code change.
+
+Clicking it leads signed-in people to their home (`/home`) and visitors to the landing page (`/`).
+Search engines always see it leading to `/`.
 
 ## Edge cases
 

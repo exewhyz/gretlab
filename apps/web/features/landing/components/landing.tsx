@@ -97,7 +97,7 @@ function Header({ facts, signedIn }: { facts: LandingFacts; signedIn: boolean })
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-canvas/90 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-[80rem] items-center gap-6 px-5 lg:px-12">
-        <Link href="/" className="flex items-center gap-2.5 text-title-sm font-semibold text-ink">
+        <Link href={signedIn ? "/home" : "/"} className="flex items-center gap-2.5 text-title-sm font-semibold text-ink">
           <LogoMark className="size-7 shrink-0 text-ink" />
           {facts.site}
         </Link>

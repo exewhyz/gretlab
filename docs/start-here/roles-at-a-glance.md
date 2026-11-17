@@ -67,4 +67,7 @@ admin (logged as support), one to look without changing anything.
 | Someone who runs or teaches in an organization | the organization's dashboard, `/orgs/<slug>` |
 | A teacher across organizations | Teach, `/teach` |
 | Platform staff | Dashboard, `/admin` |
-| A visitor | the public problem library, `/problems` |
+| A visitor | the landing page, `/` |
+
+The landing page at `/` opens for everyone, signed in or not. The logo leads signed-in people to their
+home (`/home`) and visitors to the landing page.

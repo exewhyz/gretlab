@@ -10,6 +10,7 @@ aren't listed.
 
 - The landing page at the site's address now opens for signed-in people too, with **Your home**
   in its header. Signing in still takes you to your home.
+- The logo takes you to your home when you're signed in, and to the landing page when you're not.
 
 ## 15 November 2026
 

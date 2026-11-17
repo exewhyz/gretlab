@@ -15,6 +15,7 @@ import { useViewer } from "@/features/account/use-viewer"
 import { Brand } from "@/features/lab/components/brand"
 import { ExamHeader, useExamLock } from "@/features/exams/components/exam-lock"
 import { NotificationBell } from "@/features/notifications/components/bell"
+import { HomeLink } from "@/components/home-link"
 
 const DEFAULT_TITLE = "GretLab"
 
@@ -29,9 +30,9 @@ export function PageHeader({ children }: { children?: ReactNode }) {
   return (
     <>
       <header className="sticky top-0 z-30 flex h-14 flex-none items-center gap-2 border-b border-hairline bg-canvas px-4 sm:gap-3">
-        <Link href="/" className="mr-2 min-w-0 shrink">
+        <HomeLink className="mr-2 min-w-0 shrink">
           <Brand title={viewer?.siteTitle ?? DEFAULT_TITLE} />
-        </Link>
+        </HomeLink>
         <ScopeSwitcher />
         <ModeToggle />
         <PrimaryNav />

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 
+import { HomeLink } from "@/components/home-link"
 import { LogoMark } from "@/components/logo"
 
 import type { LegalFacts } from "../server"
@@ -53,13 +54,12 @@ export function LegalPage({
     <div className="min-h-dvh bg-canvas text-body-md text-body">
       <header className="border-b border-hairline">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link
-            href="/"
+          <HomeLink
             className="flex items-center gap-2.5 text-title-sm font-semibold text-ink"
           >
             <LogoMark className="size-7 shrink-0 text-ink" />
             {facts.site}
-          </Link>
+          </HomeLink>
           <nav aria-label="Legal" className="flex gap-1 text-nav">
             {DOCS.map((d) => (
               <Link
@@ -121,9 +121,9 @@ export function LegalPage({
               {other.label.toLowerCase()}
             </Link>{" "}
             too. Back to{" "}
-            <Link href="/" className={LINK}>
+            <HomeLink className={LINK}>
               {facts.site}
-            </Link>
+            </HomeLink>
             .
           </p>
         </main>

@@ -28,6 +28,7 @@ import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AccountMenu } from "@/features/account/account-menu"
 import { NotificationBell } from "@/features/notifications/components/bell"
+import { HomeLink } from "@/components/home-link"
 
 /*
  * The frame of the app's working areas (a school, the platform admin): a shadcn Sidebar,
@@ -229,13 +230,12 @@ export function AppFrame({
           <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-hairline bg-canvas/95 px-3 backdrop-blur sm:px-4">
             <SidebarTrigger aria-label="Toggle the menu" />
             <Separator orientation="vertical" className="mx-1 h-5" />
-            <Link
-              href="/"
+            <HomeLink
               className="font-mono text-sm font-bold tracking-tighter text-primary"
               aria-label="GretLab home"
             >
               &gt;&gt;&gt;
-            </Link>
+            </HomeLink>
             {title && (
               <span className="min-w-0 truncate text-sm font-medium text-ink">
                 {title}
