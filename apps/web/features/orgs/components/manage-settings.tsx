@@ -243,8 +243,105 @@ export function SettingsForm({
           </Button>
         </div>
       </Card>
+      {initial.execution && (
+        <ExecutionCard
+          slug={slug}
+          execution={initial.execution}
+          onSaved={onSaved}
+        />
+      )}
       <ModulesCard slug={slug} org={initial} onSaved={onSaved} />
     </>
+  )
+}
+
+/**
+ * Where the organization's code runs: it can turn server execution off for its own work
+ * (when the judge is failing) and allow grading in the browser, never more than the
+ * platform allows.
+ */
+function ExecutionCard({
+  slug,
+  execution,
+  onSaved,
+}: {
+  slug: string
+  execution: NonNullable<Summary["org"]["execution"]>
+  onSaved: () => void
+}) {
+  const [server, setServer] = useState(execution.server)
+  const [browserGrading, setBrowserGrading] = useState(execution.browserGrading)
+  const [message, setMessage] = useState<Message>(null)
+  const { platform } = execution
+  const gradingAllowed = platform.browser && platform.browserGrading
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/orgs/${slug}`, {
+        method: "PATCH",
+        body: { execution: { server, browserGrading } },
+      }),
+    onSuccess: () => {
+      setMessage({ text: "Saved.", kind: "ok" })
+      onSaved()
+    },
+    onError: (e) => setMessage({ text: e.message, kind: "err" }),
+  })
+  return (
+    <Card className="grid gap-3" data-testid="execution-card">
+      <div>
+        <h2 className="text-title-sm text-ink">Code execution</h2>
+        <p className="text-body-sm text-body">
+          Where your assignments, contests and members-only problems run
+          code. You can only narrow what the platform allows.
+        </p>
+      </div>
+      <label className="flex items-start gap-2 text-body-sm text-ink">
+        <Switch
+          checked={server && platform.server}
+          disabled={!platform.server}
+          onCheckedChange={(checked) => {
+            setServer(checked)
+            setMessage(null)
+          }}
+          aria-label="Run code on the server"
+        />
+        <span>
+          Run code on the server
+          <span className="block text-xs text-body">
+            {platform.server
+              ? "Every language, graded in the sandbox. Turn it off if the judge is failing; students then run Python and JavaScript in their browser."
+              : "Server execution is off for the whole site, so it can't be turned on here."}
+          </span>
+        </span>
+      </label>
+      <label className="flex items-start gap-2 text-body-sm text-ink">
+        <Switch
+          checked={browserGrading && gradingAllowed}
+          disabled={!gradingAllowed}
+          onCheckedChange={(checked) => {
+            setBrowserGrading(checked)
+            setMessage(null)
+          }}
+          aria-label="Allow grading in the browser"
+        />
+        <span>
+          Allow grading in the browser
+          <span className="block text-xs text-body">
+            {gradingAllowed
+              ? "Lets assignments and contests choose \"In the students' browsers\" (Python and JavaScript), and lets members-only practice be submitted while the server is off. Every test's input reaches the student's browser; the server checks the outputs, and results are provisional until the server judges them again."
+              : "Grading in the browser is off for the whole site."}
+          </span>
+        </span>
+      </label>
+      <div className="flex items-center gap-3 border-t border-hairline pt-3">
+        <span className="flex-1">
+          <FormMessage message={message} />
+        </span>
+        <Button disabled={save.isPending} onClick={() => save.mutate()}>
+          Save
+        </Button>
+      </div>
+    </Card>
   )
 }
 

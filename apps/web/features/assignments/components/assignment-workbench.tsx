@@ -67,6 +67,7 @@ export function AssignmentWorkbench({
       notices={[]}
       activeId={data.problem.id}
       detail={data.problem}
+      assignmentSlug={assignment.slug}
       statusOverride={data.status}
       hrefFor={hrefFor}
       onNavigate={(id) => router.push(hrefFor(id))}

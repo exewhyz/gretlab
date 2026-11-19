@@ -1,3 +1,4 @@
+import { checkWorkExecution } from "@/features/submissions/execution"
 import {
   assignmentProblems,
   assignmentQuestions,
@@ -189,6 +190,7 @@ export async function saveAssignment(
     questions.map((q) => q.questionId).filter((q) => !allowed.has(q)),
     orgId
   )
+  await checkWorkExecution(orgId, fields)
   if (id) await guardStartedExam(id, input)
   const wasPublished = id
     ? ((

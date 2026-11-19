@@ -12,6 +12,7 @@ import {
   LEASE_MS,
   processSubmission,
   pruneOldRuns,
+  rejudgeProvisional,
   retrySystemErrors,
   releaseExpired,
 } from "./queue.ts"
@@ -103,6 +104,16 @@ const recovery = setInterval(() => {
 const rejudging = setInterval(() => {
   retrySystemErrors(db).catch((error) =>
     console.error("[runner] re-judging error:", error)
+  )
+  void (async () => {
+    const rows = await db.select().from(settingsTable)
+    const stored = Object.fromEntries(rows.map((row) => [row.key, row.value]))
+    await rejudgeProvisional(
+      db,
+      resolveSettings(stored)["server_execution.enabled"]
+    )
+  })().catch((error) =>
+    console.error("[runner] provisional re-judging error:", error)
   )
 }, REJUDGE_CHECK_MS)
 const housekeeping = setInterval(() => {

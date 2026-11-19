@@ -64,6 +64,8 @@ export const orgSettingsSchema = z
     /** null: every language the platform has on. */
     languages: z.array(z.string().max(40)).max(50).nullable(),
     allowPaste: z.boolean(),
+    /** Where its code runs, within the platform's settings (packages/judge/src/execution.ts). */
+    execution: z.object({ server: z.boolean(), browserGrading: z.boolean() }),
   })
   .partial()
 

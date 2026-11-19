@@ -226,6 +226,9 @@ async function bringChanges(t: typeof templates.$inferSelect) {
           : null,
         published: use.published,
         audience: use.audience,
+        // Where code runs and its limit belong to each use, like its lab networks.
+        execution: use.execution,
+        submissionsPerMinute: use.submissionsPerMinute,
         // Its own: review dates and projects belong to each use.
         peerReview: use.peerReview,
         projects: (await projectsOf([use.id])).map(({ id, title, instructions, points }) => ({ id, title, instructions, points })),
@@ -345,6 +348,8 @@ export async function applyTemplate(
         exam: t.content.exam ? { ...t.content.exam, startWithin: t.content.exam.startWithin ?? null } : null,
         published: input.published,
         audience: use.groupId ? [[use.groupId]] : [],
+        execution: "server",
+        submissionsPerMinute: null,
         peerReview: null,
         projects: [],
         problems: t.content.problems.map((p) => ({ ...p, outcomes: [] })),

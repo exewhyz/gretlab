@@ -32,6 +32,8 @@ export interface WorkbenchProps {
   /** Given when the page already has it; otherwise fetched. */
   detail?: ProblemDetail
   contestSlug?: string
+  /** On an assignment's own pages, so its execution and limits apply. */
+  assignmentSlug?: string
   blockedReason?: ReactNode
   listTitle?: string
   /** Replaces the practice progress, for a contest's own results. */
@@ -55,6 +57,7 @@ export function Workbench({
   notices,
   detail,
   contestSlug,
+  assignmentSlug,
   blockedReason,
   listTitle = "Problems",
   statusOverride,
@@ -180,6 +183,7 @@ export function Workbench({
           question={current}
           detail={detail}
           contestSlug={contestSlug}
+          assignmentSlug={assignmentSlug}
           blockedReason={blockedReason}
         >
           <article ref={problemPane} className={styles.problem}>

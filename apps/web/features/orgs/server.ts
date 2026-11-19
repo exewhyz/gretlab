@@ -34,6 +34,8 @@ import {
   listChanges,
   yearProblem,
   type OrgType,
+  platformExecution,
+  readOrgExecution,
 } from "@workspace/judge"
 import type { z } from "zod"
 
@@ -982,6 +984,13 @@ export async function getManageSummary(slug: string, user: User) {
       active: ctx.org.active,
       languages: ctx.org.languages,
       allowPaste: ctx.org.allowPaste,
+      /** Where its code runs, and what the platform allows (it can only narrow that). */
+      execution: {
+        server: readOrgExecution(ctx.org.execution).server !== false,
+        browserGrading:
+          readOrgExecution(ctx.org.execution).browserGrading === true,
+        platform: platformExecution(await getSettings()),
+      },
       /** What this org chose, over its type's defaults. */
       moduleChoices: readModuleChoices(ctx.org.modules),
       /** The modules on right now (defaults + choices, limited to the type and ready ones). */
@@ -1023,6 +1032,15 @@ export async function updateSettings(
       `${ctx.org.name} is a ${KINDS[ctx.org.type].label.toLowerCase()}; the kind of an organization can't be changed. Create a new organization for another kind.`
     )
   input = { ...input, type: undefined }
+  if (input.execution?.browserGrading) {
+    const platform = platformExecution(await getSettings())
+    if (!platform.browser || !platform.browserGrading)
+      throw new ApiError(
+        400,
+        "browser_grading_off",
+        "Grading in the browser is turned off for the whole site, so it can't be turned on here."
+      )
+  }
   if (input.modules) {
     const type = ctx.org.type
     const policy = (await kindPolicies())[type]
@@ -1762,6 +1780,7 @@ const SETTING_LABELS = {
   groupLevels: "Group levels",
   languages: "Languages",
   allowPaste: "Pasting in the editor",
+  execution: "Code execution",
 }
 
 /** Manage › Activity: a page of the organization's log, filtered. */

@@ -208,7 +208,7 @@ export async function guardExamSubmission(
   ip: string | null
 ) {
   const exam = await activeExam(user.id)
-  if (!exam) return false
+  if (!exam) return null
   if (!problemId || !exam.problemIds.includes(problemId)) {
     throw locked("During your exam, only the exam's problems can be run.")
   }
@@ -220,7 +220,7 @@ export async function guardExamSubmission(
       "During the exam, submit from the lab's network."
     )
   }
-  return true
+  return exam.assignment
 }
 
 /** Editorials and solutions, of any problem, are closed during a sitting. */

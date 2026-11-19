@@ -12,19 +12,36 @@ import {
   testCases,
   users,
   type RunCase,
+  type Contest,
   type Submission,
   type User,
 } from "@workspace/db"
 import {
+  isBrowserLanguage,
   nextPollMs,
+  outputsMatch,
+  overallVerdict,
+  perMinuteLimit,
   QUEUE_CHANNEL,
   queueHeadStartMs,
   sourceFilesSchema,
   type LanguageId,
+  type Verdict,
 } from "@workspace/judge"
 
 import { ApiError, isStaff, notFound } from "@/lib/api/route"
-import { getLanguages, requireFeature } from "@/features/settings/server"
+import {
+  getLanguages,
+  getSettings,
+  requireFeature,
+} from "@/features/settings/server"
+import { findAssignment } from "@/features/assignments/grading"
+import {
+  browserGradingOff,
+  planFor,
+  testInputs,
+  workHasProblem,
+} from "./execution"
 import { contestFor } from "@/features/contests/server"
 import { accessTo, orgPolicy, viewpoint } from "@/features/orgs/access"
 import { cached } from "@/lib/ttl-cache"
@@ -42,7 +59,22 @@ export interface CreateSubmission {
   inputs?: string[]
   problemSlug?: string
   contestSlug?: string
+  /** Submitted from an assignment's own pages, so its rules (execution, limit) apply. */
+  assignmentSlug?: string
+  /** A Submit graded in the browser: each test's output, checked here. */
+  browser?: { outputs: BrowserOutput[] }
 }
+
+export interface BrowserOutput {
+  testCaseId: string
+  stdout: string
+  stderr: string
+  timeout?: boolean
+  wallMs?: number
+}
+
+/** As much of a program's output as a result keeps, like the runner's previews. */
+const OUTPUT_PREVIEW_CHARS = 16 * 1024
 
 type Transaction = Parameters<
   Parameters<ReturnType<typeof getDb>["transaction"]>[0]
@@ -290,7 +322,7 @@ export async function createSubmission(
   /** Where it came from, for exams limited to a lab's network. */
   ip: string | null = null
 ) {
-  const settings = await requireFeature("server_execution.enabled")
+  const settings = await getSettings()
 
   const files = sourceFilesSchema.safeParse(input.files)
   if (!files.success) {
@@ -340,9 +372,14 @@ export async function createSubmission(
   }
 
   // During an exam sitting: only the exam's problems, from its networks, contests included.
-  const inExam = await guardExamSubmission(user, problem?.id ?? null, ip)
+  const exam = await guardExamSubmission(user, problem?.id ?? null, ip)
+  const inExam = exam !== null
 
   let contestId: string | null = null
+  let contestRules: Pick<
+    Contest,
+    "id" | "orgId" | "execution" | "submissionsPerMinute"
+  > | null = null
   // An organization's language rules cover its contests and its members-only problems.
   let ruledBy: string | null = null
   if (input.contestSlug) {
@@ -350,6 +387,7 @@ export async function createSubmission(
       throw new ApiError(400, "problem_required", "Choose a problem.")
     const contest = await resolveContest(user, input.contestSlug, problem.id)
     contestId = contest.id
+    contestRules = contest
     ruledBy = contest.orgId
   } else if (problem && !(await canReachProblem(user, problem))) {
     // Drafts are reachable only through a contest that lists them, or by their writers;
@@ -379,6 +417,70 @@ export async function createSubmission(
     )
   }
 
+  // The assignment whose rules apply: the exam being sat, or the one it was submitted from.
+  let assignment = exam
+  if (!assignment && !contestId && input.assignmentSlug && problem) {
+    const found = (await findAssignment(input.assignmentSlug, user)).assignment
+    if (await workHasProblem({ assignmentId: found.id }, problem.id))
+      assignment = found
+  }
+
+  const plan = await planFor(
+    user,
+    { problem, contest: contestRules, assignment },
+    settings
+  )
+  const work = contestRules ?? assignment
+  const perMinute = perMinuteLimit(
+    settings["submissions.per_minute"],
+    work?.submissionsPerMinute ?? null
+  )
+
+  if (input.browser) {
+    if (input.kind !== "submit" || !problem) {
+      throw new ApiError(
+        400,
+        "browser_submit_only",
+        "Only a graded Submit sends its outputs from the browser."
+      )
+    }
+    if (plan.submit !== "browser") throw browserGradingOff()
+    if (!isBrowserLanguage(language.id)) {
+      throw new ApiError(
+        400,
+        "language_unavailable",
+        "Only Python and JavaScript can be graded in the browser."
+      )
+    }
+    return gradeFromBrowser(user, {
+      problemId: problem.id,
+      contestId,
+      language: language.id,
+      entry: input.entry,
+      files: files.data,
+      timeLimitMs: problem.timeLimitMs ?? language.timeLimitMs,
+      memoryLimitMb: problem.memoryLimitMb ?? language.memoryLimitMb,
+      outputs: input.browser.outputs,
+      perMinute,
+      maxPending: settings["submissions.max_pending"],
+    })
+  }
+
+  if (plan[input.kind] !== "server") {
+    if (input.kind === "submit" && plan.submit === "browser") {
+      throw new ApiError(
+        409,
+        "grade_in_browser",
+        "The server isn't running code right now. Reload the page to submit from your browser."
+      )
+    }
+    throw new ApiError(
+      403,
+      "feature_disabled",
+      "Server execution is turned off."
+    )
+  }
+
   const runCases =
     input.kind === "run"
       ? await resolveRunCases(input.inputs ?? [input.stdin ?? ""], problem?.id)
@@ -395,7 +497,7 @@ export async function createSubmission(
     await enforceRateLimits(
       tx,
       user,
-      settings["submissions.per_minute"],
+      perMinute,
       settings["submissions.max_pending"]
     )
     const [created] = await tx
@@ -418,6 +520,135 @@ export async function createSubmission(
     await tx.execute(sql.sql`SELECT pg_notify(${QUEUE_CHANNEL}, '')`)
     return created
   })
+}
+
+/**
+ * A Submit graded in the browser: the outputs it sent are compared here with expected
+ * outputs that never left the server, and the result is kept as provisional until the
+ * sandbox judges the same code again (the runner does, once server execution is back).
+ */
+async function gradeFromBrowser(
+  user: User,
+  input: {
+    problemId: string
+    contestId: string | null
+    language: LanguageId
+    entry: string
+    files: Submission["files"]
+    timeLimitMs: number
+    memoryLimitMb: number
+    outputs: BrowserOutput[]
+    perMinute: number
+    maxPending: number
+  }
+) {
+  const cases = await getDb()
+    .select({
+      id: testCases.id,
+      expected: testCases.expected,
+      isSample: testCases.isSample,
+      points: testCases.points,
+    })
+    .from(testCases)
+    .where(eq(testCases.problemId, input.problemId))
+    .orderBy(asc(testCases.position))
+  const sent = new Map(input.outputs.map((o) => [o.testCaseId, o]))
+  if (cases.some((c) => !sent.has(c.id)) || sent.size !== cases.length) {
+    throw new ApiError(
+      400,
+      "missing_outputs",
+      "The problem's tests changed. Reload the page and submit again."
+    )
+  }
+  const results = cases.map((c) => {
+    const out = sent.get(c.id)!
+    const verdict: Verdict = out.timeout
+      ? "TLE"
+      : out.stderr.trim()
+        ? "RE"
+        : outputsMatch(out.stdout, c.expected)
+          ? "AC"
+          : "WA"
+    return {
+      testCaseId: c.id,
+      isSample: c.isSample,
+      verdict,
+      stdout: out.stdout.slice(0, OUTPUT_PREVIEW_CHARS),
+      stderr: out.stderr.slice(0, OUTPUT_PREVIEW_CHARS),
+      wallMs: Math.max(0, Math.round(out.wallMs ?? 0)),
+      maxRssKb: null,
+      points: verdict === "AC" ? c.points : 0,
+    }
+  })
+  const now = new Date()
+  return getDb().transaction(async (tx) => {
+    await enforceRateLimits(tx, user, input.perMinute, input.maxPending)
+    const [created] = await tx
+      .insert(submissions)
+      .values({
+        userId: user.id,
+        problemId: input.problemId,
+        contestId: input.contestId,
+        kind: "submit",
+        language: input.language,
+        entry: input.entry,
+        files: input.files,
+        timeLimitMs: input.timeLimitMs,
+        memoryLimitMb: input.memoryLimitMb,
+        status: "done",
+        provisional: true,
+        verdict: cases.length ? overallVerdict(results) : "AC",
+        results,
+        score: results.reduce((sum, r) => sum + r.points, 0),
+        maxScore: cases.reduce((sum, c) => sum + c.points, 0),
+        runtimeMs: results.length
+          ? Math.max(...results.map((r) => r.wallMs))
+          : null,
+        passedTests: results.filter((r) => r.verdict === "AC").length,
+        totalTests: cases.length,
+        startedAt: now,
+        finishedAt: now,
+      })
+      .returning({ id: submissions.id, status: submissions.status })
+    return created!
+  })
+}
+
+/** Every test's input, for a Submit the browser will grade. Refused where it isn't allowed. */
+export async function browserTests(
+  user: User,
+  input: { problemSlug: string; contestSlug?: string; assignmentSlug?: string }
+) {
+  const [problem] = await getDb()
+    .select()
+    .from(problems)
+    .where(slugIs(input.problemSlug))
+  if (!problem) throw notFound("Problem not found")
+  const exam = await guardExamSubmission(user, problem.id, null).catch(
+    (error: unknown) => {
+      // Network checks happen when the outputs come back; anything else stands.
+      if (error instanceof ApiError && error.code === "exam_network") return null
+      throw error
+    }
+  )
+  let contest: Pick<
+    Contest,
+    "id" | "orgId" | "execution" | "submissionsPerMinute"
+  > | null = null
+  if (input.contestSlug) {
+    contest = await resolveContest(user, input.contestSlug, problem.id)
+  } else if (!(await canReachProblem(user, problem))) {
+    throw notFound("Problem not found")
+  }
+  let assignment = exam
+  if (!assignment && !contest && input.assignmentSlug) {
+    const found = (await findAssignment(input.assignmentSlug, user)).assignment
+    if (await workHasProblem({ assignmentId: found.id }, problem.id))
+      assignment = found
+  }
+  const plan = await planFor(user, { problem, contest, assignment })
+  if (plan.submit !== "browser") throw browserGradingOff()
+  return { tests: await testInputs(problem.id) }
 }
 
 /**

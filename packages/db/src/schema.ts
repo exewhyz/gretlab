@@ -73,8 +73,35 @@ export const users = pgTable("users", {
   passwordLockedUntil: timestamp("password_locked_until", { withTimezone: true }),
   /** Sessions signed in before this are signed out (a password reset, "sign out everywhere"). */
   sessionsValidAfter: timestamp("sessions_valid_after", { withTimezone: true }),
+  /**
+   * What the person says about themselves (Account › Profile): a headline, a bio, where
+   * they are and their links, plus their phone sealed (lib/sealed.ts).
+   */
+  profile: jsonb("profile").$type<UserProfile>().notNull().default({}),
   createdAt: createdAt(),
 })
+
+export interface UserProfile {
+  headline?: string
+  bio?: string
+  city?: string
+  website?: string
+  github?: string
+  linkedin?: string
+  /** Sealed with lib/sealed.ts (purpose "profile"). */
+  phone?: string
+}
+
+/** A member's details in one organization: set by themselves or by its staff. */
+export interface MemberProfile {
+  designation?: string
+  department?: string
+  employeeId?: string
+  /** Sealed with lib/sealed.ts (purpose "profile"). */
+  phone?: string
+  /** When they joined the organization's staff, YYYY-MM-DD. */
+  joinedOn?: string
+}
 
 /**
  * Single-use links sent by email: confirming a new account's address, and resetting a
@@ -389,6 +416,10 @@ export const contests = pgTable("contests", {
   }),
   /** Who it's for: conditions that must all hold, each any of its groups. Empty: everyone. */
   audience: jsonb("audience").$type<string[][]>().notNull().default([]),
+  /** Where its code runs: the server sandbox, or the browser (Python and JavaScript only). */
+  execution: text("execution").$type<"server" | "browser">().notNull().default("server"),
+  /** Submissions per student per minute; null: the platform's. Never above the platform's. */
+  submissionsPerMinute: integer("submissions_per_minute"),
   createdAt: createdAt(),
   /** For save conflicts: a form saved over a newer version is refused. */
   updatedAt: updatedAt(),
@@ -421,6 +452,10 @@ export const assignments = pgTable("assignments", {
   templateId: uuid("template_id").references((): AnyPgColumn => templates.id, {
     onDelete: "set null",
   }),
+  /** Where its code runs: the server sandbox, or the browser (Python and JavaScript only). */
+  execution: text("execution").$type<"server" | "browser">().notNull().default("server"),
+  /** Submissions per student per minute; null: the platform's. Never above the platform's. */
+  submissionsPerMinute: integer("submissions_per_minute"),
   createdAt: createdAt(),
   /** For save conflicts: a form saved over a newer version is refused. */
   updatedAt: updatedAt(),
@@ -586,6 +621,11 @@ export const submissions = pgTable(
     memoryLimitMb: integer("memory_limit_mb").notNull(),
 
     status: submissionStatus("status").notNull().default("queued"),
+    /**
+     * Graded in the student's browser (outputs checked on the server) while the server
+     * couldn't run it. Judged again in the sandbox once it can, which clears this.
+     */
+    provisional: boolean("provisional").notNull().default(false),
     /** Times a "System error" was sent back to be judged again (runner housekeeping). */
     rejudges: integer("rejudges").notNull().default(0),
     verdict: text("verdict").$type<Verdict>(),
@@ -617,6 +657,10 @@ export const submissions = pgTable(
     index("submissions_queue")
       .on(table.queueAt)
       .where(sql`status = 'queued'`),
+    // Provisional verdicts waiting to be judged again on the server.
+    index("submissions_provisional")
+      .on(table.createdAt)
+      .where(sql`provisional`),
     index("submissions_active_user")
       .on(table.userId)
       .where(sql`status <> 'done'`),
@@ -713,6 +757,19 @@ export const organizations = pgTable("organizations", {
     .$type<Record<string, unknown>>()
     .notNull()
     .default({}),
+  /**
+   * Module levels the platform set for this organization alone (Admin › Organizations),
+   * over its kind's policy: off, optional or on from the start. Only what was set is stored.
+   */
+  platformModules: jsonb("platform_modules")
+    .$type<Record<string, string>>()
+    .notNull()
+    .default({}),
+  /** Where its code runs, within the platform's settings (packages/judge/src/execution.ts). */
+  execution: jsonb("execution")
+    .$type<{ server?: boolean; browserGrading?: boolean }>()
+    .notNull()
+    .default({}),
   /** The week (its Monday, YYYY-MM-DD) of the last weekly summary sent, so each goes once. */
   digestWeek: text("digest_week"),
   createdAt: createdAt(),
@@ -769,6 +826,8 @@ export const orgMembers = pgTable(
     shareProgress: boolean("share_progress").notNull().default(false),
     /** How they got in: open, domain, invite, approval, created, import. */
     joinedVia: text("joined_via").notNull(),
+    /** Their details here: designation, department, staff number, phone (sealed). */
+    profile: jsonb("profile").$type<MemberProfile>().notNull().default({}),
     createdAt: createdAt(),
   },
   (table) => [

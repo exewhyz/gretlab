@@ -14,6 +14,7 @@ import {
   ORG_TYPE_CONFIG,
   ORG_TYPES,
   readKindPolicy,
+  organizationPolicy,
   readModuleChoices,
 } from "./org-types.ts"
 import { ORG_NAV, visibleOrgNav } from "./navigation.ts"
@@ -93,4 +94,18 @@ test("the Groups page is named for the kind", () => {
   assert.equal(label("college"), "Batches")
   assert.equal(label("cohort"), "Cohorts")
   assert.equal(label("other"), "Groups")
+})
+
+test("the platform can set one organization's modules over its kind's policy", () => {
+  const kindPolicy = { library: "off" as const }
+  // Allowed for this one organization only, and on from the start.
+  const policy = organizationPolicy("school", kindPolicy, { library: "default" })
+  assert.equal(enabledModules("school", {}, policy).has("library"), true)
+  assert.equal(enabledModules("school", {}, kindPolicy).has("library"), false)
+  // Switched off for it, even where its kind has it on.
+  const off = organizationPolicy("school", {}, { attendance: "off" })
+  assert.equal(enabledModules("school", { attendance: true }, off).has("attendance"), false)
+  // A module the kind can't support stays off; junk is ignored.
+  const junk = organizationPolicy("company", {}, { hostel: "default", nope: "default", attendance: 3 })
+  assert.equal(enabledModules("company", {}, junk).has("hostel"), false)
 })

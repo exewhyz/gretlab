@@ -2,8 +2,11 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  isBrowserLanguage,
   outputsMatch,
   overallVerdict,
+  planExecution,
+  type ExecutionPlan,
   type SourceFile,
   type Verdict,
 } from "@workspace/judge"
@@ -38,13 +41,13 @@ import {
 import { useLocalStore } from "../lib/local-store"
 import { progressStore, saveLayout, saveQuestionStatus } from "../lib/stores"
 import type { ProblemDetail, ProblemSummary } from "../types"
-import { usePythonEngine } from "./use-python-engine"
+import { useBrowserEngine } from "./use-python-engine"
 import type { ApiResult } from "@/lib/api/types"
 import type { getSubmissionStatus } from "@/features/submissions/server"
 
 export type OutputTab = "cases" | "result"
 
-/** "server" runs in the sandbox; "browser" runs Python locally, for visitors. */
+/** "server" runs in the sandbox; "browser" runs Python or JavaScript in this browser. */
 export type ExecutionMode = "loading" | "server" | "browser" | "unavailable"
 
 export interface TestOutcome {
@@ -72,6 +75,8 @@ export type TestRun =
       maxScore: number | null
       outcomes: TestOutcome[]
       submissionId: string | null
+      /** Graded in the browser; the server judges it again once it can. */
+      provisional: boolean
     }
 
 interface SubmissionResponse {
@@ -81,6 +86,7 @@ interface SubmissionResponse {
   score: number | null
   maxScore: number | null
   compileOutput: string | null
+  provisional?: boolean
   results: (TestOutcome & { number: number })[]
 }
 
@@ -145,6 +151,7 @@ function useSessionState({
   question,
   detail: givenDetail,
   contestSlug,
+  assignmentSlug,
   blockedReason,
 }: SessionOptions) {
   const queryClient = useQueryClient()
@@ -158,15 +165,52 @@ function useSessionState({
   })
   const detail = givenDetail ?? fetched.data
 
-  const mode: ExecutionMode = !viewer
-    ? "loading"
-    : viewer.user && viewer.features.serverExecution
-      ? "server"
-      : viewer.features.browserExecution && !contestSlug
-        ? "browser"
-        : "unavailable"
-
-  const engine = usePythonEngine(mode === "browser")
+  // Where Run and Submit go: the platform's, the organization's and the work's settings.
+  const signedIn = Boolean(viewer?.user)
+  const planned = useQuery({
+    queryKey: ["execution", question.id, contestSlug, assignmentSlug],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (!isPlayground) params.set("problem", question.id)
+      if (contestSlug) params.set("contest", contestSlug)
+      if (assignmentSlug) params.set("assignment", assignmentSlug)
+      return api<ExecutionPlan>(`/execution?${params}`)
+    },
+    enabled: signedIn,
+    staleTime: 30_000,
+  })
+  const plan: ExecutionPlan | null = !viewer
+    ? null
+    : signedIn
+      ? (planned.data ??
+        (planned.isError
+          ? planExecution({
+              platform: {
+                server: viewer.features.serverExecution,
+                browser: viewer.features.browserExecution,
+                browserGrading: false,
+              },
+              org: null,
+              work: null,
+              context: contestSlug ? "contest" : "practice",
+              signedIn: true,
+            })
+          : null))
+      : planExecution({
+          platform: {
+            server: false,
+            browser: viewer.features.browserExecution,
+            browserGrading: false,
+          },
+          org: null,
+          work: null,
+          context: contestSlug ? "contest" : "practice",
+          signedIn: false,
+        })
+  const toMode = (where: ExecutionPlan["run"] | undefined): ExecutionMode =>
+    where === undefined ? "loading" : where === "none" ? "unavailable" : where
+  const mode = toMode(plan?.run)
+  const submitMode = toMode(plan?.submit)
 
   // Wait for the problem itself: its own starter code decides what a new editor holds,
   // and saving the language's blank file meanwhile would hide it.
@@ -174,7 +218,7 @@ function useSessionState({
   const languages = (ready ? (viewer?.languages ?? []) : [])
     .filter(
       (language) =>
-        (mode !== "browser" || language.id === "python") &&
+        (!plan?.browserOnly || isBrowserLanguage(language.id)) &&
         (!detail?.allowedLanguages ||
           detail.allowedLanguages.includes(language.id))
     )
@@ -189,6 +233,10 @@ function useSessionState({
   const workspace = language
     ? readWorkspace(workspaces, question.id, language)
     : null
+  const engine = useBrowserEngine(
+    language?.id,
+    mode === "browser" || submitMode === "browser"
+  )
 
   // Starts as the samples, once they've loaded. A changed input becomes a custom case.
   const [editedCases, setEditedCases] = useState<string[] | null>(null)
@@ -395,8 +443,18 @@ function useSessionState({
     !blockedReason &&
     workspace !== null &&
     (mode === "server" || (mode === "browser" && engine.isReady))
+  const canSubmit =
+    !busy &&
+    !blockedReason &&
+    workspace !== null &&
+    (submitMode === "server" || (submitMode === "browser" && engine.isReady))
 
-  function send(kind: "run" | "submit", files: SourceFile[], entry: string) {
+  function send(
+    kind: "run" | "submit",
+    files: SourceFile[],
+    entry: string,
+    browser?: { outputs: unknown[] }
+  ) {
     return api<{ id: string }>("/submissions", {
       body: {
         kind,
@@ -406,8 +464,40 @@ function useSessionState({
         inputs: kind === "run" ? cases : undefined,
         problemSlug: isPlayground ? undefined : question.id,
         contestSlug,
+        assignmentSlug,
+        browser,
       },
     })
+  }
+
+  /** Runs every test's input here and sends the outputs; the server checks them. */
+  async function gradeInBrowser(files: SourceFile[], entry: string) {
+    const params = new URLSearchParams({ problem: question.id })
+    if (contestSlug) params.set("contest", contestSlug)
+    if (assignmentSlug) params.set("assignment", assignmentSlug)
+    const { tests } = await api<{ tests: { id: string; input: string }[] }>(
+      `/submissions/tests?${params}`
+    )
+    const outputs = []
+    for (const [index, test] of tests.entries()) {
+      if (isCurrent.current) {
+        setTestRun({
+          phase: "running",
+          message: `Grading in your browser: test ${index + 1} of ${tests.length}…`,
+        })
+      }
+      const started = performance.now()
+      const result = await engine.run(files, entry, test.input)
+      outputs.push({
+        testCaseId: test.id,
+        stdout: result.out,
+        stderr: result.failed ? result.err || "Failed" : "",
+        timeout: result.timeout ?? false,
+        wallMs: Math.round(performance.now() - started),
+      })
+    }
+    const { id } = await send("submit", files, entry, { outputs })
+    return api<SubmissionResponse>(`/submissions/${id}`)
   }
 
   /** Tries the code on the cases in the panel. Nothing is graded or recorded as a submission. */
@@ -445,7 +535,7 @@ function useSessionState({
 
   /** Grades the code against every test, and records it in the student's submissions. */
   async function submitForGrading() {
-    if (!canRun || !workspace || mode !== "server") return
+    if (!canSubmit || !workspace) return
     // Running or submitting is a moment worth saving everywhere.
     flushSave(true)
     setBusy(true)
@@ -453,12 +543,20 @@ function useSessionState({
     openTab("result")
     try {
       setTestRun({ phase: "running", message: "Submitting…" })
-      const { id } = await send("submit", workspace.files, workspace.entry)
-      const result = await waitForResult(id, (position) => {
-        if (isCurrent.current) {
-          setTestRun({ phase: "running", message: queueMessage(position) })
-        }
-      })
+      const result =
+        submitMode === "browser"
+          ? await gradeInBrowser(workspace.files, workspace.entry)
+          : await waitForResult(
+              (await send("submit", workspace.files, workspace.entry)).id,
+              (position) => {
+                if (isCurrent.current) {
+                  setTestRun({
+                    phase: "running",
+                    message: queueMessage(position),
+                  })
+                }
+              }
+            )
       void queryClient.invalidateQueries({ queryKey: ["submissions"] })
       void queryClient.invalidateQueries({ queryKey: ["progress"] })
       void queryClient.invalidateQueries({ queryKey: ["contest-problem"] })
@@ -493,7 +591,7 @@ function useSessionState({
       const expected = detail?.samples[sample]?.[1] ?? null
       const verdict: Verdict = result.timeout
         ? "TLE"
-        : result.err
+        : result.failed
           ? "RE"
           : expected === null
             ? "OK"
@@ -520,6 +618,7 @@ function useSessionState({
       maxScore: null,
       outcomes,
       submissionId: null,
+      provisional: false,
     })
   }
 
@@ -544,6 +643,8 @@ function useSessionState({
     contestSlug,
     isPlayground,
     mode,
+    submitMode,
+    plan,
     viewer,
     languages,
     language,
@@ -567,6 +668,7 @@ function useSessionState({
     blockedReason,
     busy,
     canRun,
+    canSubmit,
     runOnce,
     submitForGrading,
   }
@@ -591,6 +693,7 @@ function presentResult(
     maxScore: result.maxScore,
     submissionId: kind === "submit" ? result.id : null,
     outcomes: result.results,
+    provisional: result.provisional ?? false,
   }
 }
 
@@ -600,6 +703,8 @@ interface SessionOptions {
   question: ProblemSummary
   detail?: ProblemDetail
   contestSlug?: string
+  /** On an assignment's own pages, so its execution and limits apply. */
+  assignmentSlug?: string
   /** Why code can't run here right now, such as a contest that needs registering for. */
   blockedReason?: ReactNode
 }

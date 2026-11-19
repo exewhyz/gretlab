@@ -129,6 +129,16 @@ export const contestInputSchema = z
     problemIds: z.array(z.uuid()).max(26, "At most 26 problems"),
     /** Quiz questions from the bank (ones that mark themselves), answered once each. */
     questions: chosenQuestions,
+    /** Where its code runs; "browser" means Python and JavaScript only, graded provisionally. */
+    execution: z.enum(["server", "browser"]).default("server"),
+    /** Submissions per student per minute; null: the platform's. Checked against it on save. */
+    submissionsPerMinute: z
+      .number({ error: "Enter a number" })
+      .int()
+      .min(1, "At least 1 a minute")
+      .max(600)
+      .nullable()
+      .default(null),
     /** Organization groups it's for. Ignored for platform contests. */
     audience: audienceSchema,
   })
@@ -170,6 +180,16 @@ export const assignmentInputSchema = z
     published: z.boolean(),
     /** Keep rubric marks and line comments from students until released. */
     holdFeedback: z.boolean().default(false),
+    /** Where its code runs; "browser" means Python and JavaScript only, graded provisionally. */
+    execution: z.enum(["server", "browser"]).default("server"),
+    /** Submissions per student per minute; null: the platform's. Checked against it on save. */
+    submissionsPerMinute: z
+      .number({ error: "Enter a number" })
+      .int()
+      .min(1, "At least 1 a minute")
+      .max(600)
+      .nullable()
+      .default(null),
     /** A lab exam: one sitting per student. Null for an ordinary assignment. */
     exam: z
       .object({
@@ -317,4 +337,21 @@ export const submissionInputSchema = z.object({
     .optional(),
   problemSlug: z.string().optional(),
   contestSlug: z.string().optional(),
+  assignmentSlug: z.string().optional(),
+  /** A Submit graded in the browser: each test's output (packages/judge/src/execution.ts). */
+  browser: z
+    .object({
+      outputs: z
+        .array(
+          z.object({
+            testCaseId: z.string().uuid(),
+            stdout: z.string().max(1024 * 1024),
+            stderr: z.string().max(1024 * 1024),
+            timeout: z.boolean().optional(),
+            wallMs: z.number().min(0).max(600_000).optional(),
+          })
+        )
+        .max(500),
+    })
+    .optional(),
 })

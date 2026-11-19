@@ -23,6 +23,12 @@ export interface Summary {
     active: boolean
     languages: string[] | null
     allowPaste: boolean
+    /** Where its code runs, and what the platform allows. */
+    execution?: {
+      server: boolean
+      browserGrading: boolean
+      platform: { server: boolean; browser: boolean; browserGrading: boolean }
+    }
     moduleChoices: Partial<Record<ModuleKey, boolean>>
     modules: ModuleKey[]
     /** Modules this kind may have here, as the platform set them. */

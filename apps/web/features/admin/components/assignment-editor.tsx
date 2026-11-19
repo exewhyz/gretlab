@@ -44,6 +44,12 @@ import type { ApiResult } from "@/lib/api/types"
 import type { orgCourseOutcomes } from "@/features/outcomes/server"
 import type { orgTemplateFromAssignment } from "@/features/templates/org"
 import { YourAddress } from "./gradebook"
+import {
+  ExecutionFields,
+  executionDraft,
+  executionInput,
+  type ExecutionDraft,
+} from "./execution-fields"
 
 export interface AssignmentForm {
   slug: string
@@ -81,6 +87,8 @@ export interface AssignmentForm {
   peerAnonymous: boolean
   /** Empty: no end. */
   peerDueAt: string
+  /** Where code runs and the submission limit, as typed. */
+  run: ExecutionDraft
 }
 
 export interface StoredAssignment {
@@ -96,6 +104,8 @@ export interface StoredAssignment {
   published: boolean
   holdFeedback: boolean
   exam: ExamSettings | null
+  execution?: "server" | "browser"
+  submissionsPerMinute?: number | null
   peerReview?: {
     reviews: number
     anonymous: boolean
@@ -134,6 +144,7 @@ export function blankForm(forClass: string | null): AssignmentForm {
     allowLate: false,
     latePenaltyPercent: "0",
     published: false,
+    run: executionDraft(),
     problemIds: [],
     audience: forClass ? [[forClass]] : [],
     points: {},
@@ -191,6 +202,7 @@ export function AssignmentEditorPage({
         opensAt: data.opensAt ? toLocalInput(data.opensAt) : blank.opensAt,
         dueAt: data.dueAt ? toLocalInput(data.dueAt) : blank.dueAt,
         latePenaltyPercent: String(data.latePenaltyPercent),
+        run: executionDraft(data),
         problemIds: data.problems.map((p) => p.problemId),
         points: Object.fromEntries(
           data.problems.map((p) => [p.problemId, String(p.points)])
@@ -317,6 +329,9 @@ export function AssignmentEditor({
       description: form.description,
       allowLate: form.exam ? false : form.allowLate,
       holdFeedback: form.holdFeedback,
+      ...(template
+        ? { execution: "server" as const, submissionsPerMinute: null }
+        : executionInput(form.run)),
       exam: form.exam
         ? {
             minutes:
@@ -386,7 +401,10 @@ export function AssignmentEditor({
     }
     const found: FieldErrors = {}
     for (const issue of parsed.error.issues) {
-      const key = issue.path[0] as keyof FieldErrors
+      const field = issue.path[0]
+      const key = (
+        field === "execution" || field === "submissionsPerMinute" ? "run" : field
+      ) as keyof FieldErrors
       found[key] ??= issue.message
     }
     setErrors(found)
@@ -453,6 +471,13 @@ export function AssignmentEditor({
       }
       if (error instanceof ApiRequestError && error.code === "conflict") {
         setErrors({ slug: "Another assignment already uses this address." })
+      }
+      if (
+        error instanceof ApiRequestError &&
+        (error.code === "limit_too_high" ||
+          error.code === "browser_not_allowed")
+      ) {
+        setErrors({ run: error.message })
       }
       setMessage({ text: error.message, kind: "err" })
     },
@@ -811,6 +836,14 @@ export function AssignmentEditor({
             </div>
           )}
         </div>
+
+        {!template && (
+          <ExecutionFields
+            value={form.run}
+            onChange={(next) => set("run", next)}
+            error={errors.run}
+          />
+        )}
 
         {!template && !form.exam && (
           <div

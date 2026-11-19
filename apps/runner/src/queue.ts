@@ -148,6 +148,38 @@ export async function retrySystemErrors(db: Database) {
   return retried.length
 }
 
+/** Provisional verdicts sent back to the sandbox per pass, so a backlog drains steadily. */
+const PROVISIONAL_BATCH = 200
+
+/**
+ * Submissions graded in a browser while the server couldn't run them are judged again here,
+ * once server execution is on for the platform and for the organization they belong to.
+ * The sandbox's verdict replaces the provisional one.
+ */
+export async function rejudgeProvisional(db: Database, serverOn: boolean) {
+  if (!serverOn) return 0
+  const rows = await db.execute<{ id: string }>(sql.sql`
+    UPDATE submissions SET
+      status = 'queued', provisional = false, verdict = NULL, attempts = 0,
+      locked_by = NULL, locked_until = NULL, finished_at = NULL, queue_at = now()
+    WHERE id IN (
+      SELECT s.id FROM submissions s
+      LEFT JOIN contests c ON c.id = s.contest_id
+      LEFT JOIN problems p ON p.id = s.problem_id
+      LEFT JOIN organizations o ON o.id = COALESCE(c.org_id, p.org_id)
+      WHERE s.provisional AND s.status = 'done'
+        AND COALESCE((o.execution ->> 'server')::boolean, true)
+      ORDER BY s.created_at
+      LIMIT ${PROVISIONAL_BATCH}
+      FOR UPDATE OF s SKIP LOCKED
+    )
+    RETURNING id
+  `)
+  const count = rows.length
+  if (count) await notifyQueue(db)
+  return count
+}
+
 export async function notifyQueue(db: Database) {
   await db.execute(sql.sql`SELECT pg_notify(${QUEUE_CHANNEL}, '')`)
 }

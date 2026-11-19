@@ -60,6 +60,7 @@ export function EditorPane({
     runOnce,
     canRun,
     mode,
+    submitMode,
     isPlayground,
   } = session
   const signedIn = Boolean(session.viewer?.user)
@@ -177,11 +178,13 @@ export function EditorPane({
           ) : (
             <Button
               size="sm"
-              disabled={!canRun || mode === "browser"}
+              disabled={!session.canSubmit}
               title={
-                mode === "browser"
-                  ? "Submitting is paused: server execution is turned off"
-                  : undefined
+                submitMode === "unavailable"
+                  ? "Submitting is paused: the server can't run code right now"
+                  : submitMode === "browser"
+                    ? "Graded in your browser and checked on the server (provisional)"
+                    : undefined
               }
               onClick={session.submitForGrading}
             >
@@ -193,13 +196,22 @@ export function EditorPane({
       {mode === "browser" && (
         <div className="flex-none border-b border-hairline bg-canvas-soft px-3 py-1.5 text-xs text-body">
           {signedIn ? (
-            <>
-              Server execution is turned off right now, so Python runs in your
-              browser. Submitting is paused until it&apos;s back.
-            </>
+            submitMode === "browser" ? (
+              <>
+                Code runs in your browser here (Python and JavaScript). Submit
+                is graded in your browser and checked on the server; the result
+                is provisional until the server judges it again.
+              </>
+            ) : (
+              <>
+                The server can&apos;t run code right now, so Python and
+                JavaScript run in your browser. Submitting is paused until
+                it&apos;s back.
+              </>
+            )
           ) : (
             <>
-              Running Python in your browser.{" "}
+              Running Python and JavaScript in your browser.{" "}
               <Link
                 className="underline underline-offset-2 hover:text-ink"
                 href={`/sign-in?callbackUrl=${encodeURIComponent(pathname)}`}

@@ -165,6 +165,18 @@ export const ORG_TYPE_CONFIG = Object.fromEntries(
 /** The platform's per-kind decisions: a level for any of the kind's modules. */
 export type KindPolicy = Partial<Record<ModuleKey, ModuleLevel>>
 
+/**
+ * One organization's module levels as the platform set them (Admin › Organizations), over
+ * its kind's policy. Only modules the kind can support count, so a kind's limits still hold.
+ */
+export function organizationPolicy(
+  type: OrgType,
+  kindPolicy: KindPolicy | null | undefined,
+  override: unknown
+): KindPolicy {
+  return { ...(kindPolicy ?? {}), ...readKindPolicy(type, override) }
+}
+
 /** Whether a kind can support a module at all. */
 export const kindCan = (type: OrgType, key: ModuleKey) =>
   (KINDS[type].capabilities as readonly string[]).includes(key)

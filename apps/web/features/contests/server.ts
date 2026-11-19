@@ -1,3 +1,4 @@
+import { checkWorkExecution } from "@/features/submissions/execution"
 import {
   contestAnswers,
   contestParticipants,
@@ -504,6 +505,7 @@ export async function saveContest(
     orgId,
     true
   )
+  await checkWorkExecution(orgId, fields)
   const values = { ...fields, orgId, audience: orgId ? fields.audience : [] }
   if (id) refreshLeaderboard(id)
   return getDb().transaction(async (tx) => {

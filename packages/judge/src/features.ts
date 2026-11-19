@@ -130,7 +130,7 @@ export const SETTINGS = {
   "server_execution.enabled": {
     label: "Server execution",
     description:
-      "Signed-in students run and submit code on the server sandbox. Turning it off stops server runs at once and pauses Submit; students can still run Python in their browser if that's on below.",
+      "Signed-in students run and submit code on the server sandbox. Turning it off stops server runs at once. Students can still run Python and JavaScript in their browser if that's on below, and Submit works only where grading in the browser is allowed.",
     group: "Execution",
     schema: z.boolean(),
     default: true,
@@ -138,10 +138,18 @@ export const SETTINGS = {
   "browser_execution.enabled": {
     label: "Run in the browser",
     description:
-      "Python runs in the visitor's own browser for anyone who isn't signed in, and for everyone while server execution is off. It costs nothing and touches no server. Never used in contests.",
+      "Python and JavaScript run in the visitor's own browser for anyone who isn't signed in, and for everyone while server execution is off. It costs nothing and touches no server. Used in contests only when a contest chooses it.",
     group: "Execution",
     schema: z.boolean(),
     default: true,
+  },
+  "browser_execution.grading": {
+    label: "Grade in the browser",
+    description:
+      "Lets Submit work without the server, for Python and JavaScript: the browser runs every test's input and the server checks the output, so expected outputs never leave the server, though hidden inputs reach the student's browser. Such verdicts are provisional and are judged again on the server once it's back. Used for library practice while server execution is off, and by organizations that turn it on for their own work.",
+    group: "Execution",
+    schema: z.boolean(),
+    default: false,
   },
   "submissions.per_minute": {
     label: "Submissions per student per minute",

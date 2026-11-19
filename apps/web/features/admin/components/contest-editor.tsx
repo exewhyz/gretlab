@@ -30,6 +30,12 @@ import { orgPages } from "@/lib/paths"
 import { FieldError, ProblemPicker, toLocalInput } from "./contest-parts"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle } from "./shell"
+import {
+  ExecutionFields,
+  executionDraft,
+  executionInput,
+  type ExecutionDraft,
+} from "./execution-fields"
 
 export interface ContestForm {
   slug: string
@@ -48,6 +54,8 @@ export interface ContestForm {
   questions: { questionId: string; points: string }[]
   /** Organization groups it's for; empty for everyone. */
   audience: string[][]
+  /** Where code runs and the submission limit, as typed. */
+  run: ExecutionDraft
 }
 
 export type StoredContest = ApiResult<typeof orgContest>
@@ -70,6 +78,7 @@ export function blankForm(forClass: string | null): ContestForm {
     problemIds: [],
     questions: [],
     audience: forClass ? [[forClass]] : [],
+    run: executionDraft(),
   }
 }
 
@@ -102,6 +111,7 @@ export function ContestEditorPage({
         endsAt: toLocalInput(data.endsAt),
         penaltyMinutes: String(data.penaltyMinutes),
         freezeMinutes: String(data.freezeMinutes),
+        run: executionDraft(data),
         questions: (data.questions ?? []).map((q) => ({
           questionId: q.questionId,
           points: String(q.points),
@@ -188,6 +198,7 @@ export function ContestEditor({
         points: q.points.trim() === "" ? NaN : Number(q.points),
       })),
       audience: form.audience.filter((c) => c.length > 0),
+      ...executionInput(form.run),
       published,
       penaltyMinutes:
         form.penaltyMinutes.trim() === "" ? NaN : Number(form.penaltyMinutes),
@@ -202,7 +213,10 @@ export function ContestEditor({
     }
     const found: FieldErrors = {}
     for (const issue of parsed.error.issues) {
-      const key = issue.path[0] as keyof ContestForm
+      const field = issue.path[0]
+      const key = (
+        field === "execution" || field === "submissionsPerMinute" ? "run" : field
+      ) as keyof ContestForm
       found[key] ??= issue.message
     }
     setErrors(found)
@@ -248,6 +262,13 @@ export function ContestEditor({
       }
       if (error instanceof ApiRequestError && error.code === "conflict") {
         setErrors({ slug: "Another contest already uses this address." })
+      }
+      if (
+        error instanceof ApiRequestError &&
+        (error.code === "limit_too_high" ||
+          error.code === "browser_not_allowed")
+      ) {
+        setErrors({ run: error.message })
       }
       setMessage({ text: error.message, kind: "err" })
     },
@@ -448,6 +469,12 @@ export function ContestEditor({
           />
           Registration open
         </label>
+
+        <ExecutionFields
+          value={form.run}
+          onChange={(next) => set("run", next)}
+          error={errors.run}
+        />
 
         {conflict && (
           <SaveConflict

@@ -145,12 +145,12 @@ export function OutcomeBrowser({ outcomes }: { outcomes: TestOutcome[] }) {
 }
 
 export function TestResults() {
-  const { testRun, runError, mode, viewer } = useQuestionSession()
+  const { testRun, runError, mode, submitMode, viewer } = useQuestionSession()
   const nextStep =
-    mode === "server"
+    submitMode === "server" || submitMode === "browser"
       ? "Submit to grade it against every test."
       : viewer?.user
-        ? "Submitting is paused while server execution is off."
+        ? "Submitting is paused while the server can't run code."
         : "Sign in to submit it against the hidden tests."
 
   if (runError) {
@@ -164,7 +164,7 @@ export function TestResults() {
     return (
       <p className="text-body-sm text-body">
         <b>Run</b> tries your code on the test cases.{" "}
-        {mode === "server"
+        {mode === "server" || submitMode === "browser"
           ? "Submit grades it against every test, including hidden ones."
           : nextStep}
       </p>
@@ -205,6 +205,14 @@ export function TestResults() {
           <span className="text-caption text-body tabular-nums">
             {passed} / {compared.length} {kind === "submit" ? "tests" : "cases"}{" "}
             passed
+          </span>
+        )}
+        {kind === "submit" && testRun.provisional && (
+          <span
+            className="rounded-full border border-hairline px-2 text-caption text-body"
+            title="Graded in your browser and checked on the server. The server judges it again once it can, and that result replaces this one."
+          >
+            Provisional
           </span>
         )}
         {pointsMatter && (
