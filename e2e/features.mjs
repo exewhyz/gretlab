@@ -356,14 +356,18 @@ await t.getByRole("switch", { name: "Daily challenge" }).waitFor({ timeout: 1500
 check("new switches appear in Settings", await t.getByRole("switch", { name: "Favorites and lists" }).isVisible() && await t.getByLabel("Timezone").isVisible())
 
 // Server execution off: a signed-in student isn't told to sign in; Submit is paused.
+// Always switched back on, so a failure here can't leave later suites without the server.
 await admin("/admin/settings", { method: "PATCH", body: { "server_execution.enabled": false } })
-const off = await open("feat-c@example.com")
-await off.goto(`${BASE}/problems/p1`)
-await off.getByText(/Server execution is turned off right now/).waitFor({ timeout: 30000 })
-check("execution off: signed-in student not asked to sign in", (await off.getByText(/Sign in to submit/).count()) === 0)
-check("execution off: Submit is paused", await off.getByRole("button", { name: "Submit", exact: true }).isDisabled())
-await off.screenshot({ path: SHOTS + "execution-off.png" })
-await admin("/admin/settings", { method: "PATCH", body: { "server_execution.enabled": true } })
+try {
+  const off = await open("feat-c@example.com")
+  await off.goto(`${BASE}/problems/p1`)
+  await off.getByText(/The server can't run code right now/).waitFor({ timeout: 30000 })
+  check("execution off: signed-in student not asked to sign in", (await off.getByText(/Sign in to submit/).count()) === 0)
+  check("execution off: Submit is paused", await off.getByRole("button", { name: "Submit", exact: true }).isDisabled())
+  await off.screenshot({ path: SHOTS + "execution-off.png" })
+} finally {
+  await admin("/admin/settings", { method: "PATCH", body: { "server_execution.enabled": true } })
+}
 
 check("no console or hydration errors", errors.length === 0, [...new Set(errors)].slice(0, 5).join(" || "))
 await browser.close()
