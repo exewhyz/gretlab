@@ -24,8 +24,8 @@ solve, with the daily challenge, personal lists and a leaderboard around it.
 - **The library.** The platform's problems, grouped into units (Unit 1 · Basics, …), each with a
   difficulty, tags, starter code and a reference solution in every language. Public problem pages need
   no account, so search engines can read them.
-- **Running code.** Signed-in people run code on the server's judge. Visitors run Python in the browser
-  (Pyodide) and are asked to sign in to submit.
+- **Running code.** Signed-in people run code on the server's judge. Visitors run Python (Pyodide) and
+  JavaScript in the browser and are asked to sign in to submit.
 - **Members-only problems** belong to one organization: never in the public library, the daily
   challenge or profiles. Members solve them at `/orgs/<slug>/practice/<problem>`.
 - **Problems written for an assignment, exam or contest** are unlisted: reached only through the work
@@ -74,7 +74,7 @@ To bring many in at once, use **Import** with the [problem file format](/problem
 
 | Who | Sees |
 | --- | --- |
-| A visitor | Public problem pages; runs Python in the browser |
+| A visitor | Public problem pages; runs Python and JavaScript in the browser |
 | Anyone signed in | The public library, the daily challenge, profiles and the leaderboard |
 | A member | Also their organization's members-only problems |
 | Problem writers | Drafts they wrote, and every test including hidden ones |
@@ -82,8 +82,9 @@ To bring many in at once, use **Import** with the [problem file format](/problem
 
 ## Edge cases
 
-- With **server execution off** in platform settings, signed-in students run in the browser and Submit
-  is paused; they're never told to sign in.
+- With **server execution off** in platform settings, signed-in students run Python and JavaScript in
+  the browser; they're never told to sign in. Submit is paused unless **Grade in the browser** is on,
+  which grades practice provisionally (see [Run and Submit](/features/coding/run-and-submit/#where-code-runs)).
 - A problem used in work can't be put in other work unless its owner allows it.
 - Lists of other people's private problems or lists answer "not found", not "not allowed".
 - Changing a problem's address in the editor is refused if another problem has or had it ("Choose

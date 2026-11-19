@@ -3,6 +3,7 @@
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@workspace/ui/lib/utils"
+import { useRevealActive } from "@workspace/ui/hooks/use-reveal"
 
 function Tabs({
   className,
@@ -43,8 +44,11 @@ function TabsList({
   variant = "default",
   ...props
 }: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
+  // A row of tabs that scrolls keeps the chosen one in view.
+  const ref = useRevealActive<HTMLDivElement>([], { watch: true })
   return (
     <TabsPrimitive.List
+      ref={ref}
       data-slot="tabs-list"
       data-variant={variant}
       className={cn(tabsListVariants({ variant }), className)}

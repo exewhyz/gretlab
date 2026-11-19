@@ -8,7 +8,9 @@ import {
 } from "@phosphor-icons/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
+
+import { useRevealActive } from "@workspace/ui/hooks/use-reveal"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { cn } from "@workspace/ui/lib/utils"
@@ -106,21 +108,11 @@ function useFolded(navLabel: string) {
 
 /**
  * Keeps the page you're on in view in a long sidebar: after each navigation the active
- * item is scrolled into the visible part, without moving the page itself.
+ * item is scrolled into the visible part of the sidebar, without moving the page itself.
  */
 function useActiveInView() {
-  const box = useRef<HTMLDivElement | null>(null)
   const pathname = usePathname()
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const active = box.current?.querySelector<HTMLElement>(
-        '[data-active="true"], [data-active=""], [aria-current="page"]'
-      )
-      active?.scrollIntoView({ block: "nearest", inline: "nearest" })
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [pathname])
-  return box
+  return useRevealActive<HTMLDivElement>([pathname])
 }
 
 /** Where the docs live, linked from every sidebar's footer. */

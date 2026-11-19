@@ -51,6 +51,23 @@ A role is a bundle of [permissions](/reference/permissions/), given **across the
 - Roles count only while a membership is active, and are read on every request, so revoking works at
   once.
 
+## Profiles
+
+Everyone in an organization has a profile there (`/orgs/<slug>/profile/<id>`; your own from the
+sidebar's footer, anyone's from Members). It shows:
+
+- their roles and where they hold them, and the groups they sit in;
+- for a student: their record (admission number, class, roll, year, date of birth, phone, address)
+  and their parents;
+- for a parent: their children;
+- for staff: what they teach, the classes they're class teacher of, and their staff details:
+  designation, department, staff number, start date and a work phone.
+
+Staff fill in their own details from **Edit my details here**; the staff number is set by staff who
+manage members. The person, their linked parents, and staff who may see members (for the person's
+groups) see the profile; anyone else gets "not found". What a person says about themselves (a
+headline, about, city, links, phone) is on their account, under **Account › Profile**.
+
 ## Step by step
 
 ### Add a role

@@ -6,6 +6,7 @@ import { useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { useExamInProgress } from "@/features/exams/components/exam"
 import { cn } from "@workspace/ui/lib/utils"
+import { useRevealActive } from "@workspace/ui/hooks/use-reveal"
 
 import { NotesPanel } from "@/features/catalog/components/notes-panel"
 import { SubmissionsPanel } from "@/features/submissions/components/submissions-panel"
@@ -74,6 +75,8 @@ export function Workbench({
   const layout = useLocalStore(layoutStore, (value) => value)
   const practice = useProgress()
   const status = statusOverride ?? practice
+  // The open problem stays in view in a long list.
+  const listBox = useRevealActive<HTMLElement>([activeId])
   const [leftTab, setLeftTab] = useState<
     "problem" | "editorial" | "notes" | "submissions"
   >("problem")
@@ -125,7 +128,7 @@ export function Workbench({
         )}
         style={benchVars}
       >
-        <nav className={styles.list} aria-label="Problems">
+        <nav ref={listBox} className={styles.list} aria-label="Problems">
           {layout.listOpen ? (
             <>
               <div className={styles.paneHead}>

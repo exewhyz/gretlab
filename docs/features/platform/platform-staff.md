@@ -30,6 +30,10 @@ Reviewer, Support, Organizations manager, Communications, Auditor) and custom on
 - **Kinds' modules:** Dashboard › Organization kinds sets, per kind, whether each module it can use is
   off, optional or on from the start, for every organization of that kind at once, and each kind's
   suggested roles.
+- **One organization's modules:** Dashboard › Organizations › **Modules** sets the same levels for
+  one organization alone, over its kind's (or back to "As its kind"). Only modules its kind can run
+  are listed. It takes effect at once and goes in the platform's activity log. Needs "Manage
+  organizations" or "Manage organization kinds".
 
 ## Reaching inside an organization
 

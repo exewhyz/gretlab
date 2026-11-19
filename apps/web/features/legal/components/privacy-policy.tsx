@@ -57,7 +57,9 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             <Item term="Your account">
               your name, email address and handle. If you sign in with Google, Google tells
               us your name and email. If you use a password, we keep only a one-way hash of
-              it (scrypt), never the password itself.
+              it (scrypt), never the password itself. Your profile holds what you choose to
+              add: a headline, a few words about you, your city, links (a website, GitHub,
+              LinkedIn) and a phone number, which is stored encrypted.
             </Item>
             <Item term="Two-factor sign-in">
               if you turn it on, the secret for your authenticator app (encrypted), and
@@ -74,7 +76,9 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               attendance, timetable, marks and report cards, leave requests, library loans,
               bus route, hostel bed, admission applications and student records. A student
               record&apos;s date of birth, phone number and address, and the same details in
-              admission applications, are stored encrypted.
+              admission applications, are stored encrypted. For staff, the details an
+              organization keeps about you (designation, department, staff number, the date
+              you joined, and a work phone, stored encrypted).
             </Item>
             <Item term="Parents and guardians">
               the link between a parent&apos;s account and their child&apos;s, made by the
@@ -96,7 +100,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             </Item>
             <Item term="Without an account">
               nothing on our servers about your code: it stays in your browser, and Python
-              runs on your own device.
+              and JavaScript run on your own device.
             </Item>
           </List>
         </>
@@ -131,7 +135,10 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             teachers and administrators see what their role allows for the classes they
             run: your submissions and their results, your working copy and how it was
             written (for assignments they can grade), grades, attendance and records. Every
-            change they make to members, roles and settings is recorded.
+            change they make to members, roles and settings is recorded. Your profile in an
+            organization (your classes, roles, record, parents and contact details) is
+            shown to you, your linked parents and its staff who may see members; your
+            account&apos;s phone number too.
           </Item>
           <Item term="Your practice">
             your own practice outside the organization&apos;s work is shared with it only if

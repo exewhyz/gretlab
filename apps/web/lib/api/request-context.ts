@@ -14,6 +14,11 @@ export interface RequestInfo {
   apiKey?: { id: string; orgId: string; name: string; permissions: string[] }
   /** Set when the request queued webhook deliveries, so they're sent once it's answered. */
   webhooksQueued?: boolean
+  /**
+   * The session route() already read for this request, so a handler asking again
+   * (readSession) doesn't decode the cookie and query the user a second time.
+   */
+  session?: unknown
 }
 
 const store = new AsyncLocalStorage<RequestInfo>()

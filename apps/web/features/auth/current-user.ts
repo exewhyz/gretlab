@@ -5,6 +5,8 @@ import { redirect } from "next/navigation"
 
 import { platformAccess } from "@/features/platform/access"
 
+import { requestInfo } from "@/lib/api/request-context"
+
 import { authOptions } from "./options"
 import { TRUST_COOKIE, trusted } from "./two-factor"
 
@@ -26,6 +28,9 @@ const NOBODY: SessionState = { user: null, pending: null, twoFactor: false }
  * passed the second step since it was turned on, or their browser is trusted for it.
  */
 export async function readSession(): Promise<SessionState> {
+  // Inside an API request, route() has read it already (lib/api/request-context.ts).
+  const known = requestInfo().session as SessionState | undefined
+  if (known) return known
   const session = await getServerSession(authOptions)
   const email = session?.user?.email
   if (!email) return NOBODY

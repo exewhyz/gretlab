@@ -165,7 +165,7 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
       const info: RequestInfo = {
         ip: clientIp(request),
         userAgent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
-        ...(keyed ? { apiKey: keyed.key } : {}),
+        ...(keyed ? { apiKey: keyed.key } : { session }),
       }
       const data = await withRequest(info, () =>
         handler({

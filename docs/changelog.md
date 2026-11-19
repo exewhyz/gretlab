@@ -6,6 +6,49 @@ description: What's new in GretLab, newest first.
 What changed for the people using GretLab, newest first. Fixes and changes that don't show to anyone
 aren't listed.
 
+## 19 November 2026
+
+### Where code runs, and Submit without the server
+
+- **Python and JavaScript run in the browser** whenever the server can't run code, and for
+  visitors. Only those two languages are offered then.
+- **Grade in the browser** (Dashboard › Settings › Execution, off by default): lets Submit work
+  while server execution is off. The browser runs every test's input and the server checks the
+  outputs, so expected outputs never leave the server. Hidden tests' inputs do reach the
+  student's browser. Such results are marked **Provisional**, and the server judges the same code
+  again once it's back; that verdict replaces the provisional one. It's used for library
+  practice, and by organizations that turn it on.
+- **An organization's own switches** (Manage › Settings › Code execution): turn server execution
+  off for your own work if the judge is failing, and allow grading in the browser. You can only
+  narrow what the platform allows.
+- **Each assignment and contest** chooses where its code runs: on the server, or in the students'
+  browsers (Python and JavaScript only, with a warning in the form). It can also set a lower
+  **submission limit per minute** than the platform's, never a higher one.
+
+### Profiles
+
+- **Account** (account menu) has two tabs: **Profile** (your name, profile address, headline,
+  about you, city, links and phone) and **Security**. A checklist shows what's still missing.
+- **A profile in each organization**: open anyone from Members, or your own from the sidebar's
+  footer. It shows their roles and classes and the people linked to them: a student's record and
+  parents, a parent's children, a teacher's subjects and classes. Staff profiles have a
+  designation, department, staff number and start date, which staff can fill in themselves
+  (their staff number is set by the office). Each part shows only to people allowed to see it.
+
+### For the platform
+
+- **Modules for one organization** (Dashboard › Organizations › Modules): set any module off,
+  optional or on from the start for that organization alone, over what its kind allows.
+
+### Around the site
+
+- Saves and failures show a short notice in the corner, and a thin bar along the top shows a page
+  or a save is on its way.
+- The dashboards' header and sidebar show the GretLab logo. The sidebar has a footer with your
+  profile, Account, and the docs.
+- The page you're on stays in view in a long sidebar, problem list or row of tabs.
+- Organization pages load a little faster: the sidebar's data is fetched in one go.
+
 ## 17 November 2026
 
 ### Readings, quizzes, labs and projects in courses

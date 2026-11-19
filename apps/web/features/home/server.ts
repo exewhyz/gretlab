@@ -42,27 +42,13 @@ export type { HomeView } from "./home-core"
 /** What the sidebar and header need, on every page of the school. */
 export async function orgShell(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
-  const views = await viewsOf(ctx, user)
   const permissions = heldAnywhere(ctx)
   const db = getDb()
   const modules = ctx.modules
-  const [children, [pending], roles] = await Promise.all([
-    views.includes("parent")
-      ? db
-          .select({
-            id: guardians.studentId,
-            name: users.name,
-            email: users.email,
-          })
-          .from(guardians)
-          .innerJoin(users, eq(guardians.studentId, users.id))
-          .where(
-            and(
-              eq(guardians.orgId, ctx.org.id),
-              eq(guardians.parentId, user.id)
-            )
-          )
-      : [],
+  // Everything here needs only the context, so it's asked for at once: the shell loads on
+  // every organization page, and each round trip to the database counts.
+  const [views, [pending], roles, leavePending, admissionsNew] = await Promise.all([
+    viewsOf(ctx, user),
     permissions.includes("org.members.invite")
       ? db
           .select({ n: count() })
@@ -84,7 +70,22 @@ export async function orgShell(slug: string, user: User) {
           eq(roleAssignments.userId, user.id)
         )
       ),
+    pendingLeaveCount(ctx),
+    newApplications(ctx),
   ])
+  const children = views.includes("parent")
+    ? await db
+        .select({
+          id: guardians.studentId,
+          name: users.name,
+          email: users.email,
+        })
+        .from(guardians)
+        .innerJoin(users, eq(guardians.studentId, users.id))
+        .where(
+          and(eq(guardians.orgId, ctx.org.id), eq(guardians.parentId, user.id))
+        )
+    : []
   // Everyone is a member, so that role is named only when it's the only one.
   const roleNames = [
     ...new Set(
@@ -115,8 +116,8 @@ export async function orgShell(slug: string, user: User) {
     /** The kind's words, for the frame (My classes, About the school). */
     terms: kindTerms(ctx.org.type),
     noun: KINDS[ctx.org.type].noun,
-    leavePending: await pendingLeaveCount(ctx),
-    admissionsNew: await newApplications(ctx),
+    leavePending,
+    admissionsNew,
     children: children.map((c) => ({ id: c.id, name: c.name ?? c.email })),
     /** Has a profile here (a member, or a linked parent), so the sidebar links to it. */
     hasProfile: ctx.membership !== null || views.includes("parent"),

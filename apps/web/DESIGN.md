@@ -257,7 +257,8 @@ Status colours appear mainly as text, or as a 5–10% tint behind text (`bg-succ
 
 ## Layout
 
-- **Frames.** Learn pages sit under one sticky 56px header (`page-header.tsx`) on the cream canvas. Working areas (an organization, the platform dashboard) use the `AppFrame` sidebar layout: the full sidebar from 1024px, an icon rail with tooltips from 768px, and a slide-out menu below.
+- **Frames.** Learn pages sit under one sticky 56px header (`page-header.tsx`) on the cream canvas. Working areas (an organization, the platform dashboard) use the `AppFrame` sidebar layout: the full sidebar from 1024px, an icon rail with tooltips from 768px, and a slide-out menu below. Their header carries the Mark at 28px (never a text stand-in); the sidebar's top block is the Mark for the platform and an ink initials tile for an organization.
+- **Feedback.** A 2px Signal Orange bar along the top of the page (`components/progress-bar.tsx`) while a page opened from a link or a save is on its way; it waits 120ms before showing, so quick things don't flash, and stands still under reduced motion. Toasts (`lib/toast.ts`, sonner, bottom right) announce saves that have nowhere else to say so and failures no screen handled; forms keep their messages beside the button.
 - **Width.** Content columns are capped by purpose: `max-w-md`/`lg` for forms and dialogs, `max-w-2xl`/`3xl` for reading and settings, `max-w-5xl` for wide data pages. Tables scroll inside their card rather than widening the page.
 - **Spacing.** The base unit is 4px. Most gaps are 8px (`gap-2`) and 12px (`gap-3`); 16px separates groups and pads compact cards; 20px pads the standard card. Density is moderate: tight inside a row, generous between sections.
 - **Data screens.** A list's summary figures go in one line above it (`Stats`: hairline above and below, label over figure), not a row of tiles. Percentages in tables are `PercentBar`s. Long lists page on the server with the shared `Pager`.
@@ -330,7 +331,7 @@ A table wider than its column scrolls sideways inside its own box (`ScrollX` in 
 
 ### Navigation
 - **Header:** sticky, 56px, cream with a hairline below: the mark and site name, the organization switcher, the Learn/Teach toggle, the current mode's sections, then the bell, theme and account menu. Phones get a menu.
-- **Sidebar:** Margin Cream, 14px medium items with 16px Phosphor icons, 8px radius. Hover and the active item fill Soft Rule, and the active item turns medium weight. Groups fold, and the choice is remembered.
+- **Sidebar:** Margin Cream, 14px medium items with 16px Phosphor icons, 8px radius. Hover and the active item fill Soft Rule, and the active item turns medium weight. Groups fold, and the choice is remembered. The active item is kept in view (`useRevealActive`, which scrolls only the list's own box, never the page; tab rows and the lab's problem list use it too). The footer, above a hairline, holds the signed-in person (initials, name, email: their profile there), Account and the docs.
 
 ### The Mark
 Code braces holding a check, on a rounded ink tile (radius 14 of 64): cream braces, a Signal Orange check. It says what GretLab does: code goes in, and it comes out judged and graded (the Accepted verdict, the gradebook, the report card). In the header it sits at 28px beside the site name in `title-sm` semibold ink. The tile follows the text colour and the braces the page colour, so it inverts in dark mode while the check stays orange. The shapes live in `components/logo.tsx` (`MARK`, `LogoMark`) and draw the favicon (`app/icon.svg`), the Apple icon, `public/logo.png` (512px, for structured data), the share cards and the docs' logo. Don't redraw it elsewhere; import `MARK`.

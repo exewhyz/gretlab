@@ -177,7 +177,7 @@ function ProfileEditor({ profile }: { profile: Profile }) {
           {text("city", "City")}
           {text("phone", "Phone", {
             type: "tel",
-            help: "Kept sealed. Only you and staff of your organizations who may see members' details see it.",
+            help: "Kept sealed. Only you, your linked parents and staff of your organizations who may see members' details see it.",
           })}
           {text("website", "Website", { placeholder: "https://…" })}
           {text("github", "GitHub username")}

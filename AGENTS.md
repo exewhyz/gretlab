@@ -106,6 +106,14 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - **"Accepted" only ever means a graded submission passed everything.** Always display results through `verdictLabel()`, which enforces this. Runs are stored as `AC` when samples match, so showing `VERDICTS[verdict]` for a Run would claim something false.
 - Hidden tests show their verdict and timing to students, never input, output or expected output. Staff see everything.
 
+### Where code runs (`packages/judge/src/execution.ts`, unit-tested; `features/submissions/execution.ts`)
+
+- **Three levels, each only narrowing the one above:** the platform's settings (`server_execution.enabled`, `browser_execution.enabled`, `browser_execution.grading`, off by default), the owning organization's (`organizations.execution`: `server: false` turns its work off the server, `browserGrading: true` opts in; Manage › Settings › Code execution), then the assignment's or contest's `execution` (`server` or `browser`). `planExecution()` gives `{ run, submit, browserOnly }`; the editor asks `GET /execution?problem=&contest=&assignment=`. The organization is the work's owner, else the problem's.
+- **Browser languages:** Python (Pyodide, `public/py-worker.js`) and JavaScript (`public/js-worker.js`: `fs.readFileSync(0)`, `readline`, `process.stdin`, `console`, local `require`). `browserOnly` limits the editor to them. Both run through `BrowserRunner` (`features/lab/lib/python-runner.ts`) with the time limit and restart.
+- **Provisional grading:** `GET /submissions/tests` hands out every test's id and input (never `expected`), only where `plan.submit === "browser"`; the browser POSTs `/submissions` with `browser.outputs`, and `gradeFromBrowser` compares them with the expected outputs on the server and stores a done row with `provisional = true`. The runner (`rejudgeProvisional` in `apps/runner/src/queue.ts`, beside `retrySystemErrors`) queues those again once server execution is on for the platform and the organization; the sandbox's verdict replaces it. Results show a **Provisional** tag. Hidden inputs reach the student's browser in this mode, by the owner's choice (November 2026): it's for practice and for organizations that turn it on when the judge is failing.
+- Without the server, Runs fall back to the browser outside contests; Submit falls back only for practice (with grading allowed). Assignments and contests use the browser only when they choose it; their forms refuse it where the platform or organization doesn't allow it (`browser_not_allowed`).
+- **Submission limits per work:** `submissions_per_minute` on assignments and contests (null: the platform's). `perMinuteLimit` takes the lower; a form above the platform's is refused (`limit_too_high`). The assignment's applies when submitting from its pages (`assignmentSlug`) or during its exam. Template uses keep their own execution and limit, like lab networks.
+
 ## Navigation (keep it this simple)
 
 - The header's switcher (`features/account/scope-switcher.tsx`, shown to people in an organization) chooses whose content lists show: everything, personal (from no organization), any mix of organizations, or one; each organization can be opened from it. It's a per-browser cookie read by `useContentScope()`; Problems, Assignments, Contests and Teach filter with it and show a note with the hidden count and "Show everything". It only narrows lists; access is still decided on the server.
@@ -284,7 +292,9 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - **Modules are decided in three layers** (`enabledModules(type, stored, policy)` in `org-types.ts`, unit-tested):
   1. the kind's capabilities: a module it can't support is never on;
   2. the platform's policy for the kind (`org_kind_policies`), set in **Admin › Organization kinds** by staff with "Manage organization kinds" (`platform.kinds.manage`): each capable module is off, optional, or on from the start, for every organization of the kind at once;
-  3. the organization's own choices (Settings › Modules, from `moduleOptions()`), within what's optional or on.
+  3. the platform's levels for this organization alone (`organizations.platform_modules`, Admin › Organizations › Modules, `platform.orgs.manage` or `platform.kinds.manage`, audited `platform.org_modules`), merged over the kind's by `organizationPolicy()`;
+  4. the organization's own choices (Settings › Modules, from `moduleOptions(org)`), within what's optional or on.
+  - Always work an organization's modules out with `orgModules(org, policies)` (or `modulesOf(org)`, `ctx.modules`), which applies all four.
   - A module not `ready` is never on.
   - Policies are read through a 30-second cache (`kindPolicies()` in `features/orgs/kinds.ts`), cleared when they change.
   - The org context carries the result as `ctx.modules`; use it (or `modulesOf(org)` / `kindPolicies()` outside a context), never `enabledModules` without the policy.
@@ -781,6 +791,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - Profiles and the leaderboard need sign-in and show names and handles, never emails.
 - Editorials and solutions are unlocked by solving the problem when `practice.solutions_after_solve` is on, and are never in public page data.
 
+## Profiles (`features/profile`)
+
+- **Account › Profile** (`/account`, beside `/account/security` as tabs with their own addresses): name, handle (unique, 409 `handle_taken`), headline, about, city, website, GitHub, LinkedIn and a phone, in `users.profile`; the phone sealed (`lib/sealed.ts`, purpose "profile"). `GET/PATCH /me/profile`, with what's still missing.
+- **A member's profile** (`/orgs/:slug/profile/:id`, `me` for your own; `orgPages().profile`): roles and where, groups, a student's record (from Student records, unsealed for those who may see it) and parents, a parent's children, what a teacher teaches and leads, and staff details in `org_members.profile` (designation, department, staff number, start date, a sealed work phone). Members and linked parents have one; anyone else is 404.
+- Who sees it: the person, their linked parents, and staff with "See members", "See student records" or "See parents" for one of the person's groups (a parent's: their children's), or platform staff looking in. Contact details and the record only to those. Who edits the staff details: the person (not their staff number) and "Manage members" for their groups; others' edits are audited (`member.profile`). Students edit nothing here; their record is the office's.
+- The sidebar's footer links to your profile in the organization (`orgShell().hasProfile`), and the Members list links names to profiles.
+
 ## Sandbox rules (security-critical; do not relax)
 
 Learned from the 2024 Judge0 escapes (privileged container, host touching sandbox symlinks, sandbox reaching the database).
@@ -804,6 +821,9 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - **Response types.** A screen takes its data's type from the server function behind the route, not a copy: `type Report = ApiResult<typeof orgReport>`, with `import type` only (`apps/web/lib/api/types.ts`; `Jsonified` turns dates into strings, as JSON does). Every screen that calls an API uses this: about 180 response types.
   - The exceptions, where the screen deliberately shapes data differently, keep a local type with a comment: the problem editor and practice page, admissions, the question session, the organization's public page, and the staff check-in.
   - Server functions should return precise types (literal unions, not `string`; `row!` after an insert's `returning()`), since screens now see them as they are.
+- **Feedback.** Mutations that don't handle their own error get a toast (`components/query-provider.tsx`'s `MutationCache`); `meta: { success: "…" }` announces a success, `meta: { quiet: true }` silences a failure the screen shows another way. Call `toast` from `lib/toast.ts` directly where a screen has no message of its own. `components/progress-bar.tsx` shows a top bar during link navigations and saves.
+- **Keeping the current item in view.** `useRevealActive` (`@workspace/ui/hooks/use-reveal`) scrolls a list's or tab row's own box to the item marked `aria-current`, `aria-selected` or `data-active`, never the page. `TabsList`, the AppFrame sidebar and the lab's problem list use it.
+- **One session read per API request.** `route()` stores the session it read in the request context, and `readSession()` returns it, so handlers that ask again (`/me`) don't decode the cookie and query the user twice.
 - **Errors.** Unexpected server errors go through `reportError()` (`apps/web/lib/report-error.ts`): one JSON log line with a short `ref`. API 500s show that ref to the person, and `instrumentation.ts` reports page and server-action errors the same way.
 - **File size.** Screens and server modules are split by job, with the old file kept as an index that re-exports, so imports don't change. Examples: `features/home/components/home-*.tsx`, `features/results/components/*`, `features/orgs/{core,groups,server}.ts`, and `features/assignments/{grading,student-work,staff-work,gradebook-server}.ts`. When a file passes about 800 lines, split it the same way: shared types and helpers in a `*-parts` or `*-core` file, one file per screen or job, no circular imports.
 - **CI.** `.github/workflows/ci.yml` runs lint, typecheck, unit tests and `drizzle-kit check` on every push. The end-to-end regression stays local (`pnpm test:e2e`, Docker with gVisor).
@@ -921,6 +941,7 @@ Learned from the 2024 Judge0 escapes (privileged container, host touching sandbo
 - `e2e/courses.mjs`: writing outlines (what a course may hold, stale saves), sharing courses, a college's own and copied courses, giving one to a class, release by day and by the module before, practice answers, teacher progress, deleting, and the pages.
 - `e2e/platform.mjs`: platform roles, custom roles, the no-escalation rules, ADMIN_EMAILS owners, blocking, the activity log and the menu per role.
 - `e2e/flows.mjs`: Run vs Submit, history and creating a contest, as a person uses them. Included in `pnpm test:e2e`.
+- `e2e/execution-profiles.mjs`: where code runs (the platform's switches, an organization narrowing them and never widening, an assignment's and a contest's choice, limits above the platform's refused, a work's lower limit holding), browser grading (inputs only, outputs checked, Accepted/Wrong/Runtime error, missing outputs and server-only languages refused, provisional rows, the runner judging them again when one is up), one organization's modules set by the platform, Account › Profile (handles, links, a sealed phone), members' profiles (who sees a student's record and parents, a parent's children, staff details and who edits them), and the pages (Account's tabs and a toast, a profile on a phone, the sidebar footer and logo, the form's warning, a JavaScript Submit graded in the browser).
 - After a mutation, invalidate every query that shows that data. Stale contest data was the cause of several real bugs: "not registered" after registering, and old results after submitting.
 - Check that a test actually ran. A filter or quoting mistake has twice produced output that looked like a result.
 - Passing checks don't prove a page looks right. Look at the screenshots it writes to `/tmp/gretlab-e2e`: visual bugs and the "Run counts as solved" bug were both found that way.
@@ -973,6 +994,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Integrations: organization API keys and signed webhooks (`docs/api.md`)
 - [x] Links that only lead where people can go; access and not-found pages; Coding lab as a module; foldable sidebar; data screens with summary lines; server-paged long lists
 - [x] Codebase: CI (lint, typecheck, unit tests, migrations), typed page addresses (`orgPages`), screens typed from server functions (`ApiResult`), large files split by job, structured error logging with references
+- [x] Where code runs in three levels (platform, organization, assignment or contest), Python and JavaScript in the browser, provisional browser grading re-judged by the runners, per-work submission limits; one organization's modules set by the platform; Account › Profile and members' profiles in each organization; toasts, a progress bar, the sidebar footer and logo
 
 **On hold (the owner's decision, November 2026), don't start without asking:**
 - fees and payments (the `finance` module is listed but not ready);
