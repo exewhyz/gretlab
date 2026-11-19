@@ -33,7 +33,18 @@ interface RunnerOptions {
 export class BrowserRunner {
   status: EngineStatus = { state: "loading" }
 
+  /** Whether anything has asked for this engine yet (it loads only when needed). */
+  started = false
+
   constructor(private readonly options: RunnerOptions) {}
+
+  /** Follows the status without starting the engine (for indicators). */
+  watch = (listener: () => void) => {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
 
   private worker: Worker | null = null
   private ready: Promise<boolean> = Promise.resolve(false)
@@ -70,6 +81,7 @@ export class BrowserRunner {
   }
 
   private start() {
+    this.started = true
     this.setStatus({ state: "loading" })
     this.ready = new Promise((resolve) => {
       this.resolveReady = resolve

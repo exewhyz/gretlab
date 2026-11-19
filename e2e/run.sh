@@ -104,5 +104,6 @@ suite platform-reach http://localhost:3100
 suite access-links http://localhost:3100
 suite data-screens http://localhost:3100
 suite integrations http://localhost:3100
+suite execution-profiles http://localhost:3100 /tmp/gretlab-e2e/execution-profiles/
 
 exit $CODE

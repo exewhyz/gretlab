@@ -310,6 +310,7 @@ export function OrgShell({
         tooltip: shell?.org.name ?? "School",
       }}
       navLabel="Organization"
+      profileHref={shell?.hasProfile ? orgPages(slug).profile("me") : undefined}
       loading={!shell}
       groups={groups.map((g) => ({
         group: g.group,

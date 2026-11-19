@@ -1093,7 +1093,13 @@ export async function updateSettings(
       .set({ ...input, website: input.website === "" ? null : input.website })
       .where(eq(organizations.id, ctx.org.id))
       .returning()
-    const changes = changesBetween(ctx.org, org!, SETTING_LABELS)
+    // Where code runs is logged as its two switches, in words.
+    const switches = (o: typeof org) => ({
+      ...o,
+      serverRuns: readOrgExecution(o!.execution).server !== false,
+      browserGrading: readOrgExecution(o!.execution).browserGrading === true,
+    })
+    const changes = changesBetween(switches(ctx.org), switches(org), SETTING_LABELS)
     const moduleLabel = (key: string) =>
       MODULES[key as keyof typeof MODULES]?.label ?? key
     const lists = [
@@ -1785,7 +1791,8 @@ const SETTING_LABELS = {
   groupLevels: "Group levels",
   languages: "Languages",
   allowPaste: "Pasting in the editor",
-  execution: "Code execution",
+  serverRuns: "Run code on the server",
+  browserGrading: "Grading in the browser",
 }
 
 /** Manage › Activity: a page of the organization's log, filtered. */

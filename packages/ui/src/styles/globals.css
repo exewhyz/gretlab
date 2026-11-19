@@ -218,3 +218,19 @@
     outline-offset: 2px;
   }
 }
+
+/* The page's top progress bar (apps/web/components/progress-bar.tsx): it creeps towards the
+   end and waits there until the page or save is done. */
+@keyframes gl-progress {
+  0% { width: 0%; }
+  30% { width: 45%; }
+  70% { width: 75%; }
+  100% { width: 90%; }
+}
+.gl-progress {
+  width: 90%;
+  animation: gl-progress 6s cubic-bezier(0.1, 0.6, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gl-progress { animation: none; width: 60%; }
+}

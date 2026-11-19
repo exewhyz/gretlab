@@ -239,13 +239,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
   return (
     <AppFrame
       brand={{
-        mark: "GL",
+        mark: "logo",
         title: viewer ? "Platform" : undefined,
         subtitle: viewer ? role : undefined,
         href: "/admin",
         tooltip: "Platform",
       }}
       navLabel="Dashboard"
+      profileHref="/account"
       loading={!viewer}
       groups={viewer ? groups : []}
       isActive={(href) =>

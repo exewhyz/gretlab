@@ -118,6 +118,8 @@ export async function orgShell(slug: string, user: User) {
     leavePending: await pendingLeaveCount(ctx),
     admissionsNew: await newApplications(ctx),
     children: children.map((c) => ({ id: c.id, name: c.name ?? c.email })),
+    /** Has a profile here (a member, or a linked parent), so the sidebar links to it. */
+    hasProfile: ctx.membership !== null || views.includes("parent"),
   }
 }
 

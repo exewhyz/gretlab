@@ -4,7 +4,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { useViewer } from "@/features/account/use-viewer"
 
-import { usePythonEngine } from "../hooks/use-python-engine"
+import { useLoadedEngine } from "../hooks/use-python-engine"
 
 export function EngineStatusIndicator({ className }: { className?: string }) {
   const { data: viewer } = useViewer()
@@ -12,15 +12,21 @@ export function EngineStatusIndicator({ className }: { className?: string }) {
   const inBrowser = Boolean(
     viewer && !onServer && viewer.features.browserExecution
   )
-  const { status } = usePythonEngine(inBrowser)
+  // Never loads an engine itself: it shows the one the editor asked for, if any.
+  const { status: loaded, name } = useLoadedEngine()
+  const status = loaded ?? { state: "ready" as const }
   const ready = onServer || (inBrowser && status.state === "ready")
   const label = onServer
     ? "Server sandbox"
-    : status.state === "ready"
-      ? "Python ready"
-      : status.state === "loading"
-        ? "Loading Python…"
-        : status.message
+    : !inBrowser
+      ? "Running code is off"
+      : status.state === "ready"
+        ? name
+          ? `${name} ready`
+          : "Runs in your browser"
+        : status.state === "loading"
+          ? `Loading ${name ?? "the engine"}…`
+          : status.message
 
   return (
     <div

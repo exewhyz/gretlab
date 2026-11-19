@@ -37,7 +37,32 @@ export function useBrowserEngine(language: string | undefined, enabled = true) {
   return { status, isReady: on && status.state === "ready", run: runner.run }
 }
 
-/** Python's engine, for the status indicator. */
+/** Python's engine (the problem editor fills expected outputs with it). */
 export function usePythonEngine(enabled = true) {
   return useBrowserEngine("python", enabled)
+}
+
+/**
+ * The browser engine that's loaded, if any, without loading one: for the status indicator.
+ * Null until a page asks for an engine.
+ */
+export function useLoadedEngine() {
+  const read = () =>
+    python.started ? python.status : javascript.started ? javascript.status : null
+  const status = useSyncExternalStore(
+    (listener) => {
+      const a = python.watch(listener)
+      const b = javascript.watch(listener)
+      return () => {
+        a()
+        b()
+      }
+    },
+    read,
+    () => null
+  )
+  return {
+    status,
+    name: python.started ? "Python" : javascript.started ? "JavaScript" : null,
+  }
 }

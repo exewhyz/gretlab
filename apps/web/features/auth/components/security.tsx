@@ -61,7 +61,7 @@ export function SecuritySettings() {
   const methodCount = Number(s.methods.app) + Number(s.methods.email)
   return (
     <div className="grid max-w-2xl gap-4">
-      <h1 className="text-display-sm text-ink">Security</h1>
+      <h2 className="text-title-md text-ink">Security</h2>
       {s.required && !s.enabled && (
         <p
           role="alert"

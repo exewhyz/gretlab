@@ -1,8 +1,14 @@
 "use client"
 
-import { CaretDownIcon, type Icon } from "@phosphor-icons/react"
+import {
+  BookOpenIcon,
+  CaretDownIcon,
+  GearSixIcon,
+  type Icon,
+} from "@phosphor-icons/react"
 import Link from "next/link"
-import { useEffect, useState, type ReactNode } from "react"
+import { usePathname } from "next/navigation"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { cn } from "@workspace/ui/lib/utils"
@@ -10,6 +16,7 @@ import { Separator } from "@workspace/ui/components/separator"
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -25,8 +32,10 @@ import {
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 
+import { LogoMark } from "@/components/logo"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { AccountMenu } from "@/features/account/account-menu"
+import { useViewer } from "@/features/account/use-viewer"
 import { NotificationBell } from "@/features/notifications/components/bell"
 import { HomeLink } from "@/components/home-link"
 
@@ -95,6 +104,28 @@ function useFolded(navLabel: string) {
   return [folded, toggle] as const
 }
 
+/**
+ * Keeps the page you're on in view in a long sidebar: after each navigation the active
+ * item is scrolled into the visible part, without moving the page itself.
+ */
+function useActiveInView() {
+  const box = useRef<HTMLDivElement | null>(null)
+  const pathname = usePathname()
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const active = box.current?.querySelector<HTMLElement>(
+        '[data-active="true"], [data-active=""], [aria-current="page"]'
+      )
+      active?.scrollIntoView({ block: "nearest", inline: "nearest" })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [pathname])
+  return box
+}
+
+/** Where the docs live, linked from every sidebar's footer. */
+const DOCS_URL = "https://docs.gretlab.grettech.com"
+
 export function AppFrame({
   brand,
   navLabel,
@@ -104,10 +135,12 @@ export function AppFrame({
   title,
   badge,
   headerExtra,
+  profileHref,
   children,
 }: {
   /** The block at the top of the sidebar. */
   brand: {
+    /** Initials on a tile, or "logo" for GretLab's own mark. */
     mark: string
     title?: string
     subtitle?: string
@@ -123,10 +156,15 @@ export function AppFrame({
   title?: string
   badge?: string
   headerExtra?: ReactNode
+  /** The signed-in person's profile in this area, linked from the sidebar's footer. */
+  profileHref?: string
   children: ReactNode
 }) {
   const [open, setOpen] = useWideEnough()
   const [folded, toggleFolded] = useFolded(navLabel)
+  const content = useActiveInView()
+  const { data: viewer } = useViewer()
+  const person = viewer?.user
   return (
     <TooltipProvider>
       <SidebarProvider open={open} onOpenChange={setOpen}>
@@ -139,12 +177,16 @@ export function AppFrame({
                   render={<Link href={brand.href} />}
                   tooltip={brand.tooltip}
                 >
-                  <span
-                    aria-hidden="true"
-                    className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary font-mono text-xs font-bold text-primary-foreground"
-                  >
-                    {brand.mark}
-                  </span>
+                  {brand.mark === "logo" ? (
+                    <LogoMark className="size-8 shrink-0 text-ink" />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-md bg-ink font-mono text-xs font-bold text-canvas"
+                    >
+                      {brand.mark}
+                    </span>
+                  )}
                   <span className="grid min-w-0 flex-1 text-left leading-tight">
                     {brand.title ? (
                       <>
@@ -165,7 +207,7 @@ export function AppFrame({
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarHeader>
-          <SidebarContent>
+          <SidebarContent ref={content}>
             {loading &&
               Array.from({ length: 6 }, (_, i) => (
                 <div key={i} className="px-3 py-1.5">
@@ -224,6 +266,56 @@ export function AppFrame({
               })}
             </nav>
           </SidebarContent>
+          <SidebarFooter className="border-t border-sidebar-border">
+            <SidebarMenu>
+              {person && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    size="lg"
+                    tooltip={`${person.name ?? person.email}: your profile`}
+                    render={<Link href={profileHref ?? "/account"} />}
+                    isActive={false}
+                    data-testid="sidebar-profile"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-ink"
+                    >
+                      {initials(person.name ?? person.email)}
+                    </span>
+                    <span className="grid min-w-0 flex-1 text-left leading-tight">
+                      <span className="truncate text-sm font-medium text-ink">
+                        {person.name ?? person.email}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {person.email}
+                      </span>
+                    </span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Account"
+                  render={<Link href="/account" />}
+                >
+                  <GearSixIcon />
+                  <span>Account</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Docs and help"
+                  render={
+                    <a href={DOCS_URL} target="_blank" rel="noopener noreferrer" />
+                  }
+                >
+                  <BookOpenIcon />
+                  <span>Docs and help</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
           <SidebarRail />
         </Sidebar>
         <SidebarInset className="min-w-0 bg-canvas">
@@ -231,10 +323,10 @@ export function AppFrame({
             <SidebarTrigger aria-label="Toggle the menu" />
             <Separator orientation="vertical" className="mx-1 h-5" />
             <HomeLink
-              className="font-mono text-sm font-bold tracking-tighter text-primary"
-              aria-label="GretLab home"
+              className="flex shrink-0 items-center"
+              aria-label={`${viewer?.siteTitle ?? "GretLab"} home`}
             >
-              &gt;&gt;&gt;
+              <LogoMark className="size-7 text-ink" />
             </HomeLink>
             {title && (
               <span className="min-w-0 truncate text-sm font-medium text-ink">
@@ -259,4 +351,12 @@ export function AppFrame({
       </SidebarProvider>
     </TooltipProvider>
   )
+}
+
+/** "Asha Rao" → "AR"; an address's first letters otherwise. */
+function initials(name: string) {
+  const words = name.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean)
+  return (
+    (words[0]?.[0] ?? "") + (words.length > 1 ? (words.at(-1)?.[0] ?? "") : "")
+  ).toUpperCase() || "?"
 }

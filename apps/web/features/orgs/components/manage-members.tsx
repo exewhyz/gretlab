@@ -1,5 +1,9 @@
 "use client"
 
+import Link from "next/link"
+
+import { orgPages } from "@/lib/paths"
+
 import { DotsThreeIcon } from "@phosphor-icons/react"
 
 import {
@@ -347,7 +351,12 @@ export function MemberRow({
   return (
     <tr data-testid="member-row" className="align-top">
       <td>
-        <div className="text-ink">{m.name ?? m.email}</div>
+        <Link
+          href={orgPages(slug).profile(m.userId)}
+          className="text-ink underline-offset-2 hover:underline"
+        >
+          {m.name ?? m.email}
+        </Link>
         <div className="text-xs">{m.email}</div>
         {m.status === "pending" && (
           <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">

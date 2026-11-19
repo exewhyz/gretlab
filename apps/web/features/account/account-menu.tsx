@@ -307,6 +307,9 @@ export function AccountMenu() {
             My lists
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem render={<Link href="/account" />}>
+          Account
+        </DropdownMenuItem>
         <DropdownMenuItem render={<Link href="/account/security" />}>
           Security
         </DropdownMenuItem>

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 
 import { PageHeader } from "@/components/page-header"
 import { readSession } from "@/features/auth/current-user"
-import { SecuritySettings } from "@/features/auth/components/security"
+import { AccountPage } from "@/features/profile/components/account-page"
 
 export const metadata: Metadata = {
   title: "Security",
@@ -18,7 +18,7 @@ export default async function Page() {
     <div className="min-h-dvh">
       <PageHeader />
       <main className="mx-auto max-w-5xl p-4">
-        <SecuritySettings />
+        <AccountPage tab="security" />
       </main>
     </div>
   )

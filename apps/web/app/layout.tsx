@@ -5,6 +5,9 @@ import type { ReactNode } from "react"
 import "@workspace/ui/globals.css"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { Toaster } from "@workspace/ui/components/sonner"
+
+import { ProgressBar } from "@/components/progress-bar"
 import { QueryProvider } from "@/components/query-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ADSENSE_CLIENT } from "@/features/ads/config"
@@ -51,7 +54,9 @@ export default async function RootLayout({
         <JsonLd data={siteIdentity(await siteSettings())} />
         <ThemeProvider>
           <QueryProvider>
+            <ProgressBar />
             <ExamLockProvider>{children}</ExamLockProvider>
+            <Toaster position="bottom-right" closeButton />
           </QueryProvider>
         </ThemeProvider>
       </body>

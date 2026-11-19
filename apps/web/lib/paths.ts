@@ -29,6 +29,8 @@ export function orgPages(slug: string) {
     myAttendance: `${base}/my-attendance`,
     practice: (problem: string) => `${base}/practice/${problem}`,
     child: (studentId: string) => `${base}/children/${studentId}`,
+    /** Someone's profile here; "me" for your own. */
+    profile: (userId: string) => `${base}/profile/${userId}`,
     results: (studentId: string | "me") => `${base}/results/${studentId}`,
     /** A class (group) page, optionally on one tab. */
     cls: (groupId: string, tab?: ClassTab, extra?: Record<string, string>) => {
