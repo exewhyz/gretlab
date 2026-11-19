@@ -617,20 +617,16 @@ async function gradeFromBrowser(
 /** Every test's input, for a Submit the browser will grade. Refused where it isn't allowed. */
 export async function browserTests(
   user: User,
-  input: { problemSlug: string; contestSlug?: string; assignmentSlug?: string }
+  input: { problemSlug: string; contestSlug?: string; assignmentSlug?: string },
+  /** Where it came from: during an exam, only its networks may have the tests. */
+  ip: string | null = null
 ) {
   const [problem] = await getDb()
     .select()
     .from(problems)
     .where(slugIs(input.problemSlug))
   if (!problem) throw notFound("Problem not found")
-  const exam = await guardExamSubmission(user, problem.id, null).catch(
-    (error: unknown) => {
-      // Network checks happen when the outputs come back; anything else stands.
-      if (error instanceof ApiError && error.code === "exam_network") return null
-      throw error
-    }
-  )
+  const exam = await guardExamSubmission(user, problem.id, ip)
   let contest: Pick<
     Contest,
     "id" | "orgId" | "execution" | "submissionsPerMinute"

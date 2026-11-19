@@ -33,11 +33,14 @@ export function makeQueryClient() {
     mutationCache: new MutationCache({
       onError: (error, _vars, _ctx, mutation) => {
         if (mutation.options.onError || mutation.meta?.quiet) return
-        toast.error(
+        const message =
           error instanceof Error && error.message
             ? error.message
             : "Something went wrong. Please try again."
-        )
+        // Many screens show a failure beside the button already; say it only where none did.
+        setTimeout(() => {
+          if (!document.body.innerText.includes(message)) toast.error(message)
+        }, 150)
       },
       onSuccess: (_data, _vars, _ctx, mutation) => {
         if (mutation.meta?.success) toast.success(mutation.meta.success)
