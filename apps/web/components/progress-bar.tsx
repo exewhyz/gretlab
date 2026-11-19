@@ -20,9 +20,11 @@ export function ProgressBar() {
   const giveUp = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    // Next pushes the new address from inside its own insertion effect, where React
+    // forbids state updates, so the bar is told a moment later.
     const finish = () => {
-      setNavigating(false)
       if (giveUp.current) clearTimeout(giveUp.current)
+      setTimeout(() => setNavigating(false), 0)
     }
     const onClick = (event: MouseEvent) => {
       if (
@@ -91,7 +93,7 @@ export function ProgressBar() {
       role="progressbar"
       aria-label={navigating ? "Loading the page" : "Saving"}
       aria-busy={!done}
-      className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-0.5 overflow-hidden"
+      className="pointer-events-none fixed inset-x-0 top-0 z-100 h-0.5 overflow-hidden"
     >
       <div
         className={
