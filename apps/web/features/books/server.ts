@@ -12,7 +12,6 @@ import {
   addDays,
   available,
   cannotBorrow,
-  enabledModules,
   isDay,
   loanStatus,
   readLibrarySettings,
@@ -28,7 +27,7 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/route"
-import { kindPolicies } from "@/features/orgs/kinds"
+import { kindPolicies, orgModules } from "@/features/orgs/kinds"
 
 /*
  * The Library module: an organization's books (`library_books`, with a number of copies)
@@ -616,6 +615,7 @@ export async function dueLoans(userId: string) {
       slug: organizations.slug,
       type: organizations.type,
       modules: organizations.modules,
+      platformModules: organizations.platformModules,
     })
     .from(libraryLoans)
     .innerJoin(libraryBooks, eq(libraryLoans.bookId, libraryBooks.id))
@@ -630,7 +630,7 @@ export async function dueLoans(userId: string) {
     .then(async (rows) => {
       const policies = await kindPolicies()
       return rows
-        .filter((r) => enabledModules(r.type, r.modules, policies[r.type]).has("library"))
+        .filter((r) => orgModules(r, policies).has("library"))
         .map((r) => ({ ...r, overdue: r.dueOn < day }))
     })
 }

@@ -18,7 +18,6 @@ import {
 import {
   ancestry,
   domainMatches,
-  enabledModules,
   readAdmissionSettings,
   grantsPermission,
   isModuleKey,
@@ -34,6 +33,7 @@ import {
   listChanges,
   yearProblem,
   type OrgType,
+  organizationPolicy,
   platformExecution,
   readOrgExecution,
 } from "@workspace/judge"
@@ -44,7 +44,12 @@ import { auditCsv, readAudit, type AuditFilters } from "@/features/audit/server"
 import { notify } from "@/features/notifications/server"
 import { platformCan } from "@/features/platform/access"
 import { getSettings } from "@/features/settings/server"
-import { kindPolicies, kindRoleTemplates, moduleOptions } from "./kinds"
+import {
+  kindPolicies,
+  kindRoleTemplates,
+  moduleOptions,
+  orgModules,
+} from "./kinds"
 
 import { rolePermissions } from "./access"
 
@@ -513,7 +518,7 @@ export async function getOrganization(slug: string, viewer: User | null) {
     pendingApproval: isMember && org.signupStatus === "pending",
     /** Taking applications now (Admissions module): the page offers to apply. */
     admissionsOpen: (() => {
-      const modules = enabledModules(org.type, org.modules, policies[org.type])
+      const modules = orgModules(org, policies)
       const a = readAdmissionSettings(org.moduleSettings)
       return (
         modules.has("admissions") &&
@@ -996,7 +1001,7 @@ export async function getManageSummary(slug: string, user: User) {
       /** The modules on right now (defaults + choices, limited to the type and ready ones). */
       modules: [...ctx.modules],
       /** Modules this kind may have here, with the platform's level (optional or on by default). */
-      moduleOptions: await moduleOptions(ctx.org.type),
+      moduleOptions: await moduleOptions(ctx.org),
       /** What the kind is, in its own words (it can't be changed). */
       kind: {
         label: KINDS[ctx.org.type].label,
@@ -1043,7 +1048,11 @@ export async function updateSettings(
   }
   if (input.modules) {
     const type = ctx.org.type
-    const policy = (await kindPolicies())[type]
+    const policy = organizationPolicy(
+      type,
+      (await kindPolicies())[type],
+      ctx.org.platformModules
+    )
     for (const [key, on] of Object.entries(input.modules)) {
       if (!on || !isModuleKey(key)) continue
       if (!moduleAvailable(type, key, policy)) {
@@ -1092,11 +1101,7 @@ export async function updateSettings(
         "Modules",
         [...ctx.modules].map(moduleLabel),
         [
-          ...enabledModules(
-            org!.type,
-            org!.modules,
-            (await kindPolicies())[org!.type]
-          ),
+          ...orgModules(org!, await kindPolicies()),
         ].map(moduleLabel)
       ),
     ].filter(Boolean)

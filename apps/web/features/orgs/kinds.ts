@@ -10,6 +10,7 @@ import {
   KINDS,
   kindCan,
   MODULE_KEYS,
+  organizationPolicy,
   MODULES,
   moduleLevel,
   ORG_TYPES,
@@ -67,14 +68,42 @@ export function kindRoleTemplates(): Promise<Record<OrgType, RoleTemplate[]>> {
   })
 }
 
-/** The modules on for an organization, under its kind's policy. */
-export async function modulesOf(org: { type: OrgType; modules: unknown }) {
-  return enabledModules(org.type, org.modules, (await kindPolicies())[org.type])
+/** What the modules of one organization are decided from. */
+export interface ModuleOwner {
+  type: OrgType
+  modules: unknown
+  /** The platform's levels for this organization alone; missing follows the kind. */
+  platformModules?: unknown
 }
 
-/** For an organization's settings: each module its kind may have, with the platform's level. */
-export async function moduleOptions(type: OrgType) {
-  const policy = (await kindPolicies())[type]
+/**
+ * The modules on for an organization: its kind's capabilities, the platform's policy for
+ * the kind, the platform's levels for this organization, then its own choices.
+ */
+export function orgModules(
+  org: ModuleOwner,
+  policies: Record<OrgType, KindPolicy>
+) {
+  return enabledModules(
+    org.type,
+    org.modules,
+    organizationPolicy(org.type, policies[org.type], org.platformModules)
+  )
+}
+
+/** The modules on for an organization, under its kind's policy and its own levels. */
+export async function modulesOf(org: ModuleOwner) {
+  return orgModules(org, await kindPolicies())
+}
+
+/** For an organization's settings: each module it may have, with the platform's level. */
+export async function moduleOptions(org: { type: OrgType; platformModules?: unknown }) {
+  const type = org.type
+  const policy = organizationPolicy(
+    type,
+    (await kindPolicies())[type],
+    org.platformModules
+  )
   // Modules not ready yet are listed too, so Settings can show them as coming soon.
   return MODULE_KEYS.filter((k) => kindCan(type, k))
     .map((key) => ({ key, level: moduleLevel(type, key, policy) }))
@@ -243,4 +272,105 @@ export async function saveKindRoles(user: User, kind: string, input: z.infer<typ
     { kind: type }
   )
   return kindsOverview(user)
+}
+
+/* ---------- one organization's modules, as the platform decides ---------- */
+
+async function needOrgFeatures(user: User) {
+  if (
+    !(await platformCan(user, "platform.orgs.manage")) &&
+    !(await platformCan(user, "platform.kinds.manage"))
+  )
+    throw new ApiError(
+      403,
+      "forbidden",
+      "Deciding an organization's modules needs \"Manage organizations\" or \"Manage organization kinds\"."
+    )
+}
+
+async function orgRow(orgId: string) {
+  const [org] = await getDb()
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      slug: organizations.slug,
+      type: organizations.type,
+      modules: organizations.modules,
+      platformModules: organizations.platformModules,
+    })
+    .from(organizations)
+    .where(sql.eq(organizations.id, orgId))
+  if (!org) throw notFound("Organization not found")
+  return org
+}
+
+/**
+ * Admin › Organizations › Modules: each module its kind can support, the kind's level, what
+ * the platform set for this organization alone, and whether it's on now.
+ */
+export async function orgFeatures(user: User, orgId: string) {
+  await needOrgFeatures(user)
+  const org = await orgRow(orgId)
+  const policies = await kindPolicies()
+  const override = readKindPolicy(org.type, org.platformModules)
+  const on = orgModules(org, policies)
+  return {
+    org: { id: org.id, name: org.name, slug: org.slug, kind: KINDS[org.type].label },
+    modules: MODULE_KEYS.filter((k) => kindCan(org.type, k)).map((key) => ({
+      key,
+      label: MODULES[key].label,
+      description: MODULES[key].description,
+      ready: MODULES[key].ready,
+      /** The kind's level, which applies when this organization has none of its own. */
+      kindLevel: moduleLevel(org.type, key, policies[org.type]),
+      level: override[key] ?? null,
+      on: on.has(key),
+    })),
+  }
+}
+
+export const orgFeaturesSchema = z.object({
+  /** null: follow the kind's level. */
+  modules: z.record(z.string(), z.enum(["off", "optional", "default"]).nullable()),
+})
+
+export async function saveOrgFeatures(
+  user: User,
+  orgId: string,
+  input: z.infer<typeof orgFeaturesSchema>
+) {
+  await needOrgFeatures(user)
+  const org = await orgRow(orgId)
+  const bad = Object.keys(input.modules).find(
+    (k) => !(MODULE_KEYS as string[]).includes(k) || !kindCan(org.type, k as ModuleKey)
+  )
+  if (bad)
+    throw new ApiError(
+      400,
+      "not_capable",
+      `${KINDS[org.type].label} can't run ${MODULES[bad as ModuleKey]?.label ?? bad}.`
+    )
+  const before = readKindPolicy(org.type, org.platformModules)
+  const next: KindPolicy = { ...before }
+  for (const [key, level] of Object.entries(input.modules)) {
+    if (level === null) delete next[key as ModuleKey]
+    else next[key as ModuleKey] = level
+  }
+  await getDb()
+    .update(organizations)
+    .set({ platformModules: next })
+    .where(sql.eq(organizations.id, org.id))
+  const word = (l: string | undefined) =>
+    l === undefined ? "as its kind" : l === "default" ? "on by default" : l
+  const changed = MODULE_KEYS.filter((k) => before[k] !== next[k]).map(
+    (k) => `${MODULES[k].label} ${word(next[k])}`
+  )
+  if (changed.length)
+    await writePlatformAudit(
+      user,
+      "platform.org_modules",
+      `${org.name}: ${changed.join(", ")}`,
+      { org: org.id }
+    )
+  return orgFeatures(user, orgId)
 }

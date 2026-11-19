@@ -1,10 +1,9 @@
 import { getDb, orgMembers, organizations, sql, type User } from "@workspace/db"
-import { enabledModules } from "@workspace/judge"
 
 import { loansOf } from "@/features/books/server"
 import { stayOf } from "@/features/hostel/server"
 import { rideOf } from "@/features/transport/server"
-import { kindPolicies, modulesOf } from "@/features/orgs/kinds"
+import { kindPolicies, modulesOf, orgModules } from "@/features/orgs/kinds"
 
 /*
  * A person's life at school beyond their classes: library books now, and their bus route
@@ -46,6 +45,7 @@ export async function myCampus(user: User) {
       name: organizations.name,
       type: organizations.type,
       modules: organizations.modules,
+      platformModules: organizations.platformModules,
     })
     .from(orgMembers)
     .innerJoin(organizations, eq(orgMembers.orgId, organizations.id))
@@ -59,7 +59,7 @@ export async function myCampus(user: User) {
     .orderBy(asc(organizations.name))
   const policies = await kindPolicies()
   const withModules = orgs.filter((o) => {
-    const on = enabledModules(o.type, o.modules, policies[o.type])
+    const on = orgModules(o, policies)
     return CAMPUS_MODULES.some((m) => on.has(m))
   })
   return Promise.all(

@@ -19,7 +19,6 @@ import {
   ancestry,
   audienceGroups,
   type Audience,
-  enabledModules,
   ORG_VIEW_PERMISSIONS,
   grantsPermission,
   type ModuleKey,
@@ -36,7 +35,7 @@ import { requestInfo } from "@/lib/api/request-context"
 import { writeEntry } from "@/features/audit/server"
 import { orgReach } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
-import { kindPolicies } from "./kinds"
+import { kindPolicies, orgModules } from "./kinds"
 
 import { rolePermissions } from "./access"
 
@@ -135,7 +134,7 @@ export async function context(slug: string, user: User): Promise<OrgContext> {
         : []),
     ],
     groups,
-    modules: enabledModules(org.type, org.modules, policies[org.type]),
+    modules: orgModules(org, policies),
   }
   // An API key: its maker's roles here, narrowed to the key's permissions; no platform reach.
   const key = requestInfo().apiKey

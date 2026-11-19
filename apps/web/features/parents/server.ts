@@ -10,7 +10,6 @@ import {
   users,
   type User,
 } from "@workspace/db"
-import { enabledModules } from "@workspace/judge"
 import { z } from "zod"
 
 import { listAssignments } from "@/features/assignments/server"
@@ -30,7 +29,7 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 import { classTimetable } from "@/features/timetable/server"
-import { kindPolicies } from "@/features/orgs/kinds"
+import { kindPolicies, orgModules } from "@/features/orgs/kinds"
 import { ApiError, notFound } from "@/lib/api/route"
 import { likeTerm, paged } from "@/lib/api/paging"
 
@@ -479,9 +478,7 @@ export async function myChildren(user: User) {
   const policies = await kindPolicies()
   return rows
     .filter((r) =>
-      enabledModules(r.org.type, r.org.modules, policies[r.org.type]).has(
-        "parents"
-      )
+      orgModules(r.org, policies).has("parents")
     )
     .map((r) => ({
       id: r.studentId,

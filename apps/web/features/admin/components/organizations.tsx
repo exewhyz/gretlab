@@ -21,6 +21,9 @@ import { formatDate } from "@/lib/format"
 import { KindPicker } from "@/features/orgs/components/kind-picker"
 
 import { Card, Loading, PageTitle, Pager, Table } from "./shell"
+import { OrgFeaturesDialog } from "./org-features"
+import { useViewer } from "@/features/account/use-viewer"
+import { grantsPlatformPermission } from "@workspace/judge"
 import { orgPages } from "@/lib/paths"
 
 interface OrgRow {
@@ -52,6 +55,12 @@ export function AdminOrganizations() {
   } | null>(null)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  const [featuresFor, setFeaturesFor] = useState<string | null>(null)
+  const { data: viewer } = useViewer()
+  const held = viewer?.user?.platform.permissions ?? []
+  const decidesModules =
+    grantsPlatformPermission(held, "platform.orgs.manage") ||
+    grantsPlatformPermission(held, "platform.kinds.manage")
   // The server is asked once typing pauses.
   const asked = useDebounced(search.trim())
   const {
@@ -201,7 +210,16 @@ export function AdminOrganizations() {
               <td className="tabular-nums">{org.members}</td>
               <td className="capitalize">{org.joinPolicy}</td>
               <td>{formatDate(org.createdAt)}</td>
-              <td className="text-right">
+              <td className="text-right whitespace-nowrap">
+                {decidesModules && (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => setFeaturesFor(org.id)}
+                  >
+                    Modules
+                  </Button>
+                )}
                 {org.active ? (
                   <ConfirmButton
                     size="xs"
@@ -244,6 +262,13 @@ export function AdminOrganizations() {
         <p className="mt-3 text-body-sm text-body">
           {search ? "No organization matches." : "No organizations yet."}
         </p>
+      )}
+      {featuresFor && (
+        <OrgFeaturesDialog
+          orgId={featuresFor}
+          open
+          onOpenChange={(open) => !open && setFeaturesFor(null)}
+        />
       )}
     </>
   )
