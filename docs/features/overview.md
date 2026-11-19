@@ -14,6 +14,8 @@ The `coding` module: on for every kind from the start, and switchable off.
   problems, the daily challenge, lists, study plans, profiles and the leaderboard.
 - [Run and Submit](/features/coding/run-and-submit/): trying code on the samples, and grading it on
   every test.
+- [Where code runs](/features/coding/where-code-runs/): the server or the student's browser, set by the
+  platform, the organization and each assignment or contest, with provisional grading.
 - [Assignments and the gradebook](/features/coding/assignments/): problem sets with due times, late
   penalties, rubrics, line comments, extensions and a gradebook that's always computed.
 - [Quizzes and the question bank](/features/coding/quizzes/): choice, short-answer and written questions
@@ -50,6 +52,8 @@ The `coding` module: on for every kind from the start, and switchable off.
 
 - [Members, groups and roles](/features/people/members-groups-roles/): joining, invite links, groups in
   the organization's own levels, and roles given across it or within a group.
+- [Profiles](/features/people/profiles/): your account's profile, and who someone is in each
+  organization: roles, classes, a student's record and parents, staff details.
 - [Student records](/features/people/student-records/): academic years, admission numbers, enrolments,
   import and promotion.
 - [Admissions](/features/people/admissions/) and [Parent accounts](/features/people/parent-accounts/).

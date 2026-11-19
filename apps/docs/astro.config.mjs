@@ -90,6 +90,7 @@ export default defineConfig({
               items: [
                 { label: "Problems and practice", slug: "features/coding/problems-and-practice" },
                 { label: "Run and Submit", slug: "features/coding/run-and-submit" },
+                { label: "Where code runs", slug: "features/coding/where-code-runs" },
                 { label: "Assignments and the gradebook", slug: "features/coding/assignments" },
                 { label: "Quizzes and the question bank", slug: "features/coding/quizzes" },
                 { label: "Lab exams", slug: "features/coding/lab-exams" },
@@ -128,6 +129,7 @@ export default defineConfig({
               collapsed: true,
               items: [
                 { label: "Members, groups and roles", slug: "features/people/members-groups-roles" },
+                { label: "Profiles", slug: "features/people/profiles" },
                 { label: "Student records", slug: "features/people/student-records" },
                 { label: "Admissions", slug: "features/people/admissions" },
                 { label: "Parent accounts", slug: "features/people/parent-accounts" },

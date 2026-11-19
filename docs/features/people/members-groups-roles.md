@@ -53,20 +53,8 @@ A role is a bundle of [permissions](/reference/permissions/), given **across the
 
 ## Profiles
 
-Everyone in an organization has a profile there (`/orgs/<slug>/profile/<id>`; your own from the
-sidebar's footer, anyone's from Members). It shows:
-
-- their roles and where they hold them, and the groups they sit in;
-- for a student: their record (admission number, class, roll, year, date of birth, phone, address)
-  and their parents;
-- for a parent: their children;
-- for staff: what they teach, the classes they're class teacher of, and their staff details:
-  designation, department, staff number, start date and a work phone.
-
-Staff fill in their own details from **Edit my details here**; the staff number is set by staff who
-manage members. The person, their linked parents, and staff who may see members (for the person's
-groups) see the profile; anyone else gets "not found". What a person says about themselves (a
-headline, about, city, links, phone) is on their account, under **Account › Profile**.
+Everyone in an organization has a profile there: their roles, classes and the people linked to them.
+Open anyone's from **Members**. See [Profiles](/features/people/profiles/).
 
 ## Step by step
 
@@ -92,4 +80,5 @@ headline, about, city, links, phone) is on their account, under **Account › Pr
 ## Related
 
 - [Roles](/reference/roles/) and [Permissions](/reference/permissions/)
+- [Profiles](/features/people/profiles/)
 - [Student records](/features/people/student-records/)

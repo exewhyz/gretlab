@@ -69,7 +69,7 @@ export const PAGES = {
     path: "/problems",
     title: "Coding problems",
     description:
-      "Free programming practice problems by topic and difficulty, in Python, JavaScript, C, C++ and Java, with hints, editorials and a judge that runs your code in the browser.",
+      "Free coding practice problems by topic and difficulty in Python, JavaScript, C, C++ and Java, with hints, editorials and a judge that checks every test.",
   },
   topics: {
     path: "/problems/topics",
@@ -87,7 +87,7 @@ export const PAGES = {
     path: "/playground",
     title: "Code playground",
     description:
-      "Write and run Python, JavaScript, C, C++ or Java in your browser, with multiple files and a real compiler, no setup needed.",
+      "Write and run code with multiple files and no setup: Python and JavaScript right in your browser, and C, C++ and Java on a real compiler once you sign in.",
   },
   privacy: {
     path: "/privacy",

@@ -47,6 +47,12 @@ One thing a role allows, such as "Take attendance". Some have finer actions unde
 GretLab itself, run by platform staff: the library, the platform's own contests and assignments, and
 the organizations. "Personal" content is the platform's.
 
+## Provisional
+
+A verdict graded in the student's browser while the server couldn't run code: the browser ran the
+tests' inputs and the server checked the outputs. The server judges the same code again once it can,
+and that verdict replaces it. See [Where code runs](/features/coding/where-code-runs/).
+
 ## Role
 
 A bundle of permissions, given across an organization or within a group. See [Roles](/reference/roles/).

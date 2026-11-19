@@ -1,14 +1,13 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 
+import { privateMetadata } from "@/lib/seo/metadata"
+
 import { PageHeader } from "@/components/page-header"
 import { readSession } from "@/features/auth/current-user"
 import { AccountPage } from "@/features/profile/components/account-page"
 
-export const metadata: Metadata = {
-  title: "Security",
-  robots: { index: false },
-}
+export const metadata: Metadata = privateMetadata("Security")
 
 export default async function Page() {
   const session = await readSession()

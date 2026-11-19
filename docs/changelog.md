@@ -24,6 +24,7 @@ aren't listed.
 - **Each assignment and contest** chooses where its code runs: on the server, or in the students'
   browsers (Python and JavaScript only, with a warning in the form). It can also set a lower
   **submission limit per minute** than the platform's, never a higher one.
+- How the three levels fit together: [Where code runs](/features/coding/where-code-runs/).
 
 ### Profiles
 
@@ -34,11 +35,13 @@ aren't listed.
   parents, a parent's children, a teacher's subjects and classes. Staff profiles have a
   designation, department, staff number and start date, which staff can fill in themselves
   (their staff number is set by the office). Each part shows only to people allowed to see it.
+  See [Profiles](/features/people/profiles/).
 
 ### For the platform
 
 - **Modules for one organization** (Dashboard › Organizations › Modules): set any module off,
-  optional or on from the start for that organization alone, over what its kind allows.
+  optional or on from the start for that organization alone, over what its kind allows. See
+  [Platform staff and organizations](/features/platform/platform-staff/).
 
 ### Around the site
 
@@ -48,6 +51,9 @@ aren't listed.
   profile, Account, and the docs.
 - The page you're on stays in view in a long sidebar, problem list or row of tabs.
 - Organization pages load a little faster: the sidebar's data is fetched in one go.
+- The privacy policy says what profiles keep and who sees them.
+- Search results describe the problem library and the playground more accurately: Python and
+  JavaScript run in your browser, and other languages once you sign in.
 
 ## 17 November 2026
 

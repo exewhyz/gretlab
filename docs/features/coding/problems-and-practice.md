@@ -84,7 +84,7 @@ To bring many in at once, use **Import** with the [problem file format](/problem
 
 - With **server execution off** in platform settings, signed-in students run Python and JavaScript in
   the browser; they're never told to sign in. Submit is paused unless **Grade in the browser** is on,
-  which grades practice provisionally (see [Run and Submit](/features/coding/run-and-submit/#where-code-runs)).
+  which grades practice provisionally (see [Where code runs](/features/coding/where-code-runs/)).
 - A problem used in work can't be put in other work unless its owner allows it.
 - Lists of other people's private problems or lists answer "not found", not "not allowed".
 - Changing a problem's address in the editor is refused if another problem has or had it ("Choose
