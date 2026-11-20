@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   transpilePackages: ["@workspace/ui", "@workspace/db", "@workspace/judge"],
   poweredByHeader: false,
+  // Upgrade reminders from `next dev` and `next build` only for security releases.
+  experimental: { agentUpgrade: "security" },
   async headers() {
     return [
       {
