@@ -2,6 +2,8 @@ import { getDb, problemSlugHistory, problems, sql } from "@workspace/db"
 
 import { ApiError } from "@/lib/api/errors"
 
+import { RESERVED_SLUGS } from "./schemas"
+
 const { and, eq, inArray, ne, or } = sql
 
 /*
@@ -23,9 +25,18 @@ export const slugIs = (slug: string) =>
  * proxy.ts, which answers old addresses with a real 308 before any page renders. Former and
  * current slugs are kept in memory and reloaded every 5 minutes; a slug that's neither (a
  * problem renamed moments ago, or an address that doesn't exist) is looked up on its own,
- * one indexed query. The proxy runs apart from the API, so saves can't clear this directly.
+ * one indexed query, and remembered as unknown until the next reload, so a page like
+ * /problems/topics never waits on the database. Reserved addresses are skipped outright.
+ * The proxy runs apart from the API, so saves can't clear this directly.
  */
-let slugMaps: { former: Map<string, string>; current: Set<string>; at: number } | null = null
+let slugMaps: {
+  former: Map<string, string>
+  current: Set<string>
+  unknown: Set<string>
+  at: number
+} | null = null
+/** Unknown slugs remembered between reloads, at most this many (bots try random ones). */
+const MAX_UNKNOWN = 5000
 let loading: Promise<void> | null = null
 
 async function loadSlugMaps() {
@@ -40,20 +51,23 @@ async function loadSlugMaps() {
   slugMaps = {
     former: new Map(former.map((r) => [r.from, r.to])),
     current: new Set(current.map((r) => r.slug)),
+    unknown: new Set(),
     at: Date.now(),
   }
 }
 
 export async function formerSlugTarget(slug: string): Promise<string | undefined> {
+  if (RESERVED_SLUGS.has(slug)) return undefined
   if (!slugMaps || Date.now() - slugMaps.at > 5 * 60 * 1000) {
     loading ??= loadSlugMaps().finally(() => (loading = null))
     await loading
   }
   const maps = slugMaps!
   const known = maps.former.get(slug)
-  if (known !== undefined || maps.current.has(slug)) return known
+  if (known !== undefined || maps.current.has(slug) || maps.unknown.has(slug)) return known
   const now = await currentSlug(slug)
   if (now) maps.former.set(slug, now)
+  else if (maps.unknown.size < MAX_UNKNOWN) maps.unknown.add(slug)
   return now ?? undefined
 }
 

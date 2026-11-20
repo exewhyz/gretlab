@@ -3,9 +3,10 @@
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useRef, useState, type CSSProperties, type Ref } from "react"
+import { useEffect, useRef, useState, type CSSProperties, type Ref } from "react"
 
 import { Button, buttonVariants } from "@workspace/ui/components/button"
+import { Skeleton } from "@workspace/ui/components/skeleton"
 import { cn } from "@workspace/ui/lib/utils"
 import {
   NativeSelect,
@@ -71,6 +72,21 @@ export function EditorPane({
 
   const [pasteNote, setPasteNote] = useState(false)
 
+  // The toolbar, notices and file tabs depend on the viewer, the problem and where code runs,
+  // which arrive a moment after the page. Until they're known the pane stays hidden behind a
+  // skeleton, so it appears once at its final size instead of pushing the editor down
+  // in steps. A problem that never loads shows the pane anyway after a few seconds.
+  const known =
+    mode !== "loading" &&
+    (Boolean(workspace) ||
+      (languages.length === 0 && (isPlayground || Boolean(session.detail))))
+  const [waitedEnough, setWaitedEnough] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setWaitedEnough(true), 4000)
+    return () => clearTimeout(timer)
+  }, [])
+  const settled = known || waitedEnough
+
   function dragRows(event: PointerEvent) {
     const box = codeBox.current?.getBoundingClientRect()
     const paneRect = pane.current?.getBoundingClientRect()
@@ -109,9 +125,26 @@ export function EditorPane({
         if (typeof ref === "function") ref(node)
         else if (ref) ref.current = node
       }}
-      className={cn(styles.editor, !outputOpen && styles.outputHidden)}
+      className={cn(
+        styles.editor,
+        !outputOpen && styles.outputHidden,
+        "relative",
+        !settled && "[&>*:not([data-pane-skeleton])]:invisible"
+      )}
       aria-label="Code editor"
+      aria-busy={!settled}
     >
+      {!settled && (
+        <div
+          data-pane-skeleton
+          aria-hidden
+          className="absolute inset-0 z-10 flex flex-col gap-3 p-3"
+        >
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="w-full flex-1" />
+        </div>
+      )}
       <div className={styles.editorHead}>
         {problemHidden && !isPlayground && (
           <Button

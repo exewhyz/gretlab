@@ -6,6 +6,17 @@ description: What's new in GretLab, newest first.
 What changed for the people using GretLab, newest first. Fixes and changes that don't show to anyone
 aren't listed.
 
+## 20 November 2026
+
+### Faster problem pages
+
+- **The editor no longer jumps** while the playground or a problem page loads: the toolbar,
+  notices and file tabs appear once, at their final size.
+- **The problem shows first.** Your code appears at once as plain text, and the full editor
+  starts a moment later (or as soon as you click into the code).
+- **Topic pages** (`/problems/topics`) open faster: they no longer wait on the database before
+  the saved copy is sent.
+
 ## 19 November 2026
 
 ### Where code runs, and Submit without the server
