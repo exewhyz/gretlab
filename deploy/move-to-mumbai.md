@@ -35,7 +35,10 @@ Supabase's **Connect** button shows them. Use each only where it says.
    small database limit. Check the current prices on Supabase's pricing page.
 3. **Create the production project:**
    - Region: **South Asia (Mumbai)**.
-   - Postgres version: the same as Neon's or newer, never older.
+   - Postgres version: 17 (the owner's choice, 21 November 2026), one below Neon's 18. Copying
+     down a version isn't guaranteed in general, but GretLab's schema uses nothing new in 18 (the
+     full regression runs on 17), and copying the local data from 18 into 17 with the commands
+     below matched every table, constraint and index (tested 21 November 2026).
    - A long generated database password, kept in your password manager.
    - If the form offers **Enable Data API**, turn it off. GretLab doesn't use it.
 4. **Lock it down** (Supabase would otherwise let its public REST API reach tables in `public`):
@@ -61,7 +64,7 @@ Supabase's **Connect** button shows them. Use each only where it says.
 The rehearsal proves the copy works and tells you how long it takes. It uses a **second,
 throwaway Supabase project** (the free plan is fine), never the production one.
 
-1. Create the throwaway project in Mumbai, same Postgres version, and lock it down exactly as in
+1. Create the throwaway project in Mumbai, Postgres 17 like production, and lock it down exactly as in
    step 1.4. It will hold real people's data, so treat it like production.
 2. In a terminal, in an empty folder:
    ```bash
