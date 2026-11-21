@@ -61,15 +61,18 @@ Supabase's **Connect** button shows them. Use each only where it says.
 
 ## 2. Rehearse (a day or more before, no downtime)
 
-The rehearsal proves the copy works and tells you how long it takes. It uses a **second,
-throwaway Supabase project** (the free plan is fine), never the production one.
+The rehearsal proves the copy works and tells you how long it takes. It copies into the
+**production** Supabase project itself (the owner's choice, 21 November 2026): nothing points at
+it yet, and the cutover copies over it again (`--clean`), so the rehearsal's copy, and anything
+done to it meanwhile, is replaced.
 
-1. Create the throwaway project in Mumbai, Postgres 17 like production, and lock it down exactly as in
-   step 1.4. It will hold real people's data, so treat it like production.
+1. Check the production project is locked down (step 1.4): in its SQL editor,
+   `select nspacl from pg_namespace where nspname = 'public';` shows no `anon=` or
+   `authenticated=`. It will hold real people's data from now on.
 2. In a terminal, in an empty folder:
    ```bash
    export NEON_URL='<Neon direct address>'
-   export TARGET_URL='<throwaway project, session pooler, port 5432>'
+   export TARGET_URL='<production project, session pooler, port 5432>'
    time docker run --rm -v "$PWD":/work -e NEON_URL postgres:18 \
      pg_dump "$NEON_URL" --format=custom --no-owner --no-acl \
        --schema=public --schema=drizzle --file=/work/gretlab.dump
@@ -93,15 +96,15 @@ throwaway Supabase project** (the free plan is fine), never the production one.
 5. Try the app against it from your Mac. Use another port; never stop your own dev server:
    ```bash
    cd <repo>
-   DATABASE_URL='<throwaway transaction pooler, port 6543>' DATABASE_PREPARE=false \
+   DATABASE_URL='<production transaction pooler, port 6543>' DATABASE_PREPARE=false \
      pnpm --filter web exec next dev -p 3001
    ```
    Open http://localhost:3001, sign in with a password account, open the library, a problem,
    an organization home and the dashboard. Submissions stay queued (no judge points at it);
    that's expected.
 6. Note how long the dump and restore took. That's the length of the cutover's quiet window.
-7. **Clean up:** delete the throwaway project, and delete `gretlab.dump`. It holds everyone's
-   data.
+7. **Clean up:** delete `gretlab.dump`; it holds everyone's data. Keep the copy in Supabase,
+   but point nothing at it until the cutover: it's already out of date.
 
 ## 3. Cut over
 
@@ -131,12 +134,18 @@ is left behind.
    Check it took: open a new SQL editor tab and run
    `show default_transaction_read_only;`. It should say `on`. From now on any save on the live
    site fails with an error, and reading still works.
-3. **Copy**, exactly as in the rehearsal, into the **production** Supabase project (session
-   pooler, port 5432). `pg_dump` only reads, so the freeze doesn't stop it.
+3. **Copy** into the production Supabase project (session pooler, port 5432) as in the
+   rehearsal, with one change: add `--clean --if-exists` to `pg_restore`, so it replaces the
+   rehearsal's copy instead of colliding with it:
+   ```bash
+   pg_restore --dbname="$TARGET_URL" --clean --if-exists --no-owner --no-acl /work/gretlab.dump
+   ```
+   (Tested 21 November 2026: a second restore with these removed rows added after the first and
+   matched every table.) `pg_dump` only reads, so the freeze doesn't stop it.
 4. **Compare** with `deploy/compare-databases.sh`. With Neon frozen, **every table must match**
    (it prints "Every table matches."). If one differs, something got written before the freeze
-   took. Don't go on: check the freeze (step 2), then copy again into a new, empty Supabase
-   project (steps 1.3 and 1.4); the address changes, which doesn't matter yet.
+   took. Don't go on: check the freeze (step 2), take a new dump and restore it again with
+   `--clean --if-exists`.
 5. **Check the grants** (step 2.4) on the production project.
 6. **Point Vercel at it.** Project `web` › Settings:
    - Environment Variables (Production): `DATABASE_URL` = the production **transaction pooler**
