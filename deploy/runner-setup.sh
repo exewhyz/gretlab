@@ -9,8 +9,10 @@
 #   curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh
 #   sudo bash /tmp/runner-setup.sh
 #
-# DATABASE_URL is the DIRECT Postgres address (not a pooler): the runner keeps a LISTEN
-# session open. Optional: RUNNER_CONCURRENCY (default: one per core, at most 8), REPO, BRANCH,
+# DATABASE_URL is the DIRECT Postgres address, or a pooler in SESSION mode (Supabase: the
+# pooler's port 5432, which also works from IPv4-only servers), never transaction pooling
+# (Supabase's port 6543): the runner keeps a LISTEN session open. When switching databases,
+# pass the new address with SEED=0, so the starter problems aren't loaded over real data. Optional: RUNNER_CONCURRENCY (default: one per core, at most 8), REPO, BRANCH,
 # DIR, SEED=0 to skip loading the starter problems.
 #
 # Give this machine nothing else to do. A runner controls Docker, which is root on the

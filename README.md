@@ -63,7 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-
 sudo DATABASE_URL='postgres://user:password@host:port/db' bash runner-setup.sh
 ```
 
-It installs Docker and gVisor, proves a container runs under gVisor, locks the firewall to SSH, builds the language images, creates the database tables (and loads the starter problems), runs the 16 hostile-program tests against the real sandbox, and only then starts the runner. Use the database's direct address, not a pooler. Run it again to update; run it on more servers for more capacity. Keep the server for this alone (see AGENTS.md › Sandbox rules).
+It installs Docker and gVisor, proves a container runs under gVisor, locks the firewall to SSH, builds the language images, creates the database tables (and loads the starter problems), runs the 16 hostile-program tests against the real sandbox, and only then starts the runner. Use the database's direct address, or a pooler in session mode (Supabase's port 5432), never transaction pooling: the runner keeps a `LISTEN` session open. Run it again to update; run it on more servers for more capacity. Keep the server for this alone (see AGENTS.md › Sandbox rules).
 
 ### How the live site runs (Vercel, Neon, EC2)
 

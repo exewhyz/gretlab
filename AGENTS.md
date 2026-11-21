@@ -1002,6 +1002,7 @@ Status is updated as items ship; anything not ticked has not been built.
 - using Google's sign-in strength (amr/auth_time) in two-factor;
 
 **Open follow-ups:**
+- Moving the database to Supabase in Mumbai and the web functions to `bom1` (the owner's decision, November 2026; Neon has no India region and requests from India took ~300 ms to reach Sydney). The owner runs it from `deploy/move-to-mumbai.md`, checking copies with `deploy/compare-databases.sh`. The judge stays on EC2 in Sydney, on Supabase's session pooler (port 5432, for `LISTEN`). The same day: the privacy policy (it names Neon and Australia), README › How the live site runs and the Shipped paragraph below. The wider plan (organizations of 200,000 students, judge pools per organization, Redis, a job queue, Cloudflare R2, monitoring, costs) is in the owner's "GretLab Scaling Plan" report.
 - A flaky check in `e2e/assignments.mjs`: "locked: drafts from before the exam don't come back". It fails now and then and passes when rerun alone; the cause isn't found yet (the clocks of the app and the database agreed).
 - Design: `/impeccable doctor` reports the skill's setup gaps.
 - About 230 hand-written client types remain where screens shape data on purpose; convert others as they're touched.

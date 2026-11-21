@@ -28,8 +28,12 @@ const SLOTS = Number(
 const MEMORY_BUDGET_MB = Number(
   process.env.RUNNER_MEMORY_MB ?? Math.floor(totalmem() / 1024 / 1024) - 1024
 )
-/** The fallback when a wake-up is missed. Notifications make the usual case instant. */
-const POLL_MS = Number(process.env.RUNNER_POLL_MS ?? 1000)
+/**
+ * The fallback when a wake-up is missed. Every path that queues work sends one (pg_notify), and
+ * the listener re-checks after reconnecting, so this rarely matters. Kept long: an idle judge
+ * polling every second kept the database busy (and billed) around the clock.
+ */
+const POLL_MS = Number(process.env.RUNNER_POLL_MS ?? 10_000)
 const HEARTBEAT_MS = Math.max(1000, Math.floor(LEASE_MS / 3))
 const RECOVERY_MS = Math.max(1000, Math.floor(LEASE_MS / 2))
 const HOUSEKEEPING_MS = 60 * 60_000
@@ -72,12 +76,15 @@ function sleepUntilWoken(ms: number) {
   })
 }
 
-// Outside any pooler: LISTEN needs a session of its own, which transaction pooling can't give.
+// LISTEN needs a session of its own: a direct connection or a pooler in session mode (Supabase's
+// port 5432), never transaction pooling.
 const listener = postgres(
   process.env.DATABASE_DIRECT_URL ?? process.env.DATABASE_URL ?? "",
   { max: 1, onnotice: () => {} }
 )
-await listener.listen(QUEUE_CHANNEL, wakeNow)
+// The third callback runs on every (re)connect: notifications sent while the connection was down
+// are lost, so look at the queue straight away instead of waiting for the next poll.
+await listener.listen(QUEUE_CHANNEL, wakeNow, wakeNow)
 
 let stopping = false
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
