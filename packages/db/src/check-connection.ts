@@ -66,6 +66,13 @@ try {
   console.log("All checks passed.")
   process.exit(0)
 } catch (error) {
-  console.error("FAILED:", error instanceof Error ? error.message : error)
+  // Drizzle wraps the driver's error ("Failed query: …"); the reason is in its cause.
+  const cause = error instanceof Error ? (error.cause ?? error) : error
+  const code = (cause as { code?: string } | null)?.code
+  console.error(
+    "FAILED:",
+    cause instanceof Error ? cause.message : cause,
+    code ? `(${code})` : ""
+  )
   process.exit(1)
 }
