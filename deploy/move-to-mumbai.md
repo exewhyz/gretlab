@@ -93,15 +93,17 @@ done to it meanwhile, is replaced.
    select grantee, count(*) from information_schema.role_table_grants
    where table_schema = 'public' and grantee in ('anon', 'authenticated') group by 1;
    ```
-5. Try the app against it from your Mac. Use another port; never stop your own dev server:
+5. Check the database the way the web app will use it: through the **transaction pooler**
+   (port 6543), with the app's own client and settings. It reads, and writes only inside a
+   transaction it rolls back. (A second `next dev` beside your own can't run: Next 16 locks the
+   app's build folder.)
    ```bash
-   cd <repo>
+   cd <repo>/packages/db
    DATABASE_URL='<production transaction pooler, port 6543>' DATABASE_PREPARE=false \
-     pnpm --filter web exec next dev -p 3001
+     pnpm exec tsx src/check-connection.ts
    ```
-   Open http://localhost:3001, sign in with a password account, open the library, a problem,
-   an organization home and the dashboard. Submissions stay queued (no judge points at it);
-   that's expected.
+   It should end with "All checks passed." The pages themselves are checked live after the
+   cutover (section 4), with the way back (section 5) still open.
 6. Note how long the dump and restore took. That's the length of the cutover's quiet window.
 7. **Clean up:** delete `gretlab.dump`; it holds everyone's data. Keep the copy in Supabase,
    but point nothing at it until the cutover: it's already out of date.
