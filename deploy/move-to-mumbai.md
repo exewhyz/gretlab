@@ -23,6 +23,11 @@ Supabase's **Connect** button shows them. Use each only where it says.
 | Session pooler, same host | 5432 | session | The judge (it keeps a `LISTEN` session), migrations, the copy (`pg_dump`/`pg_restore`) |
 | Direct, `db.<project>.supabase.co` | 5432 | none | Not needed. It's IPv6-only unless you buy the IPv4 add-on; the session pooler does the same job over IPv4 |
 
+**Add `?sslmode=require` to the end of every Supabase address you use.** Enforce SSL is on, and
+Supabase's Connect button leaves it out. The `pg_*` tools try SSL by themselves, but the app and the
+judge (postgres.js) don't: without it they're refused with `ESSLREQUIRED` (found in the rehearsal,
+22 November 2026). Neon's addresses already carry it.
+
 ## 1. Before you start
 
 1. **Look at the current database.** In Neon's SQL editor:
@@ -99,7 +104,7 @@ done to it meanwhile, is replaced.
    app's build folder.)
    ```bash
    cd <repo>/packages/db
-   DATABASE_URL='<production transaction pooler, port 6543>' DATABASE_PREPARE=false \
+   DATABASE_URL='<production transaction pooler, port 6543>?sslmode=require' DATABASE_PREPARE=false \
      pnpm exec tsx src/check-connection.ts
    ```
    It should end with "All checks passed." The pages themselves are checked live after the
@@ -151,14 +156,14 @@ is left behind.
 5. **Check the grants** (step 2.4) on the production project.
 6. **Point Vercel at it.** Project `web` › Settings:
    - Environment Variables (Production): `DATABASE_URL` = the production **transaction pooler**
-     (port 6543). Keep `DATABASE_PREPARE=false`.
+     (port 6543), ending `?sslmode=require`. Keep `DATABASE_PREPARE=false`.
    - Functions › Function Region: **Mumbai, India (bom1)**, in place of Sydney.
    - Deployments › the latest production deployment › **Redeploy**. Settings only apply to new
      deployments.
 7. **Point the judge at it** (this also pulls the latest judge code from `main`):
    ```bash
    curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh
-   sudo DATABASE_URL='<production session pooler, port 5432>' SEED=0 bash /tmp/runner-setup.sh
+   sudo DATABASE_URL='<production session pooler, port 5432>?sslmode=require' SEED=0 bash /tmp/runner-setup.sh
    ```
    `SEED=0` matters: without it the script loads the starter problems over real data. The
    script migrates (nothing to do), reruns the sandbox attack tests and starts the judge.
