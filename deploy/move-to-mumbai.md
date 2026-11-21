@@ -53,8 +53,8 @@ Supabase's **Connect** button shows them. Use each only where it says.
      alter default privileges for role postgres in schema public revoke all on functions from anon, authenticated;
      ```
 5. **Tools:** Docker on your Mac. `pg_dump`, `pg_restore` and `psql` come from the
-   `postgres:17` image, so nothing else to install. If Neon runs a version newer than 17, use
-   that image instead (`postgres:18`).
+   `postgres:18` image, so nothing else to install. The image must match Neon's major version
+   (18, checked 21 November 2026): an older `pg_dump` refuses a newer server.
 
 ## 2. Rehearse (a day or more before, no downtime)
 
@@ -67,10 +67,10 @@ throwaway Supabase project** (the free plan is fine), never the production one.
    ```bash
    export NEON_URL='<Neon direct address>'
    export TARGET_URL='<throwaway project, session pooler, port 5432>'
-   time docker run --rm -v "$PWD":/work -e NEON_URL postgres:17 \
+   time docker run --rm -v "$PWD":/work -e NEON_URL postgres:18 \
      pg_dump "$NEON_URL" --format=custom --no-owner --no-acl \
        --schema=public --schema=drizzle --file=/work/gretlab.dump
-   time docker run --rm -v "$PWD":/work -e TARGET_URL postgres:17 \
+   time docker run --rm -v "$PWD":/work -e TARGET_URL postgres:18 \
      pg_restore --dbname="$TARGET_URL" --no-owner --no-acl /work/gretlab.dump
    ```
    **Inside the container, the variables are written as `"$NEON_URL"`; type them exactly

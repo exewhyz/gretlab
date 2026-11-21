@@ -5,7 +5,7 @@
 #
 #   OLD_URL='postgres://…' NEW_URL='postgres://…' bash deploy/compare-databases.sh
 #
-# Needs only Docker: psql comes from the postgres:17 image. The addresses are passed as
+# Needs only Docker: psql comes from the postgres:18 image. The addresses are passed as
 # environment variables, never on a command line, so they don't show in `ps` or shell history
 # beyond the line you type. Exit status 0 when every table matches, 1 otherwise.
 set -euo pipefail
@@ -13,7 +13,7 @@ set -euo pipefail
 : "${OLD_URL:?Set OLD_URL to the database you are copying from}"
 : "${NEW_URL:?Set NEW_URL to the database you are copying to}"
 
-docker run --rm -i -e OLD_URL -e NEW_URL postgres:17 bash -s <<'EOF'
+docker run --rm -i -e OLD_URL -e NEW_URL postgres:18 bash -s <<'EOF'
 set -euo pipefail
 export LC_ALL=C
 
