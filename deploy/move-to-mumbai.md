@@ -103,7 +103,12 @@ throwaway Supabase project** (the free plan is fine), never the production one.
 ## 3. Cut over
 
 Choose a quiet hour (late night, India time), with no exam sitting or contest running or
-starting soon (Dashboard › Assignments and Contests). Tell teachers beforehand.
+starting soon (Dashboard › Assignments and Contests). Tell teachers beforehand: for the few
+minutes of the copy, pages open but nothing saves (no submissions, drafts or sign-ups).
+
+The rehearsal's copy is thrown away. This copy is taken fresh from Neon now, so everything people
+did up to this moment comes across. Freezing Neon first means nothing written during the copy
+is left behind.
 
 1. **Stop the judge**, so nothing is judged twice:
    ```bash
@@ -111,19 +116,32 @@ starting soon (Dashboard › Assignments and Contests). Tell teachers beforehand
    cd /opt/gretlab && sudo docker compose -f docker-compose.runner.yml stop runner
    ```
    Queued submissions stay in the database and are copied with it.
-2. **Copy**, exactly as in the rehearsal, into the **production** Supabase project (session
-   pooler, port 5432).
-3. **Compare** with `deploy/compare-databases.sh`. Any table that differs was written to on
-   Neon during the copy. Look at what it is: a draft or a notification can be left; a
-   submission or a grade change can be copied by hand, or the copy repeated into a fresh project.
-4. **Check the grants** (step 2.4) on the production project.
-5. **Point Vercel at it.** Project `web` › Settings:
+2. **Freeze Neon** (read only), in Neon's SQL editor:
+   ```sql
+   do $$ begin
+     execute format('alter database %I set default_transaction_read_only = on', current_database());
+   end $$;
+   -- Close open connections, so they reconnect read-only:
+   select count(pg_terminate_backend(pid)) from pg_stat_activity
+   where datname = current_database() and pid <> pg_backend_pid();
+   ```
+   Check it took: open a new SQL editor tab and run
+   `show default_transaction_read_only;`. It should say `on`. From now on any save on the live
+   site fails with an error, and reading still works.
+3. **Copy**, exactly as in the rehearsal, into the **production** Supabase project (session
+   pooler, port 5432). `pg_dump` only reads, so the freeze doesn't stop it.
+4. **Compare** with `deploy/compare-databases.sh`. With Neon frozen, **every table must match**
+   (it prints "Every table matches."). If one differs, something got written before the freeze
+   took. Don't go on: check the freeze (step 2), then copy again into a new, empty Supabase
+   project (steps 1.3 and 1.4); the address changes, which doesn't matter yet.
+5. **Check the grants** (step 2.4) on the production project.
+6. **Point Vercel at it.** Project `web` › Settings:
    - Environment Variables (Production): `DATABASE_URL` = the production **transaction pooler**
      (port 6543). Keep `DATABASE_PREPARE=false`.
    - Functions › Function Region: **Mumbai, India (bom1)**, in place of Sydney.
    - Deployments › the latest production deployment › **Redeploy**. Settings only apply to new
      deployments.
-6. **Point the judge at it** (this also pulls the latest judge code from `main`):
+7. **Point the judge at it** (this also pulls the latest judge code from `main`):
    ```bash
    curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh
    sudo DATABASE_URL='<production session pooler, port 5432>' SEED=0 bash /tmp/runner-setup.sh
@@ -149,12 +167,24 @@ back. Open an organization home and the dashboard. Check the judge log shows no 
 
 Within the first hours, going back is quick:
 
-1. Vercel: `DATABASE_URL` back to Neon's pooled address, Function Region back to Sydney, Redeploy.
-2. Judge: `sudo DATABASE_URL='<Neon direct address>' SEED=0 bash /tmp/runner-setup.sh`.
+1. Unfreeze Neon, in its SQL editor (the `begin read write` is needed: the frozen database
+   refuses even this otherwise):
+   ```sql
+   begin read write;
+   do $$ begin
+     execute format('alter database %I reset default_transaction_read_only', current_database());
+   end $$;
+   commit;
+   select count(pg_terminate_backend(pid)) from pg_stat_activity
+   where datname = current_database() and pid <> pg_backend_pid();
+   ```
+2. Vercel: `DATABASE_URL` back to Neon's pooled address, Function Region back to Sydney, Redeploy.
+3. Judge: `sudo DATABASE_URL='<Neon direct address>' SEED=0 bash /tmp/runner-setup.sh`.
 
 Anything written to Supabase after the cutover isn't on Neon. The longer you wait, the more
-that is, so decide early. Leave Neon untouched for a week; with nothing connected, it sleeps
-and costs little.
+that is, so decide early. Leave Neon frozen and untouched for a week: frozen, nothing can write to
+it by mistake (an old deployment, a forgotten script), and with nothing connected it sleeps and
+costs little.
 
 ## 6. Afterwards
 
