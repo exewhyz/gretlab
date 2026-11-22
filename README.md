@@ -73,7 +73,7 @@ Supabase addresses need `?sslmode=require` at the end (its Enforce SSL is on, an
 
 | Part | Where | Notes |
 | --- | --- | --- |
-| Web app (`apps/web`: the whole UI and API) | Vercel, project `web`, Function Region `bom1` (Mumbai) | Deploys itself on every push to `main` |
+| Web app (`apps/web`: the whole UI and API) | Vercel, project `gretlab-web`, Function Region `bom1` (Mumbai) | Deploys itself on every push to `main` |
 | Postgres 17 | Supabase, Mumbai (`ap-south-1`) | Two addresses: the **transaction pooler** (port 6543) for Vercel, the **session pooler** (port 5432) for the judge, migrations and copies. The session pooler takes at most 15 connections; the judge uses 5 |
 | Code judge (`apps/runner`) | AWS EC2 (`c7i-flex.large`, Ubuntu), set up by `deploy/runner-setup.sh` | gVisor sandboxes; firewall allows SSH only; `restart: always`, so it comes back after a reboot |
 
