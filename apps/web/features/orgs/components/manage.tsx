@@ -21,15 +21,17 @@ export function ManageShell({
   slug: string
   children: ReactNode
 }) {
-  const { data, error } = useSummary(slug)
+  // Asked at once, beside the page's own data (not before it); a page that needs it waits for
+  // it itself. A refusal (403, 404) still shows the access page in place of the page.
+  const { error } = useSummary(slug)
   // The school frame (features/home/components/org-shell.tsx) draws the sidebar and header.
   return (
     <OrgShell slug={slug}>
-      {data ? (
+      {error ? (
+        <Loading error={error} />
+      ) : (
         // The shared dashboard editors work for this organization inside here.
         <OwnerProvider orgSlug={slug}>{children}</OwnerProvider>
-      ) : (
-        <Loading error={error} />
       )}
     </OrgShell>
   )

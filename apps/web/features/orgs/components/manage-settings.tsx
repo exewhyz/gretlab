@@ -13,7 +13,7 @@ import {
   RadioGroupItem,
 } from "@workspace/ui/components/radio-group"
 import { Field, FormMessage, TextArea, TextInput } from "@/components/form"
-import { Card, PageTitle } from "@/features/admin/components/shell"
+import { Card, Loading, PageTitle } from "@/features/admin/components/shell"
 import { useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
 
@@ -23,8 +23,8 @@ import { useSummary, type Message, type Summary } from "./manage-shared"
 
 export function ManageSettings({ slug }: { slug: string }) {
   const queryClient = useQueryClient()
-  const { data } = useSummary(slug)
-  if (!data) return null
+  const { data, error } = useSummary(slug)
+  if (!data) return <Loading error={error} />
   return (
     <SettingsForm
       key={JSON.stringify(data.org)}
@@ -291,8 +291,8 @@ function ExecutionCard({
       <div>
         <h2 className="text-title-sm text-ink">Code execution</h2>
         <p className="text-body-sm text-body">
-          Where your assignments, contests and members-only problems run
-          code. You can only narrow what the platform allows.
+          Where your assignments, contests and members-only problems run code.
+          You can only narrow what the platform allows.
         </p>
       </div>
       <label className="flex items-start gap-2 text-body-sm text-ink">

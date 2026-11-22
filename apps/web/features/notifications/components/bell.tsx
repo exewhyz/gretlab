@@ -14,7 +14,7 @@ import {
 } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { useViewer } from "@/features/account/use-viewer"
+import { FRAME_KEYS, useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 import type { ApiResult } from "@/lib/api/types"
@@ -22,7 +22,7 @@ import type { myNotifications } from "@/features/notifications/server"
 
 type Notices = ApiResult<typeof myNotifications>
 
-const KEY = ["me", "notifications"]
+const KEY = FRAME_KEYS.notifications
 
 /** The header's bell: reminders (due soon, contests, attendance) and what happened. */
 export function NotificationBell() {

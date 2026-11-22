@@ -325,32 +325,39 @@ function useSessionState({
   }, [flushSave])
 
   // Opening a problem: take the account's copy of any language that's newer than this
-  // browser's, written on another computer.
+  // browser's, written on another computer. Asked for at once, beside the problem and where
+  // code runs (not after them), and taken once those say which languages there are.
+  const saved = useQuery({
+    queryKey: ["draft", question.id],
+    queryFn: () =>
+      api<{
+        drafts: {
+          language: string
+          files: SourceFile[]
+          entry: string
+          updatedAt: string
+        }[]
+      }>(`/problems/${encodeURIComponent(question.id)}/draft`),
+    enabled: syncsToAccount,
+    // Always the account's latest when a problem opens, and nothing kept after it closes.
+    staleTime: 0,
+    gcTime: 0,
+    // Not reachable (signed out meanwhile, offline): this browser's copy stands.
+    retry: false,
+  })
   const adopted = useRef(false)
   const languageIds = languages.map((l) => l.id).join()
   useEffect(() => {
     if (!syncsToAccount || !detail || adopted.current || !languageIds) return
+    if (!saved.data) return
     adopted.current = true
-    void api<{
-      drafts: {
-        language: string
-        files: SourceFile[]
-        entry: string
-        updatedAt: string
-      }[]
-    }>(`/problems/${encodeURIComponent(question.id)}/draft`)
-      .then(({ drafts }) => {
-        for (const draft of drafts) {
-          const lang = languages.find((l) => l.id === draft.language)
-          if (lang) adoptSavedDraft(question.id, lang, draft)
-        }
-      })
-      .catch(() => {
-        // Not reachable (signed out meanwhile, offline): this browser's copy stands.
-      })
+    for (const draft of saved.data.drafts) {
+      const lang = languages.find((l) => l.id === draft.language)
+      if (lang) adoptSavedDraft(question.id, lang, draft)
+    }
     // languages is rebuilt each render; languageIds says when it really changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [syncsToAccount, detail, languageIds, question.id])
+  }, [syncsToAccount, detail, languageIds, question.id, saved.data])
 
   // The session is keyed by question: a run that finishes after the student has
   // moved on must not touch this question's state.

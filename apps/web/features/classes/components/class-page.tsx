@@ -38,7 +38,7 @@ import {
 } from "./class-grades"
 import { Overview } from "./class-parts"
 import { StudentPeople, TeacherPeople } from "./class-people"
-import { Stream } from "./class-stream"
+import { Stream, streamQuery } from "./class-stream"
 import { Classwork } from "./class-work"
 
 const TABS = [
@@ -76,6 +76,8 @@ export function ClassPage({
   const [tab, setTab] = useState<Tab>(
     TABS.includes(initialTab as Tab) ? (initialTab as Tab) : "stream"
   )
+  // The stream opens first: ask for it now, beside the class, not after it.
+  useQuery({ ...streamQuery(slug, groupId), enabled: tab === "stream" })
   if (!data) return <Loading error={error} />
 
   const teacher = data.viewer.teaches

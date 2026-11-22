@@ -90,6 +90,7 @@ suite admissions http://localhost:3100
 suite signup http://localhost:3100
 suite pdfs http://localhost:3100
 suite member-home http://localhost:3100
+suite trips http://localhost:3100
 suite links http://localhost:3100
 suite org-kinds http://localhost:3100
 suite college http://localhost:3100

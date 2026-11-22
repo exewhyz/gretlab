@@ -14,6 +14,9 @@ aren't listed.
   Mumbai instead of Sydney, so each request no longer crosses to Australia and back.
 - **The privacy policy** says where data is kept now: the website and the database in India,
   submitted code run in Australia.
+- **Fewer waits on each page.** The first page you open, a problem, a class, and the first
+  management page of an organization now ask the server for everything at once instead of one
+  thing after another, so they appear sooner.
 
 ## 20 November 2026
 

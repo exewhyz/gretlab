@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useCallback, useMemo, useSyncExternalStore } from "react"
 
-import { useViewer } from "@/features/account/use-viewer"
+import { FRAME_KEYS, useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
 
 /*
@@ -83,7 +83,7 @@ export function useContentScope() {
   const { data: viewer } = useViewer()
   const signedIn = Boolean(viewer?.user)
   const { data: orgs } = useQuery({
-    queryKey: ["me", "orgs"],
+    queryKey: FRAME_KEYS.orgs,
     queryFn: () => api<ScopeOrg[]>("/me/orgs"),
     enabled: signedIn,
   })

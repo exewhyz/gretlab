@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { createContext, useContext, useEffect, type ReactNode } from "react"
 
-import { useViewer } from "@/features/account/use-viewer"
+import { FRAME_KEYS, useViewer } from "@/features/account/use-viewer"
 import { Brand } from "@/features/lab/components/brand"
 import { api } from "@/lib/api/client"
 
@@ -39,7 +39,7 @@ export const insideExam = (pathname: string, slug: string) =>
 export function ExamLockProvider({ children }: { children: ReactNode }) {
   const { data: viewer } = useViewer()
   const { data } = useQuery({
-    queryKey: ["exam", "active"],
+    queryKey: FRAME_KEYS.exam,
     queryFn: () =>
       api<{ exam: ActiveExam | null }>("/me/exam").then((r) => r.exam),
     enabled: Boolean(viewer?.user),
@@ -64,7 +64,9 @@ export function ExamLockProvider({ children }: { children: ReactNode }) {
       ) : (
         children
       )}
-      {active && <ExamGuard slug={active.slug} fullscreen={active.fullscreen} />}
+      {active && (
+        <ExamGuard slug={active.slug} fullscreen={active.fullscreen} />
+      )}
     </ExamLockContext.Provider>
   )
 }

@@ -84,6 +84,12 @@ export function StreamCard({
   )
 }
 
+/** The class's stream: one query, which the class page also starts beside its own. */
+export const streamQuery = (slug: string, groupId: string) => ({
+  queryKey: ["org", slug, "class", groupId, "stream"],
+  queryFn: () => api<StreamItem[]>(`/orgs/${slug}/classes/${groupId}/stream`),
+})
+
 export function Stream({
   slug,
   groupId,
@@ -94,11 +100,9 @@ export function Stream({
   canPost: boolean
 }) {
   const queryClient = useQueryClient()
-  const key = ["org", slug, "class", groupId, "stream"]
-  const { data, error } = useQuery({
-    queryKey: key,
-    queryFn: () => api<StreamItem[]>(`/orgs/${slug}/classes/${groupId}/stream`),
-  })
+  const stream = streamQuery(slug, groupId)
+  const key = stream.queryKey
+  const { data, error } = useQuery(stream)
   const [text, setText] = useState("")
   const [message, setMessage] = useState<Message>(null)
   const act = useMutation({
