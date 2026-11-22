@@ -29,6 +29,7 @@ docker compose -f $ROOT/docker-compose.yml exec -T postgres psql -U gretlab -d g
 (cd $ROOT/packages/db && pnpm exec tsx src/migrate.ts && pnpm exec tsx src/seed.ts)
 
 pnpm --dir $ROOT --filter runner test:queue || exit 1
+pnpm --dir $ROOT --filter @workspace/db test:lists || exit 1
 
 cd $ROOT/apps/web && pnpm exec next build >/dev/null || exit 1
 NEXTAUTH_URL=http://localhost:3100 NEXTAUTH_SECRET=e2e-only-secret GOOGLE_CLIENT_ID=fake GOOGLE_CLIENT_SECRET=fake ADMIN_EMAILS=admin@example.com PROXY_SECRET=e2e-proxy-secret-0123456789 GITHUB_LOOKUP=off LTI_ALLOW_HTTP=true RESEND_API_KEY=e2e RESEND_API_URL=http://127.0.0.1:3198 MAIL_FROM='Gretlab <no-reply@example.com>' CRON_SECRET=e2e-cron-secret-0123456789 WEBHOOKS_ALLOW_LOCAL=true pnpm exec next start -p 3100 > $LOGS/web.log 2>&1 &

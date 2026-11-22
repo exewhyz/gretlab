@@ -4,7 +4,8 @@ import postgres from "postgres"
 import * as schema from "./schema.ts"
 
 export * from "./schema.ts"
-export * as sql from "drizzle-orm"
+export * as sql from "./sql.ts"
+export { anyOf, noneOf } from "./lists.ts"
 
 function connect() {
   const url = process.env.DATABASE_URL
