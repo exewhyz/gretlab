@@ -14,6 +14,11 @@ aren't listed.
   Mumbai instead of Sydney, so each request no longer crosses to Australia and back.
 - **The privacy policy** says where data is kept now: the website and the database in India,
   submitted code run in Australia.
+- **Large organizations.** A notice to a whole year of thousands of students now reaches every
+  one of them, and their parents, in the bell and by email. Before, past about 13,000 people it
+  quietly reached nobody.
+- **Gradebooks show 100 students at a time,** with search, so an assignment for a whole year of
+  thousands opens quickly; the figures above still count everyone, and the CSV has everyone.
 - **Fewer waits on each page.** The first page you open, a problem, a class, and the first
   management page of an organization now ask the server for everything at once instead of one
   thing after another, so they appear sooner.

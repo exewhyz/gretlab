@@ -6,6 +6,8 @@
  *   - with parent accounts, 5,000 parents each get a copy naming their own child
  *   - an assignment's gradebook for all 20,000: the summary counts everyone, the screen gets a
  *     page at a time and searches on the server, and the CSV still has everyone
+ *   - member pickers ask for a page; the whole list stays complete for integrations
+ *   - the largest imports allowed (5,000 members, 3,000 student records), timed
  *   node e2e/large-org.mjs [base-url]
  */
 import { execFileSync } from "node:child_process"
@@ -160,6 +162,24 @@ await tab.waitForFunction(() => document.querySelectorAll('[data-testid="grade-r
 check("searching asks the server and shows the one student", (await tab.getByTestId("grade-row").count()) === 1 && (await tab.getByTestId("grade-row").first().innerText()).includes("lo-s-4321@example.com"))
 await tab.screenshot({ path: SHOTS + "gradebook.png", fullPage: false }).catch(() => {})
 await browser.close()
+
+// ---------- the biggest imports allowed, into an organization this size
+const members = Array.from({ length: 5000 }, (_, i) => ({ email: `lo-m-${i + 1}@example.com`, name: `Lo Member ${i + 1}`, group: "First year / Section 1", role: "" }))
+started = Date.now()
+const checked = await owner(`${O}/import`, { body: { rows: members, commit: false } })
+const checkMs = Date.now() - started
+started = Date.now()
+const imported = await owner(`${O}/import`, { body: { rows: members, commit: true } })
+const importMs = Date.now() - started
+const inSection = Number(psql(`select count(*) from group_members gm join users u on u.id = gm.user_id where gm.group_id = '${sections[0].id}' and u.email like 'lo-m-%@example.com'`))
+check(`importing 5,000 members: checked in ${checkMs} ms, added in ${importMs} ms`, checked.status === 200 && imported.status === 200 && inSection === 5000 && importMs < 60_000, JSON.stringify({ checked: checked.status, imported: imported.status, inSection, body: JSON.stringify(imported.json).slice(0, 200) }))
+await owner(`${O}/academic-years`, { body: { name: "2026-2027", startsOn: "2026-01-01", endsOn: "2027-12-31", isCurrent: true } })
+const students = Array.from({ length: 3000 }, (_, i) => ({ name: `Lo New ${i + 1}`, email: `lo-n-${i + 1}@example.com`, admissionNo: "", gender: "", birthDate: "", phone: "", address: "", class: "First year / Section 2", rollNo: String(i + 1) }))
+started = Date.now()
+const enrolled = await owner(`${O}/students/import`, { body: { rows: students, commit: true } })
+const enrolMs = Date.now() - started
+const recorded = Number(psql(`select count(*) from student_records r join users u on u.id = r.user_id where r.org_id = '${orgId}' and u.email like 'lo-n-%@example.com'`))
+check(`importing 3,000 student records: added in ${enrolMs} ms`, enrolled.status === 200 && recorded === 3000 && enrolMs < 60_000, JSON.stringify({ status: enrolled.status, recorded, body: JSON.stringify(enrolled.json).slice(0, 300) }))
 
 cleanup()
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED")
