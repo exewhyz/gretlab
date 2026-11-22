@@ -54,7 +54,7 @@ All under `/api/v1/orgs/<slug>`. Each needs the permission in brackets.
 | Method and path | What |
 | --- | --- |
 | `GET /members?page=1&kind=learner` | Members, 100 a page, with counts by kind (staff, learner, parent, other) [See members] |
-| `GET /members` | Everyone at once [See members] |
+| `GET /members` | Everyone at once: in a large organization, page it instead [See members] |
 | `GET /groups` | Classes, sections, teams and how they nest [See members] |
 | `GET /students?page=1` | Student records with admission numbers [See student records] |
 | `GET /attendance/overview?month=2026-11` | Every class's month: days taken, share present, how many below the minimum [See attendance] |
@@ -63,6 +63,7 @@ All under `/api/v1/orgs/<slug>`. Each needs the permission in brackets.
 | `GET /reports?part=figures` | The figures: summary, assignments, teaching [See reports] |
 | `GET /reports?page=1&inactive=true` | Students' activity and assignment results, 100 a page [See reports] |
 | `GET /reports` | The whole report at once [See reports] |
+| `GET /assignments/<id>/gradebook?page=1` | A gradebook, 100 students a page (`?q=` searches names and emails); `summary` counts everyone, and the page is under `paging` because `total` is the assignment's points [See grades] |
 | `GET /assignments/<id>/gradebook?format=csv` | A gradebook as CSV [See grades] |
 
 ### Paged lists
@@ -74,6 +75,8 @@ Lists that can grow long take `?page=` (from 1), with `?q=` to search and `?perP
 ```
 
 A page past the end answers with the last page. Some lists also repeat `items` under an older name (`members`, `links`, `students`). Without `?page`, they answer the whole list. A `page` or `perPage` that isn't a number in range is a 400 `invalid_query`.
+
+In an organization of thousands, read lists a page at a time: the whole list of 20,000 members takes several seconds and a large answer, while a page takes about one. The whole list stays complete (it's never cut short), so a sync that reads it misses nobody.
 
 The same paths change things too (POST, PUT, PATCH, DELETE), with the matching permissions. A key may change whatever its permissions allow.
 

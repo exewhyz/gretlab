@@ -133,6 +133,18 @@ const csv = await fetch(`${BASE}/api/v1${book}?format=csv`, { headers: { cookie:
 const lines = (await csv.text()).trim().split("\n")
 check(`the CSV still has everyone (${lines.length - 1} rows)`, csv.status === 200 && lines.length - 1 === STUDENTS)
 
+// ---------- members: pickers ask for a page, never everyone
+started = Date.now()
+const picker = await owner(`${O}/members?${new URLSearchParams({ q: "", page: "1", perPage: "50" })}`)
+check(`"Add people" gets 50 of everyone (${Date.now() - started} ms)`, picker.json?.members?.length === 50 && picker.json?.total >= STUDENTS, JSON.stringify({ n: picker.json?.members?.length, total: picker.json?.total }))
+const staffOnly = await owner(`${O}/members?${new URLSearchParams({ status: "active", kind: "staff", page: "1", perPage: "200" })}`)
+check("the lead picker gets only staff", staffOnly.json?.total === 1 && staffOnly.json?.members?.[0]?.email === "lo-o@example.com", JSON.stringify({ total: staffOnly.json?.total }))
+started = Date.now()
+const everyone = await owner(`${O}/members`)
+check(`without ?page the list is still complete, for integrations (${everyone.json?.length} in ${Date.now() - started} ms)`,
+  // Parents aren't members: a parent holds only their link to a child.
+  everyone.json?.length === STUDENTS + 1, everyone.json?.length)
+
 // ---------- the gradebook page in a browser
 const browser = await chromium.launch()
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })

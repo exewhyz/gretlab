@@ -13,9 +13,15 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 
-import { Check, Field, FormMessage, SelectInput, TextInput } from "@/components/form"
+import {
+  Check,
+  Field,
+  FormMessage,
+  SelectInput,
+  TextInput,
+} from "@/components/form"
 import { api } from "@/lib/api/client"
-
+import { useDebounced } from "@/lib/use-debounced"
 
 import type { Group, Member, RunInfo } from "./manage-shared"
 
@@ -40,21 +46,32 @@ export function RunDialog({
   const [endsOn, setEndsOn] = useState(group.endsOn ?? "")
   const [leadId, setLeadId] = useState(group.lead?.id ?? "")
   const [open, setOpen] = useState(group.open ?? false)
+  // Staff only, a page at a time from the server: an organization can have tens of thousands
+  // of members. Past one page, a search box narrows it, also on the server.
+  const [search, setSearch] = useState("")
+  const asked = useDebounced(search.trim())
   const members = useQuery({
-    queryKey: ["org", slug, "members", "staff"],
-    queryFn: () => api<Member[]>(`/orgs/${slug}/members?status=active`),
+    queryKey: ["org", slug, "members", "staff", asked],
+    queryFn: () =>
+      api<{ members: Member[]; total: number }>(
+        `/orgs/${slug}/members?${new URLSearchParams({ status: "active", kind: "staff", page: "1", perPage: "200", q: asked })}`
+      ),
     enabled: info.lead,
   })
+  const more = (members.data?.total ?? 0) > 200 || asked !== ""
   // Staff: anyone with a role beyond plain membership.
-  const staff = (members.data ?? []).filter(
-    (m) => m.status === "active" && m.roles.some((r) => r.systemKey !== "member")
+  const staff = (members.data?.members ?? []).filter(
+    (m) =>
+      m.status === "active" && m.roles.some((r) => r.systemKey !== "member")
   )
   const save = useMutation({
     mutationFn: () =>
       api(`/orgs/${slug}/groups/${group.id}/run`, {
         method: "PUT",
         body: {
-          ...(info.dates ? { startsOn: startsOn || null, endsOn: endsOn || null } : {}),
+          ...(info.dates
+            ? { startsOn: startsOn || null, endsOn: endsOn || null }
+            : {}),
           ...(info.lead ? { leadId: leadId || null } : {}),
           ...(info.open ? { open } : {}),
         },
@@ -87,20 +104,41 @@ export function RunDialog({
           {info.dates && (
             <div className="grid grid-cols-2 gap-3">
               <Field label="Starts">
-                <TextInput type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
+                <TextInput
+                  type="date"
+                  value={startsOn}
+                  onChange={(e) => setStartsOn(e.target.value)}
+                />
               </Field>
               <Field label="Ends">
-                <TextInput type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
+                <TextInput
+                  type="date"
+                  value={endsOn}
+                  onChange={(e) => setEndsOn(e.target.value)}
+                />
               </Field>
             </div>
           )}
+          {info.lead && more && (
+            <Field label={`Find a ${lead}`}>
+              <TextInput
+                placeholder="Search staff by name or email"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </Field>
+          )}
           {info.lead && (
             <Field label={info.leadTerm}>
-              <SelectInput value={leadId} onChange={(e) => setLeadId(e.target.value)}>
+              <SelectInput
+                value={leadId}
+                onChange={(e) => setLeadId(e.target.value)}
+              >
                 <option value="">No {lead}</option>
-                {group.lead && !staff.some((m) => m.userId === group.lead!.id) && (
-                  <option value={group.lead.id}>{group.lead.name}</option>
-                )}
+                {group.lead &&
+                  !staff.some((m) => m.userId === group.lead!.id) && (
+                    <option value={group.lead.id}>{group.lead.name}</option>
+                  )}
                 {staff.map((m) => (
                   <option key={m.userId} value={m.userId}>
                     {m.name ?? m.email}
@@ -117,7 +155,9 @@ export function RunDialog({
             />
           )}
         </form>
-        {save.error && <FormMessage message={{ text: save.error.message, kind: "err" }} />}
+        {save.error && (
+          <FormMessage message={{ text: save.error.message, kind: "err" }} />
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel

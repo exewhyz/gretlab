@@ -131,8 +131,11 @@ export function GroupPeople({
   })
   const candidates = useQuery({
     queryKey: ["org", slug, "members", addSearch, "", ""],
+    // One page of matches: with no search yet, the first 50, never the whole organization.
     queryFn: () =>
-      api<Member[]>(`/orgs/${slug}/members?q=${encodeURIComponent(addSearch)}`),
+      api<{ members: Member[] }>(
+        `/orgs/${slug}/members?${new URLSearchParams({ q: addSearch, page: "1", perPage: "50" })}`
+      ).then((r) => r.members),
     enabled: Boolean(data?.canManage),
   })
   const act = useMutation({
