@@ -68,7 +68,11 @@ export async function autoscaleJudges(opts: { force?: boolean } = {}) {
         db
           .select({
             id: judgeMachines.id,
-            lastBusyAt: runners.lastBusyAt,
+            // By the database's clock, like the stamp itself.
+            idleSeconds:
+              sql.sql<number>`extract(epoch from now() - ${runners.lastBusyAt})`.mapWith(
+                Number
+              ),
             busy: runners.busy,
           })
           .from(judgeMachines)
@@ -122,7 +126,7 @@ export async function autoscaleJudges(opts: { force?: boolean } = {}) {
         .filter((j) => j.busy === 0)
         .map((j) => ({
           id: j.id,
-          idleMinutes: (Date.now() - j.lastBusyAt.getTime()) / 60_000,
+          idleMinutes: j.idleSeconds / 60,
         })),
     })
     if (decision.action === "start") {

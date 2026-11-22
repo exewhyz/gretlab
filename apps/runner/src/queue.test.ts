@@ -286,11 +286,16 @@ const online = (id: string, poolOrgId: string | null, ago = 0) =>
       host: id,
       slots: 4,
       poolOrgId,
-      lastSeenAt: new Date(Date.now() - ago),
+      // By the database's clock, which the queue judges "online" by (the Docker VM's clock can
+      // drift minutes from this machine's).
+      lastSeenAt: sql.sql`now() - make_interval(secs => ${ago / 1000})`,
     })
     .onConflictDoUpdate({
       target: runners.id,
-      set: { poolOrgId, lastSeenAt: new Date(Date.now() - ago) },
+      set: {
+        poolOrgId,
+        lastSeenAt: sql.sql`now() - make_interval(secs => ${ago / 1000})`,
+      },
     })
 const earlier = (ms: number) => new Date(Date.now() - ms)
 
@@ -418,8 +423,11 @@ test("a heartbeat with work marks the judge busy now; one without leaves when it
     .select()
     .from(runners)
     .where(sql.eq(runners.id, "b-judge"))
+  const [{ dbNow } = { dbNow: new Date(0) }] = await db.execute<{
+    dbNow: Date
+  }>(sql.sql`select now() as "dbNow"`)
   assert.ok(
-    busy!.lastBusyAt.getTime() > Date.now() - 5_000,
-    "a busy heartbeat moves it to now"
+    busy!.lastBusyAt.getTime() > new Date(dbNow).getTime() - 5_000,
+    "a busy heartbeat moves it to now, by the database's clock"
   )
 })

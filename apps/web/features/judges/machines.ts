@@ -1,11 +1,4 @@
-import {
-  DescribeInstancesCommand,
-  DescribeLaunchTemplatesCommand,
-  EC2Client,
-  RunInstancesCommand,
-  TerminateInstancesCommand,
-  type RunInstancesCommandInput,
-} from "@aws-sdk/client-ec2"
+import * as EC2 from "@aws-sdk/client-ec2"
 import { DescribeParametersCommand, SSMClient } from "@aws-sdk/client-ssm"
 import {
   DecodeAuthorizationMessageCommand,
@@ -62,12 +55,62 @@ export interface Machines {
 
 export const REGION = "ap-southeast-2"
 
+/*
+ * The EC2 SDK, as GretLab uses it. Its own types describe all of EC2 (19 MB of them), and
+ * relating GretLab's objects to them made every typecheck of the web app take 320 s instead of
+ * 7 s (measured 22 November 2026). So the real SDK runs, imported normally, but TypeScript sees
+ * only this: the four commands used, with what's read from their answers.
+ */
+type Ec2Command = { readonly input: unknown }
+interface Ec2Sdk {
+  EC2Client: new (config: { region: string; credentials: unknown }) => {
+    send(command: Ec2Command): Promise<unknown>
+  }
+  RunInstancesCommand: new (
+    input: StartRequest & { DryRun?: boolean }
+  ) => Ec2Command
+  TerminateInstancesCommand: new (input: {
+    InstanceIds: string[]
+  }) => Ec2Command
+  DescribeInstancesCommand: new (input: { InstanceIds: string[] }) => Ec2Command
+  DescribeLaunchTemplatesCommand: new (input: {
+    LaunchTemplateNames: string[]
+  }) => Ec2Command
+}
+const ec2Sdk = EC2 as unknown as Ec2Sdk
+type Ec2Client = InstanceType<Ec2Sdk["EC2Client"]>
+
+/** The parts of EC2's answers that are read. */
+interface RunInstancesOutput {
+  Instances?: { InstanceId?: string }[]
+}
+interface DescribeInstancesOutput {
+  Reservations?: {
+    Instances?: { InstanceId?: string; State?: { Name?: string } }[]
+  }[]
+}
+interface DescribeLaunchTemplatesOutput {
+  LaunchTemplates?: { LatestVersionNumber?: number }[]
+}
+
+interface StartRequest {
+  LaunchTemplate: { LaunchTemplateName: string; Version: string }
+  InstanceType: string
+  MinCount: number
+  MaxCount: number
+  ClientToken: string
+  TagSpecifications: {
+    ResourceType: "instance" | "volume"
+    Tags: { Key: string; Value: string }[]
+  }[]
+}
+
 /** What Start sends AWS, so the setup check's dry run tries exactly the same thing. */
 function startRequest(input: {
   size: string
   pool: string | null
   rowId: string
-}): RunInstancesCommandInput {
+}): StartRequest {
   const tags = [
     { Key: "gretlab:judge", Value: "true" },
     {
@@ -79,7 +122,7 @@ function startRequest(input: {
   ]
   return {
     LaunchTemplate: { LaunchTemplateName: "gretlab-judge", Version: "$Latest" },
-    InstanceType: input.size as never,
+    InstanceType: input.size,
     MinCount: 1,
     MaxCount: 1,
     // A retried request starts no second machine.
@@ -98,14 +141,14 @@ const messageOf = (error: unknown) =>
   error instanceof Error ? error.message : String(error)
 
 class AwsMachines implements Machines {
-  private ec2: EC2Client
+  private ec2: Ec2Client
   private ssm: SSMClient
   private sts: STSClient
   private credentials: ReturnType<typeof awsCredentialsProvider>
   constructor(private roleArn: string) {
     this.credentials = awsCredentialsProvider({ roleArn })
     const config = { region: REGION, credentials: this.credentials }
-    this.ec2 = new EC2Client(config)
+    this.ec2 = new ec2Sdk.EC2Client(config)
     this.ssm = new SSMClient(config)
     this.sts = new STSClient(config)
   }
@@ -137,9 +180,11 @@ class AwsMachines implements Machines {
   }
 
   async start(input: { size: string; pool: string | null; rowId: string }) {
-    let out
+    let out: RunInstancesOutput
     try {
-      out = await this.ec2.send(new RunInstancesCommand(startRequest(input)))
+      out = (await this.ec2.send(
+        new ec2Sdk.RunInstancesCommand(startRequest(input))
+      )) as RunInstancesOutput
     } catch (error) {
       throw new Error(await this.explain(error))
     }
@@ -150,16 +195,16 @@ class AwsMachines implements Machines {
 
   async end(instanceId: string) {
     await this.ec2.send(
-      new TerminateInstancesCommand({ InstanceIds: [instanceId] })
+      new ec2Sdk.TerminateInstancesCommand({ InstanceIds: [instanceId] })
     )
   }
 
   async states(instanceIds: string[]) {
     const states = new Map<string, MachineState>()
     if (instanceIds.length === 0) return states
-    const out = await this.ec2.send(
-      new DescribeInstancesCommand({ InstanceIds: instanceIds })
-    )
+    const out = (await this.ec2.send(
+      new ec2Sdk.DescribeInstancesCommand({ InstanceIds: instanceIds })
+    )) as DescribeInstancesOutput
     for (const reservation of out.Reservations ?? []) {
       for (const instance of reservation.Instances ?? []) {
         if (instance.InstanceId && instance.State?.Name) {
@@ -188,11 +233,11 @@ class AwsMachines implements Machines {
       return results
     }
     try {
-      const out = await this.ec2.send(
-        new DescribeLaunchTemplatesCommand({
+      const out = (await this.ec2.send(
+        new ec2Sdk.DescribeLaunchTemplatesCommand({
           LaunchTemplateNames: ["gretlab-judge"],
         })
-      )
+      )) as DescribeLaunchTemplatesOutput
       const template = out.LaunchTemplates?.[0]
       results.push({
         name: "The launch template",
@@ -210,7 +255,7 @@ class AwsMachines implements Machines {
     }
     try {
       await this.ec2.send(
-        new RunInstancesCommand({
+        new ec2Sdk.RunInstancesCommand({
           ...startRequest({ size, pool: null, rowId: crypto.randomUUID() }),
           DryRun: true,
         })

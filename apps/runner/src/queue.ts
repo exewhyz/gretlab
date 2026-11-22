@@ -103,7 +103,9 @@ export async function heartbeat(
         )
       )
   }
-  const now = new Date()
+  // The database's clock, not this machine's: "online" and "idle" are judged against now() in
+  // the database, and a judge whose clock drifts must not look online, or offline, by mistake.
+  const now = sql.sql`now()`
   const values = {
     ...runner,
     busy: jobIds.length,
