@@ -47,7 +47,8 @@ const anon = async (path, body) => {
   return { status: res.status }
 }
 const last = (to) => {
-  const [subject, html, text] = psql(`select subject || '␞' || coalesce(html,'') || '␞' || body from email_outbox where to_address='${to}' order by created_at desc limit 1`).split("␞")
+  // As the sender gets it: an email to many people keeps its words once (email_contents).
+  const [subject, html, text] = psql(`select coalesce(c.subject, o.subject) || '␞' || coalesce(case when c.id is null then o.html else c.html end, '') || '␞' || coalesce(c.body, o.body) from email_outbox o left join email_contents c on c.id = o.content_id where o.to_address='${to}' order by o.created_at desc limit 1`).split("␞")
   return { subject, html: html ?? "", text: text ?? "" }
 }
 
