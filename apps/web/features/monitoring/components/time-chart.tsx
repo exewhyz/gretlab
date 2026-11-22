@@ -20,11 +20,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@workspace/ui/components/chart"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@workspace/ui/components/collapsible"
+import { Button } from "@workspace/ui/components/button"
+
+import { DetailSheet } from "@/components/detail-sheet"
+import { Stats, Table } from "@/features/admin/components/shell"
 
 /*
  * One chart of one signal over time, the same way everywhere on Dashboard › Monitoring
@@ -246,18 +245,33 @@ export function TimeChart({
           )}
         </ChartContainer>
       </div>
-      <TableView data={data} series={series} format={format} long={long} />
+      <TableView
+        title={title}
+        hint={hint}
+        data={data}
+        series={series}
+        format={format}
+        long={long}
+      />
     </section>
   )
 }
 
-/** The same numbers as a table: only the times that have any, newest first. */
+/**
+ * The same numbers as a table, in a side sheet (DESIGN.md: what's behind an item opens in a
+ * sheet, never pushed into the page): each line's peak, when, and average, then every time
+ * with something in it, newest first, in the shared Table.
+ */
 function TableView({
+  title,
+  hint,
   data,
   series,
   format,
   long,
 }: {
+  title: string
+  hint: string
   data: Point[]
   series: Series[]
   format: (value: unknown) => string
@@ -267,48 +281,62 @@ function TableView({
   const rows = data
     .filter((p) => series.some((s) => Number(p[s.key] ?? 0) !== 0))
     .reverse()
+  const summary = series.flatMap((s) => {
+    const values = data
+      .map((p) => ({ t: p.t, v: p[s.key] }))
+      .filter((x): x is { t: string; v: number } => typeof x.v === "number")
+    if (values.length === 0) return []
+    const peak = values.reduce((a, b) => (b.v > a.v ? b : a))
+    const average = values.reduce((n, x) => n + x.v, 0) / values.length
+    const name = series.length > 1 ? `${s.label}: ` : ""
+    return [
+      {
+        label: `${name}highest`,
+        value: format(peak.v),
+        hint: timeLabel(peak.t, true),
+      },
+      { label: `${name}average`, value: format(average) },
+    ]
+  })
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="mt-2 text-caption text-muted-foreground underline underline-offset-2 hover:text-ink">
-        {open ? "Hide the table" : "View as table"}
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        {rows.length === 0 ? (
-          <p className="mt-2 text-caption text-muted-foreground">
-            Nothing in this range.
-          </p>
-        ) : (
-          <div className="mt-2 max-h-56 overflow-auto">
-            <table className="w-full text-caption">
-              <thead>
-                <tr className="text-left text-muted-foreground">
-                  <th className="py-1 font-medium">Time</th>
+    <>
+      <Button
+        variant="link"
+        size="sm"
+        className="mt-1 h-auto px-0 text-caption text-muted-foreground"
+        onClick={() => setOpen(true)}
+      >
+        View as table
+      </Button>
+      {open && (
+        <DetailSheet
+          title={title}
+          description={`${hint}. Times with nothing are left out; newest first.`}
+          onClose={() => setOpen(false)}
+          width="40rem"
+          testId="chart-table"
+        >
+          {summary.length > 0 && <Stats items={summary} />}
+          {rows.length === 0 ? (
+            <p className="mt-3 text-body-sm text-body">
+              Nothing in this range.
+            </p>
+          ) : (
+            <Table headers={["Time", ...series.map((s) => s.label)]}>
+              {rows.map((p) => (
+                <tr key={p.t}>
+                  <td className="text-body">{timeLabel(p.t, true)}</td>
                   {series.map((s) => (
-                    <th key={s.key} className="py-1 text-right font-medium">
-                      {s.label}
-                    </th>
+                    <td key={s.key} className="text-ink tabular-nums">
+                      {format(p[s.key])}
+                    </td>
                   ))}
                 </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => (
-                  <tr key={p.t} className="border-t border-hairline">
-                    <td className="py-1 text-body">{timeLabel(p.t, long)}</td>
-                    {series.map((s) => (
-                      <td
-                        key={s.key}
-                        className="py-1 text-right text-ink tabular-nums"
-                      >
-                        {format(p[s.key])}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CollapsibleContent>
-    </Collapsible>
+              ))}
+            </Table>
+          )}
+        </DetailSheet>
+      )}
+    </>
   )
 }

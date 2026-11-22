@@ -23,6 +23,7 @@ import {
   Loading,
   PageTitle,
   PercentBar,
+  Table,
 } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
@@ -281,53 +282,37 @@ export function MonitoringPage() {
               No judge is online: code waits in the queue.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-body-sm">
-                <thead>
-                  <tr className="text-left text-caption text-muted-foreground">
-                    <th className="py-1.5 font-medium">Judge</th>
-                    <th className="py-1.5 font-medium">Serves</th>
-                    <th className="py-1.5 font-medium">Busy</th>
-                    <th className="py-1.5 font-medium">Code</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {h.judges.list.map((j) => (
-                    <tr key={j.host} className="border-t border-hairline">
-                      <td className="py-1.5 text-ink">
-                        {j.host}
-                        <span className="ml-2 text-caption text-muted-foreground">
-                          {j.fromDashboard ? "dashboard" : "by hand"}
-                        </span>
-                      </td>
-                      <td className="py-1.5 text-body">
-                        {j.pool ?? "Everyone"}
-                      </td>
-                      <td className="py-1.5">
-                        <PercentBar
-                          value={
-                            j.slots
-                              ? Math.round((100 * j.busy) / j.slots)
-                              : null
-                          }
-                          low={-1}
-                        />
-                      </td>
-                      <td className="py-1.5">
-                        <code className="text-caption">
-                          {j.version?.slice(0, 7) ?? "unknown"}
-                        </code>
-                        {j.outOfDate && (
-                          <span className="ml-2 text-caption text-destructive">
-                            out of date
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table headers={["Judge", "Serves", "Busy", "Code"]}>
+              {h.judges.list.map((j) => (
+                <tr key={j.host}>
+                  <td className="text-ink">
+                    {j.host}
+                    <span className="ml-2 text-caption text-muted-foreground">
+                      {j.fromDashboard ? "dashboard" : "by hand"}
+                    </span>
+                  </td>
+                  <td className="text-body">{j.pool ?? "Everyone"}</td>
+                  <td>
+                    <PercentBar
+                      value={
+                        j.slots ? Math.round((100 * j.busy) / j.slots) : null
+                      }
+                      low={-1}
+                    />
+                  </td>
+                  <td>
+                    <code className="text-caption">
+                      {j.version?.slice(0, 7) ?? "unknown"}
+                    </code>
+                    {j.outOfDate && (
+                      <span className="ml-2 text-caption text-destructive">
+                        out of date
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </Table>
           )}
         </div>
       </Section>
@@ -362,19 +347,18 @@ export function MonitoringPage() {
             <h3 className="mb-2 text-title-sm text-ink">
               Why email failed in the last day
             </h3>
-            <ul className="grid gap-1.5" data-testid="email-reasons">
-              {h.email.reasons.map((r) => (
-                <li
-                  key={r.reason}
-                  className="flex items-baseline gap-3 text-body-sm"
-                >
-                  <span className="w-10 shrink-0 text-right font-semibold text-ink tabular-nums">
-                    {r.count}×
-                  </span>
-                  <span className="text-body">{r.reason}</span>
-                </li>
-              ))}
-            </ul>
+            <div data-testid="email-reasons">
+              <Table headers={["Reason", "Emails"]}>
+                {h.email.reasons.map((r) => (
+                  <tr key={r.reason}>
+                    <td className="text-body" data-wrap>
+                      {r.reason}
+                    </td>
+                    <td className="text-ink tabular-nums">{r.count}</td>
+                  </tr>
+                ))}
+              </Table>
+            </div>
           </div>
         )}
       </Section>

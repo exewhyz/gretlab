@@ -117,13 +117,20 @@ for (const [width, name] of [[1440, "laptop"], [390, "phone"]]) {
   check(`${name}: the state, the golden signals and the charts are there`, await tab.getByTestId("health-state").isVisible() && (await tab.getByTestId("chart-wait").locator("svg .recharts-line-curve").count()) >= 1 && (await tab.getByTestId("chart-throughput").locator("svg .recharts-area-area").count()) >= 1)
   await tab.getByRole("tab", { name: "6 hours" }).click()
   await tab.waitForTimeout(800)
-  await tab.getByTestId("chart-wait").getByText("View as table").click()
   // Bars are actually drawn (each a path with a size), not just the axes.
   const bars = await tab.getByTestId("chart-email-sent").locator(".recharts-bar-rectangle path").evaluateAll((paths) =>
     paths.map((p) => { const b = p.getBBox(); return [Math.round(b.width * 10) / 10, Math.round(b.height)] })
   )
   check(`${name}: the bar charts draw their bars`, bars.filter(([w, h]) => w > 0 && h > 0).length >= 50, JSON.stringify({ drawn: bars.length, sample: bars.slice(0, 4) }))
-  check(`${name}: a chart's numbers open as a table`, (await tab.getByTestId("chart-wait").locator("table tbody tr").count()) >= 10)
+  // "View as table" opens the chart's numbers in a side sheet: the peak and average, then every time.
+  await tab.getByTestId("chart-wait").getByRole("button", { name: "View as table" }).click()
+  const sheet = tab.getByTestId("chart-table")
+  await sheet.waitFor({ timeout: 10_000 }).catch(() => {})
+  check(`${name}: a chart's numbers open as a table in a sheet`, (await sheet.locator("table tbody tr").count()) >= 10 && (await sheet.getByText(/highest/).count()) >= 1 && (await sheet.getByRole("columnheader", { name: "Slowest (95%)" }).count()) === 1)
+  await tab.screenshot({ path: `${SHOTS}monitoring-table-${name}.png` })
+  await tab.keyboard.press("Escape")
+  await sheet.waitFor({ state: "detached", timeout: 10_000 }).catch(() => {})
+  check(`${name}: the table sheet closes`, (await sheet.count()) === 0)
   check(`${name}: nothing spills sideways on monitoring`, await tab.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
   if (width >= 1024) {
     // The charts mustn't squeeze the menu: it keeps its full 16rem.
