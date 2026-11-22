@@ -33,6 +33,7 @@ import {
   getGradebook,
   gradebookCsv,
   gradebookPage,
+  keptGradebook,
   listAssignmentsForStaff,
   saveAssignment,
   studentAttempts,
@@ -250,7 +251,10 @@ export async function orgGradebook(
     })
     return gradebookCsv(id, ctx.org.id, scope)
   }
-  const whole = await getGradebook(id, ctx.org.id, scope)
+  // The screen pages through a kept copy (unchanged since it was worked out); others, fresh.
+  const whole = view?.page
+    ? await keptGradebook(id, ctx.org.id, scope)
+    : await getGradebook(id, ctx.org.id, scope)
   const book = view?.page
     ? gradebookPage(whole, view)
     : { ...whole, paging: null }

@@ -4,6 +4,7 @@ import {
   getGradebook,
   gradebookCsv,
   gradebookPage,
+  keptGradebook,
 } from "@/features/assignments/server"
 import { readPage } from "@/lib/api/paging"
 
@@ -22,7 +23,9 @@ export const GET = route(
         platformCan(user, "platform.work.manage"),
       ])
       const view = readPage(query)
-      const book = await getGradebook(id, null)
+      const book = view.page
+        ? await keptGradebook(id, null)
+        : await getGradebook(id, null)
       return {
         ...(view.page ? gradebookPage(book, view) : { ...book, paging: null }),
         /** What the page offers them: each button only where its action would be allowed. */

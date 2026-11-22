@@ -22,6 +22,7 @@ aren't listed.
   (john@ at two schools) no longer fails as a whole.
 - **Gradebooks show 100 students at a time,** with search, so an assignment for a whole year of
   thousands opens quickly; the figures above still count everyone, and the CSV has everyone.
+  Moving between pages is instant, and a new mark or submission shows straight away.
 - **Fewer waits on each page.** The first page you open, a problem, a class, and the first
   management page of an organization now ask the server for everything at once instead of one
   thing after another, so they appear sooner.

@@ -58,6 +58,7 @@ import {
 } from "./grading"
 
 const { and, asc, desc, eq, gte, inArray, ne } = sql
+const raw = sql.sql
 
 export interface GradebookRow {
   name: string | null
@@ -218,6 +219,93 @@ export async function colleaguesOf(assignment: Assignment, exceptId?: string) {
         .map((g) => g.userId)
     ),
   ]
+}
+
+/*
+ * The screen's gradebook, kept between page requests. Working out a gradebook grades every
+ * student (2 s at 20,000), and the screen asks for it page by page and every 30 seconds.
+ * A kept copy is used only while a fingerprint of everything it was worked out from is
+ * unchanged: the assignment's own rows (settings, problems, questions, projects,
+ * extensions), its graded submissions, rubric marks, quiz answers and marks, project work,
+ * and who is in the organization. Rows are hashed whole (`hashtext(row::text)`), so a change
+ * to any column counts, whatever the code that made it. Nothing needs clearing by hand, so it
+ * stays right across server instances, each with its own copy. Exams aren't kept (their
+ * sittings change with the clock), and the phase (open, closed) is worked out on every read.
+ */
+const KEPT = new Map<
+  string,
+  { print: string; book: Awaited<ReturnType<typeof getGradebook>>; at: number }
+>()
+const KEEP_MS = 10 * 60_000
+const KEEP_MAX = 20
+
+async function gradebookPrint(id: string, orgId: string | null) {
+  const q = raw
+  // Only the table's name is written into the query (one of the fixed names below); the
+  // assignment's id is always a parameter.
+  const rowsOf = (table: string) =>
+    q`(select count(*)::text || ':' || coalesce(sum(hashtext(t::text)), 0)::text
+      from ${q.raw(table)} t where t.assignment_id = ${id})`
+  const [row] = (await getDb().execute(q`
+    select
+      (select (a.exam is not null)::text || ':' || hashtext(a::text)::text from assignments a where a.id = ${id})
+      || '|' || ${rowsOf("assignment_problems")}
+      || '|' || ${rowsOf("assignment_questions")}
+      || '|' || ${rowsOf("assignment_projects")}
+      || '|' || ${rowsOf("assignment_extensions")}
+      || '|' || ${rowsOf("rubric_marks")}
+      || '|' || ${rowsOf("quiz_responses")}
+      || '|' || (select count(*)::text || ':' || coalesce(sum(hashtext(ps::text)), 0)::text
+          from project_submissions ps join assignment_projects ap on ap.id = ps.project_id
+          where ap.assignment_id = ${id})
+      || '|' || (select count(*)::text || ':' || coalesce(sum(hashtext(
+            s.id::text || s.status::text || coalesce(s.verdict, '') || coalesce(s.score, -1)::text
+            || coalesce(s.max_score, -1)::text || s.created_at::text)), 0)::text
+          from submissions s
+          where s.kind = 'submit' and s.status = 'done'
+            and s.problem_id in (select problem_id from assignment_problems where assignment_id = ${id})
+            and s.created_at >= (select opens_at from assignments where id = ${id}))
+      || '|' || ${
+        orgId
+          ? q`(select count(*)::text || ':' || coalesce(sum(hashtext(m.user_id::text || m.status::text)), 0)::text
+                from org_members m where m.org_id = ${orgId})
+             || '|' || (select count(*)::text || ':' || coalesce(sum(hashtext(gm.user_id::text || gm.group_id::text)), 0)::text
+                from group_members gm join org_groups g on g.id = gm.group_id where g.org_id = ${orgId})`
+          : q`(select count(*)::text from users where role = 'student' and disabled = false)`
+      } as print`)) as unknown as { print: string | null }[]
+  return row?.print ?? null
+}
+
+/** The whole gradebook, from the kept copy when nothing it depends on has changed. */
+export async function keptGradebook(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string> = "all"
+) {
+  const [print, assignment] = await Promise.all([
+    gradebookPrint(id, orgId),
+    getDb()
+      .select()
+      .from(assignments)
+      .where(and(eq(assignments.id, id), ownedBy(orgId)))
+      .then((rows) => rows[0]),
+  ])
+  if (!assignment || !print || assignment.exam)
+    return getGradebook(id, orgId, scope)
+  const key = `${orgId ?? ""}|${id}|${scope === "all" ? "all" : [...scope].sort().join(",")}`
+  const kept = KEPT.get(key)
+  if (kept && kept.print === print && Date.now() - kept.at < KEEP_MS) {
+    // The one part that changes with the clock alone.
+    return {
+      ...kept.book,
+      assignment: { ...kept.book.assignment, phase: phaseOf(assignment) },
+    }
+  }
+  const book = await getGradebook(id, orgId, scope)
+  KEPT.delete(key)
+  KEPT.set(key, { print, book, at: Date.now() })
+  if (KEPT.size > KEEP_MAX) KEPT.delete(KEPT.keys().next().value!)
+  return book
 }
 
 /**

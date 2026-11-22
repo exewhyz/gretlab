@@ -2232,11 +2232,28 @@ export const emailStatus = pgEnum("email_status", [
   "failed",
 ])
 
+/**
+ * An email's words, kept once for every outbox row that sends them: a notice to a whole year
+ * is one row here and one small row per address, not thousands of copies of the same HTML.
+ * Deleted once no outbox row points at it (features/notifications/outbox.ts, tidy).
+ */
+export const emailContents = pgTable("email_contents", {
+  id: id(),
+  subject: text("subject").notNull(),
+  text: text("body").notNull(),
+  html: text("html"),
+  createdAt: createdAt(),
+})
+
 export const emailOutbox = pgTable(
   "email_outbox",
   {
     id: id(),
     to: text("to_address").notNull(),
+    /** Shared words (email_contents); this row's subject and body are then empty. */
+    contentId: uuid("content_id").references(() => emailContents.id, {
+      onDelete: "cascade",
+    }),
     subject: text("subject").notNull(),
     text: text("body").notNull(),
     /** The branded HTML version (features/emails); null for plain-text-only email. */
@@ -2259,6 +2276,7 @@ export const emailOutbox = pgTable(
   (table) => [
     index("email_outbox_due").on(table.status, table.nextAttemptAt),
     index("email_outbox_urgent").on(table.status, table.urgent, table.nextAttemptAt),
+    index("email_outbox_content").on(table.contentId),
   ]
 )
 

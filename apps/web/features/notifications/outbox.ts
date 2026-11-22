@@ -86,7 +86,8 @@ export async function queueEmails(
 
 /**
  * Queues one email to many addresses (a notice to a whole year): a single statement, with the
- * addresses as one array and the email sent to the database once, however many there are.
+ * addresses as one array. The words are kept once (email_contents), and each address gets a
+ * small row pointing at them, so 20,000 addresses don't store 20,000 copies of the HTML.
  */
 export async function queueSameEmail(
   tx: Pick<ReturnType<typeof getDb>, "execute">,
@@ -96,9 +97,14 @@ export async function queueSameEmail(
   const to = addresses.filter((a) => !isUndeliverable(a))
   if (!mailEnabled() || to.length === 0) return
   await tx.execute(sql.sql`
-    insert into email_outbox (to_address, subject, body, html)
-    select address, ${email.subject.slice(0, 300)}, ${email.text.slice(0, 10_000)},
-      ${email.html ? email.html.slice(0, 200_000) : null}
+    with content as (
+      insert into email_contents (subject, body, html)
+      values (${email.subject.slice(0, 300)}, ${email.text.slice(0, 10_000)},
+        ${email.html ? email.html.slice(0, 200_000) : null})
+      returning id
+    )
+    insert into email_outbox (to_address, subject, body, content_id)
+    select address, '', '', (select id from content)
     from unnest(${sql.sql.param(to)}::text[]) as address`)
 }
 
@@ -111,9 +117,13 @@ type Claimed = {
   attempts: number
 } & Record<string, unknown>
 
-/** Takes a batch to send: urgent first, then oldest; only urgent when asked. */
+/**
+ * Takes a batch to send: urgent first, then oldest; only urgent when asked. Shared words
+ * (email_contents) come with each row, so senders see a whole email either way.
+ */
 function claim(limit: number, onlyUrgent = false) {
   return getDb().execute<Claimed>(sql.sql`
+    WITH claimed AS (
     UPDATE email_outbox
     SET status = 'sending', claimed_at = now(), attempts = attempts + 1
     WHERE id IN (
@@ -126,7 +136,14 @@ function claim(limit: number, onlyUrgent = false) {
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
     )
-    RETURNING id, to_address, subject, body, html, attempts
+    RETURNING id, to_address, subject, body, html, attempts, content_id
+    )
+    SELECT claimed.id, claimed.to_address,
+      coalesce(c.subject, claimed.subject) AS subject,
+      coalesce(c.body, claimed.body) AS body,
+      CASE WHEN c.id IS NULL THEN claimed.html ELSE c.html END AS html,
+      claimed.attempts
+    FROM claimed LEFT JOIN email_contents c ON c.id = claimed.content_id
   `)
 }
 
@@ -244,6 +261,15 @@ async function tidy() {
       SELECT id FROM email_outbox
       WHERE (status = 'sent' AND sent_at < now() - interval '7 days')
          OR (status = 'failed' AND created_at < now() - interval '30 days')
+      LIMIT 1000
+    )`)
+  // Shared words no row points at any more (given an hour, so a queue still being written
+  // isn't caught between its two statements).
+  await getDb().execute(sql.sql`
+    DELETE FROM email_contents WHERE id IN (
+      SELECT c.id FROM email_contents c
+      WHERE c.created_at < now() - interval '1 hour'
+        AND NOT EXISTS (SELECT 1 FROM email_outbox o WHERE o.content_id = c.id)
       LIMIT 1000
     )`)
 }

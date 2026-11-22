@@ -12,6 +12,7 @@ export {
   getGradebook,
   gradebookCsv,
   gradebookPage,
+  keptGradebook,
   releaseFeedback,
   removeExtension,
   setExtension,

@@ -100,6 +100,9 @@ const child42 = psql(`select id from users where email = 'lo-s-42@example.com'`)
 check("…naming their own child and linking to them", named.startsWith("Lo Student 42: New notice in First year|") && named.endsWith(`/children/${child42}`), named)
 const parentEmails = Number(psql(`select count(*) from email_outbox where to_address like 'lo-p-%@example.com'`))
 check(`…and by email (${parentEmails} of ${PARENTS})`, parentEmails === PARENTS)
+const shared = psql(`select count(distinct content_id) || '|' || count(*) filter (where content_id is null) from email_outbox where to_address like 'lo-s-%@example.com'`)
+const words = psql(`select subject from email_contents where id = (select content_id from email_outbox where to_address = 'lo-s-1@example.com')`)
+check("…its words stored once, shared by all 20,000 emails", shared === "1|0" && words.includes("New notice in First year"), JSON.stringify({ shared, words }))
 const student = await client("lo-s-7@example.com")
 const mine = (await student("/me/notifications")).json
 check("a student sees the notice in their bell", JSON.stringify(mine ?? "").includes("New notice in First year"), JSON.stringify(mine).slice(0, 300))
@@ -131,6 +134,16 @@ check("the last page ends with the last student", last.json?.rows?.at(-1)?.name 
 const found = await owner(`${book}?page=1&q=${encodeURIComponent("lo-s-4321@")}`)
 check("searching finds one student, on the server", found.json?.paging?.total === 1 && found.json?.rows?.[0]?.email === "lo-s-4321@example.com" && found.json?.rows?.[0]?.earned === 100, JSON.stringify(found.json?.rows?.[0]).slice(0, 200))
 check("a page and the whole gradebook agree on a student", JSON.stringify(found.json?.rows?.[0]) === JSON.stringify(whole.json?.rows?.find((r) => r.email === "lo-s-4321@example.com")))
+// The screen's next page comes from the kept copy; a new graded submission is seen at once.
+started = Date.now()
+const second = await owner(`${book}?page=2`)
+const keptMs = Date.now() - started
+check(`the next page is served from the kept gradebook (${keptMs} ms, ${pageMs} ms worked out)`, second.json?.rows?.length === 100 && keptMs < pageMs, JSON.stringify({ keptMs, pageMs }))
+const late = STUDENTS - 1
+psql(`insert into submissions (user_id, problem_id, kind, language, entry, files, time_limit_ms, memory_limit_mb, status, verdict, passed_tests, total_tests, finished_at)
+  select id, '${problemId}', 'submit', 'python', 'main.py', '[]', 1000, 256, 'done', 'AC', 1, 1, now() from users where email = 'lo-s-${late}@example.com'`)
+const after = await owner(`${book}?page=1&q=${encodeURIComponent(`lo-s-${late}@`)}`)
+check("a new graded submission shows on the next request, not a stale copy", after.json?.rows?.[0]?.earned === 100 && after.json?.summary?.started === DONE + 1, JSON.stringify({ earned: after.json?.rows?.[0]?.earned, started: after.json?.summary?.started }))
 const csv = await fetch(`${BASE}/api/v1${book}?format=csv`, { headers: { cookie: `next-auth.session-token=${await encode({ token: { email: "lo-o@example.com" }, secret: SECRET })}` } })
 const lines = (await csv.text()).trim().split("\n")
 check(`the CSV still has everyone (${lines.length - 1} rows)`, csv.status === 200 && lines.length - 1 === STUDENTS)

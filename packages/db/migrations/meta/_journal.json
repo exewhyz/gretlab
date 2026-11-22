@@ -533,6 +533,13 @@
       "when": 1795107316888,
       "tag": "0075_ambitious_mattie_franklin",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1795340951342,
+      "tag": "0076_clever_supreme_intelligence",
+      "breakpoints": true
     }
   ]
 }
