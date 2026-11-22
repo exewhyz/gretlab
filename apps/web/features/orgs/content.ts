@@ -1,4 +1,11 @@
-import { assignments, getDb, notes, problems, sql, type User } from "@workspace/db"
+import {
+  assignments,
+  getDb,
+  notes,
+  problems,
+  sql,
+  type User,
+} from "@workspace/db"
 import type { Permission } from "@workspace/judge"
 import {
   deleteQuestion,
@@ -25,10 +32,12 @@ import {
   getAssignmentForStaff,
   getGradebook,
   gradebookCsv,
+  gradebookPage,
   listAssignmentsForStaff,
   saveAssignment,
   studentAttempts,
 } from "@/features/assignments/server"
+import type { PageQuery } from "@/lib/api/paging"
 import {
   deleteContest,
   listContests,
@@ -95,7 +104,11 @@ function needAnywhere(
  */
 function needCoding(ctx: { modules: ReadonlySet<string> }) {
   if (!ctx.modules.has("coding"))
-    throw new ApiError(404, "module_off", "The coding lab is switched off here.")
+    throw new ApiError(
+      404,
+      "module_off",
+      "The coding lab is switched off here."
+    )
 }
 
 export async function orgContests(slug: string, user: User) {
@@ -223,7 +236,9 @@ export async function orgGradebook(
   slug: string,
   user: User,
   id: string,
-  csv: boolean
+  csv: boolean,
+  /** One page of students for the screen (`?page`); left out, everyone. */
+  view?: PageQuery
 ) {
   const ctx = await orgContext(slug, user)
   const permission = csv ? "gradebook.export" : "gradebook.view"
@@ -235,7 +250,10 @@ export async function orgGradebook(
     })
     return gradebookCsv(id, ctx.org.id, scope)
   }
-  const book = await getGradebook(id, ctx.org.id, scope)
+  const whole = await getGradebook(id, ctx.org.id, scope)
+  const book = view?.page
+    ? gradebookPage(whole, view)
+    : { ...whole, paging: null }
   const [row] = await getDb()
     .select({ audience: assignments.audience })
     .from(assignments)

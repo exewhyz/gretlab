@@ -1,6 +1,11 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import Link from "next/link"
 import { useState } from "react"
 
@@ -45,7 +50,8 @@ import { PeerReviewPanel } from "@/features/peer/components/peer"
 import { ProjectMarking } from "@/features/projects/components/projects"
 
 import { toLocalInput } from "./contests"
-import { Card, Loading, PageTitle, Stats, Table } from "./shell"
+import { Card, Loading, PageTitle, Pager, Stats, Table } from "./shell"
+import { useDebounced } from "@/lib/use-debounced"
 import type { ApiResult } from "@/lib/api/types"
 import type { orgGradebook } from "@/features/orgs/content"
 import type { orgRejudgeSystemErrors } from "@/features/orgs/content"
@@ -66,6 +72,10 @@ export function AssignmentGradebook({ id }: { id: string }) {
   const [marking, setMarking] = useState<string | null>(null)
   const [markingProjects, setMarkingProjects] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  // A page of students at a time, searched on the server once typing pauses; the summary
+  // still counts everyone (a year can be tens of thousands).
+  const asked = useDebounced(search.trim())
   const client = useQueryClient()
   const [rejudged, setRejudged] = useState<string | null>(null)
   const rejudge = useMutation({
@@ -92,20 +102,19 @@ export function AssignmentGradebook({ id }: { id: string }) {
     onSuccess: () =>
       client.invalidateQueries({ queryKey: owner.key("gradebook", id) }),
   })
-  const { data, error } = useQuery({
-    queryKey: owner.key("gradebook", id),
-    queryFn: () => api<Gradebook>(owner.api(`/assignments/${id}/gradebook`)),
+  const { data, error, isPlaceholderData } = useQuery({
+    queryKey: owner.key("gradebook", id, asked, page),
+    queryFn: () =>
+      api<Gradebook>(
+        `${owner.api(`/assignments/${id}/gradebook`)}?${new URLSearchParams({ page: String(page), q: asked })}`
+      ),
+    placeholderData: keepPreviousData,
     refetchInterval: 30_000,
   })
   if (!data) return <Loading error={error} />
 
-  const query = search.trim().toLowerCase()
-  const rows = data.rows.filter(
-    (row) =>
-      !query ||
-      row.email.toLowerCase().includes(query) ||
-      (row.name ?? "").toLowerCase().includes(query)
-  )
+  const rows = data.rows
+  const paging = data.paging
   const { students, started, fullMarks, average } = data.summary
   const notStarted = students - started
   const averagePercent = data.total
@@ -223,147 +232,164 @@ export function AssignmentGradebook({ id }: { id: string }) {
         placeholder="Search by name or email"
         className="mb-3 w-72"
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onChange={(event) => {
+          setSearch(event.target.value)
+          setPage(1)
+        }}
       />
-      <Table
-        headers={[
-          "Student",
-          ...(data.assignment.exam ? ["Exam"] : []),
-          ...data.problems.map((p) => `${p.title} (${p.points})`),
-          ...(data.assignment.quiz
-            ? [`Quiz (${data.assignment.quiz.points})`]
-            : []),
-          ...(data.assignment.projects
-            ? [
-                `Projects (${data.assignment.projects.reduce((n, p) => n + p.points, 0)})`,
-              ]
-            : []),
-          `Total (${data.total})`,
-        ]}
+      <div
+        aria-busy={isPlaceholderData}
+        className={cn("transition-opacity", isPlaceholderData && "opacity-60")}
       >
-        {rows.map((row) => (
-          <tr key={row.email} data-testid="grade-row">
-            <td>
-              <div className="text-ink">{row.name ?? row.handle}</div>
-              <div className="text-xs">{row.email}</div>
-              <ExtensionControl
-                assignmentId={id}
-                student={row.email}
-                name={row.name ?? row.handle ?? row.email}
-                dueAt={data.assignment.dueAt}
-                problems={data.problems}
-                extension={row.extension}
-              />
-            </td>
-            {row.exam && (
-              <td className="text-caption" data-testid="exam-cell">
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto p-0 text-caption font-normal text-ink"
-                  aria-label={`See ${row.email}'s exam`}
-                  disabled={!data.problems[0]}
-                  onClick={() =>
-                    setViewing({
-                      email: row.email,
-                      problemId: data.problems[0]!.problemId,
-                    })
-                  }
-                >
-                  {row.exam.status === "not_started"
-                    ? "Not started"
-                    : row.exam.status === "in_progress"
-                      ? `In progress, ${formatLeft(new Date(row.exam.endsAt!).getTime() - now)} left`
-                      : row.exam.finishedEarly
-                        ? "Finished"
-                        : "Time ran out"}
-                </Button>
-                {row.exam.warnings > 0 && (
-                  <div className="text-destructive">
-                    {row.exam.warnings}{" "}
-                    {row.exam.warnings === 1 ? "warning" : "warnings"}
-                  </div>
-                )}
+        <Table
+          headers={[
+            "Student",
+            ...(data.assignment.exam ? ["Exam"] : []),
+            ...data.problems.map((p) => `${p.title} (${p.points})`),
+            ...(data.assignment.quiz
+              ? [`Quiz (${data.assignment.quiz.points})`]
+              : []),
+            ...(data.assignment.projects
+              ? [
+                  `Projects (${data.assignment.projects.reduce((n, p) => n + p.points, 0)})`,
+                ]
+              : []),
+            `Total (${data.total})`,
+          ]}
+        >
+          {rows.map((row) => (
+            <tr key={row.email} data-testid="grade-row">
+              <td>
+                <div className="text-ink">{row.name ?? row.handle}</div>
+                <div className="text-xs">{row.email}</div>
+                <ExtensionControl
+                  assignmentId={id}
+                  student={row.email}
+                  name={row.name ?? row.handle ?? row.email}
+                  dueAt={data.assignment.dueAt}
+                  problems={data.problems}
+                  extension={row.extension}
+                />
               </td>
-            )}
-            {row.cells.map((cell) => (
-              <td
-                key={cell.problemId}
-                title={STATUS[cell.status].label}
-                className={cn("tabular-nums", STATUS[cell.status].tone)}
-              >
-                {cell.status === "missing" ? (
-                  "—"
-                ) : (
+              {row.exam && (
+                <td className="text-caption" data-testid="exam-cell">
                   <Button
                     type="button"
                     variant="link"
-                    data-testid="grade-cell"
-                    className="h-auto p-0 font-normal text-inherit no-underline hover:text-inherit hover:underline"
-                    aria-label={`See ${row.email}'s code`}
+                    className="h-auto p-0 text-caption font-normal text-ink"
+                    aria-label={`See ${row.email}'s exam`}
+                    disabled={!data.problems[0]}
                     onClick={() =>
                       setViewing({
                         email: row.email,
-                        problemId: cell.problemId,
+                        problemId: data.problems[0]!.problemId,
                       })
                     }
                   >
-                    {cell.earned}
-                    {cell.status === "late" && " (late)"}
+                    {row.exam.status === "not_started"
+                      ? "Not started"
+                      : row.exam.status === "in_progress"
+                        ? `In progress, ${formatLeft(new Date(row.exam.endsAt!).getTime() - now)} left`
+                        : row.exam.finishedEarly
+                          ? "Finished"
+                          : "Time ran out"}
                   </Button>
-                )}
+                  {row.exam.warnings > 0 && (
+                    <div className="text-destructive">
+                      {row.exam.warnings}{" "}
+                      {row.exam.warnings === 1 ? "warning" : "warnings"}
+                    </div>
+                  )}
+                </td>
+              )}
+              {row.cells.map((cell) => (
+                <td
+                  key={cell.problemId}
+                  title={STATUS[cell.status].label}
+                  className={cn("tabular-nums", STATUS[cell.status].tone)}
+                >
+                  {cell.status === "missing" ? (
+                    "—"
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="link"
+                      data-testid="grade-cell"
+                      className="h-auto p-0 font-normal text-inherit no-underline hover:text-inherit hover:underline"
+                      aria-label={`See ${row.email}'s code`}
+                      onClick={() =>
+                        setViewing({
+                          email: row.email,
+                          problemId: cell.problemId,
+                        })
+                      }
+                    >
+                      {cell.earned}
+                      {cell.status === "late" && " (late)"}
+                    </Button>
+                  )}
+                </td>
+              ))}
+              {data.assignment.quiz && (
+                <td className="tabular-nums" data-testid="quiz-cell">
+                  {row.quiz?.answered ? (
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 font-normal text-inherit"
+                      aria-label={`Mark ${row.email}'s answers`}
+                      onClick={() => setMarking(row.email)}
+                    >
+                      {row.quiz.earned}
+                    </Button>
+                  ) : (
+                    "—"
+                  )}
+                  {(row.quiz?.needsMarking ?? 0) > 0 && (
+                    <div className="text-xs text-primary">
+                      {row.quiz!.needsMarking} to mark
+                    </div>
+                  )}
+                </td>
+              )}
+              {data.assignment.projects && (
+                <td className="tabular-nums" data-testid="projects-cell">
+                  {row.projects?.submitted ? (
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 font-normal text-inherit"
+                      aria-label={`Mark ${row.email}'s projects`}
+                      onClick={() => setMarkingProjects(row.email)}
+                    >
+                      {row.projects.earned}
+                    </Button>
+                  ) : (
+                    "—"
+                  )}
+                  {(row.projects?.needsMarking ?? 0) > 0 && (
+                    <div className="text-xs text-primary">
+                      {row.projects!.needsMarking} to mark
+                    </div>
+                  )}
+                </td>
+              )}
+              <td className="font-semibold text-ink tabular-nums">
+                {row.earned}
               </td>
-            ))}
-            {data.assignment.quiz && (
-              <td className="tabular-nums" data-testid="quiz-cell">
-                {row.quiz?.answered ? (
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto p-0 font-normal text-inherit"
-                    aria-label={`Mark ${row.email}'s answers`}
-                    onClick={() => setMarking(row.email)}
-                  >
-                    {row.quiz.earned}
-                  </Button>
-                ) : (
-                  "—"
-                )}
-                {(row.quiz?.needsMarking ?? 0) > 0 && (
-                  <div className="text-xs text-primary">
-                    {row.quiz!.needsMarking} to mark
-                  </div>
-                )}
-              </td>
-            )}
-            {data.assignment.projects && (
-              <td className="tabular-nums" data-testid="projects-cell">
-                {row.projects?.submitted ? (
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto p-0 font-normal text-inherit"
-                    aria-label={`Mark ${row.email}'s projects`}
-                    onClick={() => setMarkingProjects(row.email)}
-                  >
-                    {row.projects.earned}
-                  </Button>
-                ) : (
-                  "—"
-                )}
-                {(row.projects?.needsMarking ?? 0) > 0 && (
-                  <div className="text-xs text-primary">
-                    {row.projects!.needsMarking} to mark
-                  </div>
-                )}
-              </td>
-            )}
-            <td className="font-semibold text-ink tabular-nums">
-              {row.earned}
-            </td>
-          </tr>
-        ))}
-      </Table>
+            </tr>
+          ))}
+        </Table>
+      </div>
+      {paging && (
+        <Pager
+          page={paging.page}
+          pages={paging.pages}
+          total={paging.total}
+          perPage={paging.perPage}
+          onPage={setPage}
+        />
+      )}
       {rows.length === 0 && (
         <p className="mt-3 text-body-sm text-body">No students match.</p>
       )}
@@ -472,107 +498,105 @@ export function StudentCode({
           : "Code"
       }
     >
-        {data?.exam && (
-          <ExamRecord
-            exam={data.exam}
-            onExtend={(minutes) =>
-              api(owner.api(`/assignments/${assignmentId}/extend`), {
-                body: { student, minutes },
-              }).then(refresh)
-            }
-          />
-        )}
-        {data && data.problem.rubric.length > 0 && (
-          <RubricMarking
-            rubric={data.problem.rubric}
-            marks={data.marks}
-            held={data.holdFeedback}
-            onSave={(marks) =>
-              api(owner.api(`/assignments/${assignmentId}/marks`), {
-                method: "PUT",
-                body: { student, problemId, marks },
-              }).then(refresh)
-            }
-          />
-        )}
-        <Tabs defaultValue="submissions">
-          <TabsList variant="line">
-            <TabsTrigger value="submissions">
-              Submissions{data ? ` (${data.attempts.length})` : ""}
-            </TabsTrigger>
-            <TabsTrigger value="live">Working copy</TabsTrigger>
-            <TabsTrigger value="playback">Playback</TabsTrigger>
-          </TabsList>
-          <TabsContent value="live" className="pt-3">
-            <LiveCode path={path} />
-          </TabsContent>
-          <TabsContent value="playback" className="pt-3">
-            <Playback path={path} />
-          </TabsContent>
-          <TabsContent value="submissions" className="grid gap-3 pt-3">
-            {!data && <Loading error={error} />}
-            {data?.attempts.length === 0 && (
-              <p className="text-body-sm text-body">
-                No graded submissions since it opened.
-              </p>
-            )}
-            {data && data.attempts.length > 0 && (
-              <p className="text-caption">
-                Select a line number to comment on that line
-                {data.holdFeedback
-                  ? ". Students see comments once you release feedback."
-                  : "; the student sees it with the submission."}
-              </p>
-            )}
-            {data?.attempts.map((a) => (
-              <div
-                key={a.id}
-                className="grid gap-1.5 border-t border-hairline pt-3"
-              >
-                <div className="flex flex-wrap gap-x-3 text-caption text-body">
-                  <span
-                    className={
-                      a.verdict === "AC" ? "text-success" : "text-destructive"
-                    }
-                  >
-                    {a.verdict === "AC" ? "Accepted" : (a.verdict ?? "—")}
+      {data?.exam && (
+        <ExamRecord
+          exam={data.exam}
+          onExtend={(minutes) =>
+            api(owner.api(`/assignments/${assignmentId}/extend`), {
+              body: { student, minutes },
+            }).then(refresh)
+          }
+        />
+      )}
+      {data && data.problem.rubric.length > 0 && (
+        <RubricMarking
+          rubric={data.problem.rubric}
+          marks={data.marks}
+          held={data.holdFeedback}
+          onSave={(marks) =>
+            api(owner.api(`/assignments/${assignmentId}/marks`), {
+              method: "PUT",
+              body: { student, problemId, marks },
+            }).then(refresh)
+          }
+        />
+      )}
+      <Tabs defaultValue="submissions">
+        <TabsList variant="line">
+          <TabsTrigger value="submissions">
+            Submissions{data ? ` (${data.attempts.length})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="live">Working copy</TabsTrigger>
+          <TabsTrigger value="playback">Playback</TabsTrigger>
+        </TabsList>
+        <TabsContent value="live" className="pt-3">
+          <LiveCode path={path} />
+        </TabsContent>
+        <TabsContent value="playback" className="pt-3">
+          <Playback path={path} />
+        </TabsContent>
+        <TabsContent value="submissions" className="grid gap-3 pt-3">
+          {!data && <Loading error={error} />}
+          {data?.attempts.length === 0 && (
+            <p className="text-body-sm text-body">
+              No graded submissions since it opened.
+            </p>
+          )}
+          {data && data.attempts.length > 0 && (
+            <p className="text-caption">
+              Select a line number to comment on that line
+              {data.holdFeedback
+                ? ". Students see comments once you release feedback."
+                : "; the student sees it with the submission."}
+            </p>
+          )}
+          {data?.attempts.map((a) => (
+            <div
+              key={a.id}
+              className="grid gap-1.5 border-t border-hairline pt-3"
+            >
+              <div className="flex flex-wrap gap-x-3 text-caption text-body">
+                <span
+                  className={
+                    a.verdict === "AC" ? "text-success" : "text-destructive"
+                  }
+                >
+                  {a.verdict === "AC" ? "Accepted" : (a.verdict ?? "—")}
+                </span>
+                {a.totalTests !== null && (
+                  <span className="tabular-nums">
+                    {a.passedTests} / {a.totalTests} tests
                   </span>
-                  {a.totalTests !== null && (
-                    <span className="tabular-nums">
-                      {a.passedTests} / {a.totalTests} tests
-                    </span>
-                  )}
-                  <span>{a.language}</span>
-                  <span>{formatDateTime(a.createdAt)}</span>
-                  {a.late && <span className="text-primary">Late</span>}
-                  {a.outside && (
-                    <span className="text-primary">
-                      Outside the exam: doesn&apos;t count
-                    </span>
-                  )}
-                </div>
-                {a.files.map((f) => (
-                  <div
-                    key={f.path}
-                    className="overflow-hidden rounded-md border border-hairline"
-                  >
-                    {a.files.length > 1 && (
-                      <div className="px-3 pt-2 text-xs text-body">
-                        {f.path}
-                      </div>
-                    )}
-                    <CommentedCode
-                      content={f.content}
-                      comments={a.comments.filter((c) => c.path === f.path)}
-                      onAdd={addComment(a.id, f.path)}
-                      onDelete={removeComment}
-                    />
-                  </div>
-                ))}
+                )}
+                <span>{a.language}</span>
+                <span>{formatDateTime(a.createdAt)}</span>
+                {a.late && <span className="text-primary">Late</span>}
+                {a.outside && (
+                  <span className="text-primary">
+                    Outside the exam: doesn&apos;t count
+                  </span>
+                )}
               </div>
-            ))}
-          </TabsContent>
-        </Tabs>
+              {a.files.map((f) => (
+                <div
+                  key={f.path}
+                  className="overflow-hidden rounded-md border border-hairline"
+                >
+                  {a.files.length > 1 && (
+                    <div className="px-3 pt-2 text-xs text-body">{f.path}</div>
+                  )}
+                  <CommentedCode
+                    content={f.content}
+                    comments={a.comments.filter((c) => c.path === f.path)}
+                    onAdd={addComment(a.id, f.path)}
+                    onDelete={removeComment}
+                  />
+                </div>
+              ))}
+            </div>
+          ))}
+        </TabsContent>
+      </Tabs>
     </DetailSheet>
   )
 }
@@ -1010,78 +1034,75 @@ export function QuizMarking({
         </>
       }
     >
-        {!data && <Loading error={error} />}
-        {data?.questions.map((q, index) => (
-          <div
-            key={q.id}
-            className="grid gap-1.5 border-t border-hairline pt-3"
+      {!data && <Loading error={error} />}
+      {data?.questions.map((q, index) => (
+        <div key={q.id} className="grid gap-1.5 border-t border-hairline pt-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="text-body-sm font-semibold text-ink">
+              Q{index + 1}
+            </span>
+            <span className="text-caption">
+              {q.needsMarking
+                ? "Needs marking"
+                : q.byTeacher
+                  ? `Marked ${q.earned} (automatic: ${q.automatic ?? "none"})`
+                  : `Automatic: ${q.earned}`}{" "}
+              / {q.points}
+            </span>
+          </div>
+          <div className="text-body-sm text-body">
+            <Markdown text={q.prompt} />
+          </div>
+          <div className="rounded-md bg-canvas-soft p-2 font-sans text-body-sm whitespace-pre-wrap text-ink">
+            {show(q)}
+          </div>
+          {(q.kind === "single" || q.kind === "multiple") && (
+            <p className="text-caption">
+              Right:{" "}
+              {q.correct
+                .map((id) => q.options.find((o) => o.id === id)?.text ?? id)
+                .join(", ")}
+            </p>
+          )}
+          {q.kind === "short" && q.accepted.length > 0 && (
+            <p className="text-caption">Accepted: {q.accepted.join(" · ")}</p>
+          )}
+          <label className="flex items-center gap-2 text-caption">
+            Your mark
+            <TextInput
+              type="number"
+              min={0}
+              max={q.points}
+              aria-label={`Mark for Q${index + 1}`}
+              placeholder={q.byTeacher ? String(q.earned) : "automatic"}
+              className="w-24 py-0.5"
+              value={given[q.id] ?? (q.byTeacher ? String(q.earned) : "")}
+              onChange={(event) => {
+                setGiven((g) => ({ ...g, [q.id]: event.target.value }))
+                setMessage(null)
+              }}
+            />
+            / {q.points} (empty: automatic)
+          </label>
+        </div>
+      ))}
+      {data && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            size="sm"
+            disabled={save.isPending || Object.keys(given).length === 0}
+            onClick={() => save.mutate()}
           >
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="text-body-sm font-semibold text-ink">
-                Q{index + 1}
-              </span>
-              <span className="text-caption">
-                {q.needsMarking
-                  ? "Needs marking"
-                  : q.byTeacher
-                    ? `Marked ${q.earned} (automatic: ${q.automatic ?? "none"})`
-                    : `Automatic: ${q.earned}`}{" "}
-                / {q.points}
-              </span>
-            </div>
-            <div className="text-body-sm text-body">
-              <Markdown text={q.prompt} />
-            </div>
-            <div className="rounded-md bg-canvas-soft p-2 font-sans text-body-sm whitespace-pre-wrap text-ink">
-              {show(q)}
-            </div>
-            {(q.kind === "single" || q.kind === "multiple") && (
-              <p className="text-caption">
-                Right:{" "}
-                {q.correct
-                  .map((id) => q.options.find((o) => o.id === id)?.text ?? id)
-                  .join(", ")}
-              </p>
-            )}
-            {q.kind === "short" && q.accepted.length > 0 && (
-              <p className="text-caption">Accepted: {q.accepted.join(" · ")}</p>
-            )}
-            <label className="flex items-center gap-2 text-caption">
-              Your mark
-              <TextInput
-                type="number"
-                min={0}
-                max={q.points}
-                aria-label={`Mark for Q${index + 1}`}
-                placeholder={q.byTeacher ? String(q.earned) : "automatic"}
-                className="w-24 py-0.5"
-                value={given[q.id] ?? (q.byTeacher ? String(q.earned) : "")}
-                onChange={(event) => {
-                  setGiven((g) => ({ ...g, [q.id]: event.target.value }))
-                  setMessage(null)
-                }}
-              />
-              / {q.points} (empty: automatic)
-            </label>
-          </div>
-        ))}
-        {data && (
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              size="sm"
-              disabled={save.isPending || Object.keys(given).length === 0}
-              onClick={() => save.mutate()}
-            >
-              Save marks
-            </Button>
-            {message && <FormMessage message={message} />}
-            {data.held && (
-              <span className="text-caption">
-                Held: the student sees these once you release results.
-              </span>
-            )}
-          </div>
-        )}
+            Save marks
+          </Button>
+          {message && <FormMessage message={message} />}
+          {data.held && (
+            <span className="text-caption">
+              Held: the student sees these once you release results.
+            </span>
+          )}
+        </div>
+      )}
     </DetailSheet>
   )
 }

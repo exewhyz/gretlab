@@ -11,6 +11,7 @@ export {
   extendStudentSitting,
   getGradebook,
   gradebookCsv,
+  gradebookPage,
   releaseFeedback,
   removeExtension,
   setExtension,

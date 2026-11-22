@@ -40,6 +40,8 @@ import { notify } from "@/features/notifications/server"
 import { rolePermissions } from "@/features/orgs/access"
 import { projectGrades } from "@/features/projects/server"
 import { ApiError, notFound } from "@/lib/api/route"
+import { pageOf, type PageQuery } from "@/lib/api/paging"
+import { byName } from "@/lib/by-name"
 
 import {
   attemptsOn,
@@ -218,6 +220,41 @@ export async function colleaguesOf(assignment: Assignment, exceptId?: string) {
   ]
 }
 
+/**
+ * One page of a gradebook, for the screen (`?page`, `?q`, `?perPage`): the summary still
+ * counts everyone, while the rows are the search's matches, ordered by name as people read
+ * them, `perPage` at a time. The paging is under `paging`, since `total` here is the points.
+ */
+export function gradebookPage(
+  book: Awaited<ReturnType<typeof getGradebook>>,
+  view: PageQuery
+) {
+  const q = view.q?.toLowerCase()
+  const matches = (
+    q
+      ? book.rows.filter(
+          (r) =>
+            r.email.toLowerCase().includes(q) ||
+            (r.name ?? "").toLowerCase().includes(q)
+        )
+      : [...book.rows]
+  ).sort(
+    (a, b) =>
+      byName(a.name ?? a.email, b.name ?? b.email) || byName(a.email, b.email)
+  )
+  const at = pageOf(matches.length, view.page ?? 1, view.perPage ?? 100)
+  return {
+    ...book,
+    rows: matches.slice(at.offset, at.offset + at.perPage),
+    paging: {
+      total: matches.length,
+      page: at.page,
+      pages: at.pages,
+      perPage: at.perPage,
+    },
+  }
+}
+
 /** Every student's marks, including those who haven't started. */
 export async function getGradebook(
   id: string,
@@ -231,20 +268,33 @@ export async function getGradebook(
     .from(assignments)
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
   if (!assignment) throw notFound("Assignment not found")
-  const items = await itemsOf([id])
   const onlySet = only && new Set(only)
-  const [students, attempts, marks] = await Promise.all([
+  const [items, students] = await Promise.all([
+    itemsOf([id]),
     studentsOf(assignment, scope).then((all) =>
       onlySet ? all.filter((s) => onlySet.has(s.id)) : all
     ),
+  ])
+  // Only these students' work: a library problem is also solved by people this assignment
+  // isn't for, and their attempts have nothing to do with it.
+  const who = only ?? students.map((s) => s.id)
+  const [attempts, marks] = await Promise.all([
     attemptsOn(
       items.map((i) => i.problemId),
       assignment.opensAt,
-      only
+      who
     ),
     // Teachers see rubric marks whether or not they're released yet.
-    marksOn([id], only),
+    marksOn([id], who),
   ])
+  // Each student's attempts, found by lookup: scanning them all per student grows with the
+  // square of the class (30,000 students, billions of comparisons).
+  const attemptsBy = new Map<string, typeof attempts>()
+  for (const attempt of attempts) {
+    const list = attemptsBy.get(attempt.userId)
+    if (list) list.push(attempt)
+    else attemptsBy.set(attempt.userId, [attempt])
+  }
   const [sittings, warnings] = assignment.exam
     ? await Promise.all([sittingsOn([id], only), warningCounts(id)])
     : [new Map<string, Map<string, Sitting>>(), new Map<string, number>()]
@@ -259,7 +309,7 @@ export async function getGradebook(
     const { cells, earned } = grade(
       assignment,
       items,
-      attempts.filter((a) => a.userId === student.id),
+      attemptsBy.get(student.id) ?? [],
       marks.get(student.id)?.get(id),
       sittings.get(id)?.get(student.id),
       extensions?.get(student.id)

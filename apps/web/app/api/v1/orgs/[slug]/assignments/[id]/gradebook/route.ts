@@ -1,14 +1,18 @@
 import { route } from "@/lib/api/route"
 import { orgGradebook } from "@/features/orgs/content"
+import { readPage } from "@/lib/api/paging"
 
-/** JSON for the dashboard; ?format=csv downloads it for a spreadsheet. */
+/**
+ * JSON for the dashboard; with ?page (and ?q, ?perPage) one page of students, the summary still
+ * counting everyone; ?format=csv downloads it all for a spreadsheet.
+ */
 export const GET = route(
   { access: "user" },
   async ({ user, params, query }) => {
     const slug = params.slug ?? ""
     const id = params.id ?? ""
     if (query.get("format") !== "csv")
-      return orgGradebook(slug, user, id, false)
+      return orgGradebook(slug, user, id, false, readPage(query))
     const { filename, body } = (await orgGradebook(slug, user, id, true)) as {
       filename: string
       body: string

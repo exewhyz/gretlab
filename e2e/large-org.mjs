@@ -4,13 +4,19 @@
  * (the API adds them one at a time), then each check goes through the API as a person would.
  *   - a notice to a grade of 20,000 students reaches every one of them, in the bell and by email
  *   - with parent accounts, 5,000 parents each get a copy naming their own child
+ *   - an assignment's gradebook for all 20,000: the summary counts everyone, the screen gets a
+ *     page at a time and searches on the server, and the CSV still has everyone
  *   node e2e/large-org.mjs [base-url]
  */
 import { execFileSync } from "node:child_process"
+import { mkdirSync } from "node:fs"
 import { createRequire } from "node:module"
 
 const ROOT = new URL("../", import.meta.url).pathname
 const { encode } = createRequire(ROOT + "apps/web/")("next-auth/jwt")
+const { chromium } = createRequire(ROOT + "package.json")("playwright")
+const SHOTS = process.argv[3] ?? "/tmp/gretlab-e2e/large-org/"
+mkdirSync(SHOTS, { recursive: true })
 const BASE = process.argv[2] ?? "http://localhost:3100"
 const SECRET = process.env.NEXTAUTH_SECRET ?? "e2e-only-secret"
 const DB = process.env.E2E_DB ?? "gretlab_test"
@@ -25,6 +31,7 @@ const check = (name, ok, detail = "") => {
 const psql = (q) => execFileSync("docker", ["compose", "-f", ROOT + "docker-compose.yml", "exec", "-T", "postgres", "psql", "-U", "gretlab", "-d", DB, "-v", "ON_ERROR_STOP=1", "-Atqc", q], { maxBuffer: 64 * 1024 * 1024 }).toString().trim()
 const cleanup = () => {
   psql(`delete from email_outbox where to_address like 'lo-%@example.com'`)
+  psql(`delete from submissions where user_id in (select id from users where email like 'lo-%@example.com')`)
   psql(`delete from organizations where slug = 'lo-uni'`)
   psql(`delete from users where email like 'lo-%@example.com'`)
 }
@@ -94,6 +101,53 @@ check(`…and by email (${parentEmails} of ${PARENTS})`, parentEmails === PARENT
 const student = await client("lo-s-7@example.com")
 const mine = (await student("/me/notifications")).json
 check("a student sees the notice in their bell", JSON.stringify(mine ?? "").includes("New notice in First year"), JSON.stringify(mine).slice(0, 300))
+
+// ---------- an assignment for the whole year, with half of them already done
+const problemId = psql(`select id from problems where slug = 'integer-operations'`)
+const hours = (h) => new Date(Date.now() + h * 3_600_000).toISOString()
+const work = await owner(`${O}/assignments`, { body: { title: "Week 1", slug: "lo-week-1", description: "", opensAt: hours(-2), dueAt: hours(48), allowLate: false, latePenaltyPercent: 0, published: true, problems: [{ problemId, points: 100 }], audience: [[year.id]] } })
+check("an assignment for the whole year", work.status === 200, JSON.stringify(work.json).slice(0, 200))
+const DONE = STUDENTS / 2
+psql(`
+  insert into submissions (user_id, problem_id, kind, language, entry, files, time_limit_ms, memory_limit_mb, status, verdict, passed_tests, total_tests, finished_at)
+    select id, '${problemId}', 'submit', 'python', 'main.py', '[]', 1000, 256, 'done', 'AC', 1, 1, now()
+    from users where email like 'lo-s-%@example.com' and substring(email from 'lo-s-([0-9]+)@')::int <= ${DONE};
+`)
+const book = `${O}/assignments/${work.json?.id}/gradebook`
+started = Date.now()
+const whole = await owner(book)
+const wholeMs = Date.now() - started
+const summary = whole.json?.summary
+check(`the gradebook counts all ${STUDENTS} (${wholeMs} ms)`, summary?.students === STUDENTS && summary?.started === DONE && summary?.average === 50, JSON.stringify(summary))
+started = Date.now()
+const first = await owner(`${book}?page=1`)
+const pageMs = Date.now() - started
+check(`the screen gets one page of 100, with the same summary (${pageMs} ms)`, first.json?.rows?.length === 100 && first.json?.paging?.total === STUDENTS && first.json?.paging?.pages === STUDENTS / 100 && first.json?.total === 100 && JSON.stringify(first.json?.summary) === JSON.stringify(summary), JSON.stringify({ rows: first.json?.rows?.length, paging: first.json?.paging, points: first.json?.total, summary: first.json?.summary }))
+check("…sorted by name, numbers by value", first.json?.rows?.[0]?.name === "Lo Student 1" && first.json?.rows?.[1]?.name === "Lo Student 2", first.json?.rows?.slice(0, 3).map((r) => r.name).join(", "))
+const last = await owner(`${book}?page=${STUDENTS / 100}`)
+check("the last page ends with the last student", last.json?.rows?.at(-1)?.name === `Lo Student ${STUDENTS}`, last.json?.rows?.at(-1)?.name)
+const found = await owner(`${book}?page=1&q=${encodeURIComponent("lo-s-4321@")}`)
+check("searching finds one student, on the server", found.json?.paging?.total === 1 && found.json?.rows?.[0]?.email === "lo-s-4321@example.com" && found.json?.rows?.[0]?.earned === 100, JSON.stringify(found.json?.rows?.[0]).slice(0, 200))
+check("a page and the whole gradebook agree on a student", JSON.stringify(found.json?.rows?.[0]) === JSON.stringify(whole.json?.rows?.find((r) => r.email === "lo-s-4321@example.com")))
+const csv = await fetch(`${BASE}/api/v1${book}?format=csv`, { headers: { cookie: `next-auth.session-token=${await encode({ token: { email: "lo-o@example.com" }, secret: SECRET })}` } })
+const lines = (await csv.text()).trim().split("\n")
+check(`the CSV still has everyone (${lines.length - 1} rows)`, csv.status === 200 && lines.length - 1 === STUDENTS)
+
+// ---------- the gradebook page in a browser
+const browser = await chromium.launch()
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+const token = await encode({ token: { email: "lo-o@example.com" }, secret: SECRET })
+await context.addCookies([{ name: "next-auth.session-token", value: token, url: BASE }])
+const tab = await context.newPage()
+await tab.goto(`${BASE}${O}/manage/assignments/${work.json?.id}/grades`)
+await tab.getByTestId("grade-row").first().waitFor({ timeout: 30_000 })
+check("the page shows one page of students", (await tab.getByTestId("grade-row").count()) === 100)
+check("…and says how many there are", await tab.getByText(/20,000|20000/).first().isVisible().catch(() => false))
+await tab.getByLabel("Search students").fill("lo-s-4321@")
+await tab.waitForFunction(() => document.querySelectorAll('[data-testid="grade-row"]').length === 1, null, { timeout: 15_000 }).catch(() => {})
+check("searching asks the server and shows the one student", (await tab.getByTestId("grade-row").count()) === 1 && (await tab.getByTestId("grade-row").first().innerText()).includes("lo-s-4321@example.com"))
+await tab.screenshot({ path: SHOTS + "gradebook.png", fullPage: false }).catch(() => {})
+await browser.close()
 
 cleanup()
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED")
