@@ -6,6 +6,15 @@ description: What's new in GretLab, newest first.
 What changed for the people using GretLab, newest first. Fixes and changes that don't show to anyone
 aren't listed.
 
+## 22 November 2026
+
+### Faster from India
+
+- **Pages and saves are quicker** for people in India: the website and its database now run in
+  Mumbai instead of Sydney, so each request no longer crosses to Australia and back.
+- **The privacy policy** says where data is kept now: the website and the database in India,
+  submitted code run in Australia.
+
 ## 20 November 2026
 
 ### Faster problem pages

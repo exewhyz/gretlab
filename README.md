@@ -65,30 +65,32 @@ sudo DATABASE_URL='postgres://user:password@host:port/db' bash runner-setup.sh
 
 It installs Docker and gVisor, proves a container runs under gVisor, locks the firewall to SSH, builds the language images, creates the database tables (and loads the starter problems), runs the 16 hostile-program tests against the real sandbox, and only then starts the runner. Use the database's direct address, or a pooler in session mode (Supabase's port 5432), never transaction pooling: the runner keeps a `LISTEN` session open. Run it again to update; run it on more servers for more capacity. Keep the server for this alone (see AGENTS.md › Sandbox rules).
 
-### How the live site runs (Vercel, Neon, EC2)
+### How the live site runs (Vercel, Supabase, EC2)
 
-The live site, https://gretlab.grettech.com, runs as three parts, all in Sydney (`ap-southeast-2`):
+The live site, https://gretlab.grettech.com, runs as three parts. The web app and the database are in Mumbai, beside the students; the judge is in Sydney (the AWS project's Region) and makes only a few queries per submission. Moved from Neon in Sydney on 22 November 2026 (`deploy/move-to-mumbai.md`).
+
+Supabase addresses need `?sslmode=require` at the end (its Enforce SSL is on, and postgres.js doesn't ask for SSL by itself; without it: `ESSLREQUIRED`).
 
 | Part | Where | Notes |
 | --- | --- | --- |
-| Web app (`apps/web`: the whole UI and API) | Vercel, project `web`, Function Region `syd1` | Deploys itself on every push to `main` |
-| Postgres | Neon | Two addresses: the **pooled** one (host contains `-pooler`) for Vercel, the **direct** one for the judge and migrations |
+| Web app (`apps/web`: the whole UI and API) | Vercel, project `web`, Function Region `bom1` (Mumbai) | Deploys itself on every push to `main` |
+| Postgres 17 | Supabase, Mumbai (`ap-south-1`) | Two addresses: the **transaction pooler** (port 6543) for Vercel, the **session pooler** (port 5432) for the judge, migrations and copies. The session pooler takes at most 15 connections; the judge uses 5 |
 | Code judge (`apps/runner`) | AWS EC2 (`c7i-flex.large`, Ubuntu), set up by `deploy/runner-setup.sh` | gVisor sandboxes; firewall allows SSH only; `restart: always`, so it comes back after a reboot |
 
-**Vercel settings** (Settings › Environment Variables, then Redeploy, because settings apply only to new deployments): `DATABASE_URL` (Neon pooled), `DATABASE_PREPARE=false` (required behind a pooler), `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS`, plus any optional settings below. The build reads the database too (it pre-renders `/problems`), and Turborepo passes only the settings listed in `turbo.json`, so add a new setting there as well (`passThroughEnv`).
+**Vercel settings** (Settings › Environment Variables, then Redeploy, because settings apply only to new deployments): `DATABASE_URL` (Supabase transaction pooler), `DATABASE_PREPARE=false` (required behind a pooler), `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ADMIN_EMAILS`, plus any optional settings below. The build reads the database too (it pre-renders `/problems`), and Turborepo passes only the settings listed in `turbo.json`, so add a new setting there as well (`passThroughEnv`).
 
 **Google sign-in:** the OAuth client lists `https://gretlab.grettech.com` as a JavaScript origin and `https://gretlab.grettech.com/api/auth/callback/google` as the redirect URI. The consent screen must be published ("In production"); in testing mode, only listed test users can sign in.
 
 **Releasing a change:**
 
-1. If the change adds a migration, apply it first, from your machine, with Neon's direct address: `DATABASE_URL='<direct>' pnpm db:migrate`. Write migrations the running site can live with (add columns and tables; rename or drop only in a later release), since the old version serves until Vercel switches over.
+1. If the change adds a migration, apply it first, from your machine, with Supabase's session pooler: `DATABASE_URL='<session pooler>?sslmode=require' pnpm db:migrate`. Write migrations the running site can live with (add columns and tables; rename or drop only in a later release), since the old version serves until Vercel switches over.
 2. Push to `main`. Vercel builds and deploys the web app.
 3. If the change touches the judge (`apps/runner`, `packages/judge`, `packages/db`, the sandbox images), update it on the server: `curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh && sudo bash /tmp/runner-setup.sh`. It reuses the saved database address, migrates, reruns the attack tests and restarts. Run a downloaded copy, not `/opt/gretlab/deploy/runner-setup.sh` (the script replaces that file as it runs), and don't pipe it into bash (docker reads the pipe).
 
 **Watching it:**
 
-- Judge logs: `ssh ubuntu@<judge address>`, then `cd /opt/gretlab && sudo docker compose -f docker-compose.runner.yml logs -f runner`. A submission stuck at "queued" means the judge is down or can't reach Neon.
-- Costs: an AWS budget (`gretlab-monthly`, $20) emails at 50% and 100% of actual spend, and at a forecast above 100%. Neon's compute stays awake, because the judge keeps a `LISTEN` connection open.
+- Judge logs: `ssh ubuntu@<judge address>`, then `cd /opt/gretlab && sudo docker compose -f docker-compose.runner.yml logs -f runner`. A submission stuck at "queued" means the judge is down or can't reach the database.
+- Costs: an AWS budget (`gretlab-monthly`, $20) emails at 50% and 100% of actual spend, and at a forecast above 100%.
 - Health: `GET /api/health` answers `{"status":"ok"}` while the website reaches the database (load balancers use it). `GET /api/health/judge` answers 200 while a code judge is online and no submission has waited over 3 minutes, and 503 with the reason otherwise.
 - Uptime alerts: a free UptimeRobot (or similar) account watching both addresses every 5 minutes emails you when either goes down.
 

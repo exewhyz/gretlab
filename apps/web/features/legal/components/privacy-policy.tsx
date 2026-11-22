@@ -183,17 +183,18 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
         <>
           <p>{we} uses these companies to run the service. They handle data only to provide their service to us.</p>
           <List>
-            <Item term="Vercel">hosting the website.</Item>
-            <Item term="Neon">the database.</Item>
-            <Item term="Amazon Web Services">the servers that run submitted code, in an isolated sandbox with no network access.</Item>
+            <Item term="Vercel">hosting the website, in Mumbai, India.</Item>
+            <Item term="Supabase">the database, in Mumbai, India.</Item>
+            <Item term="Amazon Web Services">the servers that run submitted code, in Sydney, Australia, in an isolated sandbox with no network access.</Item>
+            <Item term="Neon">an earlier copy of the database, in Sydney, Australia, kept until early December 2026 in case we need to move back, then deleted.</Item>
             <Item term="Google">sign-in with Google, and AdSense ads on public practice pages.</Item>
             <Item term="Our email provider">sending the emails described above.</Item>
             <Item term="GitHub">looking up the commit of a repository link you hand in for a project.</Item>
           </List>
           <p>
             Because of these providers, your data may be stored and processed outside your
-            country, including in Australia, where the website runs, and wherever these
-            providers operate.
+            country: in India, where the website and the database run; in Australia, where
+            submitted code is run; and wherever these providers operate.
           </p>
         </>
       ),
