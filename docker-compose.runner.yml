@@ -21,4 +21,6 @@ services:
       RUNNER_CONCURRENCY: ${RUNNER_CONCURRENCY:-8}
       # An organization's own judge: its address (/orgs/<address>). Unset: a shared judge.
       RUNNER_POOL: ${RUNNER_POOL:-}
+      # Set on machines started from the dashboard (their AWS instance id), for Stop.
+      RUNNER_MACHINE: ${RUNNER_MACHINE:-}
       DATABASE_POOL: "4"

@@ -8,6 +8,12 @@ aren't listed.
 
 ## 22 November 2026
 
+### Judge machines from the dashboard
+
+- **Start and stop judges from Dashboard › Judges** (platform staff with "Manage judges"): a
+  machine for everyone or for one organization, with its progress as it starts. Stop lets it
+  finish its work first. A limit on how many run at once keeps costs in hand.
+
 ### An organization's own judges
 
 - **A college can have judges of its own.** Its students' code then runs only on its own

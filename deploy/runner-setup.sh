@@ -35,6 +35,9 @@ if [ -z "${RUNNER_POOL+set}" ] && [ -f "$DIR/.env" ]; then
   RUNNER_POOL="$(sed -n 's/^RUNNER_POOL=//p' "$DIR/.env" | head -1)"
 fi
 RUNNER_POOL="${RUNNER_POOL:-}"
+# Machines started from the dashboard pass their AWS instance id, so Stop can drain them.
+RUNNER_MACHINE="${RUNNER_MACHINE:-}"
+case "$RUNNER_MACHINE" in *[!a-z0-9-]*) echo "RUNNER_MACHINE must be an instance id" >&2; exit 1 ;; esac
 case "$RUNNER_POOL" in
   *[!a-z0-9-]*) echo "RUNNER_POOL must be an organization's address, like greenwood" >&2; exit 1 ;;
 esac
@@ -111,6 +114,7 @@ cat > .env <<EOF
 DATABASE_URL=${DATABASE_URL}
 RUNNER_CONCURRENCY=${RUNNER_CONCURRENCY}
 RUNNER_POOL=${RUNNER_POOL}
+RUNNER_MACHINE=${RUNNER_MACHINE}
 EOF
 echo "ok: $RUNNER_CONCURRENCY parallel jobs on $CORES cores, ${RUNNER_POOL:+pool }${RUNNER_POOL:-shared}"
 

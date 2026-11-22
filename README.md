@@ -87,6 +87,8 @@ Supabase addresses need `?sslmode=require` at the end (its Enforce SSL is on, an
 2. Push to `main`. Vercel builds and deploys the web app.
 3. If the change touches the judge (`apps/runner`, `packages/judge`, `packages/db`, the sandbox images), update it on the server: `curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh && sudo bash /tmp/runner-setup.sh`. It reuses the saved database address, migrates, reruns the attack tests and restarts. Run a downloaded copy, not `/opt/gretlab/deploy/runner-setup.sh` (the script replaces that file as it runs), and don't pipe it into bash (docker reads the pipe).
 
+**Judge machines from the dashboard** (Dashboard › Judges): set up once in AWS (Sydney) on 22 November 2026: the security group `gretlab-judge` (no inbound), the machine role `gretlab-judge-machine` (reads one SSM parameter), the launch template `gretlab-judge`, the OIDC provider for the Vercel team, and the website's role `gretlab-web-judges`. The database address for new machines is the SSM SecureString `/gretlab/judge/database-url` (the session pooler with `?sslmode=require`); change it there when the database moves. Vercel needs `JUDGES_AWS_ROLE_ARN` (the website role's ARN) in Production, and OIDC federation on (Team issuer). Machines started there show in the EC2 console as `gretlab-judge…`; a hand-set-up judge (like the first one) isn't tagged, so the website can never end it.
+
 **Watching it:**
 
 - Judge logs: `ssh ubuntu@<judge address>`, then `cd /opt/gretlab && sudo docker compose -f docker-compose.runner.yml logs -f runner`. A submission stuck at "queued" means the judge is down or can't reach the database.

@@ -2,9 +2,13 @@ import { timingSafeEqual } from "node:crypto"
 
 import { NextResponse, type NextRequest } from "next/server"
 
-import { deliverDueWebhooks, webhooksWaiting } from "@/features/integrations/deliver"
+import {
+  deliverDueWebhooks,
+  webhooksWaiting,
+} from "@/features/integrations/deliver"
 import { runDueDigests } from "@/features/notifications/digest"
 import { drainOutbox, outboxHealth } from "@/features/notifications/outbox"
+import { reconcileJudges } from "@/features/judges/server"
 
 export const dynamic = "force-dynamic"
 /** The drain stops itself after 25 s; this is the host's hard limit around it. */
@@ -65,11 +69,17 @@ async function handle(request: NextRequest) {
     console.error("[webhooks]", error)
     return { sent: 0, failed: 0 }
   })
+  // Judge machines that finished draining are ended, even with nobody on the Judges page.
+  const judges = await reconcileJudges()
   return NextResponse.json({
     ...done,
+    judges,
     ...(await outboxHealth()),
     digests,
-    webhooks: { ...webhooks, waiting: await webhooksWaiting().catch(() => null) },
+    webhooks: {
+      ...webhooks,
+      waiting: await webhooksWaiting().catch(() => null),
+    },
   })
 }
 

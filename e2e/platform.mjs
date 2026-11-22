@@ -28,6 +28,8 @@ const cleanup = () => {
   psql(`delete from users where email like 'plat-%'`)
 }
 cleanup()
+// The owner (ADMIN_EMAILS), so this suite also runs on its own.
+psql(`insert into users(email,name,role) values ('admin@example.com','Admin','admin') on conflict (email) do nothing`)
 // A legacy teacher (account role teacher, no platform role yet), a student, and others.
 for (const [email, role] of [["plat-teacher@example.com", "teacher"], ["plat-a@example.com", "student"], ["plat-b@example.com", "student"], ["plat-c@example.com", "student"]]) {
   psql(`insert into users(email,name,role,handle) values ('${email}','${email.split("@")[0]}','${role}','${email.split("@")[0]}')`)

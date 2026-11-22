@@ -25,6 +25,7 @@ import {
   QuestionIcon,
   ShieldCheckIcon,
   ShapesIcon,
+  CpuIcon,
   SquaresFourIcon,
   StackIcon,
   TrophyIcon,
@@ -160,6 +161,12 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         icon: BuildingsIcon,
         label: "Organizations",
         needs: ["platform.orgs.manage"],
+      },
+      {
+        href: "/admin/judges",
+        icon: CpuIcon,
+        label: "Judges",
+        needs: ["platform.judges.view"],
       },
       {
         href: "/admin/kinds",

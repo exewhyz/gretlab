@@ -58,6 +58,40 @@ export const PLATFORM_PERMISSIONS = {
       "Decide, for each kind of organization (school, college, cohort…), which modules are off, optional, or on from the start. Applies to every organization of that kind at once.",
     module: "Platform",
   },
+  "platform.judges.manage": {
+    label: "Manage judges",
+    description:
+      "The machines that run students' code: see them, start more for everyone or for one organization, stop them, and set their size and how many may run. Grant this, or the finer actions under it.",
+    module: "Platform",
+  },
+  "platform.judges.view": {
+    label: "See judges",
+    description:
+      "The judge machines, which pool each serves, and how each one's start-up is going.",
+    module: "Platform",
+    parent: "platform.judges.manage",
+  },
+  "platform.judges.start": {
+    label: "Start judges",
+    description:
+      "Start a judge machine for everyone or for one organization. Each costs money while it runs.",
+    module: "Platform",
+    parent: "platform.judges.manage",
+  },
+  "platform.judges.stop": {
+    label: "Stop judges",
+    description:
+      "Stop a judge machine: it finishes the work it has, takes no more, then shuts down.",
+    module: "Platform",
+    parent: "platform.judges.manage",
+  },
+  "platform.judges.settings": {
+    label: "Judge settings",
+    description:
+      "The machine size new judges get, and how many may run at once.",
+    module: "Platform",
+    parent: "platform.judges.manage",
+  },
   "platform.users.manage": {
     label: "Manage users",
     description: "See accounts, block and unblock them.",
@@ -131,13 +165,15 @@ export const PLATFORM_PERMISSIONS = {
   },
   "platform.orgs.create": {
     label: "Create organizations",
-    description: "Add a school, college or other organization and name its first owner.",
+    description:
+      "Add a school, college or other organization and name its first owner.",
     module: "Platform",
     parent: "platform.orgs.manage",
   },
   "platform.orgs.suspend": {
     label: "Suspend organizations",
-    description: "Suspend an organization, bring it back, or approve one that signed up.",
+    description:
+      "Suspend an organization, bring it back, or approve one that signed up.",
     module: "Platform",
     parent: "platform.orgs.manage",
   },

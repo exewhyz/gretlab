@@ -17,7 +17,10 @@ import { api } from "@/lib/api/client"
 
 import { Card, Loading, PageTitle } from "./shell"
 
-const GROUPS = [...new Set(SETTING_KEYS.map((key) => SETTINGS[key].group))]
+// Judge settings are on Dashboard › Judges, under their own permission.
+const GROUPS = [
+  ...new Set(SETTING_KEYS.map((key) => SETTINGS[key].group)),
+].filter((group) => group !== "Judges")
 
 /** Generated from the registry: a new setting appears here with no UI code. */
 export function AdminSettings() {
@@ -90,7 +93,8 @@ function SettingRow({
     </div>
   )
 
-  const choices = (SETTINGS[settingKey] as { choices?: Record<string, string> }).choices
+  const choices = (SETTINGS[settingKey] as { choices?: Record<string, string> })
+    .choices
   if (choices) {
     return (
       <div className="flex flex-wrap items-start gap-3">
@@ -99,7 +103,9 @@ function SettingRow({
           aria-label={label}
           className="w-full min-[901px]:w-80"
           value={String(value)}
-          onChange={(event) => onSave(event.target.value as Settings[SettingKey])}
+          onChange={(event) =>
+            onSave(event.target.value as Settings[SettingKey])
+          }
         >
           {Object.entries(choices).map(([key, name]) => (
             <option key={key} value={key}>

@@ -3,6 +3,7 @@ import { availableParallelism, hostname, totalmem } from "node:os"
 
 import {
   getDb,
+  judgeMachines,
   organizations,
   settings as settingsTable,
   sql,
@@ -69,6 +70,27 @@ if (POOL_SLUG && !poolOrg) {
   process.exit(1)
 }
 const pool = poolOrg?.id ?? null
+
+/**
+ * A machine started from the dashboard (RUNNER_MACHINE: its AWS instance id). Stop there asks
+ * it to drain: it takes no more work, finishes what it has, leaves the judges list (so its
+ * organization's work falls back to the shared judges at once), says "drained", and waits for
+ * the website to end the machine. It never exits by itself: Docker would restart it.
+ */
+const MACHINE = process.env.RUNNER_MACHINE?.trim() || null
+const DRAIN_CHECK_MS = 10_000
+let lastDrainCheck = 0
+async function drainAsked() {
+  if (!MACHINE || Date.now() - lastDrainCheck < DRAIN_CHECK_MS) return false
+  lastDrainCheck = Date.now()
+  const [row] = await db
+    .select({ stage: judgeMachines.stage })
+    .from(judgeMachines)
+    .where(sql.eq(judgeMachines.instanceId, MACHINE))
+  return ["draining", "drained", "stopping", "stopped"].includes(
+    row?.stage ?? ""
+  )
+}
 
 // Refuses to start without the promised isolation. See the sandbox rules in AGENTS.md.
 await backend.verify()
@@ -165,7 +187,14 @@ console.log(
 )
 
 /** A single loop claims for every slot, so idle runners poll once, not once per slot. */
+let draining = false
 while (!stopping) {
+  if (await drainAsked().catch(() => false)) {
+    console.log(`[runner] asked to drain: finishing ${running.size} job(s)`)
+    draining = true
+    stopping = true
+    break
+  }
   if (running.size >= SLOTS) {
     await sleepUntilWoken(POLL_MS)
     continue
@@ -202,5 +231,20 @@ clearInterval(housekeeping)
 clearInterval(rejudging)
 await deregister(db, runnerId)
 await listener.end({ timeout: 2 })
-console.log("[runner] stopped")
-process.exit(0)
+if (draining && MACHINE) {
+  await db
+    .update(judgeMachines)
+    .set({ stage: "drained", note: "", stageAt: new Date() })
+    .where(
+      sql.and(
+        sql.eq(judgeMachines.instanceId, MACHINE),
+        sql.eq(judgeMachines.stage, "draining")
+      )
+    )
+  console.log("[runner] drained: waiting for the machine to be ended")
+  // Stay alive and idle: exiting would make Docker restart the judge.
+  setInterval(() => {}, 1 << 30)
+} else {
+  console.log("[runner] stopped")
+  process.exit(0)
+}

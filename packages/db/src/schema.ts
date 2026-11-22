@@ -733,6 +733,49 @@ export const runners = pgTable("runners", {
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
 })
 
+/**
+ * A judge machine started from the dashboard (Dashboard › Judges): its AWS instance, the pool it
+ * serves (an organization's, or null for shared), and where it is in its life. The website moves
+ * it through requested → launching; the machine itself reports installing → ready (or failed,
+ * deploy/judge-machine-boot.sh); Stop asks for draining, the judge answers drained once its work
+ * is done (apps/runner), and the website then ends it (stopping → stopped).
+ */
+export const judgeMachines = pgTable(
+  "judge_machines",
+  {
+    id: id(),
+    instanceId: text("instance_id").unique(),
+    poolOrgId: uuid("pool_org_id").references(() => organizations.id, {
+      onDelete: "set null",
+    }),
+    size: text("size").notNull(),
+    stage: text("stage")
+      .$type<
+        | "requested"
+        | "launching"
+        | "installing"
+        | "ready"
+        | "draining"
+        | "drained"
+        | "stopping"
+        | "stopped"
+        | "failed"
+      >()
+      .notNull()
+      .default("requested"),
+    /** Why it failed, or what it's waiting for. */
+    note: text("note").notNull().default(""),
+    requestedBy: uuid("requested_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    stageAt: timestamp("stage_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("judge_machines_stage").on(table.stage)]
+)
+
 /* ---------- organizations ---------- */
 
 /** The kinds (packages/judge/src/kinds): a new kind adds its key here, in the same order. */

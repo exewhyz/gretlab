@@ -129,6 +129,15 @@ Run `e2e/load.mjs` against your own deployment before a big event. Add runner ma
    tier can use transaction mode, with `DATABASE_PREPARE=false`. A runner far from the database
    is fine: it makes only a few queries per submission.
 
+### Judge machines from the dashboard
+
+Platform staff with **Manage judges** start and stop judge machines on **Dashboard › Judges**,
+for everyone or for one organization, and watch each one start up (starting the machine,
+installing the judge, ready). **Stop** lets a working judge finish what it has first. How many may
+run at once and their size are set on the same page. GretLab's own deployment does this on AWS in
+Sydney through a narrow role (README › How the live site runs); judges set up by hand keep working
+beside them.
+
 ### An organization's own judges
 
 A college that needs guaranteed capacity (exams for a whole year at once) can have judges of its

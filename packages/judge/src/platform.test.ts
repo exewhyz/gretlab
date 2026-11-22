@@ -72,3 +72,34 @@ test("built-in platform roles keep their reach through parents", () => {
     false
   )
 })
+
+test("Manage judges grants seeing, starting, stopping and settings; only the Owner has it", () => {
+  const children = [
+    "platform.judges.view",
+    "platform.judges.start",
+    "platform.judges.stop",
+    "platform.judges.settings",
+  ] as const
+  for (const child of children) {
+    assert.ok(
+      grantsPlatformPermission(["platform.judges.manage"], child),
+      child
+    )
+  }
+  // One action doesn't give another: seeing judges isn't starting them.
+  assert.equal(
+    grantsPlatformPermission(["platform.judges.view"], "platform.judges.start"),
+    false
+  )
+  for (const [key, role] of Object.entries(PLATFORM_ROLES)) {
+    const holds = grantsPlatformPermission(
+      role.permissions,
+      "platform.judges.start"
+    )
+    assert.equal(
+      holds,
+      key === "owner",
+      `${key} ${holds ? "can" : "can't"} start judges`
+    )
+  }
+})

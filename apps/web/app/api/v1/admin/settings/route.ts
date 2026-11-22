@@ -15,6 +15,14 @@ export const PATCH = route(
     body: z.record(z.string(), z.unknown()),
   },
   async ({ user, body }) => {
+    // Judge settings belong to "Judge settings" (Dashboard › Judges), not to this permission.
+    if (Object.keys(body).some((key) => key.startsWith("judges."))) {
+      throw new ApiError(
+        403,
+        "forbidden",
+        "Judge settings are changed on the Judges page."
+      )
+    }
     // Requiring two-factor of staff without using it yourself would lock you out at once.
     const rule = body["security.require_2fa"]
     if (

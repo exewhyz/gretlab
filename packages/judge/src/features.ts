@@ -37,7 +37,10 @@ export const SETTINGS = {
     schema: z
       .string()
       .trim()
-      .regex(/^https?:\/\/[^\s/]+(\/[^\s]*[^\s/])?$/, "A full address such as https://gretlab.grettech.com, without a slash at the end"),
+      .regex(
+        /^https?:\/\/[^\s/]+(\/[^\s]*[^\s/])?$/,
+        "A full address such as https://gretlab.grettech.com, without a slash at the end"
+      ),
     default: "https://gretlab.grettech.com" as string,
   },
   "seo.description": {
@@ -51,7 +54,8 @@ export const SETTINGS = {
   },
   "seo.tagline": {
     label: "Tagline",
-    description: "One line: the home page's title and the share card's headline.",
+    description:
+      "One line: the home page's title and the share card's headline.",
     group: "Search engines",
     schema: z.string().trim().min(3).max(80),
     default: "The coding lab and the school day, in one place" as string,
@@ -83,7 +87,7 @@ export const SETTINGS = {
   "landing.contact_email": {
     label: "Contact email for organizations",
     description:
-      "Where the landing page's \"Talk to us\" button writes to when school sign-up is off: whoever answers schools and colleges asking to join. Empty: the button offers to create an account instead.",
+      'Where the landing page\'s "Talk to us" button writes to when school sign-up is off: whoever answers schools and colleges asking to join. Empty: the button offers to create an account instead.',
     group: "Landing page",
     schema: z.union([z.literal(""), z.string().trim().email().max(200)]),
     default: "" as string,
@@ -166,6 +170,38 @@ export const SETTINGS = {
     schema: z.number().int().min(1).max(50),
     default: 3,
   },
+  // Judge machines (Dashboard › Judges, "Judge settings"): kept off the Settings page.
+  "judges.max_running": {
+    label: "Judges at once",
+    description:
+      "How many judge machines started from the dashboard may run at the same time. Each costs money while it runs.",
+    group: "Judges",
+    schema: z.number().int().min(0).max(50),
+    default: 3,
+  },
+  "judges.size": {
+    label: "Machine size",
+    description:
+      "What new judge machines are. Larger ones run more code at once and cost more. Prices are AWS's on-demand rates in Sydney (checked 22 November 2026). The AWS role allows only these.",
+    group: "Judges",
+    schema: z.enum([
+      "c7i-flex.large",
+      "c7i-flex.xlarge",
+      "c7i.large",
+      "c7i.xlarge",
+    ]),
+    default: "c7i-flex.large" as
+      "c7i-flex.large" | "c7i-flex.xlarge" | "c7i.large" | "c7i.xlarge",
+    choices: {
+      "c7i-flex.large": "c7i-flex.large: 2 vCPUs, 4 GB (about US$0.11 an hour)",
+      "c7i-flex.xlarge":
+        "c7i-flex.xlarge: 4 vCPUs, 8 GB (about US$0.22 an hour)",
+      "c7i.large":
+        "c7i.large: 2 vCPUs, 4 GB, full speed always (about US$0.12 an hour)",
+      "c7i.xlarge":
+        "c7i.xlarge: 4 vCPUs, 8 GB, full speed always (about US$0.23 an hour)",
+    },
+  },
   "queue.max_depth": {
     label: "Queue limit",
     description:
@@ -220,7 +256,8 @@ export const SETTINGS = {
     default: "off" as "off" | "staff" | "everyone",
     choices: {
       off: "No one",
-      staff: "Staff: platform staff and anyone with a role that manages something",
+      staff:
+        "Staff: platform staff and anyone with a role that manages something",
       everyone: "Everyone",
     },
   },

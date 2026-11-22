@@ -547,6 +547,13 @@
       "when": 1795343080062,
       "tag": "0077_wonderful_ultimatum",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1795350468466,
+      "tag": "0078_slim_starbolt",
+      "breakpoints": true
     }
   ]
 }
