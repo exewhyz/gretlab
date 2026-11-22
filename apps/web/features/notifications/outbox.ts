@@ -55,6 +55,9 @@ export interface QueueOptions {
   expiresInMs?: number
 }
 
+/** Rows per insert: well under Postgres's 65,535 parameters (6 a row). */
+const BATCH = 1000
+
 /** Queues emails inside the caller's transaction. Without a provider, nothing is queued. */
 export async function queueEmails(
   tx: Executor,
@@ -67,16 +70,36 @@ export async function queueEmails(
   const expiresAt = options.expiresInMs
     ? new Date(Date.now() + options.expiresInMs)
     : null
-  await tx.insert(emailOutbox).values(
-    emails.map((e) => ({
-      to: e.to,
-      subject: e.subject.slice(0, 300),
-      text: e.text.slice(0, 10_000),
-      html: e.html ? e.html.slice(0, 200_000) : null,
-      urgent: options.urgent ?? false,
-      expiresAt,
-    }))
-  )
+  for (let at = 0; at < emails.length; at += BATCH) {
+    await tx.insert(emailOutbox).values(
+      emails.slice(at, at + BATCH).map((e) => ({
+        to: e.to,
+        subject: e.subject.slice(0, 300),
+        text: e.text.slice(0, 10_000),
+        html: e.html ? e.html.slice(0, 200_000) : null,
+        urgent: options.urgent ?? false,
+        expiresAt,
+      }))
+    )
+  }
+}
+
+/**
+ * Queues one email to many addresses (a notice to a whole year): a single statement, with the
+ * addresses as one array and the email sent to the database once, however many there are.
+ */
+export async function queueSameEmail(
+  tx: Pick<ReturnType<typeof getDb>, "execute">,
+  addresses: string[],
+  email: Omit<QueuedEmail, "to">
+) {
+  const to = addresses.filter((a) => !isUndeliverable(a))
+  if (!mailEnabled() || to.length === 0) return
+  await tx.execute(sql.sql`
+    insert into email_outbox (to_address, subject, body, html)
+    select address, ${email.subject.slice(0, 300)}, ${email.text.slice(0, 10_000)},
+      ${email.html ? email.html.slice(0, 200_000) : null}
+    from unnest(${sql.sql.param(to)}::text[]) as address`)
 }
 
 type Claimed = {

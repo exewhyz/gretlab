@@ -28,7 +28,7 @@ import { getSettings } from "@/features/settings/server"
 import { modulesOf } from "@/features/orgs/kinds"
 
 import { mailEnabled } from "./mailer"
-import { drainOutbox, queueEmails } from "./outbox"
+import { drainOutbox, queueEmails, queueSameEmail } from "./outbox"
 import { policyFor } from "./policy"
 import { orgPages } from "@/lib/paths"
 
@@ -81,6 +81,114 @@ async function orgName(orgId: string) {
 /** A kind this code doesn't list as an event: shown in the bell, emailed to who wants email. */
 const UNLISTED: EventPolicy = { inApp: true, email: true, userChoice: true }
 
+/** What one person is told. */
+interface Message {
+  title: string
+  body?: string
+  /** A path on this site. */
+  href?: string
+}
+
+const clean = (m: Message) => ({
+  title: m.title.slice(0, 300),
+  body: (m.body ?? "").slice(0, 2000),
+  href: m.href ?? "",
+})
+
+/**
+ * Stores and emails one event for many people, in one transaction, at any size: either the
+ * same message for everyone (`messages` one Message) or one each (`messages` an array, in the
+ * order of `people`). Each write is a single statement with the people as one array, so a
+ * notice to 200,000 students is as many statements as one to a class. Never throws.
+ */
+async function deliver(
+  kind: string,
+  orgId: string | null,
+  people: string[],
+  messages: Message | Message[]
+) {
+  const told = { inApp: 0, email: 0 }
+  if (people.length === 0) return told
+  const each = Array.isArray(messages) ? messages.map(clean) : null
+  const shared = Array.isArray(messages) ? null : clean(messages)
+  const event = eventOfKind(kind)
+  const q = sql.sql
+  try {
+    const policy = event ? await policyFor(event, orgId) : UNLISTED
+    const emailing = policy.email && mailEnabled()
+    if (!policy.inApp && !emailing) return told
+    const site = process.env.NEXTAUTH_URL ?? ""
+    const org = emailing && orgId ? await orgName(orgId) : ""
+    const compose = (m: ReturnType<typeof clean>) =>
+      composeEmail("notification", {
+        title: m.title,
+        body: m.body,
+        link: m.href ? `${site}${m.href}` : site,
+        org,
+      })
+    await getDb().transaction(async (tx) => {
+      if (policy.inApp) {
+        await tx.execute(
+          shared
+            ? q`insert into notifications (user_id, kind, title, body, href)
+                select person, ${kind}, ${shared.title}, ${shared.body}, ${shared.href}
+                from unnest(${q.param(people)}::uuid[]) as person`
+            : q`insert into notifications (user_id, kind, title, body, href)
+                select m.person, ${kind}, m.title, m.body, m.href
+                from unnest(${q.param(people)}::uuid[], ${q.param(each!.map((m) => m.title))}::text[],
+                  ${q.param(each!.map((m) => m.body))}::text[], ${q.param(each!.map((m) => m.href))}::text[])
+                  as m(person, title, body, href)`
+        )
+        told.inApp = people.length
+      }
+      if (!emailing) return
+      const found = await tx
+        .select({
+          id: users.id,
+          email: users.email,
+          emailOn: users.emailNotifications,
+          prefs: users.notificationPrefs,
+        })
+        .from(users)
+        .where(and(inArray(users.id, people), eq(users.disabled, false)))
+      const wants = new Map(
+        found
+          .filter((person) => {
+            const choices = {
+              emailOn: person.emailOn,
+              events: readPreferences(person.prefs),
+            }
+            return event
+              ? deliveryFor(event, policy, choices).email
+              : choices.emailOn
+          })
+          .map((person) => [person.id, person.email])
+      )
+      if (shared) {
+        const addresses = people.flatMap((id) => wants.get(id) ?? [])
+        await queueSameEmail(tx, addresses, await compose(shared))
+        told.email = addresses.length
+      } else {
+        const emails = await Promise.all(
+          people.flatMap((id, i) => {
+            const to = wants.get(id)
+            return to
+              ? [compose(each![i]!).then((email) => ({ to, ...email }))]
+              : []
+          })
+        )
+        await queueEmails(tx, emails)
+        told.email = emails.length
+      }
+    })
+    if (told.email) afterResponse(() => drainOutbox())
+  } catch (error) {
+    console.error("[notifications] couldn't store:", error)
+    return { inApp: 0, email: 0 }
+  }
+  return told
+}
+
 /**
  * Tells these people about an event, as its policy allows: a notification in the bell,
  * and an email to those the policy and their own settings give one. Both are written in
@@ -89,66 +197,10 @@ const UNLISTED: EventPolicy = { inApp: true, email: true, userChoice: true }
  * how many were told each way.
  */
 export async function notify(userIds: string[], n: NewNotification) {
-  const told = { inApp: 0, email: 0 }
   const ids = [...new Set(userIds)]
-  if (ids.length === 0) return told
+  const told = await deliver(n.kind, n.orgId ?? null, ids, n)
   const event = eventOfKind(n.kind)
-  try {
-    const policy = event ? await policyFor(event, n.orgId ?? null) : UNLISTED
-    const emailing = policy.email && mailEnabled()
-    if (!policy.inApp && !emailing) return told
-    const site = process.env.NEXTAUTH_URL ?? ""
-    // One email for everyone told: the Notification template, branded (features/emails).
-    const email = emailing
-      ? await composeEmail("notification", {
-          title: n.title,
-          body: n.body ?? "",
-          link: n.href ? `${site}${n.href}` : site,
-          org: n.orgId ? await orgName(n.orgId) : "",
-        })
-      : null
-    await getDb().transaction(async (tx) => {
-      if (policy.inApp) {
-        await tx.insert(notifications).values(
-          ids.map((userId) => ({
-            userId,
-            kind: n.kind,
-            title: n.title.slice(0, 300),
-            body: (n.body ?? "").slice(0, 2000),
-            href: n.href ?? "",
-          }))
-        )
-        told.inApp = ids.length
-      }
-      if (!emailing || !email) return
-      const people = await tx
-        .select({
-          email: users.email,
-          emailOn: users.emailNotifications,
-          prefs: users.notificationPrefs,
-        })
-        .from(users)
-        .where(and(inArray(users.id, ids), eq(users.disabled, false)))
-      const recipients = people.filter((person) => {
-        const choices = {
-          emailOn: person.emailOn,
-          events: readPreferences(person.prefs),
-        }
-        return event
-          ? deliveryFor(event, policy, choices).email
-          : choices.emailOn
-      })
-      await queueEmails(
-        tx,
-        recipients.map((r) => ({ to: r.email, ...email }))
-      )
-      told.email = recipients.length
-    })
-    if (told.email) afterResponse(() => drainOutbox())
-  } catch (error) {
-    console.error("[notifications] couldn't store:", error)
-  }
-  if (n.orgId && event && COPIED_TO_PARENTS.has(event)) {
+  if (ids.length && n.orgId && event && COPIED_TO_PARENTS.has(event)) {
     await tellParents(n.orgId, ids, (child) => ({
       kind: "child_update",
       title: `${child}: ${n.title}`,
@@ -170,7 +222,8 @@ const COPIED_TO_PARENTS = new Set<string>([
 
 /**
  * Tells the parents of these students (Parent accounts module, linked in this
- * organization), one notification per child, linking to that child's page. Never throws.
+ * organization), one notification per child, linking to that child's page, all in one
+ * delivery however many children. Never throws.
  */
 export async function tellParents(
   orgId: string,
@@ -181,28 +234,41 @@ export async function tellParents(
   try {
     const db = getDb()
     const [org] = await db
-      .select({ slug: organizations.slug, type: organizations.type, modules: organizations.modules })
+      .select({
+        slug: organizations.slug,
+        type: organizations.type,
+        modules: organizations.modules,
+      })
       .from(organizations)
       .where(eq(organizations.id, orgId))
     if (!org || !(await modulesOf(org)).has("parents")) return
     const rows = await db
-      .select({ parentId: guardians.parentId, studentId: guardians.studentId, name: users.name, email: users.email })
+      .select({
+        parentId: guardians.parentId,
+        studentId: guardians.studentId,
+        name: users.name,
+        email: users.email,
+      })
       .from(guardians)
       .innerJoin(users, eq(guardians.studentId, users.id))
-      .where(and(eq(guardians.orgId, orgId), inArray(guardians.studentId, studentIds)))
-    const byChild = new Map<string, { name: string; parentIds: string[] }>()
-    for (const r of rows) {
-      const entry = byChild.get(r.studentId) ?? { name: r.name ?? r.email, parentIds: [] }
-      entry.parentIds.push(r.parentId)
-      byChild.set(r.studentId, entry)
-    }
-    for (const [studentId, child] of byChild) {
-      await notify(child.parentIds, {
-        ...message(child.name),
-        href: orgPages(org.slug).child(studentId),
-        orgId,
+      .where(
+        and(
+          eq(guardians.orgId, orgId),
+          inArray(guardians.studentId, studentIds)
+        )
+      )
+    if (rows.length === 0) return
+    // One kind for every copy (they're all the same event), each naming its child.
+    const sample = message("")
+    await deliver(
+      sample.kind,
+      orgId,
+      rows.map((r) => r.parentId),
+      rows.map((r) => {
+        const { title, body } = message(r.name ?? r.email)
+        return { title, body, href: orgPages(org.slug).child(r.studentId) }
       })
-    }
+    )
   } catch (error) {
     console.error("[notifications] couldn't tell parents:", error)
   }
@@ -210,7 +276,13 @@ export async function tellParents(
 
 export interface Reminder {
   id: string
-  kind: "due_soon" | "contest_soon" | "attendance_low" | "library_due" | "training_due" | "event_soon"
+  kind:
+    | "due_soon"
+    | "contest_soon"
+    | "attendance_low"
+    | "library_due"
+    | "training_due"
+    | "event_soon"
   title: string
   body: string
   href: string
