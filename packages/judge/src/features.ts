@@ -179,6 +179,53 @@ export const SETTINGS = {
     schema: z.number().int().min(0).max(50),
     default: 3,
   },
+  "judges.autoscale": {
+    label: "Automatic scaling",
+    description:
+      "Start shared judges when work waits or an exam is about to open, and end the ones it started once they're idle. Off: only people start and stop judges.",
+    group: "Judges",
+    schema: z.boolean(),
+    default: false,
+  },
+  "judges.min_shared": {
+    label: "Judges for everyone, at least",
+    description:
+      "Shared judges kept online even when quiet, judges set up by hand included.",
+    group: "Judges",
+    schema: z.number().int().min(0).max(20),
+    default: 1,
+  },
+  "judges.scale_up_seconds": {
+    label: "Start another after work waits (seconds)",
+    description:
+      "How long shared work may wait for a judge before another starts.",
+    group: "Judges",
+    schema: z.number().int().min(10).max(3600),
+    default: 30,
+  },
+  "judges.idle_minutes": {
+    label: "End an idle judge after (minutes)",
+    description:
+      "How long a judge started by automatic scaling may have nothing to do before it's ended.",
+    group: "Judges",
+    schema: z.number().int().min(5).max(1440),
+    default: 20,
+  },
+  "judges.exam_students_per_judge": {
+    label: "Students per judge for an exam",
+    description:
+      "Before an exam opens, a shared judge is warmed up for every this many students sitting it.",
+    group: "Judges",
+    schema: z.number().int().min(10).max(2000),
+    default: 60,
+  },
+  "judges.exam_warmup_minutes": {
+    label: "Warm up before an exam (minutes)",
+    description: "How long before an exam opens its judges are started.",
+    group: "Judges",
+    schema: z.number().int().min(0).max(240),
+    default: 15,
+  },
   "judges.size": {
     label: "Machine size",
     description:

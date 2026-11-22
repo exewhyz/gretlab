@@ -9,6 +9,7 @@ import {
 import { runDueDigests } from "@/features/notifications/digest"
 import { drainOutbox, outboxHealth } from "@/features/notifications/outbox"
 import { reconcileJudges } from "@/features/judges/server"
+import { autoscaleJudges } from "@/features/judges/autoscale"
 
 export const dynamic = "force-dynamic"
 /** The drain stops itself after 25 s; this is the host's hard limit around it. */
@@ -71,9 +72,10 @@ async function handle(request: NextRequest) {
   })
   // Judge machines that finished draining are ended, even with nobody on the Judges page.
   const judges = await reconcileJudges()
+  const scaling = await autoscaleJudges({ force: true })
   return NextResponse.json({
     ...done,
-    judges,
+    judges: { ...judges, scaling: scaling.action },
     ...(await outboxHealth()),
     digests,
     webhooks: {

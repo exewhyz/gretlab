@@ -35,7 +35,7 @@ type Stage = (typeof judgeMachines.$inferSelect)["stage"]
 type Machine = typeof judgeMachines.$inferSelect
 
 /** Stages of a machine that exists (or is about to): these count toward the limit. */
-const LIVE: Stage[] = [
+export const LIVE: Stage[] = [
   "requested",
   "launching",
   "installing",
@@ -45,7 +45,7 @@ const LIVE: Stage[] = [
   "stopping",
 ]
 /** Still coming up: a replacement in one of these is an update in progress. */
-const COMING_UP: Stage[] = ["requested", "launching", "installing"]
+export const COMING_UP: Stage[] = ["requested", "launching", "installing"]
 /** A machine that hasn't finished setting up after this long has failed. */
 const SETUP_LIMIT_MS = 30 * 60_000
 
@@ -65,7 +65,7 @@ function needMachines() {
   return provider
 }
 
-async function setStage(id: string, stage: Stage, note = "") {
+export async function setStage(id: string, stage: Stage, note = "") {
   await getDb()
     .update(judgeMachines)
     .set({ stage, note, stageAt: new Date() })
@@ -157,10 +157,7 @@ export async function listJudges() {
     })),
     /** The commit the site runs, which judges are compared with. */
     latest,
-    settings: {
-      maxRunning: settings["judges.max_running"],
-      size: settings["judges.size"],
-    },
+    settings: judgeSettingsOf(settings),
     /** Whether this copy can start machines at all. */
     available: machines() !== null,
     sizes: Object.entries(SETTINGS["judges.size"].choices).map(
@@ -170,7 +167,11 @@ export async function listJudges() {
 }
 
 /** Asks AWS for the row's machine; a refusal marks it failed, with AWS's reason in words. */
-async function launch(provider: Machines, row: Machine, pool: string | null) {
+export async function launch(
+  provider: Machines,
+  row: Machine,
+  pool: string | null
+) {
   try {
     const instanceId = await provider.start({
       size: row.size,
@@ -552,24 +553,70 @@ export async function checkJudges(): Promise<CheckResult[]> {
   return provider.check(settings["judges.size"])
 }
 
-export const settingsSchema = z.object({
-  maxRunning: SETTINGS["judges.max_running"].schema,
-  size: SETTINGS["judges.size"].schema,
+export const settingsSchema = z
+  .object({
+    maxRunning: SETTINGS["judges.max_running"].schema,
+    size: SETTINGS["judges.size"].schema,
+    autoscale: SETTINGS["judges.autoscale"].schema,
+    minShared: SETTINGS["judges.min_shared"].schema,
+    scaleUpSeconds: SETTINGS["judges.scale_up_seconds"].schema,
+    idleMinutes: SETTINGS["judges.idle_minutes"].schema,
+    studentsPerJudge: SETTINGS["judges.exam_students_per_judge"].schema,
+    warmupMinutes: SETTINGS["judges.exam_warmup_minutes"].schema,
+  })
+  .partial()
+
+/** The judge settings as the page edits them. */
+const judgeSettingsOf = (
+  settings: Awaited<ReturnType<typeof getSettings>>
+) => ({
+  maxRunning: settings["judges.max_running"],
+  size: settings["judges.size"],
+  autoscale: settings["judges.autoscale"],
+  minShared: settings["judges.min_shared"],
+  scaleUpSeconds: settings["judges.scale_up_seconds"],
+  idleMinutes: settings["judges.idle_minutes"],
+  studentsPerJudge: settings["judges.exam_students_per_judge"],
+  warmupMinutes: settings["judges.exam_warmup_minutes"],
 })
 
+/** Each judge setting: its key, and its name in the activity log. */
+const SETTING_FIELDS = {
+  maxRunning: ["judges.max_running", "Judges at once"],
+  size: ["judges.size", "Machine size"],
+  autoscale: ["judges.autoscale", "Automatic scaling"],
+  minShared: ["judges.min_shared", "Judges for everyone, at least"],
+  scaleUpSeconds: [
+    "judges.scale_up_seconds",
+    "Start another after work waits (s)",
+  ],
+  idleMinutes: ["judges.idle_minutes", "End an idle judge after (min)"],
+  studentsPerJudge: [
+    "judges.exam_students_per_judge",
+    "Students per judge for an exam",
+  ],
+  warmupMinutes: ["judges.exam_warmup_minutes", "Warm up before an exam (min)"],
+} as const
+
+/** Saves the judge settings given (any of them); only those change, and only those are logged. */
 export async function saveJudgeSettings(
   user: User,
   input: z.infer<typeof settingsSchema>
 ) {
-  await updateSettings({
-    "judges.max_running": input.maxRunning,
-    "judges.size": input.size,
-  })
+  const given = Object.entries(input).filter(([, v]) => v !== undefined) as [
+    keyof typeof SETTING_FIELDS,
+    unknown,
+  ][]
+  if (given.length === 0)
+    throw new ApiError(400, "nothing_to_save", "No settings were given.")
+  await updateSettings(
+    Object.fromEntries(given.map(([k, v]) => [SETTING_FIELDS[k][0], v]))
+  )
   await writePlatformAudit(user, "judges.settings", "Changed judge settings", {
-    changes: [
-      { field: "Judges at once", to: input.maxRunning },
-      { field: "Machine size", to: input.size },
-    ],
+    changes: given.map(([k, v]) => ({
+      field: SETTING_FIELDS[k][1],
+      to: typeof v === "boolean" ? (v ? "on" : "off") : v,
+    })),
   })
-  return { maxRunning: input.maxRunning, size: input.size }
+  return judgeSettingsOf(await getSettings())
 }

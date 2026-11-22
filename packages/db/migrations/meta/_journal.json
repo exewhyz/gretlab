@@ -561,6 +561,13 @@
       "when": 1795354693678,
       "tag": "0079_good_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1795358581341,
+      "tag": "0080_good_iron_patriot",
+      "breakpoints": true
     }
   ]
 }

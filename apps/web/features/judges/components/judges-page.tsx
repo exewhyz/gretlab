@@ -9,6 +9,7 @@ import { useState } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
+import { Switch } from "@workspace/ui/components/switch"
 import {
   Collapsible,
   CollapsibleContent,
@@ -480,49 +481,132 @@ function StartDialog({ data, onClose }: { data: Judges; onClose: () => void }) {
 
 function JudgeSettings({ data }: { data: Judges }) {
   const client = useQueryClient()
-  const [maxRunning, setMaxRunning] = useState(String(data.settings.maxRunning))
-  const [size, setSize] = useState<string>(data.settings.size)
+  const saved = data.settings
+  const [form, setForm] = useState({
+    maxRunning: String(saved.maxRunning),
+    size: saved.size as string,
+    autoscale: saved.autoscale,
+    minShared: String(saved.minShared),
+    scaleUpSeconds: String(saved.scaleUpSeconds),
+    idleMinutes: String(saved.idleMinutes),
+    studentsPerJudge: String(saved.studentsPerJudge),
+    warmupMinutes: String(saved.warmupMinutes),
+  })
+  const set = (key: keyof typeof form) => (value: string | boolean) =>
+    setForm((f) => ({ ...f, [key]: value }))
   const save = useMutation({
     mutationFn: () =>
       api("/admin/judges/settings", {
         method: "PUT",
-        body: { maxRunning: Number(maxRunning), size },
+        body: {
+          maxRunning: Number(form.maxRunning),
+          size: form.size,
+          autoscale: form.autoscale,
+          minShared: Number(form.minShared),
+          scaleUpSeconds: Number(form.scaleUpSeconds),
+          idleMinutes: Number(form.idleMinutes),
+          studentsPerJudge: Number(form.studentsPerJudge),
+          warmupMinutes: Number(form.warmupMinutes),
+        },
       }),
     onSuccess: () => void client.invalidateQueries({ queryKey: KEY }),
     meta: { success: "Judge settings saved", quiet: true },
   })
+  const number = (
+    key: keyof typeof form,
+    label: string,
+    min: number,
+    max: number
+  ) => (
+    <Field label={label}>
+      <TextInput
+        type="number"
+        min={min}
+        max={max}
+        value={String(form[key])}
+        onChange={(e) => set(key)(e.target.value)}
+      />
+    </Field>
+  )
   return (
     <>
       <h2 className="mt-6 mb-2 text-title-sm text-ink">Judge settings</h2>
       <Card>
         <form
-          className="grid gap-4 sm:grid-cols-[10rem_1fr_auto] sm:items-end"
+          className="grid gap-5"
           onSubmit={(e) => {
             e.preventDefault()
             save.mutate()
           }}
         >
-          <Field label="Judges at once">
-            <TextInput
-              type="number"
-              min={0}
-              max={50}
-              value={maxRunning}
-              onChange={(e) => setMaxRunning(e.target.value)}
+          <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
+            {number("maxRunning", "Judges at once", 0, 50)}
+            <Field label="Machine size for new judges">
+              <SelectInput
+                value={form.size}
+                onChange={(e) => set("size")(e.target.value)}
+              >
+                {data.sizes.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+          </div>
+          <label className="flex items-start gap-2 text-body-sm text-ink">
+            <Switch
+              checked={form.autoscale}
+              onCheckedChange={(checked) => set("autoscale")(checked)}
+              aria-label="Automatic scaling"
             />
-          </Field>
-          <Field label="Machine size for new judges">
-            <SelectInput value={size} onChange={(e) => setSize(e.target.value)}>
-              {data.sizes.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
-          <Button type="submit" disabled={save.isPending}>
-            Save
-          </Button>
+            <span>
+              Automatic scaling
+              <span className="block max-w-prose text-xs text-body">
+                Starts shared judges when work waits or an exam is about to
+                open, and ends the ones it started once they&apos;re idle. It
+                never goes past the limit above, and never ends a judge a person
+                started. Every start and stop is in the activity log.
+              </span>
+            </span>
+          </label>
+          {form.autoscale && (
+            <div
+              className="grid gap-4 sm:grid-cols-3"
+              data-testid="autoscale-settings"
+            >
+              {number("minShared", "Judges for everyone, at least", 0, 20)}
+              {number(
+                "scaleUpSeconds",
+                "Start another after work waits (seconds)",
+                10,
+                3600
+              )}
+              {number(
+                "idleMinutes",
+                "End an idle judge after (minutes)",
+                5,
+                1440
+              )}
+              {number(
+                "studentsPerJudge",
+                "Students per judge for an exam",
+                10,
+                2000
+              )}
+              {number(
+                "warmupMinutes",
+                "Warm up before an exam (minutes)",
+                0,
+                240
+              )}
+            </div>
+          )}
+          <div>
+            <Button type="submit" disabled={save.isPending}>
+              Save
+            </Button>
+          </div>
         </form>
         <FormMessage
           message={

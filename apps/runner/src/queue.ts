@@ -103,7 +103,15 @@ export async function heartbeat(
         )
       )
   }
-  const values = { ...runner, busy: jobIds.length, lastSeenAt: new Date() }
+  const now = new Date()
+  const values = {
+    ...runner,
+    busy: jobIds.length,
+    lastSeenAt: now,
+    // With work now, it's busy now; without, it keeps when it last was (automatic scaling
+    // ends a judge idle long enough).
+    ...(jobIds.length ? { lastBusyAt: now } : {}),
+  }
   await db
     .insert(runners)
     .values(values)

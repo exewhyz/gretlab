@@ -733,6 +733,10 @@ export const runners = pgTable("runners", {
   version: text("version"),
   /** The machine it runs on, when started from the dashboard (RUNNER_MACHINE: its instance id). */
   machineId: text("machine_id"),
+  /** The last heartbeat it had work (or when it started): how long it has been idle. */
+  lastBusyAt: timestamp("last_busy_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   busy: integer("busy").notNull().default(0),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
 })
@@ -779,6 +783,8 @@ export const judgeMachines = pgTable(
         onDelete: "set null",
       }
     ),
+    /** Started by automatic scaling, which may end it when idle (never one a person started). */
+    auto: boolean("auto").notNull().default(false),
     /** Update asked for: a replacement is started for it, one machine at a time. */
     updateWanted: boolean("update_wanted").notNull().default(false),
     updateRequestedBy: uuid("update_requested_by").references(() => users.id, {

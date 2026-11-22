@@ -1,4 +1,5 @@
 import { route } from "@/lib/api/route"
+import { autoscaleJudges } from "@/features/judges/autoscale"
 import {
   listJudges,
   reconcileJudges,
@@ -9,6 +10,7 @@ import {
 /** The judge machines, each brought up to date with AWS first. */
 export const GET = route({ access: "platform.judges.view" }, async () => {
   await reconcileJudges()
+  await autoscaleJudges()
   return listJudges()
 })
 

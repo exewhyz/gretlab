@@ -392,3 +392,34 @@ test("a heartbeat records the judge's code version and machine", async () => {
   assert.equal(row?.version, "abc123")
   assert.equal(row?.machineId, "i-0123")
 })
+
+test("a heartbeat with work marks the judge busy now; one without leaves when it last was", async () => {
+  await db.delete(runners)
+  const self = { id: "b-judge", host: "h", slots: 2 }
+  await heartbeat(db, self, [])
+  const long = new Date(Date.now() - 60 * 60_000)
+  await db
+    .update(runners)
+    .set({ lastBusyAt: long })
+    .where(sql.eq(runners.id, "b-judge"))
+  await heartbeat(db, self, [])
+  const [quiet] = await db
+    .select()
+    .from(runners)
+    .where(sql.eq(runners.id, "b-judge"))
+  assert.equal(
+    quiet?.lastBusyAt.getTime(),
+    long.getTime(),
+    "an idle heartbeat keeps the time"
+  )
+  const job = await enqueue()
+  await heartbeat(db, self, [job.id])
+  const [busy] = await db
+    .select()
+    .from(runners)
+    .where(sql.eq(runners.id, "b-judge"))
+  assert.ok(
+    busy!.lastBusyAt.getTime() > Date.now() - 5_000,
+    "a busy heartbeat moves it to now"
+  )
+})

@@ -39,13 +39,16 @@ export async function writeEntry(tx: Writer, input: AuditInput) {
     : input.actor.email
   const actorLabel = apiKey ? `${who}, API key "${apiKey.name}"` : who
   // What's told to the organization's webhooks, in the same transaction as the entry.
-  if (input.orgId && (await queueWebhooks(tx, input.orgId, {
-    event: input.action,
-    at: new Date().toISOString(),
-    summary: input.summary.slice(0, 1000),
-    actor: { id: input.actor.id, label: actorLabel },
-    detail: input.detail ?? null,
-  })))
+  if (
+    input.orgId &&
+    (await queueWebhooks(tx, input.orgId, {
+      event: input.action,
+      at: new Date().toISOString(),
+      summary: input.summary.slice(0, 1000),
+      actor: { id: input.actor.id, label: actorLabel },
+      detail: input.detail ?? null,
+    }))
+  )
     info.webhooksQueued = true
   await tx.insert(auditLog).values({
     orgId: input.orgId,
@@ -59,6 +62,29 @@ export async function writeEntry(tx: Writer, input: AuditInput) {
     userAgent,
     support: input.support ?? false,
   })
+}
+
+/**
+ * An entry for something GretLab did by itself (automatic scaling): no person acted, so no
+ * actor id; the label says what did it. Always the platform's own log.
+ */
+export async function writeSystemEntry(
+  label: string,
+  action: string,
+  summary: string,
+  detail?: Record<string, unknown>
+) {
+  await getDb()
+    .insert(auditLog)
+    .values({
+      orgId: null,
+      actorId: null,
+      actorLabel: label,
+      action,
+      category: auditCategory(action),
+      summary: summary.slice(0, 1000),
+      detail: detail ?? null,
+    })
 }
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)

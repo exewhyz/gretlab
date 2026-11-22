@@ -10,6 +10,8 @@
  *   - versions: each judge's code against the site's; Update (Start and Stop both needed)
  *     replaces a machine, one at a time; a failed replacement leaves the old one working;
  *     a machine stuck setting up fails; the setup check
+ *   - automatic scaling: off by default; on, waiting work starts one machine (one at a time),
+ *     and an idle machine it started is ended, never one a person started
  *   - the page, its Start dialog and Stop confirmation
  *   node e2e/judges.mjs [base-url] [screenshot-dir]
  */
@@ -33,6 +35,7 @@ const check = (name, ok, detail = "") => {
 const psql = (q) => execFileSync("docker", ["compose", "-f", ROOT + "docker-compose.yml", "exec", "-T", "postgres", "psql", "-U", "gretlab", "-d", DB, "-Atqc", q]).toString().trim()
 const cleanup = () => {
   psql(`delete from runners where host like 'jd-%'`)
+  psql(`delete from submissions where user_id in (select id from users where email like 'jd-%@example.com')`)
   psql(`delete from judge_machines`)
   psql(`delete from settings where key like 'judges.%'`)
   psql(`delete from organizations where slug in ('jd-org', 'fake-aws-refuses')`)
@@ -172,9 +175,40 @@ const checked = await viewer("/admin/judges/check")
 check("the setup check runs for anyone who may see judges", checked.status === 200 && checked.json?.results?.length >= 2 && checked.json.results.every((r) => r.ok), JSON.stringify(checked.json))
 check("…and not for anyone else", (await outsider("/admin/judges/check")).status === 403)
 
+// ---------- automatic scaling (run by the cron here: the page's runs are a few seconds apart)
+const cronNow = async () => (await (await fetch(`${BASE}/api/cron/outbox`, { method: "POST", headers: { authorization: "Bearer e2e-cron-secret-0123456789" } })).json().catch(() => null))?.judges
+const autos = () => psql(`select count(*) from judge_machines where auto`)
+const waiter = psql(`select id from users where email = 'jd-viewer@example.com'`)
+// Shared work that has waited a minute.
+psql(`insert into submissions (user_id, kind, language, entry, files, time_limit_ms, memory_limit_mb, status, created_at, queue_at) values ('${waiter}', 'run', 'python', 'main.py', '[]', 1000, 256, 'queued', now() - interval '60 seconds', now() + interval '1 day')`)
+await cronNow()
+check("automatic scaling is off unless switched on: waiting work starts nothing", autos() === "0")
+const on = await admin("/admin/judges/settings", { method: "PUT", body: { autoscale: true } })
+check("…switched on by itself (a save may change one setting)", on.status === 200 && on.json?.autoscale === true && on.json?.maxRunning === 10, JSON.stringify(on.json))
+const scaled = await cronNow()
+const auto = psql(`select id || '|' || stage || '|' || coalesce(requested_by::text, 'nobody') from judge_machines where auto`).split("|")
+check("work waiting past the limit starts one machine, started by nobody", scaled?.scaling === "start" && autos() === "1" && auto[1] === "launching" && auto[2] === "nobody", JSON.stringify({ scaled, auto }))
+await cronNow()
+check("…and no second one while it's still coming up", autos() === "1")
+check("…in the activity log as GretLab's own action, with the reason", psql(`select actor_label || '|' || summary from audit_log where action = 'judges.autoscale' order by created_at limit 1`).startsWith("GretLab (automatic scaling)|Started a judge: Work has waited"))
+// The work is done; the machine is ready and then sits idle for half an hour.
+psql(`delete from submissions where user_id = '${waiter}' and status = 'queued'`)
+psql(`update judge_machines set stage = 'ready' where id = '${auto[0]}'`)
+const autoInstance = psql(`select instance_id from judge_machines where id = '${auto[0]}'`)
+psql(`insert into runners (id, host, slots, busy, last_seen_at, last_busy_at, version, machine_id) values ('jd-auto', 'jd-auto', 2, 0, now(), now() - interval '30 minutes', 'e2e-latest', '${autoInstance}')`)
+// A machine a person started, just as idle.
+const personal = (await admin("/admin/judges", { body: {} })).json
+psql(`update judge_machines set stage = 'ready' where id = '${personal.id}'`)
+psql(`insert into runners (id, host, slots, busy, last_seen_at, last_busy_at, version, machine_id) values ('jd-person', 'jd-person', 2, 0, now(), now() - interval '90 minutes', 'e2e-latest', '${personal.instanceId}')`)
+await cronNow()
+check("an idle machine it started is ended once idle past the limit", psql(`select stage from judge_machines where id = '${auto[0]}'`) === "draining", psql(`select stage || ' ' || note from judge_machines where id = '${auto[0]}'`))
+await cronNow()
+check("…but never one a person started, however idle", psql(`select stage from judge_machines where id = '${personal.id}'`) === "ready")
+await admin("/admin/judges/settings", { method: "PUT", body: { autoscale: false } })
+
 // ---------- the activity log
 const log = psql(`select string_agg(distinct action, ',' order by action) from audit_log where org_id is null and action like 'judges.%'`)
-check("starts, stops, updates and settings are in the activity log", log === "judges.settings,judges.start,judges.stop,judges.update", log)
+check("starts, stops, updates, scaling and settings are in the activity log", log === "judges.autoscale,judges.settings,judges.start,judges.stop,judges.update", log)
 
 // ---------- the page
 const browser = await chromium.launch()
@@ -201,6 +235,8 @@ check("a failure's setup log opens from its note", await tab.getByText("==> Buil
 await tab.getByRole("button", { name: "Run the setup check" }).click()
 await tab.getByTestId("judge-check").waitFor({ timeout: 15_000 }).catch(() => {})
 check("the setup check runs from the page", (await tab.getByTestId("judge-check").getByText("Signing in to AWS").count()) === 1)
+await tab.getByRole("switch", { name: "Automatic scaling" }).click()
+check("switching automatic scaling on shows its numbers", await tab.getByTestId("autoscale-settings").isVisible())
 await tab.screenshot({ path: SHOTS + "judges.png", fullPage: true })
 const watcher = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 await watcher.addCookies([{ name: "next-auth.session-token", value: await encode({ token: { email: "jd-viewer@example.com" }, secret: SECRET }), url: BASE }])
