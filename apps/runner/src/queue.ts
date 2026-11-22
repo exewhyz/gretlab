@@ -7,7 +7,12 @@ import {
   type StoredCaseResult,
   type Submission,
 } from "@workspace/db"
-import { QUEUE_CHANNEL, isLanguageId, type LanguageId } from "@workspace/judge"
+import {
+  QUEUE_CHANNEL,
+  RUNNER_ONLINE_MS,
+  isLanguageId,
+  type LanguageId,
+} from "@workspace/judge"
 
 import { judge, type JudgeResult } from "./judge.ts"
 import type { SandboxBackend } from "./sandbox/types.ts"
@@ -28,11 +33,24 @@ function leaseEnd() {
  * SKIP LOCKED, so any number of runners can do this at once without blocking each other
  * or taking the same job.
  */
+/**
+ * The next job for this judge, oldest due first. `pool` is the organization whose own judge
+ * this is (RUNNER_POOL), or null for a shared judge:
+ * - an organization's work goes only to its own judges while one of them is online;
+ * - with none of them online, it counts as shared work, so it never waits on a dead machine;
+ * - an organization's judge takes its own work first, and when it has none, helps with
+ *   shared work (never with another organization's that has judges of its own).
+ */
 export async function claimNext(
   db: Database,
   runnerId: string,
-  freeMemoryMb: number
+  freeMemoryMb: number,
+  pool: string | null = null
 ): Promise<Submission | null> {
+  const online = sql.sql`now() - make_interval(secs => ${RUNNER_ONLINE_MS / 1000})`
+  // Shared work: the shared pool's, and any organization's whose own judges are all down.
+  const shared = sql.sql`(s.pool_org_id IS NULL OR NOT EXISTS (
+    SELECT 1 FROM runners r WHERE r.pool_org_id = s.pool_org_id AND r.last_seen_at > ${online}))`
   const [submission] = await db
     .update(submissions)
     .set({
@@ -46,10 +64,11 @@ export async function claimNext(
       eq(
         submissions.id,
         sql.sql`(
-          SELECT id FROM submissions
-          WHERE status = 'queued' AND memory_limit_mb <= ${freeMemoryMb}
-          ORDER BY queue_at
-          FOR UPDATE SKIP LOCKED
+          SELECT s.id FROM submissions s
+          WHERE s.status = 'queued' AND s.memory_limit_mb <= ${freeMemoryMb}
+            AND ${pool ? sql.sql`(s.pool_org_id = ${pool} OR ${shared})` : shared}
+          ORDER BY ${pool ? sql.sql`(s.pool_org_id IS NOT DISTINCT FROM ${pool}) DESC,` : sql.sql``} s.queue_at
+          FOR UPDATE OF s SKIP LOCKED
           LIMIT 1
         )`
       )
@@ -61,7 +80,12 @@ export async function claimNext(
 /** Proves this runner is alive, and keeps its claims from expiring. */
 export async function heartbeat(
   db: Database,
-  runner: { id: string; host: string; slots: number },
+  runner: {
+    id: string
+    host: string
+    slots: number
+    poolOrgId?: string | null
+  },
   jobIds: string[]
 ) {
   if (jobIds.length) {

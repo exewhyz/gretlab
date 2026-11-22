@@ -70,7 +70,9 @@ export const users = pgTable("users", {
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   /** Wrong passwords in a row, and until when password sign-in waits after too many. */
   passwordFailures: integer("password_failures").notNull().default(0),
-  passwordLockedUntil: timestamp("password_locked_until", { withTimezone: true }),
+  passwordLockedUntil: timestamp("password_locked_until", {
+    withTimezone: true,
+  }),
   /** Sessions signed in before this are signed out (a password reset, "sign out everywhere"). */
   sessionsValidAfter: timestamp("sessions_valid_after", { withTimezone: true }),
   /**
@@ -141,8 +143,12 @@ export const platformStaff = pgTable("platform_staff", {
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
   systemRole: text("system_role"),
-  roleId: uuid("role_id").references(() => platformRoles.id, { onDelete: "restrict" }),
-  addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
+  roleId: uuid("role_id").references(() => platformRoles.id, {
+    onDelete: "restrict",
+  }),
+  addedBy: uuid("added_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
   createdAt: createdAt(),
 })
 
@@ -273,7 +279,9 @@ export const problemSlugHistory = pgTable(
     problemId: uuid("problem_id")
       .notNull()
       .references(() => problems.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (t) => [index("problem_slug_history_problem_idx").on(t.problemId)]
 )
@@ -361,7 +369,9 @@ export const problemListItems = pgTable(
 export const dailyChallenges = pgTable("daily_challenges", {
   day: text("day").primaryKey(),
   /** The day's problem; null on a day of questions alone (see daily_questions). */
-  problemId: uuid("problem_id").references(() => problems.id, { onDelete: "cascade" }),
+  problemId: uuid("problem_id").references(() => problems.id, {
+    onDelete: "cascade",
+  }),
 })
 
 /** A day's questions, in order: several MCQs and short answers beside or instead of the problem. */
@@ -417,7 +427,10 @@ export const contests = pgTable("contests", {
   /** Who it's for: conditions that must all hold, each any of its groups. Empty: everyone. */
   audience: jsonb("audience").$type<string[][]>().notNull().default([]),
   /** Where its code runs: the server sandbox, or the browser (Python and JavaScript only). */
-  execution: text("execution").$type<"server" | "browser">().notNull().default("server"),
+  execution: text("execution")
+    .$type<"server" | "browser">()
+    .notNull()
+    .default("server"),
   /** Submissions per student per minute; null: the platform's. Never above the platform's. */
   submissionsPerMinute: integer("submissions_per_minute"),
   createdAt: createdAt(),
@@ -453,7 +466,10 @@ export const assignments = pgTable("assignments", {
     onDelete: "set null",
   }),
   /** Where its code runs: the server sandbox, or the browser (Python and JavaScript only). */
-  execution: text("execution").$type<"server" | "browser">().notNull().default("server"),
+  execution: text("execution")
+    .$type<"server" | "browser">()
+    .notNull()
+    .default("server"),
   /** Submissions per student per minute; null: the platform's. Never above the platform's. */
   submissionsPerMinute: integer("submissions_per_minute"),
   createdAt: createdAt(),
@@ -495,10 +511,18 @@ export const rubricMarks = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     marks: jsonb("marks").$type<Record<string, number>>().notNull().default({}),
-    graderId: uuid("grader_id").references(() => users.id, { onDelete: "set null" }),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    graderId: uuid("grader_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.assignmentId, table.problemId, table.userId] })]
+  (table) => [
+    primaryKey({
+      columns: [table.assignmentId, table.problemId, table.userId],
+    }),
+  ]
 )
 
 /** A teacher's comment on one line of a submitted file, given in an assignment. */
@@ -512,7 +536,9 @@ export const submissionComments = pgTable(
     assignmentId: uuid("assignment_id")
       .notNull()
       .references(() => assignments.id, { onDelete: "cascade" }),
-    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    authorId: uuid("author_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     path: text("path").notNull(),
     /** 1-based. */
     line: integer("line").notNull(),
@@ -609,6 +635,15 @@ export const submissions = pgTable(
     contestId: uuid("contest_id").references(() => contests.id, {
       onDelete: "set null",
     }),
+    /**
+     * Whose judges run it: the organization of the work (an assignment's or contest's, else
+     * the problem's); null for the shared pool (personal practice, the platform's work). An
+     * organization's work goes only to its own judges while one is online, else to the
+     * shared ones (apps/runner/src/queue.ts, claimNext).
+     */
+    poolOrgId: uuid("pool_org_id").references(() => organizations.id, {
+      onDelete: "set null",
+    }),
     kind: submissionKind("kind").notNull(),
     language: text("language").notNull(),
     entry: text("entry").notNull(),
@@ -657,6 +692,10 @@ export const submissions = pgTable(
     index("submissions_queue")
       .on(table.queueAt)
       .where(sql`status = 'queued'`),
+    // An organization's judges find their own waiting work first.
+    index("submissions_pool_queue")
+      .on(table.poolOrgId, table.queueAt)
+      .where(sql`status = 'queued'`),
     // Provisional verdicts waiting to be judged again on the server.
     index("submissions_provisional")
       .on(table.createdAt)
@@ -686,6 +725,10 @@ export const runners = pgTable("runners", {
   id: text("id").primaryKey(),
   host: text("host").notNull(),
   slots: integer("slots").notNull(),
+  /** The organization whose own judge this is (RUNNER_POOL); null for a shared judge. */
+  poolOrgId: uuid("pool_org_id").references(() => organizations.id, {
+    onDelete: "set null",
+  }),
   busy: integer("busy").notNull().default(0),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
 })
@@ -782,11 +825,18 @@ export const organizations = pgTable("organizations", {
  */
 export const orgKindPolicies = pgTable("org_kind_policies", {
   kind: orgType("kind").primaryKey(),
-  modules: jsonb("modules").$type<Record<string, string>>().notNull().default({}),
+  modules: jsonb("modules")
+    .$type<Record<string, string>>()
+    .notNull()
+    .default({}),
   /** The kind's suggested roles as the platform set them; null: the default list in code. */
   roleTemplates: jsonb("role_templates").$type<unknown[]>(),
-  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid("updated_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 })
 
 /** Branches, batches, teams or cohorts: a tree inside one organization. */
@@ -804,7 +854,9 @@ export const orgGroups = pgTable(
     startsOn: text("starts_on"),
     endsOn: text("ends_on"),
     /** For kinds with a lead per group (a pod's mentor), not per academic year. */
-    leadId: uuid("lead_id").references(() => users.id, { onDelete: "set null" }),
+    leadId: uuid("lead_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     /** For kinds with open groups (a community): members join and leave it themselves. */
     open: boolean("open").notNull().default(false),
     createdAt: createdAt(),
@@ -919,7 +971,11 @@ export const guardians = pgTable(
     createdAt: createdAt(),
   },
   (table) => [
-    uniqueIndex("guardians_link").on(table.orgId, table.parentId, table.studentId),
+    uniqueIndex("guardians_link").on(
+      table.orgId,
+      table.parentId,
+      table.studentId
+    ),
     index("guardians_parent").on(table.parentId),
     index("guardians_student").on(table.orgId, table.studentId),
   ]
@@ -1120,7 +1176,10 @@ export const twoFactor = pgTable("two_factor", {
   lastStep: integer("last_step"),
   backupCodes: jsonb("backup_codes").$type<string[]>().notNull().default([]),
   pendingSecret: text("pending_secret"),
-  pendingBackupCodes: jsonb("pending_backup_codes").$type<string[]>().notNull().default([]),
+  pendingBackupCodes: jsonb("pending_backup_codes")
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   failures: integer("failures").notNull().default(0),
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
   /** Codes by email: on or off, and the one code waiting to be typed (hashed). */
@@ -1153,7 +1212,9 @@ export const academicYears = pgTable(
   },
   (table) => [
     uniqueIndex("academic_years_name").on(table.orgId, table.name),
-    uniqueIndex("academic_years_current").on(table.orgId).where(sql`${table.isCurrent}`),
+    uniqueIndex("academic_years_current")
+      .on(table.orgId)
+      .where(sql`${table.isCurrent}`),
   ]
 )
 
@@ -1274,8 +1335,16 @@ export const auditLog = pgTable(
   },
   (table) => [
     index("audit_log_org").on(table.orgId, table.createdAt),
-    index("audit_log_org_category").on(table.orgId, table.category, table.createdAt),
-    index("audit_log_org_actor").on(table.orgId, table.actorId, table.createdAt),
+    index("audit_log_org_category").on(
+      table.orgId,
+      table.category,
+      table.createdAt
+    ),
+    index("audit_log_org_actor").on(
+      table.orgId,
+      table.actorId,
+      table.createdAt
+    ),
   ]
 )
 
@@ -1414,7 +1483,10 @@ export const academicTerms = pgTable(
     createdAt: createdAt(),
   },
   (table) => [
-    uniqueIndex("academic_terms_name").on(table.yearId, sql`lower(${table.name})`),
+    uniqueIndex("academic_terms_name").on(
+      table.yearId,
+      sql`lower(${table.name})`
+    ),
     index("academic_terms_org").on(table.orgId),
   ]
 )
@@ -1476,7 +1548,11 @@ export const examPapers = pgTable(
     createdAt: createdAt(),
   },
   (table) => [
-    uniqueIndex("exam_papers_unique").on(table.examId, table.groupId, table.subjectId),
+    uniqueIndex("exam_papers_unique").on(
+      table.examId,
+      table.groupId,
+      table.subjectId
+    ),
     index("exam_papers_group").on(table.groupId),
   ]
 )
@@ -1522,7 +1598,9 @@ export const orgWebhooks = pgTable(
     /** Event patterns: "leave.decide", "member.*", or "*" for everything. */
     events: jsonb("events").$type<string[]>().notNull().default(["*"]),
     active: boolean("active").notNull().default(true),
-    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
   },
   (table) => [index("org_webhooks_org").on(table.orgId)]
@@ -1538,9 +1616,13 @@ export const webhookDeliveries = pgTable(
       .references(() => orgWebhooks.id, { onDelete: "cascade" }),
     event: text("event").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
-    status: text("status", { enum: ["pending", "sent", "failed"] }).notNull().default("pending"),
+    status: text("status", { enum: ["pending", "sent", "failed"] })
+      .notNull()
+      .default("pending"),
     attempts: integer("attempts").notNull().default(0),
-    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     responseStatus: integer("response_status"),
     lastError: text("last_error"),
     createdAt: createdAt(),
@@ -1592,11 +1674,16 @@ export const enquiries = pgTable(
     /** new or handled. */
     status: text("status").notNull().default("new"),
     handledAt: timestamp("handled_at", { withTimezone: true }),
-    handledBy: uuid("handled_by").references(() => users.id, { onDelete: "set null" }),
+    handledBy: uuid("handled_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     ip: text("ip"),
     createdAt: createdAt(),
   },
-  (table) => [index("enquiries_created").on(table.createdAt), index("enquiries_ip").on(table.ip, table.createdAt)]
+  (table) => [
+    index("enquiries_created").on(table.createdAt),
+    index("enquiries_ip").on(table.ip, table.createdAt),
+  ]
 )
 
 /** An institution that runs on GretLab, named on the landing page (only real ones, added by staff). */
@@ -1910,7 +1997,11 @@ export const timetableSlots = pgTable(
     room: text("room").notNull().default(""),
   },
   (table) => [
-    uniqueIndex("timetable_slot_unique").on(table.groupId, table.day, table.periodId),
+    uniqueIndex("timetable_slot_unique").on(
+      table.groupId,
+      table.day,
+      table.periodId
+    ),
     index("timetable_slots_org").on(table.orgId),
   ]
 )
@@ -1973,7 +2064,9 @@ export const drafts = pgTable(
     language: text("language").notNull(),
     files: jsonb("files").$type<SourceFile[]>().notNull(),
     entry: text("entry").notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.problemId, table.language] }),
@@ -1996,7 +2089,9 @@ export const draftSnapshots = pgTable(
     files: jsonb("files").$type<SourceFile[]>().notNull(),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("draft_snapshots_by").on(table.userId, table.problemId, table.at)]
+  (table) => [
+    index("draft_snapshots_by").on(table.userId, table.problemId, table.at),
+  ]
 )
 
 /**
@@ -2016,7 +2111,10 @@ export const questions = pgTable(
     kind: text("kind").$type<QuestionKind>().notNull(),
     /** Markdown. */
     prompt: text("prompt").notNull(),
-    options: jsonb("options").$type<{ id: string; text: string }[]>().notNull().default([]),
+    options: jsonb("options")
+      .$type<{ id: string; text: string }[]>()
+      .notNull()
+      .default([]),
     /** Choice questions: the right option ids. Never sent to students before results. */
     correct: jsonb("correct").$type<string[]>().notNull().default([]),
     /** Short answers that mark themselves right. */
@@ -2044,13 +2142,19 @@ export const contentShares = pgTable(
   "content_shares",
   {
     id: id(),
-    itemType: text("item_type").$type<"problem" | "question" | "course" | "template">().notNull(),
+    itemType: text("item_type")
+      .$type<"problem" | "question" | "course" | "template">()
+      .notNull(),
     itemId: uuid("item_id").notNull(),
     /** A college (all its staff)… */
-    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     /** …or one teacher. */
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
   },
   (table) => [index("content_shares_by_item").on(table.itemType, table.itemId)]
@@ -2061,7 +2165,9 @@ export const collections = pgTable(
   "collections",
   {
     id: id(),
-    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
     createdAt: createdAt(),
@@ -2080,7 +2186,9 @@ export const collectionItems = pgTable(
     itemId: uuid("item_id").notNull(),
     position: integer("position").notNull().default(0),
   },
-  (table) => [primaryKey({ columns: [table.collectionId, table.itemType, table.itemId] })]
+  (table) => [
+    primaryKey({ columns: [table.collectionId, table.itemType, table.itemId] }),
+  ]
 )
 
 /** A bank question in an assignment or exam, with its points there. */
@@ -2110,10 +2218,15 @@ export const quizResponses = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     /** Question id → chosen option ids, or text. */
-    answers: jsonb("answers").$type<Record<string, string[] | string>>().notNull().default({}),
+    answers: jsonb("answers")
+      .$type<Record<string, string[] | string>>()
+      .notNull()
+      .default({}),
     /** Question id → a teacher's mark, replacing the automatic one. */
     marks: jsonb("marks").$type<Record<string, number>>().notNull().default({}),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.assignmentId, table.userId] })]
 )
@@ -2151,9 +2264,13 @@ export const contestAnswers = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     answer: jsonb("answer").$type<string[] | string>().notNull(),
     correct: boolean("correct").notNull(),
-    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+    answeredAt: timestamp("answered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.contestId, table.questionId, table.userId] })]
+  (table) => [
+    primaryKey({ columns: [table.contestId, table.questionId, table.userId] }),
+  ]
 )
 
 /** A student's one answer to each of a day's questions. */
@@ -2169,9 +2286,13 @@ export const dailyAnswers = pgTable(
       .references(() => questions.id, { onDelete: "cascade" }),
     answer: jsonb("answer").$type<string[] | string>().notNull(),
     correct: boolean("correct").notNull(),
-    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+    answeredAt: timestamp("answered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.day, table.userId, table.questionId] })]
+  (table) => [
+    primaryKey({ columns: [table.day, table.userId, table.questionId] }),
+  ]
 )
 
 /**
@@ -2191,7 +2312,9 @@ export const assignmentExtensions = pgTable(
     /** Problem ids it covers; empty for the whole assignment. */
     problemIds: jsonb("problem_ids").$type<string[]>().notNull().default([]),
     reason: text("reason").notNull().default(""),
-    grantedBy: uuid("granted_by").references(() => users.id, { onDelete: "set null" }),
+    grantedBy: uuid("granted_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
   },
   (table) => [primaryKey({ columns: [table.assignmentId, table.userId] })]
@@ -2275,7 +2398,11 @@ export const emailOutbox = pgTable(
   },
   (table) => [
     index("email_outbox_due").on(table.status, table.nextAttemptAt),
-    index("email_outbox_urgent").on(table.status, table.urgent, table.nextAttemptAt),
+    index("email_outbox_urgent").on(
+      table.status,
+      table.urgent,
+      table.nextAttemptAt
+    ),
     index("email_outbox_content").on(table.contentId),
   ]
 )
@@ -2310,9 +2437,14 @@ export const courseOutcomes = pgTable(
     title: text("title").notNull(),
     position: integer("position").notNull().default(0),
     /** Program outcome id → strength 1 (low), 2 (medium) or 3 (high). */
-    mapping: jsonb("mapping").$type<Record<string, number>>().notNull().default({}),
+    mapping: jsonb("mapping")
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
   },
-  (table) => [index("course_outcomes_by_group").on(table.groupId, table.position)]
+  (table) => [
+    index("course_outcomes_by_group").on(table.groupId, table.position),
+  ]
 )
 
 /** A student's one sitting of a lab exam. */
@@ -2325,7 +2457,9 @@ export const examSessions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     /** The time limit or the due time, fixed when it started. */
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     /** Set when the student finishes early. */
@@ -2355,7 +2489,9 @@ export const examEvents = pgTable(
     detail: text("detail").notNull().default(""),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("exam_events_by").on(table.assignmentId, table.userId, table.at)]
+  (table) => [
+    index("exam_events_by").on(table.assignmentId, table.userId, table.at),
+  ]
 )
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" })
@@ -2400,7 +2536,9 @@ export const courses = pgTable(
   "courses",
   {
     id: id(),
-    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
     published: boolean("published").notNull().default(false),
@@ -2430,7 +2568,9 @@ export const courseModules = pgTable(
     openAfterDays: integer("open_after_days"),
     afterPrevious: boolean("after_previous").notNull().default(false),
   },
-  (table) => [index("course_modules_by_course").on(table.courseId, table.position)]
+  (table) => [
+    index("course_modules_by_course").on(table.courseId, table.position),
+  ]
 )
 
 /** A problem, question or reading in a module, in order. */
@@ -2440,7 +2580,9 @@ export const courseItems = pgTable(
     moduleId: uuid("module_id")
       .notNull()
       .references(() => courseModules.id, { onDelete: "cascade" }),
-    itemType: text("item_type").$type<"problem" | "question" | "reading">().notNull(),
+    itemType: text("item_type")
+      .$type<"problem" | "question" | "reading">()
+      .notNull(),
     itemId: uuid("item_id").notNull(),
     position: integer("position").notNull().default(0),
   },
@@ -2510,7 +2652,12 @@ export const courseCheckpoints = pgTable(
     /** A project's mark is out of this. */
     points: integer("points").notNull().default(100),
   },
-  (table) => [uniqueIndex("course_checkpoints_module_kind").on(table.moduleId, table.kind)]
+  (table) => [
+    uniqueIndex("course_checkpoints_module_kind").on(
+      table.moduleId,
+      table.kind
+    ),
+  ]
 )
 
 /** A quiz's questions or a lab's problems, in order, each worth `points`. */
@@ -2541,7 +2688,9 @@ export const courseAttempts = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     /** Null when the checkpoint has no time limit. */
     endsAt: timestamp("ends_at", { withTimezone: true }),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
@@ -2563,9 +2712,15 @@ export const courseQuizAnswers = pgTable(
       .notNull()
       .references(() => questions.id, { onDelete: "cascade" }),
     answer: jsonb("answer").$type<string[] | string>().notNull(),
-    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+    answeredAt: timestamp("answered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.checkpointId, table.userId, table.questionId] })]
+  (table) => [
+    primaryKey({
+      columns: [table.checkpointId, table.userId, table.questionId],
+    }),
+  ]
 )
 
 /** A project checkpoint handed in: a repository pinned to a commit, and its mark. */
@@ -2582,10 +2737,14 @@ export const courseProjectSubmissions = pgTable(
     ref: text("ref"),
     commitSha: text("commit_sha"),
     note: text("note").notNull().default(""),
-    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     mark: integer("mark"),
     feedback: text("feedback").notNull().default(""),
-    markedBy: uuid("marked_by").references(() => users.id, { onDelete: "set null" }),
+    markedBy: uuid("marked_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     markedAt: timestamp("marked_at", { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.checkpointId, table.userId] })]
@@ -2607,7 +2766,9 @@ export const courseClasses = pgTable(
     dueOn: text("due_on"),
     /** Assigned training: done again every this many months (compliance). */
     renewMonths: integer("renew_months"),
-    addedBy: uuid("added_by").references(() => users.id, { onDelete: "set null" }),
+    addedBy: uuid("added_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
   },
   (table) => [
@@ -2629,7 +2790,9 @@ export const practiceAnswers = pgTable(
     answer: jsonb("answer").$type<string[] | string>().notNull(),
     correct: boolean("correct").notNull(),
     tries: integer("tries").notNull().default(1),
-    answeredAt: timestamp("answered_at", { withTimezone: true }).notNull().defaultNow(),
+    answeredAt: timestamp("answered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.questionId] })]
 )
@@ -2653,7 +2816,9 @@ export const templates = pgTable(
   "templates",
   {
     id: id(),
-    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
     content: jsonb("content").$type<TemplateContent>().notNull(),
@@ -2681,10 +2846,15 @@ export const discussionPosts = pgTable(
     groupId: uuid("group_id")
       .notNull()
       .references(() => orgGroups.id, { onDelete: "cascade" }),
-    parentId: uuid("parent_id").references((): AnyPgColumn => discussionPosts.id, {
-      onDelete: "cascade",
+    parentId: uuid("parent_id").references(
+      (): AnyPgColumn => discussionPosts.id,
+      {
+        onDelete: "cascade",
+      }
+    ),
+    authorId: uuid("author_id").references(() => users.id, {
+      onDelete: "set null",
     }),
-    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
     /** Threads only. */
     title: text("title").notNull().default(""),
     body: text("body").notNull(),
@@ -2700,7 +2870,9 @@ export const discussionPosts = pgTable(
     createdAt: createdAt(),
     editedAt: timestamp("edited_at", { withTimezone: true }),
     /** Threads: when it or a reply was last posted, for ordering. */
-    activityAt: timestamp("activity_at", { withTimezone: true }).notNull().defaultNow(),
+    activityAt: timestamp("activity_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     index("discussion_threads").on(table.groupId, table.activityAt),
@@ -2743,8 +2915,13 @@ export const peerReviews = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     /** The author's work as it was when reviews were handed out. */
-    submissionId: uuid("submission_id").references(() => submissions.id, { onDelete: "set null" }),
-    scores: jsonb("scores").$type<Record<string, number>>().notNull().default({}),
+    submissionId: uuid("submission_id").references(() => submissions.id, {
+      onDelete: "set null",
+    }),
+    scores: jsonb("scores")
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
     comment: text("comment").notNull().default(""),
     lineComments: jsonb("line_comments")
       .$type<{ path: string; line: number; body: string }[]>()
@@ -2756,7 +2933,12 @@ export const peerReviews = pgTable(
     createdAt: createdAt(),
   },
   (table) => [
-    uniqueIndex("peer_reviews_pair").on(table.assignmentId, table.problemId, table.reviewerId, table.authorId),
+    uniqueIndex("peer_reviews_pair").on(
+      table.assignmentId,
+      table.problemId,
+      table.reviewerId,
+      table.authorId
+    ),
     index("peer_reviews_reviewer").on(table.reviewerId),
   ]
 )
@@ -2771,8 +2953,12 @@ export const certificates = pgTable(
     id: id(),
     /** Short and public: what the verification page is found by. */
     code: text("code").notNull().unique(),
-    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
-    groupId: uuid("group_id").references(() => orgGroups.id, { onDelete: "set null" }),
+    orgId: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
+    groupId: uuid("group_id").references(() => orgGroups.id, {
+      onDelete: "set null",
+    }),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -2781,8 +2967,12 @@ export const certificates = pgTable(
     sourceId: uuid("source_id"),
     title: text("title").notNull(),
     detail: text("detail").notNull().default(""),
-    issuedBy: uuid("issued_by").references(() => users.id, { onDelete: "set null" }),
-    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+    issuedBy: uuid("issued_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    issuedAt: timestamp("issued_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     /** For training that must be renewed: no longer valid after this day (YYYY-MM-DD). */
     expiresOn: text("expires_on"),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
@@ -2807,7 +2997,12 @@ export const assignmentProjects = pgTable(
     points: integer("points").notNull().default(10),
     position: integer("position").notNull().default(0),
   },
-  (table) => [index("assignment_projects_by_assignment").on(table.assignmentId, table.position)]
+  (table) => [
+    index("assignment_projects_by_assignment").on(
+      table.assignmentId,
+      table.position
+    ),
+  ]
 )
 
 /**
@@ -2828,11 +3023,15 @@ export const projectSubmissions = pgTable(
     ref: text("ref"),
     commitSha: text("commit_sha"),
     note: text("note").notNull().default(""),
-    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     late: boolean("late").notNull().default(false),
     mark: integer("mark"),
     feedback: text("feedback").notNull().default(""),
-    markedBy: uuid("marked_by").references(() => users.id, { onDelete: "set null" }),
+    markedBy: uuid("marked_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     markedAt: timestamp("marked_at", { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.projectId, table.userId] })]
@@ -2854,13 +3053,18 @@ export const ltiPlatforms = pgTable(
     name: text("name").notNull(),
     issuer: text("issuer").notNull(),
     clientId: text("client_id").notNull(),
-    deploymentIds: jsonb("deployment_ids").$type<string[]>().notNull().default([]),
+    deploymentIds: jsonb("deployment_ids")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
     authUrl: text("auth_url").notNull(),
     tokenUrl: text("token_url").notNull(),
     jwksUrl: text("jwks_url").notNull(),
     createdAt: createdAt(),
   },
-  (table) => [uniqueIndex("lti_platforms_client").on(table.issuer, table.clientId)]
+  (table) => [
+    uniqueIndex("lti_platforms_client").on(table.issuer, table.clientId),
+  ]
 )
 
 /** A sign-in handshake in flight: state and nonce, used once, short-lived. */
@@ -2886,7 +3090,10 @@ export const ltiUsers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
   },
-  (table) => [primaryKey({ columns: [table.platformId, table.sub] }), index("lti_users_user").on(table.userId)]
+  (table) => [
+    primaryKey({ columns: [table.platformId, table.sub] }),
+    index("lti_users_user").on(table.userId),
+  ]
 )
 
 /** An LMS course, linked by an admin to one of the organization's classes. */
@@ -2899,10 +3106,14 @@ export const ltiContexts = pgTable(
       .references(() => ltiPlatforms.id, { onDelete: "cascade" }),
     contextId: text("context_id").notNull(),
     title: text("title").notNull().default(""),
-    groupId: uuid("group_id").references(() => orgGroups.id, { onDelete: "set null" }),
+    groupId: uuid("group_id").references(() => orgGroups.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
   },
-  (table) => [uniqueIndex("lti_contexts_key").on(table.platformId, table.contextId)]
+  (table) => [
+    uniqueIndex("lti_contexts_key").on(table.platformId, table.contextId),
+  ]
 )
 
 /** A link in an LMS course that opens an assignment, with its gradebook column there. */
@@ -2914,14 +3125,20 @@ export const ltiLinks = pgTable(
       .notNull()
       .references(() => ltiPlatforms.id, { onDelete: "cascade" }),
     resourceLinkId: text("resource_link_id").notNull(),
-    contextId: uuid("context_id").references(() => ltiContexts.id, { onDelete: "set null" }),
-    assignmentId: uuid("assignment_id").references(() => assignments.id, { onDelete: "set null" }),
+    contextId: uuid("context_id").references(() => ltiContexts.id, {
+      onDelete: "set null",
+    }),
+    assignmentId: uuid("assignment_id").references(() => assignments.id, {
+      onDelete: "set null",
+    }),
     /** Where its scores go (LTI Assignment and Grade Services). */
     lineItemUrl: text("line_item_url"),
     title: text("title").notNull().default(""),
     createdAt: createdAt(),
   },
-  (table) => [uniqueIndex("lti_links_key").on(table.platformId, table.resourceLinkId)]
+  (table) => [
+    uniqueIndex("lti_links_key").on(table.platformId, table.resourceLinkId),
+  ]
 )
 
 /** A teacher choosing what to add to an LMS course (deep linking), short-lived. */
@@ -2936,7 +3153,9 @@ export const ltiDeepLinks = pgTable("lti_deep_links", {
   deploymentId: text("deployment_id").notNull(),
   returnUrl: text("return_url").notNull(),
   data: text("data"),
-  contextId: uuid("context_id").references(() => ltiContexts.id, { onDelete: "set null" }),
+  contextId: uuid("context_id").references(() => ltiContexts.id, {
+    onDelete: "set null",
+  }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true }),
 })
@@ -2961,7 +3180,9 @@ export const orgEvents = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     /** null: everyone in the organization. */
-    groupId: uuid("group_id").references(() => orgGroups.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id").references(() => orgGroups.id, {
+      onDelete: "cascade",
+    }),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
@@ -2971,7 +3192,9 @@ export const orgEvents = pgTable(
     link: text("link").notNull().default(""),
     /** Places; null for no limit. Past it, people wait. */
     capacity: integer("capacity"),
-    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
@@ -2988,7 +3211,9 @@ export const eventRsvps = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    status: text("status").$type<"going" | "waitlist" | "not_going">().notNull(),
+    status: text("status")
+      .$type<"going" | "waitlist" | "not_going">()
+      .notNull(),
     /** When they last said they were coming: their place in the queue. */
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -3008,6 +3233,8 @@ export const emailTemplates = pgTable("email_templates", {
   key: text("key").primaryKey(),
   subject: text("subject").notNull().default(""),
   body: text("body").notNull(),
-  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
   updatedAt: updatedAt(),
 })

@@ -1,3 +1,4 @@
+import { RUNNER_ONLINE_MS } from "@workspace/judge"
 import {
   contests,
   getDb,
@@ -96,9 +97,6 @@ export async function updateUser(
   )
   return user!
 }
-
-/** A runner silent for longer than this is treated as down. */
-const RUNNER_ONLINE_MS = 60_000
 
 /** Everything an autoscaler or the dashboard needs about the queue and its capacity. */
 export async function getQueueHealth() {

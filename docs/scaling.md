@@ -129,6 +129,27 @@ Run `e2e/load.mjs` against your own deployment before a big event. Add runner ma
    tier can use transaction mode, with `DATABASE_PREPARE=false`. A runner far from the database
    is fine: it makes only a few queries per submission.
 
+### An organization's own judges
+
+A college that needs guaranteed capacity (exams for a whole year at once) can have judges of its
+own. Start a runner with `RUNNER_POOL` set to the organization's address (the `greenwood` in
+`/orgs/greenwood`):
+
+```bash
+RUNNER_POOL=greenwood DATABASE_URL=postgres://... docker compose -f docker-compose.runner.yml up -d --build
+```
+
+- The organization's work (its assignments, exams, contests and members-only problems) runs
+  **only** on its own judges while one of them is online. When they're all busy it waits for
+  them, so its capacity is exactly what it has.
+- If none of its judges is online (a machine stopped or crashed), its work goes to the shared
+  judges, so nothing waits on a dead machine. A judge counts as online if it reported in the last
+  minute.
+- When its judges have nothing of their own to do, they help the shared judges (everyone
+  without judges of their own). They never take another organization's work if that
+  organization has judges of its own.
+- A runner whose `RUNNER_POOL` isn't an organization's address refuses to start.
+
    If your Postgres host requires SSL, add `?sslmode=require` to the end of `DATABASE_URL`. The
    `psql` and `pg_dump` tools try SSL by themselves, but GretLab's database client doesn't, and is
    refused without it.

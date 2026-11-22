@@ -8,6 +8,13 @@ aren't listed.
 
 ## 22 November 2026
 
+### An organization's own judges
+
+- **A college can have judges of its own.** Its students' code then runs only on its own
+  machines, so its exams aren't slowed by anyone else's load; when those machines are idle they
+  help everyone else. If they stop, its work moves to the shared judges until they're back.
+  How to set one up: Scaling and operations › An organization's own judges.
+
 ### Faster from India
 
 - **Pages and saves are quicker** for people in India: the website and its database now run in

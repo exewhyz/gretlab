@@ -5,7 +5,14 @@
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 
-import { getDb, runners, sql, submissions, users } from "@workspace/db"
+import {
+  getDb,
+  organizations,
+  runners,
+  sql,
+  submissions,
+  users,
+} from "@workspace/db"
 
 import {
   claimNext,
@@ -53,6 +60,9 @@ before(async () => {
 after(async () => {
   await clear()
   await db.delete(runners)
+  await db
+    .delete(organizations)
+    .where(sql.inArray(organizations.slug, ["pool-a", "pool-b", "pool-c"]))
   process.exit(0)
 })
 
@@ -251,4 +261,112 @@ test("re-judging gives up after a few rounds", async () => {
     finishedAt: new Date(Date.now() - 5 * 60_000),
   })
   assert.equal(await retrySystemErrors(db), 0)
+})
+
+/* ---------- pools: an organization's own judges (RUNNER_POOL) ---------- */
+
+async function poolOrgs() {
+  await db
+    .delete(organizations)
+    .where(sql.inArray(organizations.slug, ["pool-a", "pool-b", "pool-c"]))
+  const made = await db
+    .insert(organizations)
+    .values(
+      ["pool-a", "pool-b", "pool-c"].map((slug) => ({ slug, name: slug }))
+    )
+    .returning()
+  const id = (slug: string) => made.find((o) => o.slug === slug)!.id
+  return { a: id("pool-a"), b: id("pool-b"), c: id("pool-c") }
+}
+const online = (id: string, poolOrgId: string | null, ago = 0) =>
+  db
+    .insert(runners)
+    .values({
+      id,
+      host: id,
+      slots: 4,
+      poolOrgId,
+      lastSeenAt: new Date(Date.now() - ago),
+    })
+    .onConflictDoUpdate({
+      target: runners.id,
+      set: { poolOrgId, lastSeenAt: new Date(Date.now() - ago) },
+    })
+const earlier = (ms: number) => new Date(Date.now() - ms)
+
+test("pools: an organization's judge takes its own work first, ahead of older shared work", async () => {
+  await clear()
+  await db.delete(runners)
+  const org = await poolOrgs()
+  await online("judge-a", org.a)
+  const shared = await enqueue({ queueAt: earlier(60_000) })
+  const own = await enqueue({ poolOrgId: org.a, queueAt: earlier(1_000) })
+  assert.equal((await claimNext(db, "judge-a", 4096, org.a))?.id, own.id)
+  assert.equal((await claimNext(db, "judge-a", 4096, org.a))?.id, shared.id)
+})
+
+test("pools: while one of its judges is online, an organization's work never goes elsewhere", async () => {
+  await clear()
+  await db.delete(runners)
+  const org = await poolOrgs()
+  await online("judge-a", org.a)
+  await online("judge-b", org.b)
+  await enqueue({ poolOrgId: org.a })
+  assert.equal(
+    await claimNext(db, "shared-1", 4096, null),
+    null,
+    "not to a shared judge"
+  )
+  assert.equal(
+    await claimNext(db, "judge-b", 4096, org.b),
+    null,
+    "not to another organization's judge"
+  )
+})
+
+test("pools: with none of its judges online, an organization's work falls back to the shared judges", async () => {
+  await clear()
+  await db.delete(runners)
+  const org = await poolOrgs()
+  // Its judge stopped reporting two minutes ago.
+  await online("judge-a", org.a, 120_000)
+  const stranded = await enqueue({ poolOrgId: org.a })
+  assert.equal((await claimNext(db, "shared-1", 4096, null))?.id, stranded.id)
+})
+
+test("pools: an idle organization judge helps the shared pool, and organizations without judges", async () => {
+  await clear()
+  await db.delete(runners)
+  const org = await poolOrgs()
+  await online("judge-a", org.a)
+  const shared = await enqueue({ queueAt: earlier(2_000) })
+  const noJudges = await enqueue({ poolOrgId: org.c, queueAt: earlier(1_000) })
+  const helped = [
+    await claimNext(db, "judge-a", 4096, org.a),
+    await claimNext(db, "judge-a", 4096, org.a),
+  ].map((job) => job?.id)
+  assert.deepEqual(helped, [shared.id, noJudges.id])
+})
+
+test("pools: an organization judge never helps another organization that has its own judges", async () => {
+  await clear()
+  await db.delete(runners)
+  const org = await poolOrgs()
+  await online("judge-a", org.a)
+  await online("judge-b", org.b)
+  await enqueue({ poolOrgId: org.b })
+  assert.equal(await claimNext(db, "judge-a", 4096, org.a), null)
+})
+
+test("pools: a shared judge keeps taking shared work in due order", async () => {
+  await clear()
+  await db.delete(runners)
+  const org = await poolOrgs()
+  await online("judge-a", org.a)
+  await enqueue({ poolOrgId: org.a, queueAt: earlier(9_000) })
+  const first = await enqueue({ queueAt: earlier(5_000) })
+  const second = await enqueue({ poolOrgId: org.c, queueAt: earlier(1_000) })
+  assert.equal((await claimNext(db, "shared-1", 4096, null))?.id, first.id)
+  assert.equal((await claimNext(db, "shared-1", 4096, null))?.id, second.id)
+  assert.equal(await claimNext(db, "shared-1", 4096, null), null)
 })

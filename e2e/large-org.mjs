@@ -144,6 +144,12 @@ psql(`insert into submissions (user_id, problem_id, kind, language, entry, files
   select id, '${problemId}', 'submit', 'python', 'main.py', '[]', 1000, 256, 'done', 'AC', 1, 1, now() from users where email = 'lo-s-${late}@example.com'`)
 const after = await owner(`${book}?page=1&q=${encodeURIComponent(`lo-s-${late}@`)}`)
 check("a new graded submission shows on the next request, not a stale copy", after.json?.rows?.[0]?.earned === 100 && after.json?.summary?.started === DONE + 1, JSON.stringify({ earned: after.json?.rows?.[0]?.earned, started: after.json?.summary?.started }))
+// Whose judges run it: work for this organization's assignment is its own, practice is shared.
+const someone = await client("lo-s-3@example.com")
+const forWork = await someone("/submissions", { body: { kind: "submit", language: "python", entry: "main.py", files: [{ path: "main.py", content: "print(1)" }], problemSlug: "integer-operations", assignmentSlug: "lo-week-1" } })
+const practice = await someone("/submissions", { body: { kind: "submit", language: "python", entry: "main.py", files: [{ path: "main.py", content: "print(1)" }], problemSlug: "integer-operations" } })
+const poolOf = (id) => psql(`select coalesce(pool_org_id::text, 'shared') from submissions where id = '${id}'`)
+check("work for the organization's assignment goes to its judges; personal practice to the shared ones", forWork.json?.id && practice.json?.id && poolOf(forWork.json.id) === orgId && poolOf(practice.json.id) === "shared", JSON.stringify({ forWork: forWork.status, practice: practice.status, pools: forWork.json?.id && [poolOf(forWork.json.id), practice.json?.id && poolOf(practice.json.id)] }))
 const csv = await fetch(`${BASE}/api/v1${book}?format=csv`, { headers: { cookie: `next-auth.session-token=${await encode({ token: { email: "lo-o@example.com" }, secret: SECRET })}` } })
 const lines = (await csv.text()).trim().split("\n")
 check(`the CSV still has everyone (${lines.length - 1} rows)`, csv.status === 200 && lines.length - 1 === STUDENTS)

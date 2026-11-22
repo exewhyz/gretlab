@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto"
 import { availableParallelism, hostname, totalmem } from "node:os"
 
-import { getDb, settings as settingsTable } from "@workspace/db"
+import {
+  getDb,
+  organizations,
+  settings as settingsTable,
+  sql,
+} from "@workspace/db"
 import { QUEUE_CHANNEL, resolveSettings } from "@workspace/judge"
 import postgres from "postgres"
 
@@ -43,6 +48,27 @@ const SHUTDOWN_GRACE_MS = 5 * 60_000
 const runnerId = `${hostname()}-${randomUUID().slice(0, 8)}`
 const db = getDb()
 const backend = backendFromEnv(runnerId)
+
+/**
+ * An organization's own judge (RUNNER_POOL: its address, as in /orgs/<address>): it takes that
+ * organization's work first, and only that organization's work comes to it while it's online.
+ * Unset: a shared judge. An address that isn't an organization stops it starting, rather than
+ * letting it quietly run as a shared judge.
+ */
+const POOL_SLUG = process.env.RUNNER_POOL?.trim() || null
+const [poolOrg] = POOL_SLUG
+  ? await db
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(sql.eq(organizations.slug, POOL_SLUG))
+  : []
+if (POOL_SLUG && !poolOrg) {
+  console.error(
+    `[runner] RUNNER_POOL=${POOL_SLUG}: no organization has that address`
+  )
+  process.exit(1)
+}
+const pool = poolOrg?.id ?? null
 
 // Refuses to start without the promised isolation. See the sandbox rules in AGENTS.md.
 await backend.verify()
@@ -96,7 +122,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   })
 }
 
-const self = { id: runnerId, host: hostname(), slots: SLOTS }
+const self = { id: runnerId, host: hostname(), slots: SLOTS, poolOrgId: pool }
 const tick = () =>
   heartbeat(db, self, [...running.keys()]).catch((error) =>
     console.error("[runner] heartbeat error:", error)
@@ -135,7 +161,7 @@ const housekeeping = setInterval(() => {
 
 await tick()
 console.log(
-  `[runner] ${runnerId} started: ${SLOTS} slots, ${MEMORY_BUDGET_MB} MB budget`
+  `[runner] ${runnerId} started: ${SLOTS} slots, ${MEMORY_BUDGET_MB} MB budget, ${POOL_SLUG ? `pool ${POOL_SLUG}` : "shared"}`
 )
 
 /** A single loop claims for every slot, so idle runners poll once, not once per slot. */
@@ -145,7 +171,12 @@ while (!stopping) {
     continue
   }
   try {
-    const job = await claimNext(db, runnerId, MEMORY_BUDGET_MB - usedMemory())
+    const job = await claimNext(
+      db,
+      runnerId,
+      MEMORY_BUDGET_MB - usedMemory(),
+      pool
+    )
     if (!job) {
       await sleepUntilWoken(POLL_MS)
       continue

@@ -19,4 +19,6 @@ services:
       DATABASE_URL: ${DATABASE_URL:?}
       SANDBOX_RUNTIME: runsc
       RUNNER_CONCURRENCY: ${RUNNER_CONCURRENCY:-8}
+      # An organization's own judge: its address (/orgs/<address>). Unset: a shared judge.
+      RUNNER_POOL: ${RUNNER_POOL:-}
       DATABASE_POOL: "4"

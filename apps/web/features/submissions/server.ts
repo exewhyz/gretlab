@@ -175,7 +175,11 @@ export async function canReachProblem(
   if (accessTo(vp, content, "problems.manage") === "manage") return true
   // Written for assignments and contests: only through one that uses it and has begun.
   if (!problem.listed) {
-    return problem.published && user !== null && (await usedInOpenWork(user, vp, problem.id))
+    return (
+      problem.published &&
+      user !== null &&
+      (await usedInOpenWork(user, vp, problem.id))
+    )
   }
   // Published for members: any active member of its organization.
   return (
@@ -201,7 +205,10 @@ async function usedInOpenWork(
     .from(assignmentProblems)
     .innerJoin(assignments, eq(assignmentProblems.assignmentId, assignments.id))
     .where(
-      and(eq(assignmentProblems.problemId, problemId), eq(assignments.published, true))
+      and(
+        eq(assignmentProblems.problemId, problemId),
+        eq(assignments.published, true)
+      )
     )
   for (const { assignment } of work) {
     const access = accessTo(vp, assignment, "assignments.manage")
@@ -431,6 +438,9 @@ export async function createSubmission(
     settings
   )
   const work = contestRules ?? assignment
+  // Whose judges run it: the work's organization, else the problem's (as planFor decides
+  // where code runs); none for personal practice and the platform's work.
+  const poolOrgId = work ? work.orgId : (problem?.orgId ?? null)
   const perMinute = perMinuteLimit(
     settings["submissions.per_minute"],
     work?.submissionsPerMinute ?? null
@@ -463,6 +473,7 @@ export async function createSubmission(
       outputs: input.browser.outputs,
       perMinute,
       maxPending: settings["submissions.max_pending"],
+      poolOrgId,
     })
   }
 
@@ -506,6 +517,7 @@ export async function createSubmission(
         userId: user.id,
         problemId: problem?.id,
         contestId,
+        poolOrgId,
         kind: input.kind,
         language: language.id satisfies LanguageId,
         entry: input.entry,
@@ -540,6 +552,8 @@ async function gradeFromBrowser(
     outputs: BrowserOutput[]
     perMinute: number
     maxPending: number
+    /** Whose judges re-judge it later (see createSubmission). */
+    poolOrgId: string | null
   }
 ) {
   const cases = await getDb()
@@ -589,6 +603,7 @@ async function gradeFromBrowser(
         userId: user.id,
         problemId: input.problemId,
         contestId: input.contestId,
+        poolOrgId: input.poolOrgId,
         kind: "submit",
         language: input.language,
         entry: input.entry,
@@ -782,7 +797,11 @@ export async function getSubmissionFor(id: string, viewer: User) {
   }
   const scope = await examScope(viewer.id)
   if (scope && !inExamScope(scope, submission)) {
-    throw new ApiError(403, "exam_locked", "Earlier code is closed during your exam.")
+    throw new ApiError(
+      403,
+      "exam_locked",
+      "Earlier code is closed during your exam."
+    )
   }
   return presentSubmission(submission, viewer)
 }

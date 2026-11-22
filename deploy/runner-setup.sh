@@ -12,7 +12,11 @@
 # DATABASE_URL is the DIRECT Postgres address, or a pooler in SESSION mode (Supabase: the
 # pooler's port 5432, which also works from IPv4-only servers), never transaction pooling
 # (Supabase's port 6543): the runner keeps a LISTEN session open. When switching databases,
-# pass the new address with SEED=0, so the starter problems aren't loaded over real data. Optional: RUNNER_CONCURRENCY (default: one per core, at most 8), REPO, BRANCH,
+# pass the new address with SEED=0, so the starter problems aren't loaded over real data.
+# RUNNER_POOL=<organization address> makes this an organization's own judge: its work comes here
+# first, and only here while this judge is online; when idle it helps the shared pool. Leave it
+# out for a shared judge; RUNNER_POOL= (empty) turns a pool judge back into a shared one.
+# Optional: RUNNER_CONCURRENCY (default: one per core, at most 8), REPO, BRANCH,
 # DIR, SEED=0 to skip loading the starter problems.
 #
 # Give this machine nothing else to do. A runner controls Docker, which is root on the
@@ -26,6 +30,14 @@ DIR="${DIR:-/opt/gretlab}"
 if [ -z "${DATABASE_URL:-}" ] && [ -f "$DIR/.env" ]; then
   DATABASE_URL="$(sed -n 's/^DATABASE_URL=//p' "$DIR/.env" | head -1)"
 fi
+# Likewise the pool, unless given (even empty, which makes it shared again).
+if [ -z "${RUNNER_POOL+set}" ] && [ -f "$DIR/.env" ]; then
+  RUNNER_POOL="$(sed -n 's/^RUNNER_POOL=//p' "$DIR/.env" | head -1)"
+fi
+RUNNER_POOL="${RUNNER_POOL:-}"
+case "$RUNNER_POOL" in
+  *[!a-z0-9-]*) echo "RUNNER_POOL must be an organization's address, like greenwood" >&2; exit 1 ;;
+esac
 : "${DATABASE_URL:?Set DATABASE_URL to the direct Postgres address, e.g. sudo DATABASE_URL='postgres://...' bash runner-setup.sh}"
 SEED="${SEED:-1}"
 CORES="$(nproc)"
@@ -98,8 +110,9 @@ umask 077
 cat > .env <<EOF
 DATABASE_URL=${DATABASE_URL}
 RUNNER_CONCURRENCY=${RUNNER_CONCURRENCY}
+RUNNER_POOL=${RUNNER_POOL}
 EOF
-echo "ok: $RUNNER_CONCURRENCY parallel jobs on $CORES cores"
+echo "ok: $RUNNER_CONCURRENCY parallel jobs on $CORES cores, ${RUNNER_POOL:+pool }${RUNNER_POOL:-shared}"
 
 step "Building the runner"
 "${COMPOSE[@]}" build --quiet runner
@@ -127,4 +140,5 @@ Done. This server now judges submissions from the queue in your database.
   Update:   curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh
             sudo bash /tmp/runner-setup.sh   (pulls $BRANCH, migrates, retests, restarts)
   More capacity: run it on another server with the same DATABASE_URL.
+  An organization's own judge: on its own server, add RUNNER_POOL=<organization address>.
 EOF
