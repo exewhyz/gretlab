@@ -105,7 +105,10 @@ Run `e2e/load.mjs` against your own deployment before a big event. Add runner ma
 
 ## Deploy
 
-1. **Postgres:** a managed instance with backups.
+1. **Postgres:** a managed instance with backups, in the region nearest your users. Put the
+   web tier in the **same region** as the database: a page makes several queries, and each one
+   pays the distance between them. A college in India served from Sydney waited about 300 ms
+   per request; moving the web app and the database to Mumbai fixed it (November 2026).
 2. **Stateless tier**, on any Docker host:
    ```bash
    SITE_ADDRESS=lab.college.edu DB_HOST=... DB_PASSWORD=... \
@@ -121,7 +124,14 @@ Run `e2e/load.mjs` against your own deployment before a big event. Add runner ma
    docker/sandbox/build.sh
    DATABASE_URL=postgres://... docker compose -f docker-compose.runner.yml up -d --build
    ```
-   Connect runners directly to Postgres, not through PgBouncer: they're few, and wake-ups need a real session.
+   Connect runners directly to Postgres, or through a pooler in **session** mode (Supabase's
+   port 5432), never in transaction mode: they're few, and wake-ups need a real session. The web
+   tier can use transaction mode, with `DATABASE_PREPARE=false`. A runner far from the database
+   is fine: it makes only a few queries per submission.
+
+   If your Postgres host requires SSL, add `?sslmode=require` to the end of `DATABASE_URL`. The
+   `psql` and `pg_dump` tools try SSL by themselves, but GretLab's database client doesn't, and is
+   refused without it.
 
 ## Run it
 
