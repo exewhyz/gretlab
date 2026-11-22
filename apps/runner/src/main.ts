@@ -144,7 +144,14 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   })
 }
 
-const self = { id: runnerId, host: hostname(), slots: SLOTS, poolOrgId: pool }
+const self = {
+  id: runnerId,
+  host: hostname(),
+  slots: SLOTS,
+  poolOrgId: pool,
+  version: process.env.RUNNER_VERSION?.trim() || null,
+  machineId: MACHINE,
+}
 const tick = () =>
   heartbeat(db, self, [...running.keys()]).catch((error) =>
     console.error("[runner] heartbeat error:", error)

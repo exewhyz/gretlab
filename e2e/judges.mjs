@@ -7,6 +7,9 @@
  *   - Stop: a machine still setting up ends at once; a ready one drains, then ends
  *   - a machine that vanished without being asked is marked failed
  *   - judge settings only here, not on the general Settings route; the activity log
+ *   - versions: each judge's code against the site's; Update (Start and Stop both needed)
+ *     replaces a machine, one at a time; a failed replacement leaves the old one working;
+ *     a machine stuck setting up fails; the setup check
  *   - the page, its Start dialog and Stop confirmation
  *   node e2e/judges.mjs [base-url] [screenshot-dir]
  */
@@ -29,6 +32,7 @@ const check = (name, ok, detail = "") => {
 }
 const psql = (q) => execFileSync("docker", ["compose", "-f", ROOT + "docker-compose.yml", "exec", "-T", "postgres", "psql", "-U", "gretlab", "-d", DB, "-Atqc", q]).toString().trim()
 const cleanup = () => {
+  psql(`delete from runners where host like 'jd-%'`)
   psql(`delete from judge_machines`)
   psql(`delete from settings where key like 'judges.%'`)
   psql(`delete from organizations where slug in ('jd-org', 'fake-aws-refuses')`)
@@ -109,9 +113,68 @@ check("a machine that vanished without being asked is marked failed", (await adm
 const cleared = await admin(`/admin/judges/${lost.json?.id}/stop`, { body: {} })
 check("Stop on a failed machine clears it, even when AWS no longer has it", cleared.status === 200 && cleared.json?.stage === "stopped", JSON.stringify(cleared.json))
 
+// ---------- versions and updates (the site's code is e2e-latest in the test server)
+await admin("/admin/judges/settings", { method: "PUT", body: { maxRunning: 10, size: "c7i-flex.large" } })
+const judgeOn = (host, machine, version, pool = null) => psql(`insert into runners (id, host, slots, busy, last_seen_at, version, machine_id, pool_org_id) values ('${host}', '${host}', 2, 0, now(), '${version}', ${machine ? `'${machine}'` : "null"}, ${pool ? `'${pool}'` : "null"}) on conflict (id) do update set last_seen_at = now(), version = excluded.version, machine_id = excluded.machine_id`)
+const readyMachine = async () => {
+  const made = (await admin("/admin/judges", { body: {} })).json
+  psql(`update judge_machines set stage = 'ready' where id = '${made.id}'`)
+  return made
+}
+const x = await readyMachine()
+judgeOn("jd-x", x.instanceId, "e2e-old")
+judgeOn("jd-hand", null, "e2e-old")
+let list = (await admin("/admin/judges")).json
+const xRow = list.machines.find((m) => m.id === x.id)
+check("a machine's judge shows its code, out of date against the site's", xRow?.judge?.version === "e2e-old" && xRow?.outOfDate === true && list.latest === "e2e-latest", JSON.stringify({ judge: xRow?.judge, outOfDate: xRow?.outOfDate, latest: list.latest }))
+check("a judge set up by hand shows too, marked as such", list.online.some((r) => r.host === "jd-hand" && r.fromDashboard === false && r.outOfDate === true))
+check("\"Start judges\" alone can't update (it also stops)", (await starter(`/admin/judges/${x.id}/update`, { body: {} })).status === 403)
+check("\"See judges\" can't either", (await viewer(`/admin/judges/${x.id}/update`, { body: {} })).status === 403)
+const asked = await admin(`/admin/judges/${x.id}/update`, { body: {} })
+const replacements = () => psql(`select count(*) from judge_machines where replaces_id = '${x.id}'`)
+check("Update starts one replacement for the same pool, and the old one keeps working", asked.status === 200 && asked.json?.updateWanted === true && asked.json?.stage === "ready" && replacements() === "1", JSON.stringify(asked.json))
+await admin(`/admin/judges/${x.id}/update`, { body: {} })
+await admin("/admin/judges")
+check("…asking again starts no second one", replacements() === "1")
+const fresh = psql(`select id from judge_machines where replaces_id = '${x.id}'`)
+psql(`update judge_machines set stage = 'ready' where id = '${fresh}'`)
+list = (await admin("/admin/judges")).json
+const xNow = list.machines.find((m) => m.id === x.id)
+check("once the replacement is ready, the old one drains", xNow?.stage === "draining" && xNow?.updateWanted === false && xNow?.note.includes("Replaced"), JSON.stringify(xNow))
+// Update all: two more machines on old code; one replacement at a time.
+const y = await readyMachine()
+const z = await readyMachine()
+judgeOn("jd-y", y.instanceId, "e2e-old")
+judgeOn("jd-z", z.instanceId, "e2e-old")
+judgeOn("jd-fresh", psql(`select instance_id from judge_machines where id = '${fresh}'`), "e2e-latest")
+const all = await admin("/admin/judges/update-all", { body: {} })
+const coming = () => psql(`select count(*) from judge_machines where replaces_id is not null and stage in ('requested','launching','installing')`)
+// The page refreshing (a tidy-up) while the first replacement is still starting.
+await admin("/admin/judges")
+await admin("/admin/judges")
+check("Update all takes only the out-of-date machines, and replaces one at a time", all.status === 200 && all.json?.updating === 2 && coming() === "1", JSON.stringify({ all: all.json, coming: coming() }))
+const first = psql(`select id from judge_machines where replaces_id in ('${y.id}', '${z.id}') and stage = 'launching'`)
+psql(`update judge_machines set stage = 'ready' where id = '${first}'`)
+await admin("/admin/judges")
+check("…the next one starts once the first is ready", coming() === "1" && psql(`select count(*) from judge_machines where stage = 'draining' and id in ('${y.id}', '${z.id}')`) === "1")
+const second = psql(`select id from judge_machines where replaces_id in ('${y.id}', '${z.id}') and stage = 'launching'`)
+psql(`update judge_machines set stage = 'failed', note = 'Setting up stopped at line 40.' where id = '${second}'`)
+list = (await admin("/admin/judges")).json
+const kept = list.machines.find((m) => m.id === psql(`select replaces_id from judge_machines where id = '${second}'`))
+check("a replacement that fails leaves the old machine working, and says so", kept?.stage === "ready" && kept?.updateWanted === false && kept?.note.includes("didn't work"), JSON.stringify(kept))
+// A machine that never finishes setting up.
+const slow = (await admin("/admin/judges", { body: {} })).json
+psql(`update judge_machines set stage = 'installing', stage_at = now() - interval '31 minutes' where id = '${slow.id}'`)
+check("a machine still setting up after 30 minutes has failed", (await admin("/admin/judges")).json?.machines?.find((m) => m.id === slow.id)?.stage === "failed")
+psql(`update judge_machines set note = E'Setting up stopped at line 52.\n==> Building the runner\nfailed to fetch' where id = '${slow.id}'`)
+// The setup check, for anyone who may see judges.
+const checked = await viewer("/admin/judges/check")
+check("the setup check runs for anyone who may see judges", checked.status === 200 && checked.json?.results?.length >= 2 && checked.json.results.every((r) => r.ok), JSON.stringify(checked.json))
+check("…and not for anyone else", (await outsider("/admin/judges/check")).status === 403)
+
 // ---------- the activity log
 const log = psql(`select string_agg(distinct action, ',' order by action) from audit_log where org_id is null and action like 'judges.%'`)
-check("starts, stops and settings are in the activity log", log === "judges.settings,judges.start,judges.stop", log)
+check("starts, stops, updates and settings are in the activity log", log === "judges.settings,judges.start,judges.stop,judges.update", log)
 
 // ---------- the page
 const browser = await chromium.launch()
@@ -132,6 +195,12 @@ await tab.getByTestId("judge-machine").filter({ hasText: "Starting the machine" 
 await tab.getByRole("alertdialog").getByRole("button", { name: "Stop judge" }).click()
 await tab.waitForFunction(() => !document.body.innerText.includes("Starting the machine"), null, { timeout: 15_000 }).catch(() => {})
 check("Stop from the page asks first, then ends it", !(await tab.getByText("Starting the machine").count()))
+check("an out-of-date judge shows as such, with Update", (await tab.getByText("Out of date").count()) >= 1 && (await tab.getByRole("button", { name: "Update" }).count()) >= 1)
+await tab.getByRole("button", { name: "Show the setup log" }).first().click()
+check("a failure's setup log opens from its note", await tab.getByText("==> Building the runner").first().isVisible())
+await tab.getByRole("button", { name: "Run the setup check" }).click()
+await tab.getByTestId("judge-check").waitFor({ timeout: 15_000 }).catch(() => {})
+check("the setup check runs from the page", (await tab.getByTestId("judge-check").getByText("Signing in to AWS").count()) === 1)
 await tab.screenshot({ path: SHOTS + "judges.png", fullPage: true })
 const watcher = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
 await watcher.addCookies([{ name: "next-auth.session-token", value: await encode({ token: { email: "jd-viewer@example.com" }, secret: SECRET }), url: BASE }])

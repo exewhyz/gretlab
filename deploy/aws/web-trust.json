@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<account>:oidc-provider/oidc.vercel.com/anikets-projects-07c7f981"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "oidc.vercel.com/anikets-projects-07c7f981:aud": "https://vercel.com/anikets-projects-07c7f981",
+          "oidc.vercel.com/anikets-projects-07c7f981:sub": "owner:anikets-projects-07c7f981:project:gretlab-web:environment:production"
+        }
+      }
+    }
+  ]
+}

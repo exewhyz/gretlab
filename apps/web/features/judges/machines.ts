@@ -1,17 +1,25 @@
 import {
   DescribeInstancesCommand,
+  DescribeLaunchTemplatesCommand,
   EC2Client,
   RunInstancesCommand,
   TerminateInstancesCommand,
+  type RunInstancesCommandInput,
 } from "@aws-sdk/client-ec2"
+import { DescribeParametersCommand, SSMClient } from "@aws-sdk/client-ssm"
+import {
+  DecodeAuthorizationMessageCommand,
+  STSClient,
+} from "@aws-sdk/client-sts"
 import { awsCredentialsProvider } from "@vercel/functions/oidc"
 
 /*
  * Starting and ending judge machines on AWS (EC2, Sydney), from the launch template
  * `gretlab-judge` (deploy/judge-machine-boot.sh runs on first boot). The website signs in to
  * AWS through Vercel's OIDC federation as the role in JUDGES_AWS_ROLE_ARN, which may only start
- * machines from that template, pass only the judge machine's role, and end only machines tagged
- * gretlab:judge=true. No AWS keys are stored anywhere.
+ * machines from that template, pass only the judge machine's role, end only machines tagged
+ * gretlab:judge=true, and read (never change) the template, the database parameter's name and
+ * its own refusals. No AWS keys are stored anywhere.
  *
  * JUDGES_PROVIDER=fake swaps AWS for an in-memory stand-in (the e2e suites), and an unset
  * JUDGES_AWS_ROLE_ARN means machines can't be started here (a local copy, a preview).
@@ -24,6 +32,16 @@ export type MachineState =
   | "stopped"
   | "shutting-down"
   | "terminated"
+
+/** One line of the setup check: what was tried, whether it worked, and what to do if not. */
+export interface CheckResult {
+  name: string
+  ok: boolean
+  detail: string
+}
+
+/** The database address new machines read (SSM, readable only by the machine's role). */
+export const DATABASE_PARAMETER = "/gretlab/judge/database-url"
 
 export interface Machines {
   /** Starts one machine; answers its instance id. */
@@ -38,56 +56,100 @@ export interface Machines {
   end(instanceId: string): Promise<void>
   /** Each machine's state; a machine AWS no longer knows is left out. */
   states(instanceIds: string[]): Promise<Map<string, MachineState>>
+  /** Tries every piece a start needs, changing nothing (a dry-run start). */
+  check(size: string): Promise<CheckResult[]>
 }
 
 export const REGION = "ap-southeast-2"
 
+/** What Start sends AWS, so the setup check's dry run tries exactly the same thing. */
+function startRequest(input: {
+  size: string
+  pool: string | null
+  rowId: string
+}): RunInstancesCommandInput {
+  const tags = [
+    { Key: "gretlab:judge", Value: "true" },
+    {
+      Key: "Name",
+      Value: `gretlab-judge${input.pool ? `-${input.pool}` : ""}`,
+    },
+    { Key: "gretlab-machine", Value: input.rowId },
+    ...(input.pool ? [{ Key: "gretlab-pool", Value: input.pool }] : []),
+  ]
+  return {
+    LaunchTemplate: { LaunchTemplateName: "gretlab-judge", Version: "$Latest" },
+    InstanceType: input.size as never,
+    MinCount: 1,
+    MaxCount: 1,
+    // A retried request starts no second machine.
+    ClientToken: input.rowId,
+    TagSpecifications: [
+      { ResourceType: "instance", Tags: tags },
+      {
+        ResourceType: "volume",
+        Tags: [{ Key: "gretlab:judge", Value: "true" }],
+      },
+    ],
+  }
+}
+
+const messageOf = (error: unknown) =>
+  error instanceof Error ? error.message : String(error)
+
 class AwsMachines implements Machines {
-  private client: EC2Client
-  constructor(roleArn: string) {
-    this.client = new EC2Client({
-      region: REGION,
-      credentials: awsCredentialsProvider({ roleArn }),
-    })
+  private ec2: EC2Client
+  private ssm: SSMClient
+  private sts: STSClient
+  private credentials: ReturnType<typeof awsCredentialsProvider>
+  constructor(private roleArn: string) {
+    this.credentials = awsCredentialsProvider({ roleArn })
+    const config = { region: REGION, credentials: this.credentials }
+    this.ec2 = new EC2Client(config)
+    this.ssm = new SSMClient(config)
+    this.sts = new STSClient(config)
+  }
+
+  /** An AWS refusal in words: which action, on what, and why (its encoded part decoded). */
+  private async explain(error: unknown) {
+    const text = messageOf(error)
+    const encoded = text.match(
+      /Encoded authorization failure message: (\S+)/
+    )?.[1]
+    if (!encoded) return text
+    try {
+      const out = await this.sts.send(
+        new DecodeAuthorizationMessageCommand({ EncodedMessage: encoded })
+      )
+      const decoded = JSON.parse(out.DecodedMessage ?? "{}") as {
+        context?: { action?: string; resource?: string }
+        matchedStatements?: { items?: unknown[] }
+      }
+      const why = decoded.matchedStatements?.items?.length
+        ? "a rule denies it"
+        : "no rule allows it"
+      return `AWS refused ${decoded.context?.action ?? "it"} on ${decoded.context?.resource ?? "a resource"}: ${why}. The website's AWS role (gretlab-web-judges) would need to allow it.`
+    } catch {
+      return text
+        .replace(/Encoded authorization failure message: \S+/, "")
+        .trim()
+    }
   }
 
   async start(input: { size: string; pool: string | null; rowId: string }) {
-    const tags = [
-      { Key: "gretlab:judge", Value: "true" },
-      {
-        Key: "Name",
-        Value: `gretlab-judge${input.pool ? `-${input.pool}` : ""}`,
-      },
-      { Key: "gretlab-machine", Value: input.rowId },
-      ...(input.pool ? [{ Key: "gretlab-pool", Value: input.pool }] : []),
-    ]
-    const out = await this.client.send(
-      new RunInstancesCommand({
-        LaunchTemplate: {
-          LaunchTemplateName: "gretlab-judge",
-          Version: "$Latest",
-        },
-        InstanceType: input.size as never,
-        MinCount: 1,
-        MaxCount: 1,
-        // A retried request starts no second machine.
-        ClientToken: input.rowId,
-        TagSpecifications: [
-          { ResourceType: "instance", Tags: tags },
-          {
-            ResourceType: "volume",
-            Tags: [{ Key: "gretlab:judge", Value: "true" }],
-          },
-        ],
-      })
-    )
+    let out
+    try {
+      out = await this.ec2.send(new RunInstancesCommand(startRequest(input)))
+    } catch (error) {
+      throw new Error(await this.explain(error))
+    }
     const id = out.Instances?.[0]?.InstanceId
     if (!id) throw new Error("AWS started no machine")
     return id
   }
 
   async end(instanceId: string) {
-    await this.client.send(
+    await this.ec2.send(
       new TerminateInstancesCommand({ InstanceIds: [instanceId] })
     )
   }
@@ -95,7 +157,7 @@ class AwsMachines implements Machines {
   async states(instanceIds: string[]) {
     const states = new Map<string, MachineState>()
     if (instanceIds.length === 0) return states
-    const out = await this.client.send(
+    const out = await this.ec2.send(
       new DescribeInstancesCommand({ InstanceIds: instanceIds })
     )
     for (const reservation of out.Reservations ?? []) {
@@ -106,6 +168,93 @@ class AwsMachines implements Machines {
       }
     }
     return states
+  }
+
+  async check(size: string): Promise<CheckResult[]> {
+    const results: CheckResult[] = []
+    try {
+      await this.credentials()
+      results.push({
+        name: "Signing in to AWS",
+        ok: true,
+        detail: `As ${this.roleArn.split("/").pop()}, through Vercel's OIDC federation.`,
+      })
+    } catch (error) {
+      results.push({
+        name: "Signing in to AWS",
+        ok: false,
+        detail: `${messageOf(error)}. The role's trust rule must accept this Vercel team, the project's name and production (IAM › Roles › gretlab-web-judges › Trust relationships), and OIDC federation must be on in Vercel (Team issuer).`,
+      })
+      return results
+    }
+    try {
+      const out = await this.ec2.send(
+        new DescribeLaunchTemplatesCommand({
+          LaunchTemplateNames: ["gretlab-judge"],
+        })
+      )
+      const template = out.LaunchTemplates?.[0]
+      results.push({
+        name: "The launch template",
+        ok: Boolean(template),
+        detail: template
+          ? `gretlab-judge, version ${template.LatestVersionNumber}.`
+          : "There's no launch template named gretlab-judge in Sydney.",
+      })
+    } catch (error) {
+      results.push({
+        name: "The launch template",
+        ok: false,
+        detail: await this.explain(error),
+      })
+    }
+    try {
+      await this.ec2.send(
+        new RunInstancesCommand({
+          ...startRequest({ size, pool: null, rowId: crypto.randomUUID() }),
+          DryRun: true,
+        })
+      )
+      results.push({
+        name: "Starting a machine (dry run)",
+        ok: true,
+        detail: "AWS answered without starting one.",
+      })
+    } catch (error) {
+      const dryRunPassed =
+        (error as { name?: string } | null)?.name === "DryRunOperation"
+      results.push({
+        name: "Starting a machine (dry run)",
+        ok: dryRunPassed,
+        detail: dryRunPassed
+          ? `A ${size} machine would start.`
+          : await this.explain(error),
+      })
+    }
+    try {
+      const out = await this.ssm.send(
+        new DescribeParametersCommand({
+          ParameterFilters: [{ Key: "Name", Values: [DATABASE_PARAMETER] }],
+        })
+      )
+      const parameter = out.Parameters?.[0]
+      results.push({
+        name: "The database address for new machines",
+        ok: parameter?.Type === "SecureString",
+        detail: !parameter
+          ? `There's no ${DATABASE_PARAMETER} in SSM Parameter Store (Sydney), so new machines can't reach the database. Store the session pooler's address there as a SecureString.`
+          : parameter.Type !== "SecureString"
+            ? `${DATABASE_PARAMETER} isn't encrypted (it's a ${parameter.Type}): store it again as a SecureString.`
+            : `Stored and encrypted, last changed ${parameter.LastModifiedDate?.toISOString().slice(0, 10) ?? "earlier"}. Its value is never read here.`,
+      })
+    } catch (error) {
+      results.push({
+        name: "The database address for new machines",
+        ok: false,
+        detail: await this.explain(error),
+      })
+    }
+    return results
   }
 }
 
@@ -131,6 +280,20 @@ class FakeMachines implements Machines {
         return state ? [[id, state] as const] : []
       })
     )
+  }
+  async check(size: string): Promise<CheckResult[]> {
+    return [
+      {
+        name: "Signing in to AWS",
+        ok: true,
+        detail: "The fake AWS (JUDGES_PROVIDER=fake).",
+      },
+      {
+        name: "Starting a machine (dry run)",
+        ok: true,
+        detail: `A ${size} machine would start.`,
+      },
+    ]
   }
 }
 

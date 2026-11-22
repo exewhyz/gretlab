@@ -1,0 +1,127 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "StartJudgesFromTheTemplateOnly",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": [
+        "arn:aws:ec2:ap-southeast-2:<account>:instance/*"
+      ],
+      "Condition": {
+        "ArnLike": {
+          "ec2:LaunchTemplate": "arn:aws:ec2:ap-southeast-2:<account>:launch-template/lt-09f1df87a1808a1b6"
+        },
+        "StringEquals": {
+          "aws:RequestTag/gretlab:judge": "true"
+        }
+      }
+    },
+    {
+      "Sid": "ItsDiskAndNetworkFromTheTemplate",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": [
+        "arn:aws:ec2:ap-southeast-2:<account>:volume/*",
+        "arn:aws:ec2:ap-southeast-2:<account>:network-interface/*"
+      ],
+      "Condition": {
+        "ArnLike": {
+          "ec2:LaunchTemplate": "arn:aws:ec2:ap-southeast-2:<account>:launch-template/lt-09f1df87a1808a1b6"
+        }
+      }
+    },
+    {
+      "Sid": "TheSizesAllowed",
+      "Effect": "Deny",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:ap-southeast-2:<account>:instance/*",
+      "Condition": {
+        "StringNotEquals": {
+          "ec2:InstanceType": [
+            "c7i-flex.large",
+            "c7i-flex.xlarge",
+            "c7i.large",
+            "c7i.xlarge"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "WhatTheTemplateUses",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": [
+        "arn:aws:ec2:ap-southeast-2:<account>:launch-template/lt-09f1df87a1808a1b6",
+        "arn:aws:ec2:ap-southeast-2:<account>:subnet/*",
+        "arn:aws:ec2:ap-southeast-2:<account>:security-group/sg-0734efed8a10dd07d",
+        "arn:aws:ec2:ap-southeast-2::image/*"
+      ]
+    },
+    {
+      "Sid": "TheImageParameter",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameters",
+        "ssm:GetParameter"
+      ],
+      "Resource": "arn:aws:ssm:ap-southeast-2::parameter/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
+    },
+    {
+      "Sid": "TagOnlyWhileStarting",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": [
+        "arn:aws:ec2:ap-southeast-2:<account>:instance/*",
+        "arn:aws:ec2:ap-southeast-2:<account>:volume/*",
+        "arn:aws:ec2:ap-southeast-2:<account>:network-interface/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "ec2:CreateAction": "RunInstances"
+        }
+      }
+    },
+    {
+      "Sid": "PassOnlyTheJudgeRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::<account>:role/gretlab-judge-machine",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "ec2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "SeeMachines",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceStatus"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EndOnlyJudges",
+      "Effect": "Allow",
+      "Action": "ec2:TerminateInstances",
+      "Resource": "arn:aws:ec2:ap-southeast-2:<account>:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/gretlab:judge": "true"
+        }
+      }
+    },
+    {
+      "Sid": "SetupCheckReadsOnly",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeLaunchTemplates",
+        "ssm:DescribeParameters",
+        "sts:DecodeAuthorizationMessage"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

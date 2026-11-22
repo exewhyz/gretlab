@@ -32,7 +32,17 @@ update judge_machines set stage = :'stage', note = :'note', stage_at = now()
 where instance_id = :'machine';
 SQL
 }
-trap 'stage failed "Setting up stopped at line $LINENO; see /var/log/gretlab-judge-boot.log"' ERR
+# On failure, the dashboard gets the line and the end of this log, with any database address
+# (or anything else that looks like a connection string or password) taken out.
+failed() {
+  local tail
+  tail=$(tail -n 25 /var/log/gretlab-judge-boot.log 2>/dev/null \
+    | sed -E 's#[a-z]+://[^[:space:]]+#<address removed>#g; s#(password|secret|token)[=:][^[:space:]]+#\1=<removed>#gI' \
+    | tail -c 1500)
+  stage failed "Setting up stopped at line $1.
+$tail"
+}
+trap 'failed $LINENO' ERR
 
 stage installing
 curl -fsSL https://raw.githubusercontent.com/exewhyz/gretlab/main/deploy/runner-setup.sh -o /tmp/runner-setup.sh

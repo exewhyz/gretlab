@@ -729,6 +729,10 @@ export const runners = pgTable("runners", {
   poolOrgId: uuid("pool_org_id").references(() => organizations.id, {
     onDelete: "set null",
   }),
+  /** The code it runs: the commit it was set up from (RUNNER_VERSION). */
+  version: text("version"),
+  /** The machine it runs on, when started from the dashboard (RUNNER_MACHINE: its instance id). */
+  machineId: text("machine_id"),
   busy: integer("busy").notNull().default(0),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
 })
@@ -766,6 +770,18 @@ export const judgeMachines = pgTable(
     /** Why it failed, or what it's waiting for. */
     note: text("note").notNull().default(""),
     requestedBy: uuid("requested_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** The machine this one replaces with newer code: drained once this one is ready. */
+    replacesId: uuid("replaces_id").references(
+      (): AnyPgColumn => judgeMachines.id,
+      {
+        onDelete: "set null",
+      }
+    ),
+    /** Update asked for: a replacement is started for it, one machine at a time. */
+    updateWanted: boolean("update_wanted").notNull().default(false),
+    updateRequestedBy: uuid("update_requested_by").references(() => users.id, {
       onDelete: "set null",
     }),
     createdAt: createdAt(),

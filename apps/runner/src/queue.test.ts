@@ -370,3 +370,25 @@ test("pools: a shared judge keeps taking shared work in due order", async () => 
   assert.equal((await claimNext(db, "shared-1", 4096, null))?.id, second.id)
   assert.equal(await claimNext(db, "shared-1", 4096, null), null)
 })
+
+test("a heartbeat records the judge's code version and machine", async () => {
+  await db.delete(runners)
+  await heartbeat(
+    db,
+    {
+      id: "v-judge",
+      host: "h",
+      slots: 2,
+      poolOrgId: null,
+      version: "abc123",
+      machineId: "i-0123",
+    },
+    []
+  )
+  const [row] = await db
+    .select()
+    .from(runners)
+    .where(sql.eq(runners.id, "v-judge"))
+  assert.equal(row?.version, "abc123")
+  assert.equal(row?.machineId, "i-0123")
+})

@@ -85,6 +85,10 @@ export async function heartbeat(
     host: string
     slots: number
     poolOrgId?: string | null
+    /** The commit it was set up from (RUNNER_VERSION), shown on Dashboard › Judges. */
+    version?: string | null
+    /** Its machine's instance id, when started from the dashboard (RUNNER_MACHINE). */
+    machineId?: string | null
   },
   jobIds: string[]
 ) {

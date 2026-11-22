@@ -10,6 +10,11 @@ import { useState } from "react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@workspace/ui/components/collapsible"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -31,10 +36,11 @@ import {
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import { formatDateTime } from "@/lib/format"
-import type { listJudges } from "@/features/judges/server"
+import type { checkJudges, listJudges } from "@/features/judges/server"
 
 type Judges = ApiResult<typeof listJudges>
 type Machine = Judges["machines"][number]
+type Check = { results: ApiResult<typeof checkJudges> }
 
 const KEY = ["admin", "judges"]
 
@@ -62,52 +68,99 @@ const CHANGING = new Set<Machine["stage"]>([
   "stopping",
 ])
 const LIVE = new Set<Machine["stage"]>([...CHANGING, "ready"])
+const STOPPABLE = new Set<Machine["stage"]>([
+  "requested",
+  "launching",
+  "installing",
+  "ready",
+  "failed",
+])
+
+/** A commit, short. */
+const short = (version: string | null | undefined) =>
+  version ? version.slice(0, 7) : "unknown"
 
 export function JudgesPage() {
   const client = useQueryClient()
   const { data: viewer } = useViewer()
   const held = viewer?.user?.platform.permissions ?? []
   const can = (p: PlatformPermission) => grantsPlatformPermission(held, p)
+  const canUpdate = can("platform.judges.start") && can("platform.judges.stop")
   const [starting, setStarting] = useState(false)
   const { data, error } = useQuery({
     queryKey: KEY,
     queryFn: () => api<Judges>("/admin/judges"),
     // Every 5 seconds while a machine is on its way somewhere; otherwise every half minute.
     refetchInterval: (query) =>
-      query.state.data?.machines.some((m) => CHANGING.has(m.stage))
+      query.state.data?.machines.some(
+        (m) => CHANGING.has(m.stage) || m.updateWanted
+      )
         ? 5_000
         : 30_000,
   })
+  const refresh = () => void client.invalidateQueries({ queryKey: KEY })
   const stop = useMutation({
     mutationFn: (id: string) =>
       api(`/admin/judges/${id}/stop`, { method: "POST" }),
-    onSuccess: () => void client.invalidateQueries({ queryKey: KEY }),
+    onSuccess: refresh,
+    meta: { quiet: true },
+  })
+  const update = useMutation({
+    mutationFn: (id: string) =>
+      api(`/admin/judges/${id}/update`, { method: "POST" }),
+    onSuccess: refresh,
+    meta: { quiet: true },
+  })
+  const updateAll = useMutation({
+    mutationFn: () =>
+      api<{ updating: number }>("/admin/judges/update-all", { method: "POST" }),
+    onSuccess: refresh,
+    meta: { quiet: true },
   })
   if (!data) return <Loading error={error} />
 
   const live = data.machines.filter((m) => LIVE.has(m.stage))
+  const behind = data.machines.filter(
+    (m) => m.stage === "ready" && m.outOfDate && !m.updateWanted
+  )
+  const problem = stop.error ?? update.error ?? updateAll.error
   return (
     <>
       <PageTitle
         action={
-          can("platform.judges.start") && (
-            <Button
-              size="sm"
-              disabled={
-                !data.available || live.length >= data.settings.maxRunning
-              }
-              title={
-                !data.available
-                  ? "This copy of GretLab has no AWS role, so it can't start machines."
-                  : live.length >= data.settings.maxRunning
-                    ? "At the limit of judges at once: stop one or raise the limit."
-                    : undefined
-              }
-              onClick={() => setStarting(true)}
-            >
-              Start a judge
-            </Button>
-          )
+          <span className="flex flex-wrap gap-2">
+            {canUpdate && behind.length > 0 && (
+              <ConfirmButton
+                size="sm"
+                variant="outline"
+                title={`Update ${behind.length} judge${behind.length === 1 ? "" : "s"}?`}
+                description="Each is replaced by a fresh machine with the latest code, one at a time: once the new one is ready, the old one finishes its work and ends. If a new one fails, the old one keeps working."
+                confirmLabel="Update"
+                tone="default"
+                onConfirm={() => updateAll.mutate()}
+              >
+                Update all ({behind.length})
+              </ConfirmButton>
+            )}
+            {can("platform.judges.start") && (
+              <Button
+                size="sm"
+                disabled={
+                  !data.available || live.length >= data.settings.maxRunning
+                }
+                title={
+                  !data.available
+                    ? "This copy of GretLab has no AWS role, so it can't start machines."
+                    : live.length >= data.settings.maxRunning
+                      ? "At the limit of judges at once: stop one or raise the limit."
+                      : undefined
+                }
+                onClick={() => setStarting(true)}
+              >
+                Start a judge
+              </Button>
+            )}
+          </span>
         }
       >
         Judges
@@ -138,13 +191,19 @@ export function JudgesPage() {
               0
             ),
           },
+          {
+            label: "Out of date",
+            value: data.online.filter((r) => r.outOfDate).length,
+            tone: data.online.some((r) => r.outOfDate) ? "bad" : undefined,
+            hint: data.latest ? `site: ${short(data.latest)}` : undefined,
+          },
         ]}
       />
       <FormMessage
-        message={stop.error ? { text: stop.error.message, kind: "err" } : null}
+        message={problem ? { text: problem.message, kind: "err" } : null}
       />
       <Card>
-        <Table headers={["Machine", "Stage", "Size", "Started", ""]}>
+        <Table headers={["Machine", "Stage", "Code", "Started", ""]}>
           {data.machines.map((m) => (
             <tr key={m.id} data-testid="judge-machine">
               <td>
@@ -152,20 +211,44 @@ export function JudgesPage() {
                   {m.pool ? m.pool.name : "Everyone (shared)"}
                 </div>
                 <div className="text-xs text-body">
-                  {m.instanceId ?? "not started yet"}
+                  {m.instanceId ?? "not started yet"} · {m.size}
                 </div>
-              </td>
-              <td>
-                <Badge variant={STAGES[m.stage].tone}>
-                  {STAGES[m.stage].label}
-                </Badge>
-                {m.note && (
-                  <div className="mt-1 max-w-xs text-xs whitespace-normal text-body">
-                    {m.note}
+                {m.replacesId && (
+                  <div className="text-xs text-body">
+                    Replacement with newer code
                   </div>
                 )}
               </td>
-              <td className="text-body-sm">{m.size}</td>
+              <td className="whitespace-normal">
+                <Badge variant={STAGES[m.stage].tone}>
+                  {STAGES[m.stage].label}
+                </Badge>
+                {m.updateWanted && (
+                  <Badge variant="outline" className="ml-1">
+                    Update waiting
+                  </Badge>
+                )}
+                {m.note && <Note text={m.note} />}
+              </td>
+              <td className="text-body-sm">
+                {m.judge ? (
+                  <>
+                    <code>{short(m.judge.version)}</code>
+                    {m.outOfDate && (
+                      <Badge variant="destructive" className="ml-1">
+                        Out of date
+                      </Badge>
+                    )}
+                    <div className="text-xs text-body">
+                      busy {m.judge.busy} of {m.judge.slots}
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-body">
+                    {m.stage === "ready" ? "not reporting" : ""}
+                  </span>
+                )}
+              </td>
               <td className="text-body-sm">
                 {formatDateTime(m.createdAt)}
                 {m.requestedBy && (
@@ -173,14 +256,25 @@ export function JudgesPage() {
                 )}
               </td>
               <td className="text-right">
-                {can("platform.judges.stop") &&
-                  [
-                    "requested",
-                    "launching",
-                    "installing",
-                    "ready",
-                    "failed",
-                  ].includes(m.stage) && (
+                <span className="flex justify-end gap-2">
+                  {canUpdate &&
+                    m.stage === "ready" &&
+                    !m.updateWanted &&
+                    // Out of date, or its judge isn't reporting: a fresh machine is the fix.
+                    (m.outOfDate || !m.judge) && (
+                      <ConfirmButton
+                        size="sm"
+                        variant="outline"
+                        title="Update this judge?"
+                        description="A fresh machine with the latest code starts for the same pool. Once it's ready, this one finishes its work and ends. If the new one fails, this one keeps working."
+                        confirmLabel="Update"
+                        tone="default"
+                        onConfirm={() => update.mutate(m.id)}
+                      >
+                        Update
+                      </ConfirmButton>
+                    )}
+                  {can("platform.judges.stop") && STOPPABLE.has(m.stage) && (
                     <ConfirmButton
                       size="sm"
                       variant="outline"
@@ -196,6 +290,7 @@ export function JudgesPage() {
                       Stop
                     </ConfirmButton>
                   )}
+                </span>
               </td>
             </tr>
           ))}
@@ -209,11 +304,26 @@ export function JudgesPage() {
       </Card>
       <h2 className="mt-6 mb-2 text-title-sm text-ink">Judges reporting in</h2>
       <Card>
-        <Table headers={["Judge", "Serves", "Busy"]}>
+        <Table headers={["Judge", "Serves", "Code", "Busy"]}>
           {data.online.map((r) => (
             <tr key={r.host} data-testid="judge-online">
-              <td className="text-body-sm">{r.host}</td>
+              <td className="text-body-sm">
+                {r.host}
+                {!r.fromDashboard && (
+                  <div className="text-xs text-body">
+                    set up by hand: update it on its server
+                  </div>
+                )}
+              </td>
               <td className="text-body-sm">{r.pool ?? "Everyone (shared)"}</td>
+              <td className="text-body-sm">
+                <code>{short(r.version)}</code>
+                {r.outOfDate && (
+                  <Badge variant="destructive" className="ml-1">
+                    Out of date
+                  </Badge>
+                )}
+              </td>
               <td className="text-body-sm tabular-nums">
                 {r.busy} of {r.slots}
               </td>
@@ -226,10 +336,83 @@ export function JudgesPage() {
           </p>
         )}
       </Card>
+      <SetupCheck />
       {can("platform.judges.settings") && <JudgeSettings data={data} />}
       {starting && (
         <StartDialog data={data} onClose={() => setStarting(false)} />
       )}
+    </>
+  )
+}
+
+/** A note's first line, with the rest (a setup log's last lines) folded away. */
+function Note({ text }: { text: string }) {
+  const [first, ...rest] = text.split("\n")
+  return (
+    <div className="mt-1 max-w-sm text-xs whitespace-normal text-body">
+      {first}
+      {rest.length > 0 && (
+        <Collapsible>
+          <CollapsibleTrigger className="mt-1 text-xs text-primary underline underline-offset-2">
+            Show the setup log
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <pre className="mt-1 max-h-64 overflow-auto rounded bg-muted p-2 text-[11px] whitespace-pre-wrap">
+              {rest.join("\n")}
+            </pre>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
+  )
+}
+
+function SetupCheck() {
+  const check = useQuery({
+    queryKey: [...KEY, "check"],
+    queryFn: () => api<Check>("/admin/judges/check"),
+    enabled: false,
+  })
+  return (
+    <>
+      <h2 className="mt-6 mb-2 text-title-sm text-ink">Setup check</h2>
+      <Card>
+        <p className="mb-3 max-w-prose text-body-sm text-body">
+          Tries everything a start needs, without starting anything: signing in
+          to AWS, the launch template, a dry-run start, and the database address
+          new machines read (never its value). Run it after changing anything in
+          AWS or Vercel.
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={check.isFetching}
+          onClick={() => void check.refetch()}
+        >
+          {check.isFetching ? "Checking…" : "Run the setup check"}
+        </Button>
+        {check.error && (
+          <FormMessage message={{ text: check.error.message, kind: "err" }} />
+        )}
+        {check.data && (
+          <ul className="mt-3 grid gap-2" data-testid="judge-check">
+            {check.data.results.map((r) => (
+              <li key={r.name} className="text-body-sm">
+                <span
+                  className={
+                    r.ok ? "text-ink" : "font-semibold text-destructive"
+                  }
+                >
+                  {r.ok ? "✓" : "✗"} {r.name}
+                </span>
+                <div className="text-xs whitespace-normal text-body">
+                  {r.detail}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </>
   )
 }

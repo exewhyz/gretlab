@@ -23,4 +23,6 @@ services:
       RUNNER_POOL: ${RUNNER_POOL:-}
       # Set on machines started from the dashboard (their AWS instance id), for Stop.
       RUNNER_MACHINE: ${RUNNER_MACHINE:-}
+      # The commit it was set up from (runner-setup.sh), shown on Dashboard › Judges.
+      RUNNER_VERSION: ${RUNNER_VERSION:-}
       DATABASE_POOL: "4"

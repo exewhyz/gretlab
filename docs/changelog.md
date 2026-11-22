@@ -10,6 +10,11 @@ aren't listed.
 
 ### Judge machines from the dashboard
 
+- **Update judges from the dashboard.** Each judge shows which version of the code it runs, and
+  ones behind the site are marked. **Update** replaces a judge with a fresh one running the
+  latest code, one at a time, so nothing slows down; if the new one fails, the old one keeps
+  working. A **Setup check** tries everything a start needs and says in plain words what's wrong,
+  and a judge that fails to set up shows the end of its log.
 - **Start and stop judges from Dashboard › Judges** (platform staff with "Manage judges"): a
   machine for everyone or for one organization, with its progress as it starts. Stop lets it
   finish its work first. A limit on how many run at once keeps costs in hand.
