@@ -1089,6 +1089,41 @@ export async function freeHandle(email: string) {
   for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`
 }
 
+/**
+ * Free handles for many new accounts at once (an import), by freeHandle's rule: the email's
+ * name, then name-2, name-3. One query for all of them, and handles given out in this batch
+ * count as taken, so two people named john@ in one file don't both get "john".
+ */
+export async function freeHandles(
+  emails: string[],
+  db: Pick<ReturnType<typeof getDb>, "select"> = getDb()
+) {
+  const baseOf = (email: string) =>
+    slugify(email.split("@")[0] ?? "").slice(0, 30) || "user"
+  const bases = [...new Set(emails.map(baseOf))]
+  const taken = new Set(
+    bases.length === 0
+      ? []
+      : (
+          await db
+            .select({ handle: users.handle })
+            .from(users)
+            .where(
+              raw`regexp_replace(${users.handle}, '-[0-9]+$', '') = any(${raw.param(bases)}::text[])`
+            )
+        ).map((row) => row.handle)
+  )
+  const handles = new Map<string, string>()
+  for (const email of emails) {
+    const base = baseOf(email)
+    let handle = base
+    for (let n = 2; taken.has(handle); n++) handle = `${base}-${n}`
+    taken.add(handle)
+    handles.set(email, handle)
+  }
+  return handles
+}
+
 export function refreshCatalog() {
   invalidate("problem-stats")
   invalidate("daily-pool")

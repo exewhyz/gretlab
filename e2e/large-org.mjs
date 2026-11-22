@@ -35,7 +35,7 @@ const cleanup = () => {
   psql(`delete from email_outbox where to_address like 'lo-%@example.com'`)
   psql(`delete from submissions where user_id in (select id from users where email like 'lo-%@example.com')`)
   psql(`delete from organizations where slug = 'lo-uni'`)
-  psql(`delete from users where email like 'lo-%@example.com'`)
+  psql(`delete from users where email like 'lo-%@example.com' or email like 'lo-twin@%'`)
 }
 const client = async (email) => {
   const cookie = `next-auth.session-token=${await encode({ token: { email }, secret: SECRET })}`
@@ -172,14 +172,22 @@ started = Date.now()
 const imported = await owner(`${O}/import`, { body: { rows: members, commit: true } })
 const importMs = Date.now() - started
 const inSection = Number(psql(`select count(*) from group_members gm join users u on u.id = gm.user_id where gm.group_id = '${sections[0].id}' and u.email like 'lo-m-%@example.com'`))
-check(`importing 5,000 members: checked in ${checkMs} ms, added in ${importMs} ms`, checked.status === 200 && imported.status === 200 && inSection === 5000 && importMs < 60_000, JSON.stringify({ checked: checked.status, imported: imported.status, inSection, body: JSON.stringify(imported.json).slice(0, 200) }))
+check(`importing 5,000 members: checked in ${checkMs} ms, added in ${importMs} ms`, checked.status === 200 && imported.status === 200 && inSection === 5000 && importMs < 10_000, JSON.stringify({ checked: checked.status, imported: imported.status, inSection, body: JSON.stringify(imported.json).slice(0, 200) }))
 await owner(`${O}/academic-years`, { body: { name: "2026-2027", startsOn: "2026-01-01", endsOn: "2027-12-31", isCurrent: true } })
 const students = Array.from({ length: 3000 }, (_, i) => ({ name: `Lo New ${i + 1}`, email: `lo-n-${i + 1}@example.com`, admissionNo: "", gender: "", birthDate: "", phone: "", address: "", class: "First year / Section 2", rollNo: String(i + 1) }))
 started = Date.now()
 const enrolled = await owner(`${O}/students/import`, { body: { rows: students, commit: true } })
 const enrolMs = Date.now() - started
 const recorded = Number(psql(`select count(*) from student_records r join users u on u.id = r.user_id where r.org_id = '${orgId}' and u.email like 'lo-n-%@example.com'`))
-check(`importing 3,000 student records: added in ${enrolMs} ms`, enrolled.status === 200 && recorded === 3000 && enrolMs < 60_000, JSON.stringify({ status: enrolled.status, recorded, body: JSON.stringify(enrolled.json).slice(0, 300) }))
+check(`importing 3,000 student records: added in ${enrolMs} ms`, enrolled.status === 200 && recorded === 3000 && enrolMs < 10_000, JSON.stringify({ status: enrolled.status, recorded, body: JSON.stringify(enrolled.json).slice(0, 300) }))
+
+// Two people whose emails share a name: each gets their own handle, and both get in.
+const twins = await owner(`${O}/import`, { body: { rows: [
+  { email: "lo-twin@school-a.example", name: "Twin A", group: "First year / Section 3", role: "" },
+  { email: "lo-twin@school-b.example", name: "Twin B", group: "First year / Section 3", role: "" },
+], commit: true } })
+const twinHandles = psql(`select handle from users where email like 'lo-twin@%' order by email`).split("\n")
+check("two people named lo-twin@ in one file both get in, with their own handles", twins.status === 200 && twinHandles.length === 2 && twinHandles[0] !== twinHandles[1], JSON.stringify({ status: twins.status, twinHandles, body: JSON.stringify(twins.json).slice(0, 200) }))
 
 cleanup()
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED")

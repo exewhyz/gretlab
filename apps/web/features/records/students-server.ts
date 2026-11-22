@@ -30,7 +30,7 @@ import { z } from "zod"
 import { byName } from "@/lib/by-name"
 import { anyGroupGrant, pathName } from "@/features/campus/people"
 import { campusOf } from "@/features/campus/server"
-import { today } from "@/features/catalog/server"
+import { freeHandles, today } from "@/features/catalog/server"
 import { rolePermissions } from "@/features/orgs/access"
 import {
   canFor,
@@ -53,6 +53,7 @@ import {
   needPlace,
   pathIds,
   place,
+  placeAll,
   recordOf,
   SEAL,
   sealed,
@@ -303,6 +304,96 @@ export async function createInTx(
     if (year.isCurrent) await place(tx, ctx, person.id, input.groupId)
   }
   return person.id
+}
+
+/**
+ * createInTx for many students at once (an import of up to 3,000): the same accounts,
+ * memberships, records, enrolments and places, one statement per kind of write instead of
+ * about twelve per student. Refuses (409) if any of them already has a record here.
+ */
+export async function createManyInTx(
+  tx: Tx,
+  ctx: OrgContext,
+  items: { data: z.infer<typeof studentSchema>; admissionNo: string }[],
+  year: typeof academicYears.$inferSelect | null
+) {
+  if (items.length === 0) return []
+  const q = sql.sql
+  const rows = items.map((item) => ({
+    ...item,
+    email: item.data.email
+      ? item.data.email.toLowerCase()
+      : noLoginEmail(randomUUID()),
+  }))
+  const emails = rows.map((r) => r.email)
+  // Accounts for whoever doesn't have one, with handles chosen together.
+  const handles = await freeHandles(emails, tx)
+  await tx.execute(q`
+    insert into users (email, handle, name)
+    select email, handle, name
+    from unnest(${q.param(emails)}::text[], ${q.param(rows.map((r) => handles.get(r.email)!))}::text[],
+      ${q.param(rows.map((r) => r.data.name))}::text[]) as n(email, handle, name)
+    on conflict (email) do nothing`)
+  const ids = new Map(
+    (
+      await tx
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(inArray(users.email, emails))
+    ).map((u) => [u.email, u.id])
+  )
+  const people = rows.map((r) => ids.get(r.email)!)
+  const [already] = await tx
+    .select({ id: studentRecords.userId, email: users.email })
+    .from(studentRecords)
+    .innerJoin(users, eq(users.id, studentRecords.userId))
+    .where(
+      and(
+        eq(studentRecords.orgId, ctx.org.id),
+        inArray(studentRecords.userId, people)
+      )
+    )
+    .limit(1)
+  if (already)
+    throw new ApiError(
+      409,
+      "already_a_student",
+      `${already.email} already has a student record here.`
+    )
+  // Existing accounts without a name take the one from the file.
+  await tx.execute(q`
+    update users set name = n.name
+    from unnest(${q.param(people)}::uuid[], ${q.param(rows.map((r) => r.data.name))}::text[]) as n(id, name)
+    where users.id = n.id and users.name is null`)
+  await tx.execute(q`
+    insert into org_members (org_id, user_id, status, joined_via)
+    select ${ctx.org.id}, person, 'active', 'created' from unnest(${q.param(people)}::uuid[]) as person
+    on conflict (org_id, user_id) do update set status = 'active'`)
+  const admitted = await today()
+  await tx.insert(studentRecords).values(
+    rows.map((r, i) => ({
+      orgId: ctx.org.id,
+      userId: people[i]!,
+      admissionNo: r.admissionNo,
+      gender: r.data.gender,
+      birthDate: sealed(r.data.birthDate),
+      phone: sealed(r.data.phone),
+      address: sealed(r.data.address),
+      admittedOn: admitted,
+    }))
+  )
+  const seated = rows.flatMap((r, i) =>
+    r.data.groupId && year
+      ? [{ userId: people[i]!, groupId: r.data.groupId, rollNo: r.data.rollNo }]
+      : []
+  )
+  if (seated.length && year) {
+    await tx
+      .insert(enrolments)
+      .values(seated.map((s) => ({ orgId: ctx.org.id, yearId: year.id, ...s })))
+    if (year.isCurrent) await placeAll(tx, ctx, seated)
+  }
+  return people
 }
 
 export async function addStudent(
@@ -715,8 +806,15 @@ export async function importStudents(
     }
   }
   await db.transaction(async (tx) => {
-    for (const r of adds)
-      await createInTx(tx, ctx, r.input!.data, r.input!.admissionNo, year)
+    await createManyInTx(
+      tx,
+      ctx,
+      adds.map((r) => ({
+        data: r.input!.data,
+        admissionNo: r.input!.admissionNo,
+      })),
+      year
+    )
   })
   await writeAudit(ctx, "records.import", `Imported ${adds.length} students`, {
     skipped: summary.error,

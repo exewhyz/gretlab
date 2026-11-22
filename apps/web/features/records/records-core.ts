@@ -113,6 +113,32 @@ export async function place(
       .onConflictDoNothing()
 }
 
+/** place() for many students at once (an import): two statements however many there are. */
+export async function placeAll(
+  db: Db,
+  ctx: OrgContext,
+  seats: { userId: string; groupId: string }[]
+) {
+  if (seats.length === 0) return
+  const q = sql.sql
+  const ids = ctx.groups.map((g) => g.id)
+  if (ids.length) {
+    await db.delete(groupMembers).where(
+      and(
+        inArray(
+          groupMembers.userId,
+          seats.map((s) => s.userId)
+        ),
+        inArray(groupMembers.groupId, ids)
+      )
+    )
+  }
+  await db.execute(q`
+    insert into group_members (group_id, user_id)
+    select g, u from unnest(${q.param(seats.map((s) => s.groupId))}::uuid[], ${q.param(seats.map((s) => s.userId))}::uuid[]) as m(g, u)
+    on conflict do nothing`)
+}
+
 /** Every student's place becomes their active enrolment in this year. */
 export async function syncPlaces(db: Db, ctx: OrgContext, yearId: string) {
   const students = await db

@@ -17,6 +17,9 @@ aren't listed.
 - **Large organizations.** A notice to a whole year of thousands of students now reaches every
   one of them, and their parents, in the bell and by email. Before, past about 13,000 people it
   quietly reached nobody.
+- **Imports are much faster.** 5,000 members, or 3,000 student records, are added in about a
+  second instead of half a minute. A file with two people whose emails start the same way
+  (john@ at two schools) no longer fails as a whole.
 - **Gradebooks show 100 students at a time,** with search, so an assignment for a whole year of
   thousands opens quickly; the figures above still count everyone, and the CSV has everyone.
 - **Fewer waits on each page.** The first page you open, a problem, a class, and the first

@@ -44,6 +44,7 @@ import { auditCsv, readAudit, type AuditFilters } from "@/features/audit/server"
 import { notify } from "@/features/notifications/server"
 import { platformCan } from "@/features/platform/access"
 import { getSettings } from "@/features/settings/server"
+import { freeHandles } from "@/features/catalog/server"
 import {
   kindPolicies,
   kindRoleTemplates,
@@ -92,6 +93,7 @@ import {
   context,
   forbidden,
   giveRole,
+  giveRoles,
   groupIn,
   heldAnywhere,
   heldFor,
@@ -1099,16 +1101,18 @@ export async function updateSettings(
       serverRuns: readOrgExecution(o!.execution).server !== false,
       browserGrading: readOrgExecution(o!.execution).browserGrading === true,
     })
-    const changes = changesBetween(switches(ctx.org), switches(org), SETTING_LABELS)
+    const changes = changesBetween(
+      switches(ctx.org),
+      switches(org),
+      SETTING_LABELS
+    )
     const moduleLabel = (key: string) =>
       MODULES[key as keyof typeof MODULES]?.label ?? key
     const lists = [
       listChanges(
         "Modules",
         [...ctx.modules].map(moduleLabel),
-        [
-          ...orgModules(org!, await kindPolicies()),
-        ].map(moduleLabel)
+        [...orgModules(org!, await kindPolicies())].map(moduleLabel)
       ),
     ].filter(Boolean)
     const what = [...changes.map((c) => c.field), ...lists.map((l) => l!.label)]
@@ -1854,6 +1858,8 @@ export async function importMembers(
       .where(inArray(users.email, emails.length ? emails : [""])),
     db.select().from(orgMembers).where(eq(orgMembers.orgId, ctx.org.id)),
   ])
+  const personBy = new Map(people.map((p) => [p.email, p]))
+  const memberBy = new Map(members.map((m) => [m.userId, m]))
   const groupKey = (parentId: string | null, name: string) =>
     `${parentId ?? ""}/${name.trim().toLowerCase()}`
   const existing = new Map(
@@ -1956,8 +1962,8 @@ export async function importMembers(
       }
     }
 
-    const person = people.find((p) => p.email === email)
-    const membership = person && members.find((m) => m.userId === person.id)
+    const person = personBy.get(email)
+    const membership = person && memberBy.get(person.id)
     out.action = !person
       ? "invite"
       : !membership || membership.status !== "active"
@@ -2019,43 +2025,104 @@ export async function importMembers(
       created.set(key, row!.id)
       parentOf.set(row!.id, row!.parentId)
     }
-    for (const row of report) {
-      if (row.action === "error" || row.action === "unchanged") continue
-      const person = await userByEmail(tx, row.email)
-      if (row.name && !person.name) {
-        await tx
-          .update(users)
-          .set({ name: row.name })
-          .where(eq(users.id, person.id))
-      }
-      await admitMember(tx, ctx.org, person.id, "import", false)
-      const groupId = idOf(row.groupKey)
-      if (groupId) {
-        // An existing group with groups inside means every last-level group in it.
-        const targets = ctx.groups.some((g) => g.id === groupId)
-          ? leavesUnder(ctx, groupId)
-          : [groupId]
-        for (const target of targets) {
-          await tx
-            .insert(groupMembers)
-            .values({ groupId: target, userId: person.id })
-            .onConflictDoNothing()
-          await tx
-            .delete(groupMembers)
-            .where(
-              and(
-                eq(groupMembers.userId, person.id),
-                inArray(groupMembers.groupId, [
-                  ...ancestorIds(target),
-                  NO_GROUP,
-                ])
-              )
-            )
-        }
-      }
-      if (row.roleId)
-        await giveRole(tx, ctx.org.id, person.id, row.roleId, groupId)
+    // Everyone at once, one statement per kind of write (an import is up to 5,000 people:
+    // one at a time, it was about eleven round trips each and took most of a minute).
+    const q = raw
+    const todo = report.filter(
+      (row) => row.action !== "error" && row.action !== "unchanged"
+    )
+    // New accounts, waiting for their first sign-in, with free handles chosen together.
+    const fresh = todo.filter((row) => row.action === "invite")
+    const handles = await freeHandles(
+      fresh.map((row) => row.email),
+      tx
+    )
+    if (fresh.length) {
+      await tx.execute(q`
+        insert into users (email, handle, name)
+        select email, handle, nullif(name, '')
+        from unnest(${q.param(fresh.map((r) => r.email))}::text[],
+          ${q.param(fresh.map((r) => handles.get(r.email)!))}::text[],
+          ${q.param(fresh.map((r) => r.name))}::text[]) as n(email, handle, name)
+        on conflict (email) do nothing`)
     }
+    const ids = new Map(
+      (
+        await tx
+          .select({ id: users.id, email: users.email })
+          .from(users)
+          .where(
+            inArray(
+              users.email,
+              todo.map((row) => row.email)
+            )
+          )
+      ).map((u) => [u.email, u.id])
+    )
+    const idOfRow = (row: (typeof todo)[number]) => ids.get(row.email)!
+    // A name from the file, for people who don't have one yet.
+    const named = todo.filter((row) => row.name)
+    if (named.length) {
+      await tx.execute(q`
+        update users set name = n.name
+        from unnest(${q.param(named.map(idOfRow))}::uuid[], ${q.param(named.map((r) => r.name))}::text[]) as n(id, name)
+        where users.id = n.id and users.name is null`)
+    }
+    // Members now (admitMember): back to active if they'd left, or newly in; then the member role.
+    const joining = todo.filter((row) => row.action !== "update").map(idOfRow)
+    if (joining.length) {
+      await tx.execute(q`
+        update org_members set status = 'active', share_progress = false, joined_via = 'import'
+        where org_id = ${ctx.org.id} and user_id = any(${q.param(joining)}::uuid[]) and status <> 'active'`)
+      await tx.execute(q`
+        insert into org_members (org_id, user_id, status, share_progress, joined_via)
+        select ${ctx.org.id}, person, 'active', false, 'import'
+        from unnest(${q.param(joining)}::uuid[]) as person
+        on conflict (org_id, user_id) do nothing`)
+      const memberRole = await systemRole(tx, ctx.org.id, "member")
+      await giveRoles(
+        tx,
+        ctx.org.id,
+        memberRole.id,
+        joining.map((id) => ({ id, group: null }))
+      )
+    }
+    // Groups: into the last-level groups, out of the levels above them.
+    const into: { id: string; group: string }[] = []
+    const outOf: { id: string; group: string }[] = []
+    for (const row of todo) {
+      const groupId = idOf(row.groupKey)
+      if (!groupId) continue
+      // An existing group with groups inside means every last-level group in it.
+      const targets = ctx.groups.some((g) => g.id === groupId)
+        ? leavesUnder(ctx, groupId)
+        : [groupId]
+      for (const target of targets) {
+        into.push({ id: idOfRow(row), group: target })
+        for (const above of [...ancestorIds(target), NO_GROUP])
+          outOf.push({ id: idOfRow(row), group: above })
+      }
+    }
+    if (into.length) {
+      await tx.execute(q`
+        insert into group_members (group_id, user_id)
+        select g, u from unnest(${q.param(into.map((p) => p.group))}::uuid[], ${q.param(into.map((p) => p.id))}::uuid[]) as m(g, u)
+        on conflict do nothing`)
+      await tx.execute(q`
+        delete from group_members
+        using unnest(${q.param(outOf.map((p) => p.group))}::uuid[], ${q.param(outOf.map((p) => p.id))}::uuid[]) as m(g, u)
+        where group_members.group_id = m.g and group_members.user_id = m.u`)
+    }
+    // Roles named in the file, over the group (or the whole organization).
+    const byRole = new Map<string, { id: string; group: string | null }[]>()
+    for (const row of todo) {
+      if (!row.roleId) continue
+      const list = byRole.get(row.roleId) ?? []
+      list.push({ id: idOfRow(row), group: idOf(row.groupKey) })
+      byRole.set(row.roleId, list)
+    }
+    for (const [roleId, people] of byRole)
+      await giveRoles(tx, ctx.org.id, roleId, people)
     await audit(
       tx,
       ctx,

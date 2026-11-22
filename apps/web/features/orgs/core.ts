@@ -316,6 +316,29 @@ export async function admitMember(
   return { status }
 }
 
+/**
+ * giveRole for many people at once (an import): one statement, each person given the role
+ * over their group (null: the whole organization) unless they already hold it there.
+ */
+export async function giveRoles(
+  tx: Tx | Db,
+  orgId: string,
+  roleId: string,
+  people: { id: string; group: string | null }[]
+) {
+  if (people.length === 0) return
+  const q = sql.sql
+  await tx.execute(q`
+    insert into role_assignments (org_id, user_id, role_id, group_id)
+    select ${orgId}, p.u, ${roleId}, p.g
+    from (select distinct u, g from unnest(${q.param(people.map((p) => p.id))}::uuid[],
+      ${q.param(people.map((p) => p.group))}::uuid[]) as x(u, g)) as p
+    where not exists (
+      select 1 from role_assignments r
+      where r.role_id = ${roleId} and r.user_id = p.u and r.group_id is not distinct from p.g
+    )`)
+}
+
 export async function giveRole(
   tx: Tx | Db,
   orgId: string,
