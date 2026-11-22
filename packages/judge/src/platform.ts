@@ -58,6 +58,18 @@ export const PLATFORM_PERMISSIONS = {
       "Decide, for each kind of organization (school, college, cohort…), which modules are off, optional, or on from the start. Applies to every organization of that kind at once.",
     module: "Platform",
   },
+  "platform.monitoring.view": {
+    label: "See monitoring",
+    description:
+      "The platform's health in one place: the judging queue, judges, email and webhooks, and what's wrong right now. Read-only.",
+    module: "Platform",
+  },
+  "platform.costs.view": {
+    label: "See costs",
+    description:
+      "What judge machines started from the dashboard cost this month, by organization, and a forecast to the month's end.",
+    module: "Platform",
+  },
   "platform.judges.manage": {
     label: "Manage judges",
     description:
@@ -316,6 +328,7 @@ export const PLATFORM_ROLES = {
       "platform.submissions.view",
       "platform.gradebook.view",
       "platform.orgs.view",
+      "platform.monitoring.view",
     ] as PlatformPermission[],
   },
   support: {
@@ -328,6 +341,7 @@ export const PLATFORM_ROLES = {
       "platform.orgs.act",
       "platform.submissions.view",
       "platform.audit.view",
+      "platform.monitoring.view",
     ] as PlatformPermission[],
   },
 } as const

@@ -26,6 +26,7 @@ import {
   ShieldCheckIcon,
   ShapesIcon,
   CpuIcon,
+  CurrencyDollarIcon,
   SquaresFourIcon,
   StackIcon,
   TrophyIcon,
@@ -161,6 +162,18 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         icon: BuildingsIcon,
         label: "Organizations",
         needs: ["platform.orgs.manage"],
+      },
+      {
+        href: "/admin/monitoring",
+        icon: PulseIcon,
+        label: "Monitoring",
+        needs: ["platform.monitoring.view"],
+      },
+      {
+        href: "/admin/costs",
+        icon: CurrencyDollarIcon,
+        label: "Costs",
+        needs: ["platform.costs.view"],
       },
       {
         href: "/admin/judges",

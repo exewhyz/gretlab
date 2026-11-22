@@ -8,6 +8,17 @@ aren't listed.
 
 ## 22 November 2026
 
+### Automatic scaling, monitoring and costs
+
+- **Judges can scale themselves** (Dashboard › Judges › Judge settings, off until switched on):
+  another judge starts when code has waited 30 seconds or an exam is about to open, and the
+  ones it started end once they've been idle for 20 minutes. It never goes past the limit you
+  set, and never ends a judge a person started.
+- **Dashboard › Monitoring** shows the judging queue, judges, email and webhooks in one place,
+  and says plainly what's wrong right now, like failing email and the reason.
+- **Dashboard › Costs** shows what judge machines cost this month, by organization, with a
+  forecast for the month.
+
 ### Judge machines from the dashboard
 
 - **Update judges from the dashboard.** Each judge shows which version of the code it runs, and
