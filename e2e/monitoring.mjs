@@ -71,6 +71,26 @@ check("…with its reasons, commonest first, and never an address", health?.emai
 check("a system error in the last hour shows as a problem", texts.some((t) => /^warning: \d+ submissions? ended in a system error/.test(t)) && health?.queue?.systemErrorsLastHour >= 1, texts.join(" | "))
 check("the numbers are there: queue, judges, email, webhooks", typeof health?.queue?.queued === "number" && typeof health?.judges?.online === "number" && typeof health?.email?.sentLastDay === "number" && typeof health?.webhooks?.waiting === "number")
 
+// ---------- the charts: six hours of activity, with a slow spell and a few system errors
+psql(`insert into submissions (user_id, kind, language, entry, files, time_limit_ms, memory_limit_mb, status, verdict, created_at, started_at, finished_at)
+  select '${who}', 'submit', 'python', 'main.py', '[]', 1000, 256, 'done',
+    case when g % 97 = 0 then 'SE' else 'AC' end,
+    now() - make_interval(mins => g * 360 / 600),
+    now() - make_interval(mins => g * 360 / 600) + make_interval(secs => case when g between 200 and 230 then 90 + (g % 7) * 10 else 1 + (g % 5) end),
+    now() - make_interval(mins => g * 360 / 600) + make_interval(secs => case when g between 200 and 230 then 92 + (g % 7) * 10 else 3 + (g % 5) end)
+  from generate_series(1, 600) g`)
+psql(`insert into email_outbox (to_address, subject, body, status, sent_at, created_at) select 'mon-s' || g || '@example.com', 'Hi', 'Hi', 'sent', now() - make_interval(mins => g), now() - make_interval(mins => g) from generate_series(1, 300) g`)
+const series = await admin("/admin/monitoring/series?range=6h")
+const busyPoints = (series.json?.points ?? []).filter((p) => p.judged > 0)
+check("the charts get six hours in 5-minute steps, with the activity in them", series.status === 200 && series.json?.points?.length >= 72 && busyPoints.length >= 60, JSON.stringify({ status: series.status, points: series.json?.points?.length, busy: busyPoints.length }))
+const slow = Math.max(...busyPoints.map((p) => p.waitP95 ?? 0))
+check("…the slow spell shows in the waiting times", slow >= 90, slow)
+check("…system errors land in their buckets", busyPoints.reduce((n, p) => n + p.systemErrors, 0) >= 6)
+// The current step isn't drawn (it isn't over), so the last few minutes' emails aren't counted yet.
+check("…and email sent per bucket, the unfinished step left out", (series.json?.points ?? []).reduce((n, p) => n + p.emailSent, 0) >= 290)
+check("a range that isn't offered is refused", (await admin("/admin/monitoring/series?range=99y")).status === 400)
+check("the charts need the same permission as the page", (await student("/admin/monitoring/series?range=6h")).status === 403)
+
 // ---------- costs
 const before = (await admin("/admin/costs")).json
 // An organization's machine that ran 10 hours today and stopped; a shared one running for 2 hours.
@@ -94,7 +114,22 @@ for (const [width, name] of [[1440, "laptop"], [390, "phone"]]) {
   await tab.goto(`${BASE}/admin/monitoring`)
   await tab.getByTestId("health-problems").waitFor({ timeout: 30_000 }).catch(() => {})
   check(`${name}: monitoring lists the problems and email's reasons`, (await tab.getByTestId("health-problems").getByText(/emails failed/).count()) === 1 && (await tab.getByTestId("email-reasons").getByText(/mailbox unavailable/).count()) === 1)
+  check(`${name}: the state, the golden signals and the charts are there`, await tab.getByTestId("health-state").isVisible() && (await tab.getByTestId("chart-wait").locator("svg .recharts-line-curve").count()) >= 1 && (await tab.getByTestId("chart-throughput").locator("svg .recharts-area-area").count()) >= 1)
+  await tab.getByRole("tab", { name: "6 hours" }).click()
+  await tab.waitForTimeout(800)
+  await tab.getByTestId("chart-wait").getByText("View as table").click()
+  // Bars are actually drawn (each a path with a size), not just the axes.
+  const bars = await tab.getByTestId("chart-email-sent").locator(".recharts-bar-rectangle path").evaluateAll((paths) =>
+    paths.map((p) => { const b = p.getBBox(); return [Math.round(b.width * 10) / 10, Math.round(b.height)] })
+  )
+  check(`${name}: the bar charts draw their bars`, bars.filter(([w, h]) => w > 0 && h > 0).length >= 50, JSON.stringify({ drawn: bars.length, sample: bars.slice(0, 4) }))
+  check(`${name}: a chart's numbers open as a table`, (await tab.getByTestId("chart-wait").locator("table tbody tr").count()) >= 10)
   check(`${name}: nothing spills sideways on monitoring`, await tab.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+  if (width >= 1024) {
+    // The charts mustn't squeeze the menu: it keeps its full 16rem.
+    const menu = await tab.locator('[data-slot="sidebar-container"]').first().boundingBox()
+    check(`${name}: the sidebar keeps its full width beside the charts`, (menu?.width ?? 0) >= 250, menu?.width)
+  }
   await tab.screenshot({ path: `${SHOTS}monitoring-${name}.png`, fullPage: true })
   await tab.goto(`${BASE}/admin/costs`)
   await tab.getByTestId("cost-pool").first().waitFor({ timeout: 30_000 }).catch(() => {})

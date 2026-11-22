@@ -71,6 +71,16 @@ export async function monitoring() {
       systemErrorsLastHour: numbers.systemErrorsLastHour,
     },
     judges: {
+      /** Every judge reporting in: what serves what, how busy, which code. */
+      list: judges.online.map((r) => ({
+        host: r.host,
+        pool: r.pool,
+        busy: r.busy,
+        slots: r.slots,
+        version: r.version,
+        outOfDate: r.outOfDate,
+        fromDashboard: r.fromDashboard,
+      })),
       online: judges.online.length,
       slots: queue.slots,
       busySlots: queue.busySlots,

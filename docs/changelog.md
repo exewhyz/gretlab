@@ -14,8 +14,10 @@ aren't listed.
   another judge starts when code has waited 30 seconds or an exam is about to open, and the
   ones it started end once they've been idle for 20 minutes. It never goes past the limit you
   set, and never ends a judge a person started.
-- **Dashboard › Monitoring** shows the judging queue, judges, email and webhooks in one place,
-  and says plainly what's wrong right now, like failing email and the reason.
+- **Dashboard › Monitoring** shows whether everything is healthy and what's wrong right now, the
+  four golden signals, and charts over the last hour, 6 hours, day or week: how much code is
+  judged, how long it waits (with the slow and outage lines), errors, how full the judges are,
+  and email and webhooks sent and failed, with the reasons. Every chart opens as a table.
 - **Dashboard › Costs** shows what judge machines cost this month, by organization, with a
   forecast for the month.
 
