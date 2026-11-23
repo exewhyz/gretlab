@@ -114,6 +114,9 @@ for (const [width, name] of [[1440, "laptop"], [390, "phone"]]) {
   await tab.goto(`${BASE}/admin/monitoring`)
   await tab.getByTestId("health-problems").waitFor({ timeout: 30_000 }).catch(() => {})
   check(`${name}: monitoring lists the problems and email's reasons`, (await tab.getByTestId("health-problems").getByText(/emails failed/).count()) === 1 && (await tab.getByTestId("email-reasons").getByText(/mailbox unavailable/).count()) === 1)
+  // The charts draw once their numbers arrive, a moment after the page under load.
+  await tab.getByTestId("chart-wait").locator("svg .recharts-line-curve").first().waitFor({ timeout: 30_000 }).catch(() => {})
+  await tab.getByTestId("chart-throughput").locator("svg .recharts-area-area").first().waitFor({ timeout: 30_000 }).catch(() => {})
   check(`${name}: the state, the golden signals and the charts are there`, await tab.getByTestId("health-state").isVisible() && (await tab.getByTestId("chart-wait").locator("svg .recharts-line-curve").count()) >= 1 && (await tab.getByTestId("chart-throughput").locator("svg .recharts-area-area").count()) >= 1)
   await tab.getByRole("tab", { name: "6 hours" }).click()
   await tab.waitForTimeout(800)
