@@ -19,6 +19,8 @@ export interface HealthInput {
 export type HealthLevel = "critical" | "warning" | "info"
 
 export interface HealthProblem {
+  /** Stays the same while the problem lasts, so an alert can follow it (alerts.ts). */
+  key: string
   level: HealthLevel
   text: string
 }
@@ -35,51 +37,60 @@ export function healthProblems(input: HealthInput): HealthProblem[] {
     out.push(
       input.queued > 0
         ? {
+            key: "judges_none",
             level: "critical",
             text: `No judge is online, and ${count(input.queued, "submission is", "submissions are")} waiting.`,
           }
         : {
+            key: "judges_none",
             level: "warning",
             text: "No judge is online: the next submission will wait.",
           }
     )
   } else if (input.queued > 0 && input.oldestQueuedSeconds >= 180) {
     out.push({
+      key: "queue_waiting",
       level: "critical",
       text: `Submissions have waited ${minutes(input.oldestQueuedSeconds)} minutes for a judge (${input.queued} waiting).`,
     })
   } else if (input.queued > 0 && input.oldestQueuedSeconds >= 60) {
     out.push({
+      key: "queue_waiting",
       level: "warning",
       text: `Submissions are waiting over a minute for a judge (${input.queued} waiting).`,
     })
   }
   if (input.systemErrorsLastHour > 0) {
     out.push({
+      key: "system_errors",
       level: "warning",
       text: `${count(input.systemErrorsLastHour, "submission")} ended in a system error in the last hour; they're judged again automatically.`,
     })
   }
   if (input.emailFailedLastDay > 0) {
     out.push({
+      key: "email_failed",
       level: "warning",
       text: `${count(input.emailFailedLastDay, "email")} failed in the last day (see the reasons below).`,
     })
   }
   if (input.emailQueued > 0 && input.emailOldestSeconds >= 15 * 60) {
     out.push({
+      key: "email_waiting",
       level: "warning",
       text: `${count(input.emailQueued, "email is", "emails are")} waiting; the oldest has waited ${minutes(input.emailOldestSeconds)} minutes. Is the email cron running?`,
     })
   }
   if (input.webhooksWaiting >= 100) {
     out.push({
+      key: "webhooks_waiting",
       level: "warning",
       text: `${count(input.webhooksWaiting, "webhook delivery is", "webhook deliveries are")} waiting to be sent.`,
     })
   }
   if (input.judgesOutOfDate > 0) {
     out.push({
+      key: "judges_outdated",
       level: "info",
       text: `${count(input.judgesOutOfDate, "judge runs", "judges run")} older code than the site (Dashboard › Judges).`,
     })
