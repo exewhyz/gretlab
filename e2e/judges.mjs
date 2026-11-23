@@ -68,6 +68,9 @@ check("the set-up worked", viewRole.status === 200 && startRole.status === 200, 
 // ---------- who may do what
 const page = await admin("/admin/judges")
 check("an owner sees the judges, with the settings and that machines can be started", page.status === 200 && page.json?.available === true && page.json?.settings?.maxRunning === 3 && page.json?.settings?.size === "c7i-flex.large", JSON.stringify(page.json).slice(0, 300))
+// The regression's judge logs in as the judges' own limited role (e2e/run.sh), and says so.
+const ownLogin = page.json?.online?.filter((r) => r.login === "own") ?? []
+check("a judge on the judges' own login shows it", ownLogin.length >= 1 && !page.json?.online?.some((r) => r.login === "main"), JSON.stringify(page.json?.online))
 check("someone with no platform role can't even see them", (await outsider("/admin/judges")).status === 403)
 check("\"See judges\" sees them…", (await viewer("/admin/judges")).status === 200)
 check("…but can't start one", (await viewer("/admin/judges", { body: {} })).status === 403)

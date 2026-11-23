@@ -137,14 +137,12 @@ export async function buildSchoolCoding(
     .returning({ id: contests.id })
   await insertAll(
     contestProblems,
-    library
-      .slice(10, 15)
-      .map((p, i) => ({
-        contestId: next!.id,
-        problemId: p.id,
-        label: "ABCDE"[i]!,
-        position: i,
-      }))
+    library.slice(10, 15).map((p, i) => ({
+      contestId: next!.id,
+      problemId: p.id,
+      label: "ABCDE"[i]!,
+      position: i,
+    }))
   )
   console.log(
     `  school coding lab: ${subs.length} submissions, 2 contests (${contestSubs.length} contest submissions)`

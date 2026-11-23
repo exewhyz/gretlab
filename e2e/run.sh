@@ -35,7 +35,9 @@ cd $ROOT/apps/web && pnpm exec next build >/dev/null || exit 1
 NEXTAUTH_URL=http://localhost:3100 NEXTAUTH_SECRET=e2e-only-secret GOOGLE_CLIENT_ID=fake GOOGLE_CLIENT_SECRET=fake ADMIN_EMAILS=admin@example.com PROXY_SECRET=e2e-proxy-secret-0123456789 GITHUB_LOOKUP=off LTI_ALLOW_HTTP=true RESEND_API_KEY=e2e RESEND_API_URL=http://127.0.0.1:3198 MAIL_FROM='Gretlab <no-reply@example.com>' CRON_SECRET=e2e-cron-secret-0123456789 WEBHOOKS_ALLOW_LOCAL=true JUDGES_PROVIDER=fake JUDGES_LATEST_VERSION=e2e-latest pnpm exec next start -p 3100 > $LOGS/web.log 2>&1 &
 for i in {1..20}; do curl -s -o /dev/null localhost:3100/privacy && break; sleep 1; done
 cd $ROOT/apps/runner
-DOCKER_HOST=tcp://127.0.0.1:23750 SANDBOX_RUNTIME=runsc NODE_ENV=production $ROOT/apps/runner/node_modules/.bin/tsx src/main.ts > $LOGS/runner.log 2>&1 &
+# The judge logs in as its own limited role (migration 0081), as on production, so every suite
+# proves judging needs nothing more.
+DATABASE_URL="$DATABASE_URL?options=-c%20role%3Dgretlab_judge" DOCKER_HOST=tcp://127.0.0.1:23750 SANDBOX_RUNTIME=runsc NODE_ENV=production $ROOT/apps/runner/node_modules/.bin/tsx src/main.ts > $LOGS/runner.log 2>&1 &
 RUNNER=$!
 sleep 3
 

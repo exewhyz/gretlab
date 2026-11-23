@@ -110,6 +110,8 @@ export async function heartbeat(
     ...runner,
     busy: jobIds.length,
     lastSeenAt: now,
+    // The login it judges as, shown on Dashboard › Judges (its own limited one, or not).
+    login: sql.sql`current_user`,
     // With work now, it's busy now; without, it keeps when it last was (automatic scaling
     // ends a judge idle long enough).
     ...(jobIds.length ? { lastBusyAt: now } : {}),

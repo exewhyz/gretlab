@@ -568,6 +568,20 @@
       "when": 1795358581341,
       "tag": "0080_good_iron_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1795428203861,
+      "tag": "0081_judge_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1795428679656,
+      "tag": "0082_judge_login",
+      "breakpoints": true
     }
   ]
 }

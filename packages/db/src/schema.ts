@@ -733,6 +733,11 @@ export const runners = pgTable("runners", {
   version: text("version"),
   /** The machine it runs on, when started from the dashboard (RUNNER_MACHINE: its instance id). */
   machineId: text("machine_id"),
+  /**
+   * The database login it judges as (`current_user`, written by each heartbeat): `gretlab_judge`,
+   * the judges' own limited login (migration 0081), or anything else, which can do far more.
+   */
+  login: text("login"),
   /** The last heartbeat it had work (or when it started): how long it has been idle. */
   lastBusyAt: timestamp("last_busy_at", { withTimezone: true })
     .notNull()

@@ -15,7 +15,8 @@ Also in AWS: the security group `gretlab-judge` (no inbound rules), the instance
 `gretlab-judge-machine`, the OIDC provider `oidc.vercel.com/<team>`, the launch template
 `gretlab-judge` (Ubuntu 24.04 from Canonical's SSM parameter, `c7i-flex.large`, IMDSv2 only with
 one hop and instance tags readable, a 30 GB encrypted disk) and the SecureString
-`/gretlab/judge/database-url`.
+`/gretlab/judge/database-url`, holding the judges' own limited database login (`gretlab_judge`,
+README › The judges' own database login), never the main one.
 
 After changing a policy: check it with IAM Access Analyzer (`aws accessanalyzer validate-policy`)
 and the policy simulator (`aws iam simulate-principal-policy`, with `aws:RequestedRegion` set, or

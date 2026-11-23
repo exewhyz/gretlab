@@ -34,16 +34,30 @@ const KEEP = new Set([
 ])
 
 const url = new URL(process.env.DATABASE_URL ?? "postgres://localhost/unknown")
-const [{ name } = { name: "" }] = (await db.execute<{ name: string }>(sql`select current_database() as name`)) as unknown as {
+const [{ name } = { name: "" }] = (await db.execute<{ name: string }>(
+  sql`select current_database() as name`
+)) as unknown as {
   name: string
 }[]
 const count = async (table: string) =>
-  Number(((await db.execute<{ n: string }>(sql.raw(`select count(*) as n from "${table}"`))) as unknown as { n: string }[])[0]?.n ?? 0)
+  Number(
+    (
+      (await db.execute<{ n: string }>(
+        sql.raw(`select count(*) as n from "${table}"`)
+      )) as unknown as { n: string }[]
+    )[0]?.n ?? 0
+  )
 
-console.log(`Database: ${name} on ${url.hostname}${url.port ? `:${url.port}` : ""}`)
-console.log(`  ${await count("users")} accounts, ${await count("organizations")} organizations, ${await count("submissions")} submissions, ${await count("problems")} problems`)
+console.log(
+  `Database: ${name} on ${url.hostname}${url.port ? `:${url.port}` : ""}`
+)
+console.log(
+  `  ${await count("users")} accounts, ${await count("organizations")} organizations, ${await count("submissions")} submissions, ${await count("problems")} problems`
+)
 
-const wipe = process.argv.find((a) => a.startsWith("--wipe="))?.slice("--wipe=".length)
+const wipe = process.argv
+  .find((a) => a.startsWith("--wipe="))
+  ?.slice("--wipe=".length)
 if (wipe !== name) {
   console.log(
     `\nNothing changed. To delete everything in "${name}" (except settings, languages, runners,\n` +
@@ -81,18 +95,34 @@ const tables = (
 await db.transaction(async (tx) => {
   // Quietly: Postgres notes each kept table the cascade reaches; they're put back below.
   await tx.execute(sql`set local client_min_messages = warning`)
-  await tx.execute(sql.raw(`truncate ${tables.map((t) => `"${t}"`).join(", ")} restart identity cascade`))
+  await tx.execute(
+    sql.raw(
+      `truncate ${tables.map((t) => `"${t}"`).join(", ")} restart identity cascade`
+    )
+  )
 })
-if (policies.length) await db.insert(orgKindPolicies).values(policies.map((p) => ({ ...p, updatedBy: null }))).onConflictDoNothing()
-if (wording.length) await db.insert(emailTemplates).values(wording.map((w) => ({ ...w, updatedBy: null }))).onConflictDoNothing()
+if (policies.length)
+  await db
+    .insert(orgKindPolicies)
+    .values(policies.map((p) => ({ ...p, updatedBy: null })))
+    .onConflictDoNothing()
+if (wording.length)
+  await db
+    .insert(emailTemplates)
+    .values(wording.map((w) => ({ ...w, updatedBy: null })))
+    .onConflictDoNothing()
 console.log(`  emptied ${tables.length} tables`)
 
 // ---------- the problem library: seed.ts, in a process of its own (it exits when done)
 console.log("Importing the problem library…")
-execFileSync(process.execPath, [...process.execArgv, new URL("./seed.ts", import.meta.url).pathname], {
-  stdio: "inherit",
-  env: process.env,
-})
+execFileSync(
+  process.execPath,
+  [...process.execArgv, new URL("./seed.ts", import.meta.url).pathname],
+  {
+    stdio: "inherit",
+    env: process.env,
+  }
+)
 const library = await db
   .select({ id: problems.id, slug: problems.slug })
   .from(problems)
@@ -119,12 +149,16 @@ await buildCommunity()
 await buildHolidays()
 
 // The password isn't printed: whoever ran this chose it, and terminal output gets pasted around.
-console.log(`\nDone in ${Math.round((Date.now() - t0) / 1000)} s. Every account below signs in with its email and the DEMO_PASSWORD you chose.`)
+console.log(
+  `\nDone in ${Math.round((Date.now() - t0) / 1000)} s. Every account below signs in with its email and the DEMO_PASSWORD you chose.`
+)
 let last = ""
 for (const a of ACCOUNTS) {
   if (a.org !== last) console.log(`\n${a.org}`)
   last = a.org
   console.log(`  ${a.role.padEnd(44)} ${a.email}`)
 }
-console.log("\nYour own Google account becomes the platform admin when you sign in (ADMIN_EMAILS).")
+console.log(
+  "\nYour own Google account becomes the platform admin when you sign in (ADMIN_EMAILS)."
+)
 process.exit(0)

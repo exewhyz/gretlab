@@ -198,6 +198,14 @@ export function JudgesPage() {
             tone: data.online.some((r) => r.outOfDate) ? "bad" : undefined,
             hint: data.latest ? `site: ${short(data.latest)}` : undefined,
           },
+          {
+            label: "On the main login",
+            value: data.online.filter((r) => r.login === "main").length,
+            tone: data.online.some((r) => r.login === "main")
+              ? "bad"
+              : undefined,
+            hint: "should use the judges' own",
+          },
         ]}
       />
       <FormMessage
@@ -305,7 +313,7 @@ export function JudgesPage() {
       </Card>
       <h2 className="mt-6 mb-2 text-title-sm text-ink">Judges reporting in</h2>
       <Card>
-        <Table headers={["Judge", "Serves", "Code", "Busy"]}>
+        <Table headers={["Judge", "Serves", "Code", "Database login", "Busy"]}>
           {data.online.map((r) => (
             <tr key={r.host} data-testid="judge-online">
               <td className="text-body-sm">
@@ -323,6 +331,20 @@ export function JudgesPage() {
                   <Badge variant="destructive" className="ml-1">
                     Out of date
                   </Badge>
+                )}
+              </td>
+              <td className="text-body-sm" data-testid="judge-login">
+                {r.login === "own" ? (
+                  "Its own (judging only)"
+                ) : r.login === "main" ? (
+                  <>
+                    <Badge variant="destructive">Main login</Badge>
+                    <div className="text-xs text-body">
+                      can read everything: switch it to the judges&apos; own
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-body">not reported (older code)</span>
                 )}
               </td>
               <td className="text-body-sm tabular-nums">

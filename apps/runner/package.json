@@ -8,7 +8,7 @@
     "start": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
     "test:sandbox": "tsx --test --test-reporter=spec src/sandbox/attack.test.ts",
-    "test:queue": "tsx --test --test-reporter=spec src/queue.test.ts"
+    "test:queue": "tsx --test --test-concurrency=1 --test-reporter=spec src/queue.test.ts src/role.test.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

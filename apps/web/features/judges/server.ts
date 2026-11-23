@@ -16,6 +16,9 @@ import { getSettings, updateSettings } from "@/features/settings/server"
 
 import { machines, type CheckResult, type Machines } from "./machines"
 
+/** The judges' own database login, limited to judging (migration 0081, docs/machines.md). */
+export const JUDGE_LOGIN = "gretlab_judge"
+
 /*
  * Judge machines from the dashboard (Dashboard › Judges): start one for the shared pool or for
  * an organization, watch it come up, update it to newer code, stop it. The machine reports its
@@ -121,6 +124,7 @@ export async function listJudges() {
         busy: runners.busy,
         version: runners.version,
         machineId: runners.machineId,
+        login: runners.login,
         pool: organizations.slug,
       })
       .from(runners)
@@ -154,6 +158,15 @@ export async function listJudges() {
       version: r.version,
       fromDashboard: Boolean(r.machineId),
       outOfDate: outOfDate(r.version),
+      /**
+       * Which database login it judges as: its own limited one, the main one (which can read and
+       * change everything), or not known yet (a judge older than migration 0082 says nothing).
+       */
+      login: (r.login === JUDGE_LOGIN
+        ? "own"
+        : r.login
+          ? "main"
+          : "unknown") as "own" | "main" | "unknown",
     })),
     /** The commit the site runs, which judges are compared with. */
     latest,

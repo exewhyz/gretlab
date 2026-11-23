@@ -6,6 +6,16 @@ description: What's new in GretLab, newest first.
 What changed for the people using GretLab, newest first. Fixes and changes that don't show to anyone
 aren't listed.
 
+## 23 November 2026
+
+### Judges sign in with a login that can only judge
+
+- Judges run students' code, so they now sign in to the database with their own login that can
+  only judge: it reads the queue and the tests and records results. It can't see people, grades
+  or anything else, and can't delete graded work. Dashboard › Judges shows which login each judge
+  uses. Operators switch over once, as the README describes.
+- Monitoring's chart tables open in a side panel with each line's highest value and average.
+
 ## 22 November 2026
 
 ### Automatic scaling, monitoring and costs

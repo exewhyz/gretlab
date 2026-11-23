@@ -7,17 +7,26 @@ export * from "./schema.ts"
 export * as sql from "./sql.ts"
 export { anyOf, noneOf } from "./lists.ts"
 
-function connect() {
-  const url = process.env.DATABASE_URL
-  if (!url) throw new Error("DATABASE_URL is not set")
+/**
+ * A database client for an address. `startup` adds connection settings (tests use it to act as
+ * another role, as the judge's login test does with `options: "-c role=gretlab_judge"`).
+ */
+export function connectTo(url: string, startup: Record<string, string> = {}) {
   const client = postgres(url, {
     max: Number(process.env.DATABASE_POOL ?? 10),
     idle_timeout: 30,
     connect_timeout: 10,
     // PgBouncer in transaction mode can't track prepared statements.
     prepare: process.env.DATABASE_PREPARE !== "false",
+    connection: startup,
   })
   return drizzle(client, { schema })
+}
+
+function connect() {
+  const url = process.env.DATABASE_URL
+  if (!url) throw new Error("DATABASE_URL is not set")
+  return connectTo(url)
 }
 
 export type Database = ReturnType<typeof connect>
