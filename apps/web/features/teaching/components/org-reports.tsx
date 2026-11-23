@@ -1,9 +1,9 @@
 "use client"
 
-import { useQuery, keepPreviousData } from "@tanstack/react-query"
+import { useMutation, useQuery, keepPreviousData } from "@tanstack/react-query"
 import { useState } from "react"
 
-import { Button, buttonVariants } from "@workspace/ui/components/button"
+import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import {
@@ -20,6 +20,7 @@ import type {
   orgReportStudents,
 } from "@/features/teaching/server"
 import { TextInput } from "@/components/form"
+import { JobProgress } from "@/components/job-progress"
 import { api } from "@/lib/api/client"
 import { useDebounced } from "@/lib/use-debounced"
 import type { ApiResult } from "@/lib/api/types"
@@ -42,7 +43,16 @@ export function OrgReports({
   const [onlyInactive, setOnlyInactive] = useState(false)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  // The CSV is made in the background (features/jobs), so every student downloads at any size.
+  const [exportJob, setExportJob] = useState<string | null>(null)
   const group = fixedGroup ?? chosen
+  const startExport = useMutation({
+    mutationFn: () =>
+      api<{ job: string }>(`/orgs/${slug}/reports/export`, {
+        body: { group: group || null },
+      }),
+    onSuccess: (r) => setExportJob(r.job),
+  })
   // The server is asked once typing pauses.
   const asked = useDebounced(search.trim())
   // Two parts: the figures, once per group chosen; the student table, a page at a time,
@@ -97,28 +107,38 @@ export function OrgReports({
     <>
       {fixedGroup ? (
         <div className="mb-4 flex justify-end">
-          <a
-            href={`/api/v1/orgs/${slug}/reports?group=${group}&format=csv`}
-            download
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={startExport.isPending || Boolean(exportJob)}
+            onClick={() => startExport.mutate()}
           >
             Download CSV
-          </a>
+          </Button>
         </div>
       ) : (
         <PageTitle
           action={
-            <a
-              href={`/api/v1/orgs/${slug}/reports?group=${group}&format=csv`}
-              download
-              className={cn(buttonVariants({ size: "sm" }))}
+            <Button
+              size="sm"
+              disabled={startExport.isPending || Boolean(exportJob)}
+              onClick={() => startExport.mutate()}
             >
               Download CSV
-            </a>
+            </Button>
           }
         >
           Reports
         </PageTitle>
+      )}
+      {exportJob && (
+        <div className="mb-4 max-w-md">
+          <JobProgress
+            id={exportJob}
+            label="Reports export"
+            onClose={() => setExportJob(null)}
+          />
+        </div>
       )}
       <div
         className={cn(

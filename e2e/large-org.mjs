@@ -154,6 +154,28 @@ check("work for the organization's assignment goes to its judges; personal pract
 const csv = await fetch(`${BASE}/api/v1${book}?format=csv`, { headers: { cookie: `next-auth.session-token=${await encode({ token: { email: "lo-o@example.com" }, secret: SECRET })}` } })
 const lines = (await csv.text()).trim().split("\n")
 check(`the CSV still has everyone (${lines.length - 1} rows)`, csv.status === 200 && lines.length - 1 === STUDENTS)
+// The same as background jobs (features/jobs), as the pages now do it: in steps, any size.
+const jobDone = async (job) => {
+  for (let i = 0; i < 240; i++) {
+    const j = (await owner(`/jobs/${job}`)).json
+    if (j && !["queued", "running"].includes(j.status)) return j
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  return null
+}
+const fileOf = async (job) => (await fetch(`${BASE}/api/v1/jobs/${job}/file`, { headers: { cookie: `next-auth.session-token=${await encode({ token: { email: "lo-o@example.com" }, secret: SECRET })}` } })).text()
+started = Date.now()
+const bookJob = (await owner(`${book}/export`, { method: "POST" })).json?.job
+const bookDone = await jobDone(bookJob)
+const bookFile = await fileOf(bookJob)
+check(`the gradebook export job gives the same CSV for all ${STUDENTS} (${Date.now() - started} ms)`, bookDone?.status === "done" && bookFile.trim() === lines.join("\n"), JSON.stringify({ status: bookDone?.status, rows: bookFile.trim().split("\n").length - 1 }))
+const reportCsv = (await (await fetch(`${BASE}/api/v1${O}/reports?format=csv`, { headers: { cookie: `next-auth.session-token=${await encode({ token: { email: "lo-o@example.com" }, secret: SECRET })}` } })).text()).trim().split("\r\n")
+started = Date.now()
+const reportJob = (await owner(`${O}/reports/export`, { body: { group: null } })).json?.job
+const reportDone = await jobDone(reportJob)
+const reportFile = (await fileOf(reportJob)).trim().split("\r\n")
+// The job lists students in the on-screen table's order; the same header and the same lines.
+check(`the Reports export job has every student, as the CSV does (${Date.now() - started} ms)`, reportDone?.status === "done" && reportFile.length === reportCsv.length && reportFile[0] === reportCsv[0] && [...reportFile].sort().join() === [...reportCsv].sort().join() && reportFile.length - 1 >= STUDENTS, JSON.stringify({ status: reportDone?.status, job: reportFile.length, csv: reportCsv.length }))
 
 // ---------- members: pickers ask for a page, never everyone
 started = Date.now()

@@ -198,8 +198,20 @@ async function ownJob(user: User, id: string) {
   return row
 }
 
+/** The last time a progress check on this server pushed the queue forward. */
+let lastNudge = 0
+
 export async function jobView(user: User, id: string) {
   const job = await ownJob(user, id)
+  // Someone is watching it: their checks (every 2 seconds) keep it moving, after answering,
+  // so a big export doesn't wait for the cron. At most one push at a time per server.
+  if (
+    (job.status === "queued" || job.status === "running") &&
+    Date.now() - lastNudge >= 4_000
+  ) {
+    lastNudge = Date.now()
+    kickJobs(15_000)
+  }
   const [file] = await getDb()
     .select({ name: jobFiles.name })
     .from(jobFiles)

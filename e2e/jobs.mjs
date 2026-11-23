@@ -1,6 +1,6 @@
 /**
  * Background jobs (features/jobs): long work done in steps outside the request.
- *   - a gradebook export of 2,500+ students as a job: its progress, and a file identical to the
+ *   - a gradebook export of 6,000+ students as a job (two steps of 5,000): its progress, and a file identical to the
  *     instant ?format=csv download
  *   - only its starter sees it, cancels it or downloads it; anyone else is told it doesn't exist
  *   - jobs move forward from the email cron alone (nobody waiting on them)
@@ -18,7 +18,7 @@ const BASE = process.argv[2] ?? "http://localhost:3100"
 const SECRET = process.env.NEXTAUTH_SECRET ?? "e2e-only-secret"
 const DB = process.env.E2E_DB ?? "gretlab_test"
 const CRON = process.env.CRON_SECRET ?? "e2e-cron-secret-0123456789"
-const STUDENTS = 2_500
+const STUDENTS = 6_000
 let failures = 0
 const check = (name, ok, detail = "") => {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${ok || detail === "" ? "" : "  -- " + String(detail).slice(0, 1500)}`)

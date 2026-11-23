@@ -25,6 +25,7 @@ import { byName } from "@/lib/by-name"
 import { ApiError, notFound } from "@/lib/api/route"
 import { likeTerm, paged } from "@/lib/api/paging"
 import { getGradebook } from "@/features/assignments/server"
+import { enqueue, kickJobs } from "@/features/jobs/server"
 import { today } from "@/features/catalog/server"
 import { rolePermissions } from "@/features/orgs/access"
 import {
@@ -972,6 +973,37 @@ export async function orgReportStudents(
   return { ...page, items, students: items }
 }
 
+const REPORT_CSV_HEADER = [
+  "Name",
+  "Email",
+  "Groups",
+  "Last active",
+  "Active this week",
+  "Assignments %",
+  "Practice solved",
+]
+
+/** A field defused against spreadsheet formulas. */
+function reportField(value: string | number | null) {
+  let text = value === null ? "" : String(value)
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+type ReportRow = Awaited<ReturnType<typeof studentRows>>[number]
+const reportLine = (s: ReportRow) =>
+  [
+    s.name,
+    s.email,
+    s.groups.join("; "),
+    s.lastActive ? s.lastActive.toISOString().slice(0, 10) : "",
+    s.activeThisWeek ? "yes" : "no",
+    s.assignmentPercent,
+    s.practiceSolved,
+  ]
+    .map(reportField)
+    .join(",")
+
 /** The student table as CSV, defused against spreadsheet formulas. */
 export async function orgReportCsv(
   slug: string,
@@ -979,32 +1011,59 @@ export async function orgReportCsv(
   groupId: string | null
 ) {
   const report = await orgReport(slug, user, groupId)
-  const field = (value: string | number | null) => {
-    let text = value === null ? "" : String(value)
-    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`
-    return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-  }
   const lines = [
-    [
-      "Name",
-      "Email",
-      "Groups",
-      "Last active",
-      "Active this week",
-      "Assignments %",
-      "Practice solved",
-    ],
-    ...report.students.map((s) => [
-      s.name,
-      s.email,
-      s.groups.join("; "),
-      s.lastActive ? s.lastActive.toISOString().slice(0, 10) : "",
-      s.activeThisWeek ? "yes" : "no",
-      s.assignmentPercent,
-      s.practiceSolved,
-    ]),
-  ].map((row) => row.map(field).join(","))
-  return "﻿" + lines.join("\r\n") + "\r\n"
+    REPORT_CSV_HEADER.map(reportField).join(","),
+    ...report.students.map(reportLine),
+  ]
+  return "\ufeff" + lines.join("\r\n") + "\r\n"
+}
+
+/**
+ * One part of the student table as CSV, for an export done as a job (features/jobs): page
+ * `page` of `size` students in the on-screen table's order, checked as the person each time.
+ * The first part starts with the byte-order mark and the header.
+ */
+export async function orgReportCsvPart(
+  slug: string,
+  user: User,
+  groupId: string | null,
+  page: number,
+  size: number
+) {
+  const part = await orgReportStudents(slug, user, groupId, {
+    page,
+    perPage: size,
+  })
+  const lines = part.items.map((s) => reportLine(s) + "\r\n").join("")
+  return {
+    text:
+      page === 1
+        ? "\ufeff" +
+          REPORT_CSV_HEADER.map(reportField).join(",") +
+          "\r\n" +
+          lines
+        : lines,
+    total: part.total,
+    done: part.page >= part.pages,
+    exported: Math.min(part.total, part.page * size),
+  }
+}
+
+/** Starts the student table's CSV as a background job, for the same people as ?format=csv. */
+export async function orgReportExport(
+  slug: string,
+  user: User,
+  groupId: string | null
+) {
+  const base = await reportBase(slug, user, groupId)
+  const job = await enqueue(getDb(), {
+    kind: "reports.csv",
+    orgId: base.ctx.org.id,
+    userId: user.id,
+    input: { slug, groupId },
+  })
+  kickJobs()
+  return { job }
 }
 
 /* ---------- class feedback ---------- */
