@@ -54,7 +54,7 @@ const last = (to) => {
 
 // ---------- the list
 const list = (await admin("/admin/emails")).json
-check("the admin sees every email with its placeholders", list?.templates.length === 7 && list.templates.every((t) => t.vars.length > 0 && t.subject && t.body), JSON.stringify(list?.templates?.map((t) => t.key)))
+check("the admin sees every email with its placeholders", list?.templates.length === 8 && list.templates.some((t) => t.key === "monitoring.alert") && list.templates.every((t) => t.vars.length > 0 && t.subject && t.body), JSON.stringify(list?.templates?.map((t) => t.key)))
 check("platform staff without the permission can't", (await helper("/admin/emails")).status === 403 && (await helper("/admin/emails/notification", { method: "PUT", body: { subject: "x", body: "x" } })).status === 403)
 
 // ---------- account emails are branded
