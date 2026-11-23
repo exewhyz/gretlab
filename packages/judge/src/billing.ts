@@ -466,3 +466,12 @@ export function planIncludes(stored: unknown, feature: string) {
 
 /** What a free plan holds (Billing switched on, before an organization buys). */
 export const FREE_FEATURES = ["core", "coding"] as const
+
+/** Ready-made plans: the usual features for a kind of organization, and a typical size. */
+export const PLAN_PRESETS = [
+  { key: "coding-lab", name: "Coding lab", features: ["coding", "exams_lab", "courses", "peer", "outcomes", "lti"], students: 600, staff: 25 },
+  { key: "college", name: "College", features: ["coding", "exams_lab", "courses", "outcomes", "records", "attendance", "timetable", "results", "admissions", "parents", "leave", "library", "lti"], students: 2000, staff: 120 },
+  { key: "school", name: "School", features: ["records", "attendance", "timetable", "results", "admissions", "parents", "leave", "library", "transport", "coding"], students: 800, staff: 55 },
+  { key: "coaching", name: "Coaching", features: ["coding", "exams_lab", "courses", "attendance", "runs"], students: 300, staff: 15 },
+  { key: "company", name: "Company training", features: ["courses", "training", "coding", "api"], students: 200, staff: 20 },
+] as const

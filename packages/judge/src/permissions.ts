@@ -45,6 +45,12 @@ export const PERMISSIONS = {
       "The organization's profile and rules: name, description, who can join, group level names, languages. Grant this, or the finer actions under it (LMS, outcomes, notifications).",
     module: "Structure",
   },
+  "org.billing.manage": {
+    label: "Manage plan and billing",
+    description:
+      "The organization's plan: its features, students and staff, how it pays, its billing details and invoices.",
+    module: "Structure",
+  },
   "problems.manage": {
     label: "Write problems",
     description:

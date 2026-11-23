@@ -15,6 +15,7 @@ import {
   KINDS,
   ORG_NAV,
   PERMISSIONS,
+  readPlanFeatures,
   visibleOrgNav,
   type Permission,
 } from "@workspace/judge"
@@ -153,6 +154,7 @@ export function managedNav(ctx: OrgContext) {
     can: (p) => held.has(p),
     canWholeOrg: (p) => canFor(ctx, p, []),
     enabledModules: ctx.modules,
+    planFeatures: readPlanFeatures(ctx.org.planFeatures),
   })
 }
 

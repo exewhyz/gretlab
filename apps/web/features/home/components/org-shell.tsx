@@ -72,6 +72,7 @@ function managedKeys(shell: Shell): Set<string> {
       can: (p) => shell.permissions.includes(p),
       canWholeOrg: (p) => shell.wholeOrg.includes(p),
       enabledModules: new Set(shell.modules),
+      planFeatures: shell.planFeatures,
     }).flatMap((g) => g.items.map((i) => i.key))
   )
 }
@@ -170,6 +171,7 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
     can: (p) => shell.permissions.includes(p),
     canWholeOrg: (p) => shell.wholeOrg.includes(p),
     enabledModules: new Set(shell.modules),
+    planFeatures: shell.planFeatures,
   })
   for (const g of managed) {
     const items = g.items
@@ -247,7 +249,10 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
       ...(shell.modules.includes("events")
         ? [{ key: "events", label: "Events", href: `${base}/events` }]
         : []),
+      // Your own check-in, as its page decides: an active member holding a permission
+      // (platform staff looking in aren't members).
       ...(shell.modules.includes("staffAttendance") &&
+      shell.member &&
       shell.permissions.length > 0
         ? [
             {

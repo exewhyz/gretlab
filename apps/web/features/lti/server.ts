@@ -1,3 +1,4 @@
+import { planIncludes } from "@workspace/judge"
 import { randomBytes, type JsonWebKey } from "node:crypto"
 
 import {
@@ -151,6 +152,8 @@ export async function launch(idToken: string, state: string, cookieState: string
 
   const [org] = await db.select().from(organizations).where(eq(organizations.id, platform.orgId))
   if (!org?.active) throw new ApiError(403, "suspended", "This organization is suspended.")
+  if (!planIncludes(org.planFeatures, "lti"))
+    throw new ApiError(403, "not_in_plan", "This organization's plan doesn't include LMS launches.")
   const user = await personFor(platform.id, org.id, claims)
   const teacher = isInstructor(claims[LTI.roles])
   const contextClaim = claims[LTI.context] as { id?: string; title?: string; label?: string } | undefined

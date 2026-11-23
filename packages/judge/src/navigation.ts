@@ -42,6 +42,8 @@ export interface NavItem {
   orgTypes?: OrgType[]
   /** A toggleable module key; omitted = core, always eligible. */
   module?: string
+  /** A plan feature it needs (billing.ts), for pages that aren't a module (Courses, LMS). */
+  feature?: string
   /** A different label for some org types (e.g. Groups is \"Classes\" in a school). */
   labels?: Partial<Record<OrgType, string>>
   /** Named with the kind's own word (Students, Learners, Employees). Wins over `labels`. */
@@ -251,6 +253,7 @@ export const ORG_NAV: NavItem[] = [
   },
   {
     key: "courses",
+    feature: "courses",
     label: "Courses",
     path: "/courses",
     group: "Academics",
@@ -298,6 +301,7 @@ export const ORG_NAV: NavItem[] = [
   },
   {
     key: "progress",
+    feature: "runs",
     label: "Progress",
     path: "/progress",
     group: "Academics",
@@ -307,6 +311,7 @@ export const ORG_NAV: NavItem[] = [
   },
   {
     key: "outcomes",
+    feature: "outcomes",
     label: "Outcomes",
     path: "/outcomes",
     group: "Academics",
@@ -351,7 +356,16 @@ export const ORG_NAV: NavItem[] = [
     anyOf: ["org.settings.manage"],
   },
   {
+    key: "billing",
+    label: "Plan and billing",
+    path: "/billing",
+    group: "School",
+    anyOf: ["org.billing.manage"],
+    wholeOrg: true,
+  },
+  {
     key: "integrations",
+    feature: "api",
     label: "Integrations",
     path: "/integrations",
     group: "School",
@@ -360,6 +374,7 @@ export const ORG_NAV: NavItem[] = [
   },
   {
     key: "lms",
+    feature: "lti",
     label: "LMS (LTI)",
     path: "/lms",
     group: "School",
@@ -375,6 +390,8 @@ export interface NavContext {
   canWholeOrg?: (permission: Permission) => boolean
   /** Enabled toggleable modules; a core feature ignores this. */
   enabledModules?: ReadonlySet<string>
+  /** The plan's features; missing or null: no plan limits. */
+  planFeatures?: readonly string[] | null
 }
 
 export interface NavGroupView {
@@ -409,6 +426,7 @@ export function visibleOrgNav(
           item.group === group &&
           (!item.orgTypes || item.orgTypes.includes(ctx.orgType)) &&
           (!item.module || (ctx.enabledModules?.has(item.module) ?? false)) &&
+          (!item.feature || !ctx.planFeatures || ctx.planFeatures.includes(item.feature)) &&
           (item.anyOf.length === 0 ||
             item.anyOf.some((p) =>
               item.wholeOrg ? (ctx.canWholeOrg ?? ctx.can)(p) : ctx.can(p)

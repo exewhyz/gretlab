@@ -70,6 +70,12 @@ export const PLATFORM_PERMISSIONS = {
       "An email when something on Monitoring goes wrong (no judge online, code waiting, email failing, a judge machine that won't set up, the month's cost past its limit), and another when it's fixed.",
     module: "Platform",
   },
+  "platform.billing.manage": {
+    label: "Manage plans and billing",
+    description:
+      "Feature prices and ready-made plans, every organization's plan and payments, and setting a plan by hand (custom deals, pilots).",
+    module: "Platform",
+  },
   "platform.costs.view": {
     label: "See costs",
     description:

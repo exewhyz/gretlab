@@ -13,7 +13,7 @@ import {
   users,
   type User,
 } from "@workspace/db"
-import { KINDS, kindTerms } from "@workspace/judge"
+import { KINDS, kindTerms, readPlanFeatures } from "@workspace/judge"
 
 import { newApplications } from "@/features/admissions/server"
 import { homeEvents } from "@/features/events/server"
@@ -112,6 +112,10 @@ export async function orgShell(slug: string, user: User) {
     /** Of those, the ones held across the whole organization (not just in some groups). */
     wholeOrg: permissions.filter((p) => canFor(ctx, p, [])),
     modules: [...modules],
+    /** An active member here (platform staff looking in aren't): own things need it. */
+    member: ctx.membership?.status === "active",
+    /** The plan's features (billing); null: no plan limits. */
+    planFeatures: readPlanFeatures(ctx.org.planFeatures),
     pending: Number(pending?.n ?? 0),
     /** The kind's words, for the frame (My classes, About the school). */
     terms: kindTerms(ctx.org.type),

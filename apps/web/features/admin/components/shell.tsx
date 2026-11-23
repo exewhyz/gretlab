@@ -27,6 +27,7 @@ import {
   ShapesIcon,
   CpuIcon,
   CurrencyDollarIcon,
+  ReceiptIcon,
   SquaresFourIcon,
   StackIcon,
   TrophyIcon,
@@ -174,6 +175,12 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         icon: CurrencyDollarIcon,
         label: "Costs",
         needs: ["platform.costs.view"],
+      },
+      {
+        href: "/admin/plans",
+        icon: ReceiptIcon,
+        label: "Plans",
+        needs: ["platform.billing.manage"],
       },
       {
         href: "/admin/judges",
