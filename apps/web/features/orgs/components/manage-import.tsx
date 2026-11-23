@@ -1,11 +1,12 @@
 "use client"
 
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import { Input } from "@workspace/ui/components/input"
+import { BigImport } from "@/components/big-import"
 import { Field, FormMessage, TextArea } from "@/components/form"
 import { Card, PageTitle, Table } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
@@ -61,6 +62,9 @@ export function parseCsv(text: string): string[][] {
   return rows.filter((r) => r.some((cell) => cell.trim() !== ""))
 }
 
+/** Rows checked and added at once, in the page; more go through a background job. */
+const INSTANT_ROWS = 5_000
+
 export const TEMPLATE =
   "email,name,group,role\nasha@college.edu,Asha Rao,CSE / 2026-A,\nravi@college.edu,Ravi Kumar,CSE / 2026-B,\nmeera@college.edu,Dr Meera Iyer,CSE,Teacher\n"
 
@@ -108,6 +112,12 @@ export function ManageImport({ slug }: { slug: string }) {
     },
     onError: (e) => setProblem(e.message),
   })
+  // Past what one request carries, the file goes through a background job (features/jobs).
+  const lineCount = useMemo(
+    () => text.split(/\r\n|\n|\r/).filter((l) => l.trim()).length - 1,
+    [text]
+  )
+  const big = lineCount > INSTANT_ROWS
   const doable = result
     ? result.counts.invite + result.counts.add + result.counts.update
     : 0
@@ -164,7 +174,8 @@ export function ManageImport({ slug }: { slug: string }) {
           <TextArea
             rows={6}
             value={text}
-            className="font-mono text-xs"
+            // A file of thousands of lines scrolls inside the box, not down the page.
+            className="max-h-64 overflow-y-auto font-mono text-xs"
             onChange={(event) => {
               setText(event.target.value)
               setResult(null)
@@ -181,7 +192,19 @@ export function ManageImport({ slug }: { slug: string }) {
           />
           Create groups that don&apos;t exist yet
         </label>
-        <div className="flex flex-wrap items-center gap-2">
+        {big && (
+          <BigImport
+            kind="members.import"
+            slug={slug}
+            rows={rows}
+            createGroups={createGroups}
+            noun="people"
+            onAdded={() =>
+              void queryClient.invalidateQueries({ queryKey: ["org", slug] })
+            }
+          />
+        )}
+        <div className={big ? "hidden" : "flex flex-wrap items-center gap-2"}>
           <Button
             variant="outline"
             disabled={!text.trim() || run.isPending}

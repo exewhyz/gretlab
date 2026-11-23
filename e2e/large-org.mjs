@@ -205,6 +205,25 @@ await tab.getByLabel("Search students").fill("lo-s-4321@")
 await tab.waitForFunction(() => document.querySelectorAll('[data-testid="grade-row"]').length === 1, null, { timeout: 15_000 }).catch(() => {})
 check("searching asks the server and shows the one student", (await tab.getByTestId("grade-row").count()) === 1 && (await tab.getByTestId("grade-row").first().innerText()).includes("lo-s-4321@example.com"))
 await tab.screenshot({ path: SHOTS + "gradebook.png", fullPage: false }).catch(() => {})
+
+// ---------- a file of 6,000 members on the import page: sent in parts, checked, added
+const csvBig = "email,name,group,role\n" + Array.from({ length: 6000 }, (_, i) => `lo-u-${i + 1}@example.com,Lo Upload ${i + 1},First year / Section 2,`).join("\n") + "\n"
+for (const [name, viewport] of [["laptop", { width: 1440, height: 1000 }], ["phone", { width: 390, height: 844 }]]) {
+  if (name === "phone") psql(`delete from users where email like 'lo-u-%@example.com'`)
+  await tab.setViewportSize(viewport)
+  await tab.goto(`${BASE}${O}/manage/import`)
+  await tab.getByLabel("CSV or Excel file").setInputFiles({ name: "big.csv", mimeType: "text/csv", buffer: Buffer.from(csvBig) })
+  await tab.getByTestId("big-import").getByRole("button", { name: "Check" }).click()
+  await tab.getByRole("button", { name: "Add these people" }).waitFor({ timeout: 120_000 }).catch(() => {})
+  check(`${name}: a big file is checked in the background, with what would happen`, await tab.getByTestId("job-progress").getByText(/6000 of 6000 rows can be added/).isVisible().catch(() => false))
+  await tab.screenshot({ path: `${SHOTS}import-checked-${name}.png`, fullPage: true }).catch(() => {})
+  await tab.getByRole("button", { name: "Add these people" }).click()
+  await tab.getByTestId("job-progress").getByText(/Added 6000 of 6000 rows/).waitFor({ timeout: 120_000 }).catch(() => {})
+  const uploaded = Number(psql(`select count(*) from users u join group_members gm on gm.user_id = u.id where u.email like 'lo-u-%@example.com' and gm.group_id = '${sections[1].id}'`))
+  check(`${name}: …then added (${uploaded} in Section 2)`, uploaded === 6000)
+  check(`${name}: nothing spills sideways`, await tab.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+  await tab.screenshot({ path: `${SHOTS}import-added-${name}.png`, fullPage: true }).catch(() => {})
+}
 await browser.close()
 
 // ---------- the biggest imports allowed, into an organization this size

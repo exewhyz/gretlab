@@ -36,6 +36,7 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 
+import { BigImport } from "@/components/big-import"
 import { ConfirmDialog } from "@/components/confirm"
 import {
   FormMessage,
@@ -392,6 +393,9 @@ export function toRows(text: string) {
   }
 }
 
+/** Rows checked and added at once, in the page; more go through a background job. */
+const INSTANT_STUDENT_ROWS = 3_000
+
 export function ImportStudents({
   slug,
   onDone,
@@ -402,6 +406,8 @@ export function ImportStudents({
   const client = useQueryClient()
   const [text, setText] = useState("")
   const parsed = toRows(text)
+  // Past what one request carries, the file goes through a background job (features/jobs).
+  const big = parsed.rows.length > INSTANT_STUDENT_ROWS
   const check = useMutation({
     mutationFn: (commit: boolean) =>
       api<ImportReport>(`/orgs/${slug}/students/import`, {
@@ -441,6 +447,8 @@ export function ImportStudents({
               aria-label="Or paste the CSV"
               rows={6}
               mono
+              // A file of thousands of lines scrolls inside the box, not down the dialog.
+              className="max-h-64 overflow-y-auto"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={
@@ -453,6 +461,17 @@ export function ImportStudents({
               </p>
             )}
           </div>
+        )}
+        {big && (
+          <BigImport
+            kind="students.import"
+            slug={slug}
+            rows={() => parsed.rows}
+            noun="students"
+            onAdded={() =>
+              void client.invalidateQueries({ queryKey: ["org", slug] })
+            }
+          />
         )}
         {report && (
           <div className="grid gap-2" data-testid="import-report">
@@ -505,21 +524,25 @@ export function ImportStudents({
               <Button variant="ghost" onClick={onDone}>
                 Cancel
               </Button>
-              <Button
-                variant="outline"
-                disabled={parsed.rows.length === 0 || check.isPending}
-                onClick={() => check.mutate(false)}
-              >
-                Check {parsed.rows.length || ""} lines
-              </Button>
-              <Button
-                disabled={
-                  !report || report.summary.add === 0 || check.isPending
-                }
-                onClick={() => check.mutate(true)}
-              >
-                Add {report?.summary.add ?? ""} students
-              </Button>
+              {!big && (
+                <>
+                  <Button
+                    variant="outline"
+                    disabled={parsed.rows.length === 0 || check.isPending}
+                    onClick={() => check.mutate(false)}
+                  >
+                    Check {parsed.rows.length || ""} lines
+                  </Button>
+                  <Button
+                    disabled={
+                      !report || report.summary.add === 0 || check.isPending
+                    }
+                    onClick={() => check.mutate(true)}
+                  >
+                    Add {report?.summary.add ?? ""} students
+                  </Button>
+                </>
+              )}
             </>
           )}
         </DialogFooter>

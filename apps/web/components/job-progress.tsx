@@ -23,11 +23,17 @@ export function JobProgress({
   id,
   label,
   onClose,
+  onFinished,
+  autoDownload = true,
 }: {
   id: string
   /** "Gradebook export". */
   label: string
   onClose?: () => void
+  /** Called once when it ends (done, failed or cancelled), with what it ended as. */
+  onFinished?: (job: Job) => void
+  /** Download the file by itself when ready (exports); off for an import's report. */
+  autoDownload?: boolean
 }) {
   const queryClient = useQueryClient()
   const { data: job } = useQuery({
@@ -42,11 +48,12 @@ export function JobProgress({
   const fileUrl = `/api/v1/jobs/${id}/file`
   useEffect(() => {
     if (!job || told.current) return
+    if (["done", "failed", "cancelled"].includes(job.status)) onFinished?.(job)
     if (job.status === "done") {
       told.current = true
-      toast.success(`${label} ready`)
+      toast.success(`${label}: done`)
       // The file downloads by itself; the button stays for another copy.
-      if (job.file) {
+      if (job.file && autoDownload) {
         const a = document.createElement("a")
         a.href = fileUrl
         a.download = job.file.name
@@ -54,9 +61,9 @@ export function JobProgress({
       }
     } else if (job.status === "failed") {
       told.current = true
-      toast.error(`${label} failed`)
-    }
-  }, [job, label, fileUrl])
+      toast.error(`${label}: failed`)
+    } else if (job.status === "cancelled") told.current = true
+  }, [job, label, fileUrl, onFinished, autoDownload])
 
   const running = !job || job.status === "queued" || job.status === "running"
   const percent =
@@ -91,6 +98,16 @@ export function JobProgress({
       {job?.result?.summary && (
         <p className="text-body-sm text-body">{job.result.summary}</p>
       )}
+      {job?.result?.lines && job.result.lines.length > 0 && (
+        <ul
+          className="max-h-48 overflow-y-auto rounded-lg bg-muted/40 p-2 text-caption text-body"
+          data-testid="job-lines"
+        >
+          {job.result.lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
       {job?.status === "failed" && (
         <p className="text-body-sm text-destructive">
           {job.error ?? "It couldn't finish."} Try again; if it keeps failing,
@@ -109,7 +126,9 @@ export function JobProgress({
             download={job.file.name}
             className={cn(buttonVariants({ size: "sm" }))}
           >
-            Download {job.file.name}
+            {autoDownload
+              ? `Download ${job.file.name}`
+              : "Download the full report"}
           </a>
         )}
         {running && (
