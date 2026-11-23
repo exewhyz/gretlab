@@ -2611,7 +2611,11 @@ export const uploads = pgTable(
     hash: text("hash").notNull().unique(),
     contentType: text("content_type").notNull(),
     size: integer("size").notNull(),
-    data: bytea("data").notNull(),
+    /** The bytes while they're kept here; null once they're in R2 (`key`, apps/web/lib/storage). */
+    data: bytea("data"),
+    /** Where the bytes are: `db` (above) or `r2` (the public bucket, under `key`). */
+    storedIn: text("stored_in").$type<"db" | "r2">().notNull().default("db"),
+    key: text("key"),
     uploadedBy: uuid("uploaded_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -3396,7 +3400,10 @@ export const jobFiles = pgTable("job_files", {
     .references(() => jobs.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   contentType: text("content_type").notNull(),
-  data: bytea("data").notNull(),
+  /** The parts as they're written; cleared once the finished file is in R2 (`key`). */
+  data: bytea("data"),
+  storedIn: text("stored_in").$type<"db" | "r2">().notNull().default("db"),
+  key: text("key"),
   createdAt: createdAt(),
 })
 

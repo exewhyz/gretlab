@@ -6,6 +6,7 @@ import { getDb, jobFiles, jobRows, jobs, sql, type User } from "@workspace/db"
 import { JOB_KEEP, JOB_LEASE_MS, jobAfterFailure } from "@workspace/judge"
 
 import { notFound } from "@/lib/api/route"
+import { putFile, removeFile, signedUrl, storageReady } from "@/lib/storage"
 import { reportError } from "@/lib/report-error"
 
 import { KINDS, type JobKind, type JobRow } from "./kinds"
@@ -94,8 +95,10 @@ async function stepOnce(runner: string, job: JobRow) {
         .set({ lockedUntil: new Date(Date.now() + kind.leaseMs) })
         .where(mine(job.id, runner))
     }
+    let finished = false
     await getDb().transaction(async (tx) => {
       const out = await kind.step(tx, job)
+      finished = out.done
       const [saved] = await tx
         .update(jobs)
         .set({
@@ -124,6 +127,12 @@ async function stepOnce(runner: string, job: JobRow) {
       // Cancelled, or taken over after the lease ran out: none of this step counts.
       if (!saved) throw new LostJob()
     })
+    // A finished job's file goes to R2's private bucket (when it's set up); a failure there
+    // leaves it here, where it's served from just the same.
+    if (finished)
+      await fileToStorage(job.id).catch((error) =>
+        reportError(error, { where: "job file", job: job.id })
+      )
   } catch (error) {
     if (error instanceof LostJob) return
     const ref = reportError(error, {
@@ -164,6 +173,22 @@ export async function runJobs(budgetMs: number) {
   return { steps }
 }
 
+/** Moves a finished job's file to the private bucket, keeping only who and where here. */
+async function fileToStorage(jobId: string) {
+  if (!storageReady()) return
+  const [file] = await getDb()
+    .select()
+    .from(jobFiles)
+    .where(and(eq(jobFiles.jobId, jobId), eq(jobFiles.storedIn, "db")))
+  if (!file?.data) return
+  const key = `jobs/${jobId}/${file.name.replace(/[^\w.-]/g, "_")}`
+  await putFile("private", key, new Uint8Array(file.data), file.contentType)
+  await getDb()
+    .update(jobFiles)
+    .set({ storedIn: "r2", key, data: null })
+    .where(eq(jobFiles.jobId, jobId))
+}
+
 /** Finished jobs go after 30 days, their files after a day, uploaded import rows after a day. */
 export async function tidyJobs() {
   const db = getDb()
@@ -174,6 +199,16 @@ export async function tidyJobs() {
   await db.execute(q`
     update jobs set status = 'cancelled', finished_at = now()
     where status = 'uploading' and created_at < now() - interval '1 day'`)
+  // Files in R2 are deleted there first (a lifecycle rule on jobs/ is the safety net).
+  const stale = (await db.execute(q`
+    select job_id as "jobId", key from job_files
+    where stored_in = 'r2' and created_at < now() - make_interval(hours => ${JOB_KEEP.fileHours})`)) as unknown as {
+    jobId: string
+    key: string
+  }[]
+  for (const f of stale) {
+    if (storageReady()) await removeFile("private", f.key).catch(() => {})
+  }
   await db.execute(q`
     delete from job_files where created_at < now() - make_interval(hours => ${JOB_KEEP.fileHours})`)
   await db.execute(q`
@@ -275,5 +310,8 @@ export async function jobFile(user: User, id: string) {
     .where(eq(jobFiles.jobId, job.id))
   if (!file || job.status !== "done")
     throw notFound("The file isn't ready, or has expired")
-  return file
+  // In R2: a link signed for five minutes, given only after the check above.
+  if (file.storedIn === "r2" && file.key)
+    return { redirect: await signedUrl("private", file.key, 300, file.name) }
+  return { file: { ...file, data: file.data ?? Buffer.alloc(0) } }
 }

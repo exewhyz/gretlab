@@ -3,11 +3,13 @@ import { createHash } from "node:crypto"
 import { getDb, sql, uploads, type User } from "@workspace/db"
 
 import { isStaff, ApiError, notFound } from "@/lib/api/route"
+import { imageKey, publicUrl, putFile, storageReady } from "@/lib/storage"
 import { teachesAnywhere } from "@/features/teaching/server"
 
 const { and, eq, gte, count } = sql
 
 export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+const IMMUTABLE = "public, max-age=31536000, immutable"
 const DAILY_LIMIT = 300
 
 /**
@@ -66,13 +68,28 @@ export async function saveUpload(user: User, file: File) {
     )
   }
   const hash = createHash("sha256").update(bytes).digest("hex")
+  // The same image again is the same upload.
+  const [same] = await db
+    .select({ id: uploads.id })
+    .from(uploads)
+    .where(eq(uploads.hash, hash))
+  if (same) return { id: same.id, url: `/api/v1/uploads/${same.id}` }
+  // To R2 when it's set up (lib/storage), so the database keeps only who and what.
+  const key = storageReady() ? imageKey(hash, contentType) : null
+  if (key) {
+    await putFile("public", key, bytes, contentType, {
+      cacheControl: IMMUTABLE,
+    })
+  }
   const [created] = await db
     .insert(uploads)
     .values({
       hash,
       contentType,
       size: bytes.length,
-      data: bytes,
+      data: key ? null : bytes,
+      storedIn: key ? "r2" : "db",
+      key,
       uploadedBy: user.id,
     })
     .onConflictDoNothing({ target: uploads.hash })
@@ -94,16 +111,29 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export async function uploadResponse(id: string) {
   if (!UUID.test(id)) throw notFound("Image not found")
   const [row] = await getDb()
-    .select({ contentType: uploads.contentType, data: uploads.data })
+    .select({
+      contentType: uploads.contentType,
+      data: uploads.data,
+      storedIn: uploads.storedIn,
+      key: uploads.key,
+    })
     .from(uploads)
     .where(eq(uploads.id, id))
   if (!row) throw notFound("Image not found")
-  return new Response(new Uint8Array(row.data), {
+  // In R2: its own address, served by Cloudflare. The link in a statement never changes.
+  if (row.storedIn === "r2" && row.key) {
+    return new Response(null, {
+      status: 301,
+      headers: { Location: publicUrl(row.key), "Cache-Control": IMMUTABLE },
+    })
+  }
+  const data = row.data ?? Buffer.alloc(0)
+  return new Response(new Uint8Array(data), {
     headers: {
       "Content-Type": row.contentType,
-      "Content-Length": String(row.data.length),
+      "Content-Length": String(data.length),
       // Its id never points at different bytes.
-      "Cache-Control": "public, max-age=31536000, immutable",
+      "Cache-Control": IMMUTABLE,
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy": "default-src 'none'; sandbox",
       "Content-Disposition": "inline",

@@ -6,7 +6,7 @@ import {
   WarningIcon,
   XCircleIcon,
 } from "@phosphor-icons/react"
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query"
 import {
   MONITOR_RANGES,
   isMonitorRange,
@@ -15,10 +15,12 @@ import {
 import Link from "next/link"
 import { useState, type ReactNode } from "react"
 
+import { Button } from "@workspace/ui/components/button"
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { Figure, Figures } from "@/components/figures"
+import { JobProgress } from "@/components/job-progress"
 import {
   Loading,
   PageTitle,
@@ -35,6 +37,7 @@ import { TimeChart, type Point } from "./time-chart"
 
 type Health = ApiResult<typeof monitoring> & {
   alerts: ApiResult<typeof recentAlerts>
+  can: { moveFiles: boolean }
 }
 type Timeline = ApiResult<typeof monitoringSeries>
 
@@ -402,6 +405,8 @@ export function MonitoringPage() {
         </p>
       </section>
 
+      <FileStorage storage={h.storage} canMove={h.can.moveFiles} />
+
       <Alerts alerts={h.alerts} />
     </div>
   )
@@ -580,5 +585,52 @@ function Problems({ problems }: { problems: Health["problems"] }) {
         )
       })}
     </ul>
+  )
+}
+
+/** Where images and export files live: R2, or still the database (lib/storage). */
+function FileStorage({
+  storage,
+  canMove,
+}: {
+  storage: Health["storage"]
+  canMove: boolean
+}) {
+  const [job, setJob] = useState<string | null>(null)
+  const move = useMutation({
+    mutationFn: () =>
+      api<{ job: string }>("/admin/storage/move", { method: "POST" }),
+    onSuccess: (r) => setJob(r.job),
+  })
+  return (
+    <section id="storage" className="mt-8 scroll-mt-20">
+      <h2 className="text-title-sm text-ink">File storage</h2>
+      <p className="text-body-sm text-body" data-testid="storage-line">
+        {storage.ready
+          ? `Images and exports go to Cloudflare R2. ${storage.imagesInStorage} images there, ${storage.imagesInDatabase} still in the database.`
+          : "Not set up: images and exports are kept in the database (README › File storage)."}
+      </p>
+      {storage.ready && storage.imagesInDatabase > 0 && canMove && !job && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-2"
+          disabled={move.isPending}
+          onClick={() => move.mutate()}
+        >
+          Move them to R2
+        </Button>
+      )}
+      {job && (
+        <div className="mt-2 max-w-md">
+          <JobProgress
+            id={job}
+            label="Moving images"
+            autoDownload={false}
+            onClose={() => setJob(null)}
+          />
+        </div>
+      )}
+    </section>
   )
 }

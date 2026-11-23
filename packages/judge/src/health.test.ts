@@ -15,6 +15,7 @@ const fine = (over: Partial<HealthInput> = {}): HealthInput => ({
   judgesOutOfDate: 0,
   jobsWaiting: 0,
   jobsOldestSeconds: 0,
+  filesNotStored: 0,
   ...over,
 })
 
@@ -122,4 +123,14 @@ test("background jobs waiting 10 minutes: nothing is running them", () => {
       },
     ]
   )
+})
+
+test("files that should be in R2 but aren't: it's refusing writes", () => {
+  assert.deepEqual(healthProblems(fine({ filesNotStored: 1 })), [
+    {
+      key: "storage_failing",
+      level: "warning",
+      text: "1 finished file couldn't be moved to file storage (R2) for 10 minutes; it's served from the database meanwhile. Check R2's keys and bucket.",
+    },
+  ])
 })

@@ -19,6 +19,8 @@ export interface HealthInput {
   /** Background jobs queued or running (features/jobs), and how long the oldest has waited. */
   jobsWaiting: number
   jobsOldestSeconds: number
+  /** Finished jobs' files still in the database 10 minutes on, with R2 set up (apps/web/lib/storage). */
+  filesNotStored: number
 }
 
 export type HealthLevel = "critical" | "warning" | "info"
@@ -98,6 +100,13 @@ export function healthProblems(input: HealthInput): HealthProblem[] {
       key: "jobs_waiting",
       level: "warning",
       text: `${count(input.jobsWaiting, "background job (exports and the like) is", "background jobs (exports and the like) are")} waiting; the oldest for ${minutes(input.jobsOldestSeconds)} minutes. Is the cron running?`,
+    })
+  }
+  if (input.filesNotStored > 0) {
+    out.push({
+      key: "storage_failing",
+      level: "warning",
+      text: `${count(input.filesNotStored, "finished file", "finished files")} couldn't be moved to file storage (R2) for 10 minutes; ${input.filesNotStored === 1 ? "it's" : "they're"} served from the database meanwhile. Check R2's keys and bucket.`,
     })
   }
   if (input.judgesOutOfDate > 0) {

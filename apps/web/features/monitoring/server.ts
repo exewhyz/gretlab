@@ -5,6 +5,7 @@ import { getQueueHealth } from "@/features/admin/server"
 import { webhooksWaiting } from "@/features/integrations/deliver"
 import { listJudges } from "@/features/judges/server"
 import { jobsHealth } from "@/features/jobs/server"
+import { storageReady } from "@/lib/storage"
 import { outboxHealth } from "@/features/notifications/outbox"
 
 /*
@@ -26,6 +27,7 @@ export async function monitoring() {
     emailFailures,
     [hooks],
     background,
+    [files],
   ] = await Promise.all([
     getQueueHealth(),
     listJudges(),
@@ -53,6 +55,16 @@ export async function monitoring() {
       Row[]
     >,
     jobsHealth(),
+    // Where images and finished files are: R2, or still the database.
+    db.execute(sql.sql`
+      select
+        (select count(*) from uploads where stored_in = 'r2') as images_r2,
+        (select count(*) from uploads where stored_in = 'db') as images_db,
+        (select count(*) from job_files f join jobs j on j.id = f.job_id
+           where f.stored_in = 'db' and j.status = 'done'
+             and j.finished_at < now() - interval '10 minutes') as files_db`) as unknown as Promise<
+      Row[]
+    >,
   ])
   const [emailSent] = (await db.execute(sql.sql`
     select count(*) as n from email_outbox
@@ -69,11 +81,18 @@ export async function monitoring() {
     judgesOutOfDate: judges.online.filter((r) => r.outOfDate).length,
     jobsWaiting: background.waiting,
     jobsOldestSeconds: background.oldestSeconds,
+    filesNotStored: storageReady() ? Number(files?.files_db ?? 0) : 0,
   }
   return {
     problems: healthProblems(numbers),
     /** Background jobs (features/jobs): waiting, the oldest's wait, failed in the last day. */
     jobs: background,
+    /** File storage (lib/storage): set up or not, and where the images are. */
+    storage: {
+      ready: storageReady(),
+      imagesInStorage: Number(files?.images_r2 ?? 0),
+      imagesInDatabase: Number(files?.images_db ?? 0),
+    },
     queue: {
       queued: queue.queued,
       running: queue.running,

@@ -1,4 +1,4 @@
-import { getDb, jobFiles, jobRows, sql, users } from "@workspace/db"
+import { getDb, jobFiles, jobRows, sql, uploads, users } from "@workspace/db"
 
 /*
  * What each kind of job does, one step at a time (features/jobs/server.ts runs them). A step
@@ -48,6 +48,8 @@ export const STEP = 1_000
  * (finding the class, the assignment) is most of the time; still seconds, well inside a lease.
  */
 export const EXPORT_STEP = 5_000
+/** Images a step of the move copies (each up to 2 MB). */
+const MOVE_STEP = 200
 
 /** A file's first part, or more of it. */
 export async function writeFile(
@@ -161,6 +163,66 @@ export const KINDS = {
         result: part.done
           ? {
               summary: `${part.total} ${part.total === 1 ? "student" : "students"} exported.`,
+            }
+          : undefined,
+      }
+    },
+  },
+  /**
+   * Images kept in the database, copied to R2's public bucket 200 at a time (each step writes
+   * the objects, then marks the rows and clears their bytes). Links stay the same: the image's
+   * address redirects to wherever it is.
+   */
+  "uploads.move": {
+    label: "Moving images to file storage",
+    leaseMs: 5 * 60_000,
+    async step(tx, job) {
+      const { imageKey, putFile, storageReady } = await import("@/lib/storage")
+      if (!storageReady())
+        throw new Error("File storage (R2) isn't set up on this server")
+      const batch = await tx
+        .select({
+          id: uploads.id,
+          hash: uploads.hash,
+          contentType: uploads.contentType,
+          data: uploads.data,
+        })
+        .from(uploads)
+        .where(sql.eq(uploads.storedIn, "db"))
+        .limit(MOVE_STEP)
+      for (const image of batch) {
+        if (!image.data) continue
+        const key = imageKey(image.hash, image.contentType)
+        await putFile(
+          "public",
+          key,
+          new Uint8Array(image.data),
+          image.contentType,
+          {
+            cacheControl: "public, max-age=31536000, immutable",
+          }
+        )
+        await tx
+          .update(uploads)
+          .set({ storedIn: "r2", key, data: null })
+          .where(sql.eq(uploads.id, image.id))
+      }
+      const [left] = await tx
+        .select({ n: sql.count() })
+        .from(uploads)
+        .where(sql.eq(uploads.storedIn, "db"))
+      // Counted after this step's rows were marked, in the same transaction.
+      const remaining = Number(left?.n ?? 0)
+      const moved = job.progress + batch.length
+      const done = batch.length < MOVE_STEP || remaining <= 0
+      return {
+        cursor: null,
+        progress: moved,
+        total: moved + Math.max(0, remaining),
+        done,
+        result: done
+          ? {
+              summary: `${moved} ${moved === 1 ? "image" : "images"} moved to file storage.`,
             }
           : undefined,
       }

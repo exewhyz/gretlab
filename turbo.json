@@ -36,7 +36,9 @@
         "CLIENT_IP_HEADER",
         "RESEND_*",
         "CRON_SECRET",
-        "SITE_URL"
+        "SITE_URL",
+        "R2_*",
+        "STORAGE_ENDPOINT"
       ]
     },
     "lint": {

@@ -6,6 +6,7 @@
 set -u
 ROOT=${0:a:h:h}; LOGS=${TMPDIR:-/tmp}/gretlab-e2e; mkdir -p $LOGS
 RIG=gretlab-gvisor-rig
+S3=gretlab-e2e-s3
 RUNNER=""
 # Stop what this run started however it ends (finished, failed or interrupted), so no
 # test judge or server is left to take the next run's jobs or hold port 3100.
@@ -13,6 +14,7 @@ cleanup() {
   [[ -n "$RUNNER" ]] && kill $RUNNER 2>/dev/null && wait $RUNNER 2>/dev/null
   lsof -ti:3100 | xargs kill 2>/dev/null
   docker rm -f -v $RIG >/dev/null 2>&1
+  docker rm -f -v $S3 >/dev/null 2>&1
   docker compose -f $ROOT/docker-compose.yml exec -T postgres psql -U gretlab -d gretlab -c "drop database if exists gretlab_test with (force)" >/dev/null 2>&1
 }
 trap cleanup EXIT
@@ -24,6 +26,13 @@ docker rm -f -v $RIG >/dev/null 2>&1
 docker run -d --name $RIG --privileged -p 127.0.0.1:23750:2375 -e DOCKER_TLS_CERTDIR= $RIG --tls=false >/dev/null
 for i in {1..45}; do docker exec $RIG docker version --format ok >/dev/null 2>&1 && break; sleep 1; done
 docker save gretlab/sandbox-python:1 gretlab/sandbox-node:1 gretlab/sandbox-cpp:1 gretlab/sandbox-java:1 | docker exec -i $RIG docker load >/dev/null
+
+# File storage: S3Mock stands in for Cloudflare R2 (both buckets; it doesn't check access, so
+# R2's own refusals are checked on the real thing, README › File storage).
+docker rm -f -v $S3 >/dev/null 2>&1
+docker run -d --name $S3 -p 127.0.0.1:9190:9090 -e initialBuckets=gretlab-public,gretlab-private adobe/s3mock:4.1.1 >/dev/null
+for i in {1..60}; do curl -sf -o /dev/null http://127.0.0.1:9190/ && break; sleep 1; done
+export STORAGE_ENDPOINT=http://127.0.0.1:9190 R2_ACCESS_KEY_ID=e2e R2_SECRET_ACCESS_KEY=e2e-secret R2_PUBLIC_BUCKET=gretlab-public R2_PRIVATE_BUCKET=gretlab-private R2_PUBLIC_URL=http://127.0.0.1:9190/gretlab-public
 
 docker compose -f $ROOT/docker-compose.yml exec -T postgres psql -U gretlab -d gretlab -c "drop database if exists gretlab_test with (force)" -c "create database gretlab_test" >/dev/null
 (cd $ROOT/packages/db && pnpm exec tsx src/migrate.ts && pnpm exec tsx src/seed.ts)
@@ -98,6 +107,7 @@ suite large-org http://localhost:3100
 suite judges http://localhost:3100
 suite monitoring http://localhost:3100
 suite jobs http://localhost:3100
+suite storage http://localhost:3100
 suite links http://localhost:3100
 suite org-kinds http://localhost:3100
 suite college http://localhost:3100
