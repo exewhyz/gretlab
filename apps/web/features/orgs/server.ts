@@ -1832,6 +1832,17 @@ export type ImportAction = "invite" | "add" | "update" | "unchanged" | "error"
  * Adds many people at once. Without `commit` it only reports what would happen, row by
  * row, so mistakes are fixed before anything changes. Rows with errors are skipped.
  */
+/** Whether this person may import members (features/jobs/imports): the organization's id. */
+export async function importAllowed(slug: string, user: User) {
+  const ctx = await context(slug, user)
+  if (!canAnywhere(ctx, "org.members.import")) {
+    throw forbidden(
+      `This needs the "${PERMISSIONS["org.members.import"].label}" permission.`
+    )
+  }
+  return ctx.org.id
+}
+
 export async function importMembers(
   slug: string,
   user: User,

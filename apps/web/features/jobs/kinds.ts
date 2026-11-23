@@ -1,4 +1,4 @@
-import { getDb, jobFiles, sql, users } from "@workspace/db"
+import { getDb, jobFiles, jobRows, sql, users } from "@workspace/db"
 
 /*
  * What each kind of job does, one step at a time (features/jobs/server.ts runs them). A step
@@ -33,6 +33,11 @@ export interface StepOut {
 export interface JobKind {
   /** What people read while it runs ("Gradebook export"). */
   label: string
+  /**
+   * How long one step may hold the job, when longer than the usual minute: an import checks and
+   * writes a whole file in one step. Nobody else takes the job while a step holds it.
+   */
+  leaseMs?: number
   step: (tx: Tx, job: JobRow) => Promise<StepOut>
 }
 
@@ -161,7 +166,122 @@ export const KINDS = {
       }
     },
   },
+  "members.import": importKind("members.import", "Members import"),
+  "students.import": importKind("students.import", "Students import"),
 } satisfies Record<string, JobKind>
+
+/** A report as CSV, defused against spreadsheet formulas (as every export here is). */
+function reportCsv(
+  lines: { line: number; who: string; result: string; note: string }[]
+) {
+  const field = (value: string | number) => {
+    let text = String(value)
+    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`
+    return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+  }
+  return (
+    "\ufeff" +
+    [
+      ["Line", "Who", "Result", "Note"],
+      ...lines.map((l) => [l.line, l.who, l.result, l.note]),
+    ]
+      .map((r) => r.map(field).join(","))
+      .join("\r\n") +
+    "\r\n"
+  )
+}
+
+/**
+ * An import (features/jobs/imports): the whole file in one step, as the instant import does it,
+ * as the person who started it. Checking reports what would happen; adding writes it and drops
+ * the uploaded rows. The full report becomes the job's file; the problems (500 at most) and the
+ * figures go in its result.
+ */
+function importKind(
+  kind: "members.import" | "students.import",
+  label: string
+): JobKind {
+  return {
+    label,
+    leaseMs: 10 * 60_000,
+    async step(tx, job) {
+      const input = job.input as {
+        slug: string
+        createGroups?: boolean
+        commit: boolean
+      }
+      const { rowsOf } = await import("./imports")
+      const rows = await rowsOf(job.id)
+      const user = await starter(job)
+      let lines: { line: number; who: string; result: string; note: string }[]
+      let data: Record<string, unknown>
+      if (kind === "members.import") {
+        const { importMembers } = await import("@/features/orgs/server")
+        const { importJobSchema } = await import("@/features/orgs/schemas")
+        const out = await importMembers(
+          input.slug,
+          user,
+          importJobSchema.parse({
+            rows,
+            createGroups: input.createGroups,
+            commit: input.commit,
+          })
+        )
+        lines = out.rows.map((r) => ({
+          line: r.line,
+          who: r.email,
+          result: r.action,
+          note: r.note,
+        }))
+        data = { committed: out.committed, counts: out.counts }
+      } else {
+        const { importStudents, importJobSchema } =
+          await import("@/features/records/students-server")
+        const out = await importStudents(
+          input.slug,
+          user,
+          importJobSchema.parse({ rows, commit: input.commit })
+        )
+        lines = out.rows.map((r) => ({
+          line: r.line,
+          who: r.name,
+          result: r.result,
+          note: r.note,
+        }))
+        data = { committed: out.committed, summary: out.summary }
+      }
+      const problems = lines.filter((l) => l.result === "error")
+      await writeFile(
+        tx,
+        job.id,
+        {
+          name: `${input.slug}-${kind === "members.import" ? "members" : "students"}-import-report.csv`,
+          contentType: "text/csv; charset=utf-8",
+          text: reportCsv(lines),
+        },
+        true
+      )
+      if (input.commit)
+        await tx.delete(jobRows).where(sql.eq(jobRows.jobId, job.id))
+      const ok = lines.length - problems.length
+      return {
+        cursor: null,
+        progress: lines.length,
+        total: lines.length,
+        done: true,
+        result: {
+          summary: input.commit
+            ? `Added ${ok} of ${lines.length} rows${problems.length ? `; ${problems.length} had problems and were left out` : ""}.`
+            : `${ok} of ${lines.length} rows can be added${problems.length ? `; ${problems.length} have problems` : ""}.`,
+          lines: problems
+            .slice(0, 500)
+            .map((l) => `Line ${l.line}: ${l.who || "(blank)"}: ${l.note}`),
+          data,
+        },
+      }
+    },
+  }
+}
 
 /** The person who started a job, to check each step as them. */
 async function starter(job: JobRow) {

@@ -311,6 +311,9 @@ export async function createInTx(
  * memberships, records, enrolments and places, one statement per kind of write instead of
  * about twelve per student. Refuses (409) if any of them already has a record here.
  */
+/** Rows per insert where each row is several values: well under 65,535 parameters. */
+const INSERT_BATCH = 2_000
+
 export async function createManyInTx(
   tx: Tx,
   ctx: OrgContext,
@@ -370,27 +373,33 @@ export async function createManyInTx(
     select ${ctx.org.id}, person, 'active', 'created' from unnest(${q.param(people)}::uuid[]) as person
     on conflict (org_id, user_id) do update set status = 'active'`)
   const admitted = await today()
-  await tx.insert(studentRecords).values(
-    rows.map((r, i) => ({
-      orgId: ctx.org.id,
-      userId: people[i]!,
-      admissionNo: r.admissionNo,
-      gender: r.data.gender,
-      birthDate: sealed(r.data.birthDate),
-      phone: sealed(r.data.phone),
-      address: sealed(r.data.address),
-      admittedOn: admitted,
-    }))
-  )
+  const records = rows.map((r, i) => ({
+    orgId: ctx.org.id,
+    userId: people[i]!,
+    admissionNo: r.admissionNo,
+    gender: r.data.gender,
+    birthDate: sealed(r.data.birthDate),
+    phone: sealed(r.data.phone),
+    address: sealed(r.data.address),
+    admittedOn: admitted,
+  }))
+  // In batches: a row of values per student passes Postgres's 65,535-parameter limit past
+  // about 8,000 students (8 values each).
+  for (let at = 0; at < records.length; at += INSERT_BATCH)
+    await tx.insert(studentRecords).values(records.slice(at, at + INSERT_BATCH))
   const seated = rows.flatMap((r, i) =>
     r.data.groupId && year
       ? [{ userId: people[i]!, groupId: r.data.groupId, rollNo: r.data.rollNo }]
       : []
   )
   if (seated.length && year) {
-    await tx
-      .insert(enrolments)
-      .values(seated.map((s) => ({ orgId: ctx.org.id, yearId: year.id, ...s })))
+    const places = seated.map((s) => ({
+      orgId: ctx.org.id,
+      yearId: year.id,
+      ...s,
+    }))
+    for (let at = 0; at < places.length; at += INSERT_BATCH)
+      await tx.insert(enrolments).values(places.slice(at, at + INSERT_BATCH))
     if (year.isCurrent) await placeAll(tx, ctx, seated)
   }
   return people
@@ -691,6 +700,20 @@ export const importSchema = z.object({
     .max(3000),
   commit: z.boolean().default(false),
 })
+
+/** The same import through a background job (features/jobs/imports): up to 50,000 rows. */
+export const importJobSchema = importSchema.extend({
+  rows: importSchema.shape.rows.element.array().min(1).max(50_000),
+})
+
+/** Whether this person may import students (features/jobs/imports): the organization's id. */
+export async function studentImportAllowed(slug: string, user: User) {
+  const ctx = await orgContext(slug, user)
+  needModule(ctx)
+  if (!anyGroupGrant(ctx, "students.edit"))
+    throw forbidden("Adding students isn't part of your role.")
+  return ctx.org.id
+}
 
 /** Students from a spreadsheet: a report per line, then (commit) all of them at once. */
 export async function importStudents(

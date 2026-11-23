@@ -3358,16 +3358,21 @@ export const jobs = pgTable(
     createdBy: uuid("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
+    /** `uploading`: an import's file is still arriving in parts (job_rows); nothing runs it. */
     status: text("status")
-      .$type<"queued" | "running" | "done" | "failed" | "cancelled">()
+      .$type<"uploading" | "queued" | "running" | "done" | "failed" | "cancelled">()
       .notNull()
       .default("queued"),
     input: jsonb("input").$type<Record<string, unknown>>().notNull().default({}),
     cursor: jsonb("cursor").$type<unknown>(),
     progress: integer("progress").notNull().default(0),
     total: integer("total"),
-    /** What it did: a summary line, and up to 500 lines of report. */
-    result: jsonb("result").$type<{ summary: string; lines?: string[] }>(),
+    /** What it did: a summary line, up to 500 lines of report, and figures for the page. */
+    result: jsonb("result").$type<{
+      summary: string
+      lines?: string[]
+      data?: Record<string, unknown>
+    }>(),
     attempts: integer("attempts").notNull().default(0),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
       .notNull()
@@ -3394,3 +3399,21 @@ export const jobFiles = pgTable("job_files", {
   data: bytea("data").notNull(),
   createdAt: createdAt(),
 })
+
+/**
+ * An import's rows, uploaded in parts before its job runs (a request body can't hold 50,000
+ * rows). Each part is sealed (lib/sealed.ts, purpose "job-rows"): imports carry birth dates,
+ * phones and addresses. Deleted once the import is committed, cancelled or a day old.
+ */
+export const jobRows = pgTable(
+  "job_rows",
+  {
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    count: integer("count").notNull(),
+    data: text("data").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.jobId, table.seq] })]
+)

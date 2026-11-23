@@ -135,3 +135,8 @@ export const importSchema = z.object({
   /** false: only check and report what would happen. */
   commit: z.boolean().default(false),
 })
+
+/** The same import through a background job (features/jobs/imports): up to 50,000 rows. */
+export const importJobSchema = importSchema.extend({
+  rows: importSchema.shape.rows.element.array().min(1).max(50_000),
+})

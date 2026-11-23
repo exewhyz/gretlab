@@ -9,6 +9,8 @@
  *   - member pickers ask for a page; the whole list stays complete for integrations
  *   - the largest imports allowed (5,000 members, 3,000 student records), timed
  *   - a year of 40,000 students made current, then promoted to the next, each in one request
+ *   - 50,000 members and 10,000 student records imported through a background job: uploaded in
+ *     parts, checked, then added, with the report as a file
  *   node e2e/large-org.mjs [base-url]
  */
 import { execFileSync } from "node:child_process"
@@ -230,6 +232,43 @@ const twins = await owner(`${O}/import`, { body: { rows: [
 ], commit: true } })
 const twinHandles = psql(`select handle from users where email like 'lo-twin@%' order by email`).split("\n")
 check("two people named lo-twin@ in one file both get in, with their own handles", twins.status === 200 && twinHandles.length === 2 && twinHandles[0] !== twinHandles[1], JSON.stringify({ status: twins.status, twinHandles, body: JSON.stringify(twins.json).slice(0, 200) }))
+
+// ---------- imports past one request: uploaded in parts, then checked and added as a job
+const bigImport = async (kind, rows, extra = {}) => {
+  const begun = await owner("/imports", { body: { kind, slug: "lo-uni", total: rows.length, ...extra } })
+  const id = begun.json?.job
+  for (let seq = 0; seq * 5000 < rows.length; seq++) {
+    const sent = await owner(`/imports/${id}/rows`, { body: { seq, rows: rows.slice(seq * 5000, (seq + 1) * 5000) } })
+    if (sent.status !== 200) return { id, error: `part ${seq}: ${sent.status} ${JSON.stringify(sent.json).slice(0, 200)}` }
+  }
+  const run = async (commit) => {
+    await owner(`/imports/${id}/run`, { body: { commit } })
+    for (let i = 0; i < 600; i++) {
+      const j = (await owner(`/jobs/${id}`)).json
+      if (j && j.commit === commit && !["queued", "running"].includes(j.status)) return j
+      await new Promise((r) => setTimeout(r, 500))
+    }
+    return null
+  }
+  return { id, checked: await run(false), added: await run(true) }
+}
+const BIG = 50_000
+const bigMembers = Array.from({ length: BIG }, (_, i) => ({ email: `lo-b-${i + 1}@example.com`, name: `Lo Big ${i + 1}`, group: "First year / Section 4", role: "" }))
+started = Date.now()
+const members50 = await bigImport("members.import", bigMembers)
+const membersMs = Date.now() - started
+const inSection4 = Number(psql(`select count(*) from group_members gm join users u on u.id = gm.user_id where gm.group_id = '${sections[3].id}' and u.email like 'lo-b-%@example.com'`))
+check(`importing ${BIG} members through a job: uploaded in parts, checked, then added (${membersMs} ms)`, members50.checked?.status === "done" && members50.checked.result?.data?.counts && members50.added?.status === "done" && members50.added.result?.data?.committed === true && inSection4 === BIG && membersMs < 120_000, JSON.stringify({ error: members50.error, checked: members50.checked?.result?.summary, added: members50.added?.result?.summary ?? members50.added?.error, inSection4 }))
+const report = await fetch(`${BASE}/api/v1/jobs/${members50.id}/file`, { headers: { cookie: `next-auth.session-token=${await encode({ token: { email: "lo-o@example.com" }, secret: SECRET })}` } })
+check("…with the full report as a file, and the uploaded rows gone", report.status === 200 && (await report.text()).trim().split("\r\n").length === BIG + 1 && psql(`select count(*) from job_rows where job_id = '${members50.id}'`) === "0")
+const bigStudents = Array.from({ length: 10_000 }, (_, i) => ({ name: `Lo Rec ${i + 1}`, email: `lo-r-${i + 1}@example.com`, admissionNo: "", gender: "", birthDate: "", phone: "", address: "", class: "First year / Section 3", rollNo: String((i % 500) + 1) }))
+started = Date.now()
+const students10 = await bigImport("students.import", bigStudents)
+const recorded10 = Number(psql(`select count(*) from student_records r join users u on u.id = r.user_id where r.org_id = '${orgId}' and u.email like 'lo-r-%@example.com'`))
+check(`importing 10,000 student records through a job (${Date.now() - started} ms)`, students10.added?.status === "done" && recorded10 === 10_000, JSON.stringify({ error: students10.error, checked: students10.checked?.result?.summary, problems: students10.checked?.result?.lines?.slice(0, 3), added: students10.added?.result?.summary ?? students10.added?.error, recorded10 }))
+const nosy = await client("lo-s-1@example.com")
+check("a student can't start an import", (await nosy("/imports", { body: { kind: "members.import", slug: "lo-uni", total: 10 } })).status === 403)
+check("…nor see or add to someone else's", (await nosy(`/imports/${members50.id}/rows`, { body: { seq: 0, rows: [{ email: "x@example.com" }] } })).status === 404 && (await nosy(`/jobs/${members50.id}`)).status === 404)
 
 // ---------- a year of 40,000 students: made current, then promoted
 // Past 32,768 people, anything sending one parameter per person fails (Postgres allows 65,535).

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 
 import { after } from "next/server"
 
-import { getDb, jobFiles, jobs, sql, type User } from "@workspace/db"
+import { getDb, jobFiles, jobRows, jobs, sql, type User } from "@workspace/db"
 import { JOB_KEEP, JOB_LEASE_MS, jobAfterFailure } from "@workspace/judge"
 
 import { notFound } from "@/lib/api/route"
@@ -88,6 +88,12 @@ async function stepOnce(runner: string, job: JobRow) {
   const kind: JobKind | undefined = KINDS[job.kind as keyof typeof KINDS]
   try {
     if (!kind) throw new Error(`Unknown job kind ${job.kind}`)
+    if (kind.leaseMs && kind.leaseMs > JOB_LEASE_MS) {
+      await getDb()
+        .update(jobs)
+        .set({ lockedUntil: new Date(Date.now() + kind.leaseMs) })
+        .where(mine(job.id, runner))
+    }
     await getDb().transaction(async (tx) => {
       const out = await kind.step(tx, job)
       const [saved] = await tx
@@ -158,9 +164,16 @@ export async function runJobs(budgetMs: number) {
   return { steps }
 }
 
-/** Finished jobs go after 30 days, their files after a day. */
+/** Finished jobs go after 30 days, their files after a day, uploaded import rows after a day. */
 export async function tidyJobs() {
   const db = getDb()
+  await db.execute(q`
+    delete from job_rows where job_id in (
+      select id from jobs where created_at < now() - interval '1 day'
+        or status in ('failed', 'cancelled'))`)
+  await db.execute(q`
+    update jobs set status = 'cancelled', finished_at = now()
+    where status = 'uploading' and created_at < now() - interval '1 day'`)
   await db.execute(q`
     delete from job_files where created_at < now() - make_interval(hours => ${JOB_KEEP.fileHours})`)
   await db.execute(q`
@@ -220,6 +233,8 @@ export async function jobView(user: User, id: string) {
     id: job.id,
     kind: job.kind,
     status: job.status,
+    /** Its input, for imports: whether this run adds the rows or only checks them. */
+    commit: job.input.commit === true,
     progress: job.progress,
     total: job.total,
     result: job.result,
@@ -233,6 +248,8 @@ export async function jobView(user: User, id: string) {
 
 export async function cancelJob(user: User, id: string) {
   const job = await ownJob(user, id)
+  // An import's uploaded rows go at once: they carry people's details.
+  await getDb().delete(jobRows).where(eq(jobRows.jobId, job.id))
   await getDb()
     .update(jobs)
     .set({
