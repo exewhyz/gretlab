@@ -32,7 +32,12 @@ export interface Summary {
     moduleChoices: Partial<Record<ModuleKey, boolean>>
     modules: ModuleKey[]
     /** Modules this kind may have here, as the platform set them. */
-    moduleOptions?: { key: ModuleKey; level: "optional" | "default" }[]
+    moduleOptions?: {
+      key: ModuleKey
+      level: "optional" | "default"
+      /** False when the platform allows it but the organization's plan doesn't (billing). */
+      inPlan?: boolean
+    }[]
     kind?: { label: string; description: string; terms: KindTerms }
   }
   permissions: Permission[]

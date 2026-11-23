@@ -28,6 +28,8 @@ import {
   type Grant,
   type Permission,
   type SystemRoleKey,
+  DEFAULT_FEATURES,
+  planIncludes,
 } from "@workspace/judge"
 
 import { ApiError, notFound } from "@/lib/api/route"
@@ -518,3 +520,18 @@ export async function writeAudit(
 }
 
 export { chainOf as groupChain }
+
+/**
+ * A feature the organization's plan must hold (packages/judge/src/billing.ts): checked where
+ * it starts (connecting an LMS, making a key, setting an exam), never on work already running.
+ * No plan limits (organizations from before billing, custom deals): always allowed.
+ */
+export function needPlan(ctx: { org: { planFeatures?: unknown } }, feature: string) {
+  if (planIncludes(ctx.org.planFeatures, feature)) return
+  const name = DEFAULT_FEATURES.find((f) => f.key === feature)?.name ?? "This feature"
+  throw new ApiError(
+    403,
+    "not_in_plan",
+    `${name} isn't in this organization's plan. Add it from Plan and billing.`
+  )
+}

@@ -14,6 +14,7 @@ import {
   canFor,
   groupChain,
   needFor,
+  needPlan,
   orgContext,
   writeAudit,
   type OrgContext,
@@ -82,6 +83,7 @@ export async function saveProgramOutcomes(
 ) {
   const ctx = await orgContext(slug, user)
   needFor(ctx, "org.outcomes.manage", [])
+  needPlan(ctx, "outcomes")
   const codes = input.outcomes.map((o) => o.code.toLowerCase())
   if (new Set(codes).size !== codes.length) {
     throw new ApiError(400, "duplicate_code", "Two outcomes share a code.")
@@ -149,6 +151,7 @@ export async function saveCourseOutcomes(
   input: CourseOutcomesInput
 ) {
   needFor(ctx, "assignments.manage", [[groupId]])
+  needPlan(ctx, "outcomes")
   const codes = input.outcomes.map((o) => o.code.toLowerCase())
   if (new Set(codes).size !== codes.length) {
     throw new ApiError(400, "duplicate_code", "Two outcomes share a code.")

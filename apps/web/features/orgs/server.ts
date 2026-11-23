@@ -11,11 +11,13 @@ import {
   organizations,
   roleAssignments,
   sql,
+  subscriptions,
   users,
   type Organization,
   type User,
 } from "@workspace/db"
 import {
+  FREE_FEATURES,
   ancestry,
   domainMatches,
   readAdmissionSettings,
@@ -50,6 +52,7 @@ import {
   kindRoleTemplates,
   moduleOptions,
   orgModules,
+  orgPolicy,
 } from "./kinds"
 
 import { rolePermissions } from "./access"
@@ -216,6 +219,8 @@ async function createOrgInTx(
     listed?: boolean
   } = {}
 ) {
+  const settings = await getSettings()
+  const billingOn = settings["billing.enabled"]
   const [org] = await tx
     .insert(organizations)
     .values({
@@ -223,9 +228,18 @@ async function createOrgInTx(
       slug: input.slug,
       type: input.type,
       groupLevels: ORG_TYPE_CONFIG[input.type].groupLevels,
+      // With billing on, a new organization starts on the free plan; off, nothing is limited.
+      planFeatures: billingOn ? [...FREE_FEATURES] : null,
       ...extra,
     })
     .returning()
+  await tx.insert(subscriptions).values({
+    orgId: org!.id,
+    status: billingOn ? "free" : "custom",
+    features: billingOn ? [...FREE_FEATURES] : [],
+    students: billingOn ? settings["billing.free_students"] : 0,
+    staff: billingOn ? settings["billing.free_staff"] : 0,
+  })
   // Built-in roles carry the kind's names (Faculty, Mentor, Manager); permissions are the same.
   const names = KINDS[input.type].roleNames as Record<string, string>
   await tx.insert(orgRoles).values(
@@ -1050,14 +1064,23 @@ export async function updateSettings(
   }
   if (input.modules) {
     const type = ctx.org.type
-    const policy = organizationPolicy(
+    const platform = organizationPolicy(
       type,
       (await kindPolicies())[type],
       ctx.org.platformModules
     )
+    const inPlan = orgPolicy(ctx.org, (await kindPolicies())[type])
     for (const [key, on] of Object.entries(input.modules)) {
       if (!on || !isModuleKey(key)) continue
-      if (!moduleAvailable(type, key, policy)) {
+      // Allowed for the kind, but the plan doesn't hold it: buy it first.
+      if (moduleAvailable(type, key, platform) && !moduleAvailable(type, key, inPlan)) {
+        throw new ApiError(
+          403,
+          "not_in_plan",
+          `${MODULES[key].label} isn't in this organization's plan. Add it from Plan and billing.`
+        )
+      }
+      if (!moduleAvailable(type, key, platform)) {
         throw new ApiError(
           400,
           "module_unavailable",

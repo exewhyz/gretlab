@@ -17,10 +17,10 @@ import { api } from "@/lib/api/client"
 
 import { Card, Loading, PageTitle } from "./shell"
 
-// Judge settings are on Dashboard › Judges, under their own permission.
+// Judge settings are on Dashboard › Judges, and billing on Dashboard › Plans, under their own permissions.
 const GROUPS = [
   ...new Set(SETTING_KEYS.map((key) => SETTINGS[key].group)),
-].filter((group) => group !== "Judges")
+].filter((group) => group !== "Judges" && group !== "Billing")
 
 /** Generated from the registry: a new setting appears here with no UI code. */
 export function AdminSettings() {

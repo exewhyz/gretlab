@@ -910,6 +910,11 @@ export const organizations = pgTable("organizations", {
     .$type<Record<string, string>>()
     .notNull()
     .default({}),
+  /**
+   * The features its plan holds (packages/judge/src/billing.ts): a module or feature not in
+   * it is off. Null: no plan limits (organizations from before billing, custom deals).
+   */
+  planFeatures: jsonb("plan_features").$type<string[] | null>(),
   /** Where its code runs, within the platform's settings (packages/judge/src/execution.ts). */
   execution: jsonb("execution")
     .$type<{ server?: boolean; browserGrading?: boolean }>()
@@ -3424,3 +3429,79 @@ export const jobRows = pgTable(
   },
   (table) => [primaryKey({ columns: [table.jobId, table.seq] })]
 )
+
+/**
+ * An organization's plan (apps/web/features/billing; rules in packages/judge/src/billing.ts):
+ * what it bought, for which period, and who it bills. The features are mirrored on
+ * organizations.plan_features, which the module rules read.
+ */
+export const subscriptions = pgTable("subscriptions", {
+  orgId: uuid("org_id")
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  /** free (the free allowance), active (paid), past_due, paused, custom (set by staff). */
+  status: text("status")
+    .$type<"free" | "active" | "past_due" | "paused" | "custom">()
+    .notNull()
+    .default("free"),
+  period: text("period").$type<"month" | "semester" | "year">().notNull().default("year"),
+  features: jsonb("features").$type<string[]>().notNull().default([]),
+  students: integer("students").notNull().default(0),
+  staff: integer("staff").notNull().default(0),
+  judges: integer("judges").notNull().default(0),
+  storagePacks: integer("storage_packs").notNull().default(0),
+  periodStart: timestamp("period_start", { withTimezone: true }),
+  periodEnd: timestamp("period_end", { withTimezone: true }),
+  /** The price list it bought at, kept until the next period (prices are locked for it). */
+  prices: jsonb("prices").$type<Record<string, unknown> | null>(),
+  /** What one period costs, before GST, in rupees. */
+  price: integer("price").notNull().default(0),
+  discountPercent: integer("discount_percent").notNull().default(0),
+  /** A smaller plan for the next period (removals wait for renewal). */
+  next: jsonb("next").$type<Record<string, unknown> | null>(),
+  /** When students or staff first went over what was bought (limits give 30 days' grace). */
+  overSince: timestamp("over_since", { withTimezone: true }),
+  notes: text("notes").notNull().default(""),
+  // Who the invoices are for.
+  legalName: text("legal_name").notNull().default(""),
+  gstin: text("gstin").notNull().default(""),
+  address: text("address").notNull().default(""),
+  billingEmail: text("billing_email").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+})
+
+/** A payment for a plan: a new period, a renewal, or an addition mid-period (Razorpay). */
+export const payments = pgTable(
+  "payments",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"new" | "renew" | "upgrade">().notNull(),
+    /** The plan to apply once paid, with its period. */
+    change: jsonb("change").$type<Record<string, unknown>>().notNull(),
+    amount: integer("amount").notNull(),
+    cgst: integer("cgst").notNull().default(0),
+    sgst: integer("sgst").notNull().default(0),
+    igst: integer("igst").notNull().default(0),
+    total: integer("total").notNull(),
+    status: text("status").$type<"created" | "paid" | "failed">().notNull().default("created"),
+    razorpayOrderId: text("razorpay_order_id").unique(),
+    razorpayPaymentId: text("razorpay_payment_id"),
+    invoiceNumber: text("invoice_number").unique(),
+    /** The invoice as issued (seller, buyer, lines), so a reprint matches. */
+    invoice: jsonb("invoice").$type<Record<string, unknown> | null>(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+  },
+  (table) => [index("payments_org").on(table.orgId, table.createdAt)]
+)
+
+/** The last invoice number given in each financial year ("2026-27"). */
+export const invoiceCounters = pgTable("invoice_counters", {
+  financialYear: text("financial_year").primaryKey(),
+  last: integer("last").notNull().default(0),
+})

@@ -11,6 +11,7 @@ import {
   kindCan,
   MODULE_KEYS,
   organizationPolicy,
+  planModulePolicy,
   MODULES,
   moduleLevel,
   ORG_TYPES,
@@ -60,10 +61,16 @@ const ROLES_KEY = "org-kind-role-templates"
 export function kindRoleTemplates(): Promise<Record<OrgType, RoleTemplate[]>> {
   return cached(ROLES_KEY, 30_000, async () => {
     const rows = await getDb()
-      .select({ kind: orgKindPolicies.kind, roles: orgKindPolicies.roleTemplates })
+      .select({
+        kind: orgKindPolicies.kind,
+        roles: orgKindPolicies.roleTemplates,
+      })
       .from(orgKindPolicies)
     return Object.fromEntries(
-      ORG_TYPES.map((t) => [t, roleTemplatesFor(t, rows.find((r) => r.kind === t)?.roles)])
+      ORG_TYPES.map((t) => [
+        t,
+        roleTemplatesFor(t, rows.find((r) => r.kind === t)?.roles),
+      ])
     ) as Record<OrgType, RoleTemplate[]>
   })
 }
@@ -74,6 +81,8 @@ export interface ModuleOwner {
   modules: unknown
   /** The platform's levels for this organization alone; missing follows the kind. */
   platformModules?: unknown
+  /** Its plan's features (organizations.plan_features); null: no plan limits. */
+  planFeatures?: unknown
 }
 
 /**
@@ -87,8 +96,22 @@ export function orgModules(
   return enabledModules(
     org.type,
     org.modules,
-    organizationPolicy(org.type, policies[org.type], org.platformModules)
+    orgPolicy(org, policies[org.type])
   )
+}
+
+/**
+ * The levels one organization's modules are decided by: its kind's policy, the platform's
+ * levels for it, then its plan (a module the plan doesn't hold is off; billing.ts).
+ */
+export function orgPolicy(
+  org: Pick<ModuleOwner, "type" | "platformModules" | "planFeatures">,
+  kindPolicy: KindPolicy | null | undefined
+): KindPolicy {
+  return {
+    ...organizationPolicy(org.type, kindPolicy, org.platformModules),
+    ...planModulePolicy(org.planFeatures),
+  }
 }
 
 /** The modules on for an organization, under its kind's policy and its own levels. */
@@ -97,16 +120,23 @@ export async function modulesOf(org: ModuleOwner) {
 }
 
 /** For an organization's settings: each module it may have, with the platform's level. */
-export async function moduleOptions(org: { type: OrgType; platformModules?: unknown }) {
+export async function moduleOptions(org: {
+  type: OrgType
+  platformModules?: unknown
+  planFeatures?: unknown
+}) {
   const type = org.type
-  const policy = organizationPolicy(
-    type,
-    (await kindPolicies())[type],
-    org.platformModules
-  )
-  // Modules not ready yet are listed too, so Settings can show them as coming soon.
+  const kindPolicy = (await kindPolicies())[type]
+  const platform = organizationPolicy(type, kindPolicy, org.platformModules)
+  const plan = planModulePolicy(org.planFeatures)
+  // Modules not ready yet are listed too, so Settings can show them as coming soon; ones the
+  // platform allows but the plan doesn't are listed as not in the plan.
   return MODULE_KEYS.filter((k) => kindCan(type, k))
-    .map((key) => ({ key, level: moduleLevel(type, key, policy) }))
+    .map((key) => ({
+      key,
+      level: moduleLevel(type, key, platform),
+      inPlan: plan[key] !== "off",
+    }))
     .filter((m) => m.level !== "off")
 }
 
@@ -129,7 +159,12 @@ export async function kindsOverview(user: User) {
       .from(organizations)
       .groupBy(organizations.type),
     kindRoleTemplates(),
-    getDb().select({ kind: orgKindPolicies.kind, roles: orgKindPolicies.roleTemplates }).from(orgKindPolicies),
+    getDb()
+      .select({
+        kind: orgKindPolicies.kind,
+        roles: orgKindPolicies.roleTemplates,
+      })
+      .from(orgKindPolicies),
   ])
   return {
     modules: MODULE_KEYS.map((key) => ({
@@ -225,7 +260,9 @@ export const kindRolesSchema = z.object({
   roles: z
     .array(
       z.object({
-        key: z.string().regex(/^[a-z0-9_]{2,40}$/, "Use lowercase letters, digits and _"),
+        key: z
+          .string()
+          .regex(/^[a-z0-9_]{2,40}$/, "Use lowercase letters, digits and _"),
         name: z.string().trim().min(1, "Name the role").max(60),
         description: z.string().max(300).default(""),
         permissions: z.array(z.string()).max(200),
@@ -241,25 +278,49 @@ export const kindRolesSchema = z.object({
  * start with them; existing ones are offered those they don't have. Roles already made
  * stay as they are.
  */
-export async function saveKindRoles(user: User, kind: string, input: z.infer<typeof kindRolesSchema>) {
+export async function saveKindRoles(
+  user: User,
+  kind: string,
+  input: z.infer<typeof kindRolesSchema>
+) {
   await needKinds(user)
-  if (!(ORG_TYPES as readonly string[]).includes(kind)) throw notFound("No such kind")
+  if (!(ORG_TYPES as readonly string[]).includes(kind))
+    throw notFound("No such kind")
   const type = kind as OrgType
   if (input.roles) {
     const names = input.roles.map((r) => r.name.toLowerCase())
-    if (new Set(names).size !== names.length) throw new ApiError(400, "duplicate", "Two roles have the same name.")
+    if (new Set(names).size !== names.length)
+      throw new ApiError(400, "duplicate", "Two roles have the same name.")
     if (new Set(input.roles.map((r) => r.key)).size !== input.roles.length)
       throw new ApiError(400, "duplicate", "Two roles have the same key.")
-    const bad = input.roles.flatMap((r) => r.permissions).find((p) => !isPermission(p))
-    if (bad) throw new ApiError(400, "bad_permission", `Unknown permission: ${bad}`)
-    const builtIn = Object.values(KINDS[type].roleNames).map((n) => n.toLowerCase())
-    const clash = input.roles.find((r) => builtIn.includes(r.name.toLowerCase()))
-    if (clash) throw new ApiError(400, "built_in", `"${clash.name}" is a built-in role's name.`)
+    const bad = input.roles
+      .flatMap((r) => r.permissions)
+      .find((p) => !isPermission(p))
+    if (bad)
+      throw new ApiError(400, "bad_permission", `Unknown permission: ${bad}`)
+    const builtIn = Object.values(KINDS[type].roleNames).map((n) =>
+      n.toLowerCase()
+    )
+    const clash = input.roles.find((r) =>
+      builtIn.includes(r.name.toLowerCase())
+    )
+    if (clash)
+      throw new ApiError(
+        400,
+        "built_in",
+        `"${clash.name}" is a built-in role's name.`
+      )
   }
   const roles = input.roles ? readRoleTemplates(input.roles) : null
   await getDb()
     .insert(orgKindPolicies)
-    .values({ kind: type, modules: {}, roleTemplates: roles, updatedBy: user.id, updatedAt: new Date() })
+    .values({
+      kind: type,
+      modules: {},
+      roleTemplates: roles,
+      updatedBy: user.id,
+      updatedAt: new Date(),
+    })
     .onConflictDoUpdate({
       target: orgKindPolicies.kind,
       set: { roleTemplates: roles, updatedBy: user.id, updatedAt: new Date() },
@@ -268,7 +329,9 @@ export async function saveKindRoles(user: User, kind: string, input: z.infer<typ
   await writePlatformAudit(
     user,
     "platform.kind_roles",
-    roles ? `${KINDS[type].label}: suggested roles set (${roles.map((r) => r.name).join(", ") || "none"})` : `${KINDS[type].label}: suggested roles back to the default`,
+    roles
+      ? `${KINDS[type].label}: suggested roles set (${roles.map((r) => r.name).join(", ") || "none"})`
+      : `${KINDS[type].label}: suggested roles back to the default`,
     { kind: type }
   )
   return kindsOverview(user)
@@ -284,7 +347,7 @@ async function needOrgFeatures(user: User) {
     throw new ApiError(
       403,
       "forbidden",
-      "Deciding an organization's modules needs \"Manage organizations\" or \"Manage organization kinds\"."
+      'Deciding an organization\'s modules needs "Manage organizations" or "Manage organization kinds".'
     )
 }
 
@@ -315,7 +378,12 @@ export async function orgFeatures(user: User, orgId: string) {
   const override = readKindPolicy(org.type, org.platformModules)
   const on = orgModules(org, policies)
   return {
-    org: { id: org.id, name: org.name, slug: org.slug, kind: KINDS[org.type].label },
+    org: {
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      kind: KINDS[org.type].label,
+    },
     modules: MODULE_KEYS.filter((k) => kindCan(org.type, k)).map((key) => ({
       key,
       label: MODULES[key].label,
@@ -331,7 +399,10 @@ export async function orgFeatures(user: User, orgId: string) {
 
 export const orgFeaturesSchema = z.object({
   /** null: follow the kind's level. */
-  modules: z.record(z.string(), z.enum(["off", "optional", "default"]).nullable()),
+  modules: z.record(
+    z.string(),
+    z.enum(["off", "optional", "default"]).nullable()
+  ),
 })
 
 export async function saveOrgFeatures(
@@ -342,7 +413,9 @@ export async function saveOrgFeatures(
   await needOrgFeatures(user)
   const org = await orgRow(orgId)
   const bad = Object.keys(input.modules).find(
-    (k) => !(MODULE_KEYS as string[]).includes(k) || !kindCan(org.type, k as ModuleKey)
+    (k) =>
+      !(MODULE_KEYS as string[]).includes(k) ||
+      !kindCan(org.type, k as ModuleKey)
   )
   if (bad)
     throw new ApiError(

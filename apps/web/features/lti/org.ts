@@ -4,6 +4,7 @@ import { z } from "zod"
 import {
   groupsFor,
   needFor,
+  needPlan,
   orgContext,
   writeAudit,
 } from "@/features/orgs/server"
@@ -36,6 +37,7 @@ export const platformSchema = z.object({
 async function settingsContext(slug: string, user: User) {
   const ctx = await orgContext(slug, user)
   needFor(ctx, "org.settings.lms", [])
+  needPlan(ctx, "lti")
   return ctx
 }
 

@@ -74,6 +74,7 @@ import {
   checkAudience,
   groupsFor,
   needFor,
+  needPlan,
   orgContext,
   writeAudit,
   type OrgContext,
@@ -200,6 +201,11 @@ export async function saveOrgAssignment(
   needCoding(ctx)
   checkAudience(ctx, input.audience)
   const existing = id ? await getAssignmentForStaff(id, ctx.org.id) : null
+  // Newly made an exam, given peer review or projects: the plan must hold them. Work that
+  // already has them keeps them, whatever the plan does later.
+  if (input.exam && !existing?.exam) needPlan(ctx, "exams_lab")
+  if (input.peerReview && !existing?.peerReview) needPlan(ctx, "peer")
+  if (input.projects.length > 0 && !(existing?.projects?.length ?? 0)) needPlan(ctx, "peer")
   const action = id ? "assignments.edit" : "assignments.create"
   if (existing) needFor(ctx, action, existing.audience)
   needFor(ctx, action, input.audience)

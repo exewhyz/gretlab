@@ -3,6 +3,8 @@ import { test } from "node:test"
 
 import {
   DEFAULT_PRICE_LIST,
+  planIncludes,
+  planModulePolicy,
   gstSplit,
   invoiceNumber,
   limitState,
@@ -241,4 +243,21 @@ test("the launch price list is complete and sensible", () => {
     assert.ok(f.price >= 0)
   }
   assert.equal(DEFAULT_PRICE_LIST.features.filter((f) => f.always).length, 1)
+})
+
+test("a plan switches off the modules its features don't include", () => {
+  const policy = planModulePolicy(["core", "coding", "results"])
+  assert.equal(policy.coding, undefined, "bought")
+  assert.equal(policy.exams, undefined, "report cards are the exams module")
+  assert.equal(policy.attendance, "off")
+  assert.equal(policy.transport, "off")
+  // No plan limits: nothing is switched off.
+  assert.deepEqual(planModulePolicy(null), {})
+  assert.deepEqual(planModulePolicy("nonsense"), {})
+})
+
+test("features that aren't modules are checked by name", () => {
+  assert.equal(planIncludes(["core", "lti"], "lti"), true)
+  assert.equal(planIncludes(["core"], "api"), false)
+  assert.equal(planIncludes(null, "api"), true, "no plan limits")
 })

@@ -7,7 +7,7 @@ import { today } from "@/features/catalog/server"
 import { classContext, studentsIn } from "@/features/classes/server"
 import { courseFinishers } from "@/features/courses/classes"
 import { notify } from "@/features/notifications/server"
-import { needFor, writeAudit } from "@/features/orgs/server"
+import { needFor, needPlan, writeAudit } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/route"
 
 import type { IssueInput } from "./schemas"
@@ -29,6 +29,7 @@ const newCode = () =>
 export async function issueCertificates(slug: string, user: User, groupId: string, input: IssueInput) {
   const cc = await classContext(slug, user, groupId)
   needFor(cc.ctx, "assignments.manage", [[groupId]])
+  needPlan(cc.ctx, "courses")
   const className = cc.ctx.groups.find((g) => g.id === groupId)?.name ?? "the class"
   let people: { id: string }[]
   let title: string

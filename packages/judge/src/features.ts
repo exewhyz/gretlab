@@ -186,6 +186,122 @@ export const SETTINGS = {
     schema: z.number().min(0).max(100_000),
     default: 0,
   },
+  // Plans and billing (Dashboard › Plans; packages/judge/src/billing.ts): kept off the Settings page.
+  "billing.enabled": {
+    label: "Billing",
+    description:
+      "Organizations choose and pay for a plan. Off: nothing is limited and nothing is charged. Organizations from before billing keep everything until a plan is set for them.",
+    group: "Billing",
+    schema: z.boolean(),
+    default: false,
+  },
+  "billing.prices": {
+    label: "Feature prices",
+    description: "Rupees per student per year, for each feature. Missing: the launch price.",
+    group: "Billing",
+    schema: z.record(z.string(), z.number().int().min(0).max(100_000)),
+    default: {} as Record<string, number>,
+  },
+  "billing.staff_price": {
+    label: "Staff price",
+    description: "Rupees a year for each staff member past the free ones.",
+    group: "Billing",
+    schema: z.number().int().min(0).max(100_000),
+    default: 300,
+  },
+  "billing.free_staff_per": {
+    label: "Free staff",
+    description: "One staff member free for every this many students.",
+    group: "Billing",
+    schema: z.number().int().min(1).max(1000),
+    default: 15,
+  },
+  "billing.steps": {
+    label: "Volume steps",
+    description:
+      "Percent off the student part past each number of students, like tax slabs: [students up to, percent off], the last up to null.",
+    group: "Billing",
+    schema: z
+      .array(z.tuple([z.number().int().min(1).nullable(), z.number().int().min(0).max(90)]))
+      .min(1)
+      .max(10),
+    default: [
+      [300, 0],
+      [1000, 10],
+      [3000, 15],
+      [null, 20],
+    ] as [number | null, number][],
+  },
+  "billing.semester_percent": {
+    label: "Semester surcharge",
+    description: "Percent added to half the yearly price for paying by the semester.",
+    group: "Billing",
+    schema: z.number().int().min(0).max(100),
+    default: 10,
+  },
+  "billing.month_percent": {
+    label: "Monthly surcharge",
+    description: "Percent added to a twelfth of the yearly price for paying by the month.",
+    group: "Billing",
+    schema: z.number().int().min(0).max(100),
+    default: 25,
+  },
+  "billing.quote_above": {
+    label: "Custom quote above",
+    description: "More students than this: the builder asks them to contact you.",
+    group: "Billing",
+    schema: z.number().int().min(100).max(1_000_000),
+    default: 10_000,
+  },
+  "billing.judge_price": {
+    label: "Own judge machine",
+    description: "Rupees a year for an organization's own judge machine (class hours).",
+    group: "Billing",
+    schema: z.number().int().min(0).max(10_000_000),
+    default: 72_000,
+  },
+  "billing.storage_price": {
+    label: "Storage",
+    description: "Rupees a year for each 50 GB past what's included.",
+    group: "Billing",
+    schema: z.number().int().min(0).max(1_000_000),
+    default: 500,
+  },
+  "billing.free_students": {
+    label: "Free plan: students",
+    description: "How many students the free plan allows.",
+    group: "Billing",
+    schema: z.number().int().min(0).max(10_000),
+    default: 50,
+  },
+  "billing.free_staff": {
+    label: "Free plan: staff",
+    description: "How many staff the free plan allows.",
+    group: "Billing",
+    schema: z.number().int().min(0).max(1000),
+    default: 5,
+  },
+  "billing.gst_registered": {
+    label: "Registered for GST",
+    description: "Invoices charge GST (CGST and SGST in your state, IGST across states).",
+    group: "Billing",
+    schema: z.boolean(),
+    default: false,
+  },
+  "billing.gst_rate": {
+    label: "GST rate",
+    description: "Percent; 18 for software services.",
+    group: "Billing",
+    schema: z.number().int().min(0).max(28),
+    default: 18,
+  },
+  "billing.gstin": {
+    label: "Your GSTIN",
+    description: "On every invoice; its first two digits are your state.",
+    group: "Billing",
+    schema: z.string().trim().max(15),
+    default: "",
+  },
   // Judge machines (Dashboard › Judges, "Judge settings"): kept off the Settings page.
   "judges.max_running": {
     label: "Judges at once",

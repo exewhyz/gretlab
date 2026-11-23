@@ -18,6 +18,7 @@ import { z } from "zod"
 import {
   canFor,
   needFor,
+  needPlan,
   orgContext,
   writeAudit,
 } from "@/features/orgs/server"
@@ -39,6 +40,7 @@ async function managerContext(slug: string, user: User) {
   if (requestInfo().apiKey)
     throw new ApiError(403, "forbidden", "Keys and webhooks are managed by a person, not a key.")
   needFor(ctx, "org.settings.manage", [])
+  needPlan(ctx, "api")
   return ctx
 }
 

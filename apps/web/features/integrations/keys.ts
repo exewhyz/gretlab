@@ -1,3 +1,4 @@
+import { planIncludes } from "@workspace/judge"
 import { getDb, orgApiKeys, organizations, sql, users } from "@workspace/db"
 import { apiKeyMatches, apiKeyPrefix } from "@workspace/judge/integrations"
 
@@ -19,12 +20,24 @@ export async function userForApiKey(token: string, path: string) {
   if (!prefix) throw invalid()
   const db = getDb()
   const [row] = await db
-    .select({ key: orgApiKeys, slug: organizations.slug, user: users })
+    .select({
+      key: orgApiKeys,
+      slug: organizations.slug,
+      planFeatures: organizations.planFeatures,
+      user: users,
+    })
     .from(orgApiKeys)
     .innerJoin(organizations, eq(orgApiKeys.orgId, organizations.id))
     .innerJoin(users, eq(orgApiKeys.createdBy, users.id))
     .where(and(eq(orgApiKeys.prefix, prefix), isNull(orgApiKeys.revokedAt)))
   if (!row || !apiKeyMatches(token, row.key.hash) || row.user.disabled) throw invalid()
+  // The plan no longer holds API access: keys stop working (they come back with the plan).
+  if (!planIncludes(row.planFeatures, "api"))
+    throw new ApiError(
+      403,
+      "not_in_plan",
+      "API keys and webhooks aren't in this organization's plan."
+    )
   const base = `/api/v1/orgs/${row.slug}`
   if (path !== base && !path.startsWith(`${base}/`))
     throw new ApiError(403, "forbidden", "This key only works on its own organization's API.")

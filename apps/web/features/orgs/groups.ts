@@ -41,6 +41,7 @@ import {
   leavesUnder,
   need,
   needLeaf,
+  needPlan,
   needSubset,
   settleBelow,
   systemRole,
@@ -204,6 +205,8 @@ export async function setGroupRun(
   const group = groupIn(ctx, id)
   need(ctx, "org.groups.edit", id)
   const kind = KINDS[ctx.org.type]
+  // Run dates are the cohort runs feature (a group's lead and opening it to members are free).
+  if (input.startsOn || input.endsOn) needPlan(ctx, "runs")
   const datesGiven = input.startsOn !== undefined || input.endsOn !== undefined
   if (datesGiven && !kind.groupDates)
     throw new ApiError(

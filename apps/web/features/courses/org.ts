@@ -1,7 +1,12 @@
 import type { User } from "@workspace/db"
 import type { Permission } from "@workspace/judge"
 
-import { canAnywhere, orgContext, writeAudit } from "@/features/orgs/server"
+import {
+  canAnywhere,
+  needPlan,
+  orgContext,
+  writeAudit,
+} from "@/features/orgs/server"
 import { ApiError } from "@/lib/api/route"
 
 import type { CourseInput, OutlineInput } from "./schemas"
@@ -23,6 +28,7 @@ async function courseContext(slug: string, user: User, write = false) {
   if (!needed.some((p) => canAnywhere(ctx, p))) {
     throw new ApiError(403, "forbidden", "You don't have permission to do that.")
   }
+  needPlan(ctx, "courses")
   return ctx
 }
 

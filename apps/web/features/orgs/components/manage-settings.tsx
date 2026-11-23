@@ -358,6 +358,10 @@ export function ModulesCard({
   // What the server allows here: the kind's modules, as the platform has set them.
   const options = org.moduleOptions ?? []
   const available = options.map((o) => o.key)
+  // Allowed for this kind, but not in the organization's plan (billing): buy it first.
+  const notInPlan = new Set(
+    options.filter((o) => o.inPlan === false).map((o) => o.key)
+  )
   const toggle = useMutation({
     mutationFn: ({ key, on }: { key: ModuleKey; on: boolean }) =>
       api(`/orgs/${slug}`, {
@@ -377,13 +381,14 @@ export function ModulesCard({
       {available.map((key) => {
         const m = MODULES[key]
         const on = org.modules.includes(key)
+        const locked = notInPlan.has(key)
         return (
           <label
             key={key}
             data-testid={`module-${key}`}
             className={cn(
               "flex items-start justify-between gap-4 border-t border-hairline py-3",
-              !m.ready && "opacity-60"
+              (!m.ready || locked) && "opacity-60"
             )}
           >
             <span className="grid gap-0.5">
@@ -394,13 +399,18 @@ export function ModulesCard({
                     Coming soon
                   </span>
                 )}
+                {m.ready && locked && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-body">
+                    Not in your plan
+                  </span>
+                )}
               </span>
               <span className="text-xs text-body">{m.description}</span>
             </span>
             <Switch
               aria-label={m.label}
               checked={on}
-              disabled={!m.ready || toggle.isPending}
+              disabled={!m.ready || locked || toggle.isPending}
               onCheckedChange={(next) => toggle.mutate({ key, on: next })}
             />
           </label>

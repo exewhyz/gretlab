@@ -6,6 +6,8 @@
  * Amounts are whole rupees (an invoice rounds once, at the end).
  */
 
+import { MODULE_KEYS, type ModuleKey } from "./org-types.ts"
+
 export type BillingPeriod = "month" | "semester" | "year"
 export const BILLING_PERIODS: readonly BillingPeriod[] = [
   "month",
@@ -425,3 +427,42 @@ export function limitState(
   const days = (now.getTime() - overSince.getTime()) / 86_400_000
   return days >= LIMIT_GRACE_DAYS ? "paused" : "over"
 }
+
+/** The features an organization's plan holds, as stored (null: no plan limits, everything). */
+export function readPlanFeatures(stored: unknown): string[] | null {
+  if (!Array.isArray(stored)) return null
+  return stored.filter((k): k is string => typeof k === "string")
+}
+
+/** The modules a plan's features switch on (each feature's `modules`). */
+export function planModules(features: readonly string[]) {
+  const on = new Set<ModuleKey>()
+  for (const f of DEFAULT_FEATURES)
+    if (features.includes(f.key))
+      for (const m of f.modules ?? []) on.add(m as ModuleKey)
+  return on
+}
+
+/**
+ * The plan as one more layer of the module rules (org-types.ts): every module the plan's
+ * features don't switch on is off. No plan limits (null): nothing changes.
+ */
+export function planModulePolicy(
+  stored: unknown
+): Partial<Record<ModuleKey, "off">> {
+  const features = readPlanFeatures(stored)
+  if (!features) return {}
+  const on = planModules(features)
+  const out: Partial<Record<ModuleKey, "off">> = {}
+  for (const key of MODULE_KEYS) if (!on.has(key)) out[key] = "off"
+  return out
+}
+
+/** Whether a plan includes a feature (no plan limits: everything). */
+export function planIncludes(stored: unknown, feature: string) {
+  const features = readPlanFeatures(stored)
+  return !features || features.includes(feature)
+}
+
+/** What a free plan holds (Billing switched on, before an organization buys). */
+export const FREE_FEATURES = ["core", "coding"] as const
