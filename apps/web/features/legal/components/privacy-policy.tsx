@@ -190,11 +190,13 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             <Item term="Google">sign-in with Google, and AdSense ads on public practice pages.</Item>
             <Item term="Our email provider">sending the emails described above.</Item>
             <Item term="GitHub">looking up the commit of a repository link you hand in for a project.</Item>
+            <Item term="Cloudflare">storing and serving files: images in problems and lessons (public, like the pages that show them), and the exports and import reports you download (private, reached only through a link that works for a few minutes). Stored in its Asia-Pacific region and served from its network near you.</Item>
           </List>
           <p>
             Because of these providers, your data may be stored and processed outside your
             country: in India, where the website and the database run; in Australia, where
-            submitted code is run; and wherever these providers operate.
+            submitted code is run; in the Asia-Pacific region, where files are stored; and
+            wherever these providers operate.
           </p>
         </>
       ),
@@ -241,6 +243,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             <li>An enquiry from the contact form is kept so we can follow it up; write to us to have yours deleted.</li>
             <li>Your working copy keeps its latest 2,000 changes per problem and language.</li>
             <li>Exam network addresses are kept until the teacher removes them, which they can do once they no longer need them.</li>
+            <li>A file you export, and an import&apos;s report, are kept for a day so you can download them; the rows of a big import are kept, encrypted, only until it&apos;s added (or a day at most).</li>
           </List>
           <p>
             When you ask us to delete your account, we delete or anonymize your personal data

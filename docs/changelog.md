@@ -8,6 +8,13 @@ aren't listed.
 
 ## 23 November 2026
 
+### Files on Cloudflare
+
+- **Images in problems and lessons are served from Cloudflare** (their own address, cached near
+  you), and the files you download (exports, import reports) are kept there privately, each
+  download a link that works for a few minutes. Links to images already in statements keep
+  working. The privacy policy names Cloudflare.
+
 ### Imports of up to 50,000 people, and faster lists
 
 - **Import members and students from files of up to 50,000 rows** (from 5,000 and 3,000). A

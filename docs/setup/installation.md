@@ -47,6 +47,13 @@ Locally the runner can use Docker's ordinary runtime (the two `runc` lines in `.
 gVisor. In production it refuses to start without gVisor (`runsc`), and the insecure setting is
 rejected. See [Scaling and operations](/scaling/) for running the judge for real.
 
+## File storage
+
+Uploaded images and downloadable files are kept in the database until file storage is set up.
+For a site with many people, put them in Cloudflare R2 (or any S3-compatible store with
+`STORAGE_ENDPOINT`): two buckets, one public behind its own domain and one private, and the
+`R2_*` settings. The repository's README has the steps.
+
 ## Every setting
 
 The web app reads its settings from `apps/web/.env.local` in development, and from the host in
