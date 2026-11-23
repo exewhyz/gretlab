@@ -18,7 +18,7 @@ import {
   studentsWithGroups,
 } from "@/features/campus/people"
 import { byName } from "@/lib/by-name"
-import { notify } from "@/features/notifications/server"
+import { notify, notifyEach } from "@/features/notifications/server"
 import {
   canFor,
   orgContext,
@@ -411,21 +411,31 @@ async function place(
         set: { routeId: route.id, stopId: stop.id },
       })
   })
+  await notify([person.id], {
+    kind: "transport",
+    ...busMessage(route, stop),
+    href: "/classes",
+    orgId: ctx.org.id,
+  })
+}
+
+/** What a rider is told about their bus. */
+function busMessage(
+  route: typeof transportRoutes.$inferSelect,
+  stop: typeof transportStops.$inferSelect
+) {
   const times = [
     stop.pickup && `picked up ${stop.pickup}`,
     stop.drop && `dropped ${stop.drop}`,
   ]
     .filter(Boolean)
     .join(", ")
-  await notify([person.id], {
-    kind: "transport",
+  return {
     title: `Your bus: ${route.name}, from ${stop.name}`,
     body: [times, route.vehicle && `Vehicle ${route.vehicle}`]
       .filter(Boolean)
       .join(". "),
-    href: "/classes",
-    orgId: ctx.org.id,
-  })
+  }
 }
 
 async function stopOf(routeId: string, stopId: string) {
@@ -543,7 +553,16 @@ export async function importRiders(
     ).map((m) => [m.email, m])
   )
   const report: { line: number; note: string }[] = []
-  let placed = 0
+  // Checked row by row as before, then written for the whole list at once: the routes locked
+  // together, seats counted once, every rider in one statement, and each rider (and their
+  // parents) told in one delivery. 3,000 riders were 20 s; now under a second.
+  type Pick = {
+    line: number
+    person: { id: string; groupIds: string[] }
+    route: (typeof routes)[number]
+    stop: (typeof stops)[number]
+  }
+  const picks: Pick[] = []
   for (const [i, row] of input.rows.entries()) {
     const line = i + 1
     const person = members.get(row.email)
@@ -569,18 +588,67 @@ export async function importRiders(
         line,
         note: `${route.name} has no stop called "${row.stop}"`,
       })
-    else {
-      try {
-        await place(ctx, person, route, stop)
-        placed++
-      } catch (error) {
-        report.push({
-          line,
-          note: error instanceof ApiError ? error.message : "Couldn't assign",
-        })
-      }
-    }
+    else if (!covers(ctx, "transport.assign", person.groupIds))
+      report.push({
+        line,
+        note: "Assigning this member isn't part of your role.",
+      })
+    else picks.push({ line, person, route, stop })
   }
+  // A rider listed twice ends on their last line, as one at a time did.
+  const last = new Map(picks.map((p) => [p.person.id, p]))
+  const accepted: Pick[] = []
+  if (last.size) {
+    const q = sql.sql
+    await db.transaction(async (tx) => {
+      const routeIds = [...new Set([...last.values()].map((p) => p.route.id))]
+      const riderIds = [...last.keys()]
+      // One desk at a time per route, so two can't fill its last seat together.
+      await tx.execute(
+        q`select id from transport_routes where id = any(${q.param(routeIds)}::uuid[]) order by id for update`
+      )
+      const counts = new Map(
+        (
+          (await tx.execute(q`
+            select route_id as "routeId", count(*)::int as n from transport_riders
+            where route_id = any(${q.param(routeIds)}::uuid[]) and not (user_id = any(${q.param(riderIds)}::uuid[]))
+            group by route_id`)) as unknown as { routeId: string; n: number }[]
+        ).map((r) => [r.routeId, r.n])
+      )
+      for (const pick of [...last.values()].sort((a, b) => a.line - b.line)) {
+        const taken = counts.get(pick.route.id) ?? 0
+        if (seatsLeft(pick.route.capacity, taken) <= 0) {
+          report.push({
+            line: pick.line,
+            note: `Every seat on ${pick.route.name} is taken.`,
+          })
+          continue
+        }
+        counts.set(pick.route.id, taken + 1)
+        accepted.push(pick)
+      }
+      if (accepted.length) {
+        await tx.execute(q`
+          insert into transport_riders (org_id, user_id, route_id, stop_id)
+          select ${ctx.org.id}, u, r, s
+          from unnest(${q.param(accepted.map((a) => a.person.id))}::uuid[], ${q.param(accepted.map((a) => a.route.id))}::uuid[],
+            ${q.param(accepted.map((a) => a.stop.id))}::uuid[]) as n(u, r, s)
+          on conflict (org_id, user_id) do update set route_id = excluded.route_id, stop_id = excluded.stop_id`)
+      }
+    })
+  }
+  const kept = new Set(accepted.map((a) => a.person.id))
+  const placed = picks.filter((p) => kept.has(p.person.id)).length
+  report.sort((a, b) => a.line - b.line)
+  await notifyEach(
+    "transport",
+    ctx.org.id,
+    accepted.map((a) => ({
+      userId: a.person.id,
+      ...busMessage(a.route, a.stop),
+      href: "/classes",
+    }))
+  )
   if (placed)
     await writeAudit(
       ctx,

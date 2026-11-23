@@ -220,12 +220,23 @@ export async function notifyEach(
   items: { userId: string; title: string; body?: string; href?: string }[]
 ) {
   if (items.length === 0) return { inApp: 0, email: 0 }
-  return deliver(
+  const told = await deliver(
     kind,
     orgId,
     items.map((i) => i.userId),
     items.map(({ title, body, href }) => ({ title, body, href }))
   )
+  // Parents get their copy as notify() gives it, each naming their own child's news.
+  const event = eventOfKind(kind)
+  if (orgId && event && COPIED_TO_PARENTS.has(event)) {
+    const byStudent = new Map(items.map((i) => [i.userId, i]))
+    await tellParents(orgId, [...byStudent.keys()], (child, studentId) => ({
+      kind: "child_update",
+      title: `${child}: ${byStudent.get(studentId ?? "")?.title ?? ""}`,
+      body: byStudent.get(studentId ?? "")?.body,
+    }))
+  }
+  return told
 }
 
 /** What a student is told that their parents get a copy of. */
@@ -246,7 +257,11 @@ const COPIED_TO_PARENTS = new Set<string>([
 export async function tellParents(
   orgId: string,
   studentIds: string[],
-  message: (childName: string) => Omit<NewNotification, "href" | "orgId">
+  /** Each copy's words, from the child's name (and id, for news that differs per child). */
+  message: (
+    childName: string,
+    studentId?: string
+  ) => Omit<NewNotification, "href" | "orgId">
 ) {
   if (studentIds.length === 0) return
   try {
@@ -283,7 +298,7 @@ export async function tellParents(
       orgId,
       rows.map((r) => r.parentId),
       rows.map((r) => {
-        const { title, body } = message(r.name ?? r.email)
+        const { title, body } = message(r.name ?? r.email, r.studentId)
         return { title, body, href: orgPages(org.slug).child(r.studentId) }
       })
     )

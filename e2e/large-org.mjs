@@ -43,7 +43,10 @@ const cleanup = () => {
 const client = async (email) => {
   const cookie = `next-auth.session-token=${await encode({ token: { email }, secret: SECRET })}`
   return async (path, { method, body } = {}) => {
-    const res = await fetch(BASE + "/api/v1" + path, { method: method ?? (body === undefined ? "GET" : "POST"), headers: { cookie, "content-type": "application/json", origin: BASE }, body: body === undefined ? undefined : JSON.stringify(body) })
+    const send = () => fetch(BASE + "/api/v1" + path, { method: method ?? (body === undefined ? "GET" : "POST"), headers: { cookie, "content-type": "application/json", origin: BASE }, body: body === undefined ? undefined : JSON.stringify(body) })
+    // After a long pause (rows written straight into the database), fetch can reuse a kept-alive
+    // connection the server has just closed: the request never arrived, so send it again.
+    const res = await send().catch((e) => (e?.cause?.code === "ECONNRESET" ? send() : Promise.reject(e)))
     return { status: res.status, json: await res.json().catch(() => null) }
   }
 }
@@ -296,6 +299,22 @@ const linkedAll = await owner(`${O}/parents/import`, { body: { rows: parentRows 
 const linkMs = Date.now() - started
 const linkedCount = Number(psql(`select count(*) from guardians g join users p on p.id = g.parent_id where p.email like 'lo-q-%@example.com'`))
 check(`linking 2,000 parents from a list (${linkMs} ms)`, linkedAll.status === 200 && linkedCount === 2000 && linkMs < 15_000, JSON.stringify({ status: linkedAll.status, linkedCount, body: JSON.stringify(linkedAll.json).slice(0, 200) }))
+
+// ---------- the largest rider and resident lists allowed (3,000 each), timed
+await owner(O, { method: "PATCH", body: { modules: { transport: true, hostel: true } } })
+await owner(`${O}/transport`, { body: { name: "Big Route", vehicle: "KA 01 AB 1234", driver: "Ravi", driverPhone: "98450 00000", capacity: null, stops: [{ name: "Main Gate", pickup: "07:00", drop: "15:40" }, { name: "Market", pickup: "07:15", drop: "15:25" }, { name: "College", pickup: "07:40", drop: "15:00" }] } })
+started = Date.now()
+const riders = await owner(`${O}/transport/riders/import`, { body: { rows: Array.from({ length: 3000 }, (_, i) => ({ email: `lo-s-${i + 12001}@example.com`, route: "Big Route", stop: i % 2 ? "Market" : "Main Gate" })) } })
+const ridersMs = Date.now() - started
+const riding = Number(psql(`select count(*) from transport_riders r join users u on u.id = r.user_id where u.email like 'lo-s-%@example.com'`))
+check(`putting 3,000 riders on a route from a list (${ridersMs} ms)`, riders.status === 200 && riding === 3000 && ridersMs < 15_000, JSON.stringify({ status: riders.status, riding, body: JSON.stringify(riders.json).slice(0, 200) }))
+const house = (await owner(`${O}/hostel`, { body: { name: "Big House", forWhom: "Everyone", warden: "Ms Rao", wardenPhone: "98450 11111" } })).json
+for (const [from, to] of [[1, 200], [201, 300]]) await owner(`${O}/hostel/${house?.id}/rooms`, { body: { prefix: "", floor: "1", beds: 10, from, to } })
+started = Date.now()
+const residents = await owner(`${O}/hostel/residents/import`, { body: { rows: Array.from({ length: 3000 }, (_, i) => ({ email: `lo-s-${i + 15001}@example.com`, hostel: "Big House", room: String(1 + Math.floor(i / 10)), bed: "" })) } })
+const residentsMs = Date.now() - started
+const staying = Number(psql(`select count(*) from hostel_residents r join users u on u.id = r.user_id where u.email like 'lo-s-%@example.com'`))
+check(`giving 3,000 residents beds from a list (${residentsMs} ms)`, residents.status === 200 && staying === 3000 && residentsMs < 15_000, JSON.stringify({ status: residents.status, staying, body: JSON.stringify(residents.json).slice(0, 200) }))
 
 // ---------- a year of 40,000 students: made current, then promoted
 // Past 32,768 people, anything sending one parameter per person fails (Postgres allows 65,535).
