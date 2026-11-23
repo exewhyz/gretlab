@@ -4,6 +4,8 @@
  * thresholds match GET /api/health/judge: work waiting three minutes is an outage.
  */
 
+import { JOB_STUCK_MS } from "./jobs.ts"
+
 export interface HealthInput {
   judgesOnline: number
   queued: number
@@ -14,6 +16,9 @@ export interface HealthInput {
   emailFailedLastDay: number
   webhooksWaiting: number
   judgesOutOfDate: number
+  /** Background jobs queued or running (features/jobs), and how long the oldest has waited. */
+  jobsWaiting: number
+  jobsOldestSeconds: number
 }
 
 export type HealthLevel = "critical" | "warning" | "info"
@@ -86,6 +91,13 @@ export function healthProblems(input: HealthInput): HealthProblem[] {
       key: "webhooks_waiting",
       level: "warning",
       text: `${count(input.webhooksWaiting, "webhook delivery is", "webhook deliveries are")} waiting to be sent.`,
+    })
+  }
+  if (input.jobsWaiting > 0 && input.jobsOldestSeconds * 1000 >= JOB_STUCK_MS) {
+    out.push({
+      key: "jobs_waiting",
+      level: "warning",
+      text: `${count(input.jobsWaiting, "background job (exports and the like) is", "background jobs (exports and the like) are")} waiting; the oldest for ${minutes(input.jobsOldestSeconds)} minutes. Is the cron running?`,
     })
   }
   if (input.judgesOutOfDate > 0) {

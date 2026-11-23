@@ -4,6 +4,7 @@ import { healthProblems } from "@workspace/judge"
 import { getQueueHealth } from "@/features/admin/server"
 import { webhooksWaiting } from "@/features/integrations/deliver"
 import { listJudges } from "@/features/judges/server"
+import { jobsHealth } from "@/features/jobs/server"
 import { outboxHealth } from "@/features/notifications/outbox"
 
 /*
@@ -16,34 +17,43 @@ type Row = Record<string, string | number | null>
 
 export async function monitoring() {
   const db = getDb()
-  const [queue, judges, email, waitingHooks, [judged], emailFailures, [hooks]] =
-    await Promise.all([
-      getQueueHealth(),
-      listJudges(),
-      outboxHealth(),
-      webhooksWaiting(),
-      db.execute(sql.sql`
+  const [
+    queue,
+    judges,
+    email,
+    waitingHooks,
+    [judged],
+    emailFailures,
+    [hooks],
+    background,
+  ] = await Promise.all([
+    getQueueHealth(),
+    listJudges(),
+    outboxHealth(),
+    webhooksWaiting(),
+    db.execute(sql.sql`
         select count(*) filter (where finished_at > now() - interval '1 hour') as last_hour,
                count(*) filter (where finished_at > now() - interval '1 hour' and verdict = 'SE') as system_errors,
                count(*) filter (where finished_at > now() - interval '1 day') as last_day
         from submissions
         where finished_at > now() - interval '1 day'`) as unknown as Promise<
-        Row[]
-      >,
-      // Why email failed in the last day: the commonest reasons, never the addresses.
-      db.execute(sql.sql`
+      Row[]
+    >,
+    // Why email failed in the last day: the commonest reasons, never the addresses.
+    db.execute(sql.sql`
         select coalesce(last_error, 'no reason recorded') as reason, count(*) as n
         from email_outbox
         where status = 'failed' and created_at > now() - interval '1 day'
         group by 1 order by 2 desc limit 5`) as unknown as Promise<Row[]>,
-      db.execute(sql.sql`
+    db.execute(sql.sql`
         select count(*) filter (where status = 'sent' and created_at > now() - interval '1 day') as sent,
                count(*) filter (where status = 'failed' and created_at > now() - interval '1 day') as failed
         from webhook_deliveries
         where created_at > now() - interval '1 day'`) as unknown as Promise<
-        Row[]
-      >,
-    ])
+      Row[]
+    >,
+    jobsHealth(),
+  ])
   const [emailSent] = (await db.execute(sql.sql`
     select count(*) as n from email_outbox
     where status = 'sent' and sent_at > now() - interval '1 day'`)) as unknown as Row[]
@@ -57,9 +67,13 @@ export async function monitoring() {
     emailFailedLastDay: email.failedLastDay,
     webhooksWaiting: waitingHooks,
     judgesOutOfDate: judges.online.filter((r) => r.outOfDate).length,
+    jobsWaiting: background.waiting,
+    jobsOldestSeconds: background.oldestSeconds,
   }
   return {
     problems: healthProblems(numbers),
+    /** Background jobs (features/jobs): waiting, the oldest's wait, failed in the last day. */
+    jobs: background,
     queue: {
       queued: queue.queued,
       running: queue.running,

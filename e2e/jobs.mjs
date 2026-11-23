@@ -112,6 +112,12 @@ await cron()
 const gaveUp = (await admin(`/jobs/${broken}`)).json
 check("…and after the fifth failure it has failed", gaveUp?.status === "failed" && gaveUp.finishedAt, JSON.stringify(gaveUp))
 
+// ---------- Monitoring: jobs that wait 10 minutes mean nothing is running them
+const stale = psql(`insert into jobs (kind, created_by, input, created_at, next_attempt_at) values ('gradebook.csv', '${adminId}', '${input}', now() - interval '11 minutes', now() + interval '1 hour') returning id`)
+const health = (await admin("/admin/monitoring")).json
+check("Monitoring flags a background job waiting 10 minutes, and counts the failed one", health?.problems?.some((p) => p.key === "jobs_waiting" && /background jobs? .*waiting; the oldest for 11 minutes/.test(p.text)) && health.jobs?.failedLastDay >= 1, JSON.stringify({ problems: health?.problems?.map((p) => p.key), jobs: health?.jobs }))
+psql(`delete from jobs where id = '${stale}'`)
+
 // ---------- apps/worker takes jobs as they're queued
 const worker = spawn(ROOT + "apps/worker/node_modules/.bin/tsx", ["src/main.ts"], { cwd: ROOT + "apps/worker", env: { ...process.env, SITE_URL: BASE, CRON_SECRET: CRON, DATABASE_URL: process.env.DATABASE_URL ?? `postgres://gretlab:gretlab_dev_only@127.0.0.1:5433/${DB}` }, stdio: ["ignore", "pipe", "pipe"] })
 let workerLog = ""

@@ -391,6 +391,17 @@ export function MonitoringPage() {
         />
       </Section>
 
+      <section id="jobs" className="mt-8 scroll-mt-20">
+        <h2 className="text-title-sm text-ink">Background jobs</h2>
+        <p className="text-body-sm text-body" data-testid="jobs-line">
+          Exports and other long work, done in steps.{" "}
+          {h.jobs.waiting === 0
+            ? "None waiting"
+            : `${h.jobs.waiting} waiting, the oldest for ${ago(h.jobs.oldestSeconds)}`}
+          ; {h.jobs.failedLastDay} failed in the last day.
+        </p>
+      </section>
+
       <Alerts alerts={h.alerts} />
     </div>
   )

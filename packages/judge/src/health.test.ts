@@ -13,6 +13,8 @@ const fine = (over: Partial<HealthInput> = {}): HealthInput => ({
   emailFailedLastDay: 0,
   webhooksWaiting: 0,
   judgesOutOfDate: 0,
+  jobsWaiting: 0,
+  jobsOldestSeconds: 0,
   ...over,
 })
 
@@ -102,5 +104,22 @@ test("one is said as one", () => {
   assert.ok(
     texts.some((t) => t.startsWith("1 judge runs older code")),
     texts.join(" | ")
+  )
+})
+
+test("background jobs waiting 10 minutes: nothing is running them", () => {
+  assert.deepEqual(
+    healthProblems(fine({ jobsWaiting: 2, jobsOldestSeconds: 599 })),
+    []
+  )
+  assert.deepEqual(
+    healthProblems(fine({ jobsWaiting: 2, jobsOldestSeconds: 600 })),
+    [
+      {
+        key: "jobs_waiting",
+        level: "warning",
+        text: "2 background jobs (exports and the like) are waiting; the oldest for 10 minutes. Is the cron running?",
+      },
+    ]
   )
 })
