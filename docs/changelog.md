@@ -8,6 +8,15 @@ aren't listed.
 
 ## 23 November 2026
 
+### Alerts when something goes wrong
+
+- **Monitoring now emails you** when something goes wrong: no judge online, code waiting for a
+  judge, system errors, email failing or stuck, a webhook backlog, a judge machine that failed to
+  set up, or the month's judge cost going past a limit you set. Critical problems are emailed at
+  once and warnings once they've lasted 5 minutes, each only once, with an "all clear" when it's
+  fixed. Owners get them; give other staff **Get monitoring alerts** in their role. Switch them
+  and set the cost limit in Dashboard › Settings › Alerts; Monitoring lists recent alerts.
+
 ### Judges sign in with a login that can only judge
 
 - Judges run students' code, so they now sign in to the database with their own login that can

@@ -27,12 +27,15 @@ import {
 } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
+import type { recentAlerts } from "@/features/monitoring/alerts"
 import type { monitoring } from "@/features/monitoring/server"
 import type { monitoringSeries } from "@/features/monitoring/series"
 
 import { TimeChart, type Point } from "./time-chart"
 
-type Health = ApiResult<typeof monitoring>
+type Health = ApiResult<typeof monitoring> & {
+  alerts: ApiResult<typeof recentAlerts>
+}
 type Timeline = ApiResult<typeof monitoringSeries>
 
 /*
@@ -387,7 +390,69 @@ export function MonitoringPage() {
           long={long}
         />
       </Section>
+
+      <Alerts alerts={h.alerts} />
     </div>
+  )
+}
+
+/**
+ * What was emailed, or is about to be: open problems and the last ones cleared. Critical ones
+ * go out at once, warnings once they've lasted 5 minutes, and an all clear when fixed.
+ */
+function Alerts({ alerts }: { alerts: Health["alerts"] }) {
+  const open = alerts.filter((a) => !a.clearedAt).length
+  const at = (iso: string) =>
+    new Date(iso).toLocaleString(undefined, {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  return (
+    <section id="alerts" className="mt-8 scroll-mt-20">
+      <h2 className="text-title-sm text-ink">Alerts</h2>
+      <p className="mb-3 text-body-sm text-body">
+        {open} open. Emailed to people whose role has &ldquo;Get monitoring
+        alerts&rdquo;: critical problems at once, warnings once they&apos;ve
+        lasted 5 minutes, and again when fixed. Switch them and set the cost
+        limit in{" "}
+        <Link href="/admin/settings" className="text-primary underline">
+          Settings › Alerts
+        </Link>
+        .
+      </p>
+      {alerts.length === 0 ? (
+        <p className="text-body-sm text-body">No alerts yet.</p>
+      ) : (
+        <div data-testid="alerts">
+          <Table headers={["Problem", "Started", "Emailed", "Now"]}>
+            {alerts.map((a) => (
+              <tr key={a.id}>
+                <td className="text-ink" data-wrap>
+                  <span
+                    className={cn(
+                      "mr-1 font-semibold",
+                      a.level === "critical" ? "text-destructive" : "text-ink"
+                    )}
+                  >
+                    {a.level === "critical" ? "Critical" : "Warning"}:
+                  </span>
+                  {a.text}
+                </td>
+                <td className="text-body">{at(a.firstSeenAt)}</td>
+                <td className="text-body">
+                  {a.notifiedAt ? at(a.notifiedAt) : "not yet"}
+                </td>
+                <td className="text-body">
+                  {a.clearedAt ? `Fixed ${at(a.clearedAt)}` : "Open"}
+                </td>
+              </tr>
+            ))}
+          </Table>
+        </div>
+      )}
+    </section>
   )
 }
 

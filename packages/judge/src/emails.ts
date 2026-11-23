@@ -28,7 +28,7 @@ export interface TemplateVar {
 export interface TemplateDefinition {
   label: string
   description: string
-  category: "Account" | "Sign-in" | "Notifications"
+  category: "Account" | "Sign-in" | "Notifications" | "Platform"
   subject: string
   body: string
   vars: readonly TemplateVar[]
@@ -131,6 +131,22 @@ export const EMAIL_TEMPLATES = {
       { key: "org", description: "The organization it's from (may be empty)", example: "Demo College" },
     ],
     why: "You get this because of your notification settings on {{site}}. [Change them]({{settingsLink}}).",
+  },
+  "monitoring.alert": {
+    label: "Monitoring alert",
+    description:
+      "To people with \"Get monitoring alerts\": something on Dashboard › Monitoring went wrong, got worse, or is fixed.",
+    category: "Platform",
+    subject: "{{status}}: {{problem}}",
+    body:
+      "**{{status}}** on {{site}}: {{problem}}\n\n{{detail}}\n\n[button: Open Monitoring]({{link}})",
+    vars: [
+      { key: "status", description: "Critical, Warning, Worse or Fixed", example: "Critical", required: true },
+      { key: "problem", description: "What's wrong", example: "Submissions have waited 4 minutes for a judge (3 waiting).", required: true },
+      { key: "detail", description: "When it started, and since when it's fixed", example: "Started 23 Nov 2026, 09:12 (Asia/Kolkata)." },
+      { key: "link", description: "Dashboard › Monitoring", example: "/admin/monitoring" },
+    ],
+    why: "You get this because your platform role has \"Get monitoring alerts\". [Your notification settings]({{settingsLink}}).",
   },
   "digest.weekly": {
     label: "Weekly summary",

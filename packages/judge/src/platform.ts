@@ -64,6 +64,12 @@ export const PLATFORM_PERMISSIONS = {
       "The platform's health in one place: the judging queue, judges, email and webhooks, and what's wrong right now. Read-only.",
     module: "Platform",
   },
+  "platform.monitoring.alerts": {
+    label: "Get monitoring alerts",
+    description:
+      "An email when something on Monitoring goes wrong (no judge online, code waiting, email failing, a judge machine that won't set up, the month's cost past its limit), and another when it's fixed.",
+    module: "Platform",
+  },
   "platform.costs.view": {
     label: "See costs",
     description:

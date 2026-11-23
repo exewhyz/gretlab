@@ -98,12 +98,13 @@ Supabase addresses need `?sslmode=require` at the end (its Enforce SSL is on, an
 5. Dashboard › Judges › **Update all**: each fresh machine signs in with the new address. A judge set up by hand: rerun `runner-setup.sh` on it with `DATABASE_URL='<the new address>'`.
 6. Dashboard › Judges › Judges reporting in: every judge's **Database login** says "Its own (judging only)". "Main login" marks one still on the all-powerful one.
 
-With this login, `runner-setup.sh` skips migrations (the owner runs them) and can't load the starter problems (`SEED=0`).
+With this login, `runner-setup.sh` skips migrations and the starter problems: the owner runs those.
 
 **Watching it:**
 
 - Judge logs: `ssh ubuntu@<judge address>`, then `cd /opt/gretlab && sudo docker compose -f docker-compose.runner.yml logs -f runner`. A submission stuck at "queued" means the judge is down or can't reach the database.
 - Costs: an AWS budget (`gretlab-monthly`, $20) emails at 50% and 100% of actual spend, and at a forecast above 100%.
+- Alerts: anyone whose platform role has **Get monitoring alerts** (Owners do) is emailed when something on Dashboard › Monitoring goes wrong and again when it's fixed; Dashboard › Settings › Alerts switches them and sets a monthly judge cost limit. They're checked when the email cron runs and whenever `/api/health/judge` is called, so point an uptime monitor at it every minute (UptimeRobot, Better Stack and the like have free plans): that makes alerts prompt, and the monitor itself tells you if the site or email is down, which an email alert can't.
 - Health: `GET /api/health` answers `{"status":"ok"}` while the website reaches the database (load balancers use it). `GET /api/health/judge` answers 200 while a code judge is online and no submission has waited over 3 minutes, and 503 with the reason otherwise.
 - Uptime alerts: a free UptimeRobot (or similar) account watching both addresses every 5 minutes emails you when either goes down.
 

@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 
 import { getQueueHealth } from "@/features/admin/server"
+import { checkAlerts } from "@/features/monitoring/alerts"
 
 export const dynamic = "force-dynamic"
 
@@ -13,6 +14,8 @@ const STUCK_SECONDS = 180
  * take the website out of rotation. Says only whether and why, not hosts or counts.
  */
 export async function GET() {
+  // An uptime monitor calls this every minute or so: the alerts are checked then too.
+  after(() => checkAlerts())
   try {
     const queue = await getQueueHealth()
     const problem =

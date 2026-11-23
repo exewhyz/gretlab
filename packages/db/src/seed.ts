@@ -38,6 +38,13 @@ const content = JSON.parse(readFileSync(path, "utf8")) as {
 }
 
 const db = getDb()
+// The judges' own login can't write the library (and needn't: the owner seeds). A judge set up
+// with it (runner-setup.sh) skips this, as migrate.ts does.
+const [who] = await db.execute<{ me: string }>(sql`select current_user as me`)
+if (who?.me === "gretlab_judge") {
+  console.log("Starter problems skipped: this is the judges' login")
+  process.exit(0)
+}
 let added = 0
 
 for (const [unitIndex, unit] of content.units.entries()) {

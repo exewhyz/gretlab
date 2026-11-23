@@ -3,6 +3,8 @@
  *   - who sees them: the Owner both; Support and Auditor monitoring, not costs; nobody else
  *   - monitoring: failed email with its reasons, and system errors, as problems
  *   - costs: a stopped and a running machine at Sydney prices, by pool, and the forecast
+ *   - alerts: critical at once, warnings after 5 minutes, once each, the all clear, the cost
+ *     limit, who gets them, switched off, and the list on the page
  *   - both pages in a browser, and on a phone
  *   node e2e/monitoring.mjs [base-url] [screenshot-dir]
  */
@@ -24,7 +26,10 @@ const check = (name, ok, detail = "") => {
   if (!ok) failures++
 }
 const psql = (q) => execFileSync("docker", ["compose", "-f", ROOT + "docker-compose.yml", "exec", "-T", "postgres", "psql", "-U", "gretlab", "-d", DB, "-Atqc", q]).toString().trim()
+const ALERT_SUBJECTS = `(subject like 'Critical:%' or subject like 'Warning:%' or subject like 'Worse:%' or subject like 'Fixed:%')`
 const cleanup = () => {
+  psql(`delete from monitoring_alerts`)
+  psql(`delete from email_outbox where ${ALERT_SUBJECTS}`)
   psql(`delete from judge_machines where instance_id like 'i-mon%'`)
   psql(`delete from email_outbox where to_address like 'mon-%@example.com'`)
   psql(`delete from submissions where user_id in (select id from users where email like 'mon-%@example.com')`)
@@ -105,6 +110,50 @@ check("…by pool, with the organization's name", org?.name === "Mon College" &&
 check("the forecast keeps the running machine going to the month's end", report.forecast > report.soFar && Math.abs(report.runningHourly - before.runningHourly - hourly["c7i.large"]) < 1e-6, JSON.stringify({ forecast: report?.forecast, runningHourly: report?.runningHourly }))
 check("each machine hour includes its address and disk (about 0.9 cents)", Math.abs(hourly["c7i-flex.large"] - 0.11072 - 0.008945) < 0.0001, hourly["c7i-flex.large"])
 
+// ---------- alerts
+const cron = async () => (await (await fetch(`${BASE}/api/cron/outbox`, { method: "POST", headers: { authorization: "Bearer e2e-cron-secret-0123456789" } })).json().catch(() => null))?.alerts
+const mailTo = (address, subject) => Number(psql(`select count(*) from email_outbox where to_address = '${address}' and subject like '${subject}'`))
+const settings = (body) => fetch(`${BASE}/api/v1/admin/settings`, { method: "PATCH", headers: { cookie: ownerCookie, "content-type": "application/json", origin: BASE }, body: JSON.stringify(body) })
+psql(`delete from monitoring_alerts`)
+psql(`delete from email_outbox where ${ALERT_SUBJECTS}`)
+// A submission no judge can take (more memory than any has), waiting 4 minutes: critical.
+psql(`insert into submissions (user_id, kind, language, entry, files, time_limit_ms, memory_limit_mb, status, created_at, queue_at) values ('${who}', 'submit', 'python', 'main.py', '[]', 1000, 999999, 'queued', now() - interval '4 minutes', now() - interval '4 minutes')`)
+const first = await cron()
+check("a critical problem is emailed at once to who gets alerts (the Owner)", first?.notified >= 1 && mailTo("admin@example.com", "Critical: Submissions have waited%") === 1, JSON.stringify(first))
+check("…and not to Support or the Auditor, who only see monitoring", mailTo("mon-support@example.com", "%") === 0 && mailTo("mon-auditor@example.com", "%") === 0)
+check("warnings are opened but not emailed yet", Number(psql(`select count(*) from monitoring_alerts where level = 'warning' and cleared_at is null and notified_at is null`)) >= 2 && mailTo("admin@example.com", "Warning:%") === 0)
+await cron()
+check("the same problem isn't emailed twice", mailTo("admin@example.com", "Critical: Submissions have waited%") === 1)
+// Five minutes on, the warnings have lasted: emailed.
+psql(`update monitoring_alerts set first_seen_at = first_seen_at - interval '6 minutes' where cleared_at is null`)
+await cron()
+check("a warning that lasts 5 minutes is emailed (failed email, system errors)", mailTo("admin@example.com", "Warning: % failed in the last day%") === 1 && mailTo("admin@example.com", "Warning: % system error%") === 1)
+check("a machine that ended by itself isn't a failed machine to stop", Number(psql(`select count(*) from monitoring_alerts where key = 'machine_failed'`)) === 0)
+// A machine that failed to set up and still runs: that is one.
+psql(`insert into judge_machines (instance_id, size, stage, note, created_at, stage_at) values ('i-mon-failed', 'c7i-flex.large', 'failed', 'Setting up stopped at line 40.', now() - interval '20 minutes', now() - interval '10 minutes')`)
+await cron()
+check("…but one that failed to set up and still runs is", Number(psql(`select count(*) from monitoring_alerts where key = 'machine_failed' and cleared_at is null`)) === 1)
+// The cost limit: anything forecast over 1 cent.
+await settings({ "alerts.cost_limit": 0.01 })
+await cron()
+check("the month's cost past its limit is an alert", Number(psql(`select count(*) from monitoring_alerts where key = 'cost' and cleared_at is null`)) === 1)
+await settings({ "alerts.cost_limit": 0 })
+// The stuck submission is judged away; five minutes later the all clear goes out.
+psql(`delete from submissions where memory_limit_mb = 999999`)
+await cron()
+check("a fixed problem isn't cleared at once (it might come back)", Number(psql(`select count(*) from monitoring_alerts where key = 'queue_waiting' and cleared_at is null`)) === 1)
+psql(`update monitoring_alerts set last_seen_at = last_seen_at - interval '6 minutes' where key in ('queue_waiting', 'cost') and cleared_at is null`)
+const fixed = await cron()
+check("…then cleared, with an all clear for what was emailed", fixed?.cleared >= 1 && mailTo("admin@example.com", "Fixed: Submissions have waited%") === 1, JSON.stringify(fixed))
+check("…and none for the cost warning, which was never emailed", mailTo("admin@example.com", "Fixed: Judge machines are forecast%") === 0)
+const listed = (await admin("/admin/monitoring")).json?.alerts ?? []
+check("Monitoring lists the alerts, open and fixed", listed.some((a) => a.key === "queue_waiting" && a.clearedAt) && listed.some((a) => !a.clearedAt), JSON.stringify(listed.map((a) => [a.key, Boolean(a.clearedAt)])))
+await settings({ "alerts.enabled": false })
+psql(`update monitoring_alerts set first_seen_at = first_seen_at - interval '1 hour'`)
+check("switched off, nothing is checked or sent", (await cron()) === null)
+await settings({ "alerts.enabled": true })
+check("the alert email has a link to Monitoring", psql(`select count(*) from email_outbox where to_address = 'admin@example.com' and subject like 'Critical:%' and body like '%/admin/monitoring%'`) === "1")
+
 // ---------- the pages
 const browser = await chromium.launch()
 for (const [width, name] of [[1440, "laptop"], [390, "phone"]]) {
@@ -118,6 +167,7 @@ for (const [width, name] of [[1440, "laptop"], [390, "phone"]]) {
   await tab.getByTestId("chart-wait").locator("svg .recharts-line-curve").first().waitFor({ timeout: 30_000 }).catch(() => {})
   await tab.getByTestId("chart-throughput").locator("svg .recharts-area-area").first().waitFor({ timeout: 30_000 }).catch(() => {})
   check(`${name}: the state, the golden signals and the charts are there`, await tab.getByTestId("health-state").isVisible() && (await tab.getByTestId("chart-wait").locator("svg .recharts-line-curve").count()) >= 1 && (await tab.getByTestId("chart-throughput").locator("svg .recharts-area-area").count()) >= 1)
+  check(`${name}: the alerts are listed`, (await tab.getByTestId("alerts").getByText(/Submissions have waited/).count()) >= 1)
   await tab.getByRole("tab", { name: "6 hours" }).click()
   await tab.waitForTimeout(800)
   // Bars are actually drawn (each a path with a size), not just the axes.

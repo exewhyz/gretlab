@@ -170,6 +170,22 @@ export const SETTINGS = {
     schema: z.number().int().min(1).max(50),
     default: 3,
   },
+  "alerts.enabled": {
+    label: "Monitoring alerts",
+    description:
+      "Email the people with \"Get monitoring alerts\" when something on Dashboard › Monitoring goes wrong, and again when it's fixed. Critical problems at once, warnings once they've lasted 5 minutes.",
+    group: "Alerts",
+    schema: z.boolean(),
+    default: true,
+  },
+  "alerts.cost_limit": {
+    label: "Cost alert (US$ a month)",
+    description:
+      "An alert when this month's judge machines are forecast to cost more than this (Dashboard › Costs). 0 is off.",
+    group: "Alerts",
+    schema: z.number().min(0).max(100_000),
+    default: 0,
+  },
   // Judge machines (Dashboard › Judges, "Judge settings"): kept off the Settings page.
   "judges.max_running": {
     label: "Judges at once",

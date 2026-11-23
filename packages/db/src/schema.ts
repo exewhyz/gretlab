@@ -747,6 +747,38 @@ export const runners = pgTable("runners", {
 })
 
 /**
+ * A problem on Dashboard › Monitoring, followed while it lasts so it's emailed once
+ * (packages/judge/src/alerts.ts decides when). At most one open alert per key; a cleared one
+ * stays as history.
+ */
+export const monitoringAlerts = pgTable(
+  "monitoring_alerts",
+  {
+    id: id(),
+    /** Which problem: a health problem's key (judges_none, queue_waiting…), machine_failed or cost. */
+    key: text("key").notNull(),
+    level: text("level").$type<"critical" | "warning">().notNull(),
+    text: text("text").notNull(),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /** The level it was last emailed at, and when; null while not emailed. */
+    notifiedLevel: text("notified_level").$type<"critical" | "warning">(),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    clearedAt: timestamp("cleared_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("monitoring_alerts_open")
+      .on(t.key)
+      .where(sql`${t.clearedAt} is null`),
+    index("monitoring_alerts_recent").on(t.firstSeenAt),
+  ]
+)
+
+/**
  * A judge machine started from the dashboard (Dashboard › Judges): its AWS instance, the pool it
  * serves (an organization's, or null for shared), and where it is in its life. The website moves
  * it through requested → launching; the machine itself reports installing → ready (or failed,
