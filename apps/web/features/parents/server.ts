@@ -21,7 +21,8 @@ import {
   pathName,
   studentsWithGroups,
 } from "@/features/campus/people"
-import { notify } from "@/features/notifications/server"
+import { freeHandles } from "@/features/catalog/server"
+import { notify, notifyEach } from "@/features/notifications/server"
 import {
   orgContext,
   userByEmail,
@@ -413,7 +414,15 @@ export async function importLinks(
   )
   const report: { line: number; result: "linked" | "error"; note: string }[] =
     []
-  let linked = 0
+  // Checked row by row as before; then written for the whole list in a few statements, so a
+  // list of 2,000 takes about as long as one (it was a query or five per row).
+  const good: {
+    line: number
+    student: { id: string; name: string | null; email: string }
+    email: string
+    name: string
+    relation: string
+  }[] = []
   for (const [i, row] of input.rows.entries()) {
     const line = i + 1
     const student = members.get(row.studentEmail)
@@ -430,20 +439,110 @@ export async function importLinks(
       fail(`You can't link parents to ${row.studentEmail}`)
       continue
     }
-    try {
-      const done = await link(ctx, student, {
-        email: row.parentEmail,
-        name: row.parentName,
-        relation: row.relation,
-      })
-      if (done.isNew)
-        await welcome(ctx, done.personId, student.name ?? student.email)
-      linked++
-      report.push({ line, result: "linked", note: "" })
-    } catch (error) {
-      fail(error instanceof ApiError ? error.message : "Couldn't link")
+    if (row.parentEmail === student.email) {
+      fail("A student can't be their own parent.")
+      continue
     }
+    good.push({
+      line,
+      student,
+      email: row.parentEmail,
+      name: row.parentName,
+      relation: row.relation,
+    })
   }
+  const welcomes: {
+    userId: string
+    title: string
+    body: string
+    href: string
+  }[] = []
+  if (good.length) {
+    const q = sql.sql
+    await getDb().transaction(async (tx) => {
+      // Parents: found by email, or an account made for them (ready at their first sign-in).
+      const emails = [...new Set(good.map((g) => g.email))]
+      const existing = await tx
+        .select({ email: users.email })
+        .from(users)
+        .where(inArray(users.email, emails))
+      const have = new Set(existing.map((e) => e.email))
+      const missing = emails.filter((e) => !have.has(e))
+      if (missing.length) {
+        const handles = await freeHandles(missing, tx)
+        await tx.execute(q`
+          insert into users (email, handle)
+          select e, h from unnest(${q.param(missing)}::text[], ${q.param(missing.map((e) => handles.get(e)!))}::text[]) as n(e, h)
+          on conflict (email) do nothing`)
+      }
+      const people = await tx
+        .select({ id: users.id, email: users.email, name: users.name })
+        .from(users)
+        .where(inArray(users.email, emails))
+      const personBy = new Map(people.map((p) => [p.email, p]))
+      // A name from the list fills a parent's empty name (the first given).
+      const named = new Map<string, string>()
+      for (const g of good)
+        if (g.name && !personBy.get(g.email)?.name && !named.has(g.email))
+          named.set(g.email, g.name)
+      if (named.size) {
+        await tx.execute(q`
+          update users set name = n.name
+          from unnest(${q.param([...named.keys()])}::text[], ${q.param([...named.values()])}::text[]) as n(email, name)
+          where users.email = n.email and users.name is null`)
+      }
+      // Links: the list's last word on each parent and child wins.
+      const pairs = new Map<
+        string,
+        (typeof good)[number] & { parentId: string }
+      >()
+      for (const g of good)
+        pairs.set(`${g.email}|${g.student.id}`, {
+          ...g,
+          parentId: personBy.get(g.email)!.id,
+        })
+      const list = [...pairs.values()]
+      const before = new Set(
+        (
+          await tx
+            .select({
+              parentId: guardians.parentId,
+              studentId: guardians.studentId,
+            })
+            .from(guardians)
+            .where(
+              and(
+                eq(guardians.orgId, ctx.org.id),
+                inArray(
+                  guardians.parentId,
+                  list.map((l) => l.parentId)
+                )
+              )
+            )
+        ).map((r) => `${r.parentId}|${r.studentId}`)
+      )
+      await tx.execute(q`
+        insert into guardians (org_id, parent_id, student_id, relation, created_by)
+        select ${ctx.org.id}, p, s, r, ${ctx.user.id}
+        from unnest(${q.param(list.map((l) => l.parentId))}::uuid[], ${q.param(list.map((l) => l.student.id))}::uuid[],
+          ${q.param(list.map((l) => l.relation))}::text[]) as n(p, s, r)
+        on conflict (org_id, parent_id, student_id) do update set relation = excluded.relation`)
+      for (const l of list) {
+        if (before.has(`${l.parentId}|${l.student.id}`)) continue
+        welcomes.push({
+          userId: l.parentId,
+          title: `You can now follow ${l.student.name ?? l.student.email} at ${ctx.org.name}`,
+          body: "See their attendance, timetable, work and marks, and their class notices.",
+          href: "/children",
+        })
+      }
+    })
+    for (const g of good)
+      report.push({ line: g.line, result: "linked", note: "" })
+    report.sort((a, b) => a.line - b.line)
+    await notifyEach("parent_linked", ctx.org.id, welcomes)
+  }
+  const linked = good.length
   if (linked) {
     await writeAudit(
       ctx,
@@ -477,9 +576,7 @@ export async function myChildren(user: User) {
     .orderBy(asc(users.name))
   const policies = await kindPolicies()
   return rows
-    .filter((r) =>
-      orgModules(r.org, policies).has("parents")
-    )
+    .filter((r) => orgModules(r.org, policies).has("parents"))
     .map((r) => ({
       id: r.studentId,
       name: r.name ?? r.email,

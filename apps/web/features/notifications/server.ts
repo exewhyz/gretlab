@@ -210,6 +210,24 @@ export async function notify(userIds: string[], n: NewNotification) {
   return told
 }
 
+/**
+ * One event for many people, each with their own words (a list of parents linked to their
+ * children, each welcome naming the child), in one delivery at any size. Never throws.
+ */
+export async function notifyEach(
+  kind: string,
+  orgId: string | null,
+  items: { userId: string; title: string; body?: string; href?: string }[]
+) {
+  if (items.length === 0) return { inApp: 0, email: 0 }
+  return deliver(
+    kind,
+    orgId,
+    items.map((i) => i.userId),
+    items.map(({ title, body, href }) => ({ title, body, href }))
+  )
+}
+
 /** What a student is told that their parents get a copy of. */
 const COPIED_TO_PARENTS = new Set<string>([
   "assignment.published",

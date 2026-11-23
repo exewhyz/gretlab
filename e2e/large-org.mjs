@@ -289,6 +289,14 @@ const nosy = await client("lo-s-1@example.com")
 check("a student can't start an import", (await nosy("/imports", { body: { kind: "members.import", slug: "lo-uni", total: 10 } })).status === 403)
 check("…nor see or add to someone else's", (await nosy(`/imports/${members50.id}/rows`, { body: { seq: 0, rows: [{ email: "x@example.com" }] } })).status === 404 && (await nosy(`/jobs/${members50.id}`)).status === 404)
 
+// ---------- the largest parent list allowed (2,000 links), timed: it must fit one request
+const parentRows = Array.from({ length: 2000 }, (_, i) => ({ studentEmail: `lo-s-${i + 10001}@example.com`, parentEmail: `lo-q-${i + 1}@example.com`, parentName: `Lo Guardian ${i + 1}`, relation: "father" }))
+started = Date.now()
+const linkedAll = await owner(`${O}/parents/import`, { body: { rows: parentRows } })
+const linkMs = Date.now() - started
+const linkedCount = Number(psql(`select count(*) from guardians g join users p on p.id = g.parent_id where p.email like 'lo-q-%@example.com'`))
+check(`linking 2,000 parents from a list (${linkMs} ms)`, linkedAll.status === 200 && linkedCount === 2000 && linkMs < 15_000, JSON.stringify({ status: linkedAll.status, linkedCount, body: JSON.stringify(linkedAll.json).slice(0, 200) }))
+
 // ---------- a year of 40,000 students: made current, then promoted
 // Past 32,768 people, anything sending one parameter per person fails (Postgres allows 65,535).
 const YEAR_STUDENTS = 40_000
