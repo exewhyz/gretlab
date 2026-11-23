@@ -4,8 +4,10 @@ import * as Presigner from "@aws-sdk/s3-request-presigner"
 /*
  * Where files live: Cloudflare R2 (S3-compatible) when it's configured, so the database keeps
  * only who and what. Two buckets:
- *   - public:  images in problem statements and the like, served from their own address
- *              (R2_PUBLIC_URL, e.g. https://files.gretlab.grettech.com), cached by Cloudflare;
+ *   - public:  images in problem statements and the like: served from their own address when
+ *              the bucket has one (R2_PUBLIC_URL, a custom domain, cached by Cloudflare), else
+ *              through links signed for 7 days that the image's address redirects to (the
+ *              redirect cached a day at Vercel's edge), so nothing about the domain changes;
  *   - private: exports and import reports, never public, reached through links signed for
  *              minutes after the same access check as the page.
  * Without R2 settings, `storageReady()` is false and callers keep files in Postgres as before
@@ -81,9 +83,16 @@ export function storageReady() {
     s.accessKeyId &&
     s.secretAccessKey &&
     s.buckets.public &&
-    s.buckets.private &&
-    s.publicUrl
+    s.buckets.private
   )
+}
+
+/**
+ * Whether the public bucket has its own address (R2_PUBLIC_URL: a custom domain, which needs
+ * the domain's DNS on Cloudflare). Without one, images are reached through signed links too.
+ */
+export function hasPublicAddress() {
+  return Boolean(settings().publicUrl)
 }
 
 let client: InstanceType<S3Sdk["S3Client"]> | null = null
@@ -128,20 +137,25 @@ export async function removeFile(bucket: Bucket, key: string) {
   )
 }
 
-/** A link to a private file that works for `seconds`, downloading under `filename`. */
+/**
+ * A link to a file that works for `seconds`: downloading under `filename`, or shown in the page
+ * (`inline`, for images).
+ */
 export async function signedUrl(
   bucket: Bucket,
   key: string,
   seconds: number,
-  filename: string
+  filename: string,
+  inline = false
 ) {
   const { client, s } = connect()
+  const name = filename.replace(/[^\w.-]/g, "_")
   return presigner.getSignedUrl(
     client,
     new s3.GetObjectCommand({
       Bucket: s.buckets[bucket],
       Key: key,
-      ResponseContentDisposition: `attachment; filename="${filename.replace(/[^\w.-]/g, "_")}"`,
+      ResponseContentDisposition: `${inline ? "inline" : "attachment"}; filename="${name}"`,
     }),
     { expiresIn: seconds }
   )

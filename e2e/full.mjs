@@ -508,8 +508,8 @@ if (phase === "all" || phase === "ui") {
   // With file storage (R2; S3Mock in tests) the image's address redirects to the files domain,
   // where Cloudflare adds nosniff and a sandbox; without it, the site serves it with them.
   const served = await d.request.get(BASE + imageUrl, { maxRedirects: 0 })
-  const there = served.status() === 301 ? await d.request.get(served.headers()["location"]) : null
-  check("and is served as an image that can't be read as anything else", (served.status() === 200 && served.headers()["content-type"] === "image/png" && served.headers()["x-content-type-options"] === "nosniff") || (served.status() === 301 && there?.status() === 200 && there.headers()["content-type"] === "image/png"), JSON.stringify({ status: served.status(), location: served.headers()["location"] }))
+  const there = [301, 302].includes(served.status()) ? await d.request.get(served.headers()["location"]) : null
+  check("and is served as an image that can't be read as anything else", (served.status() === 200 && served.headers()["content-type"] === "image/png" && served.headers()["x-content-type-options"] === "nosniff") || ([301, 302].includes(served.status()) && there?.status() === 200 && there.headers()["content-type"] === "image/png"), JSON.stringify({ status: served.status(), location: served.headers()["location"] }))
   const svg = await d.request.post(BASE + "/api/v1/uploads", { multipart: { file: { name: "x.svg", mimeType: "image/svg+xml", buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>') } } })
   check("SVG and other files that aren't plain images are refused", svg.status() === 415)
   const fromStudent = await s.request.post(BASE + "/api/v1/uploads", { multipart: { file: { name: "a.png", mimeType: "image/png", buffer: png } } })

@@ -3,13 +3,22 @@ import { createHash } from "node:crypto"
 import { getDb, sql, uploads, type User } from "@workspace/db"
 
 import { isStaff, ApiError, notFound } from "@/lib/api/route"
-import { imageKey, publicUrl, putFile, storageReady } from "@/lib/storage"
+import {
+  hasPublicAddress,
+  imageKey,
+  publicUrl,
+  putFile,
+  signedUrl,
+  storageReady,
+} from "@/lib/storage"
 import { teachesAnywhere } from "@/features/teaching/server"
 
 const { and, eq, gte, count } = sql
 
 export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 const IMMUTABLE = "public, max-age=31536000, immutable"
+/** The longest R2 (like S3) signs a link for. */
+const SIGNED_IMAGE_SECONDS = 7 * 24 * 3_600
 const DAILY_LIMIT = 300
 
 /**
@@ -120,11 +129,29 @@ export async function uploadResponse(id: string) {
     .from(uploads)
     .where(eq(uploads.id, id))
   if (!row) throw notFound("Image not found")
-  // In R2: its own address, served by Cloudflare. The link in a statement never changes.
+  // In R2. The link in a statement never changes; this answers where the image is now.
   if (row.storedIn === "r2" && row.key) {
+    // The bucket has its own address (a custom domain): there, for good.
+    if (hasPublicAddress())
+      return new Response(null, {
+        status: 301,
+        headers: { Location: publicUrl(row.key), "Cache-Control": IMMUTABLE },
+      })
+    // No custom domain: a link signed for 7 days; the redirect is cached for a day (by the
+    // browser and Vercel's edge), so the link handed out is always days from expiring.
+    const link = await signedUrl(
+      "public",
+      row.key,
+      SIGNED_IMAGE_SECONDS,
+      row.key.split("/").pop() ?? "image",
+      true
+    )
     return new Response(null, {
-      status: 301,
-      headers: { Location: publicUrl(row.key), "Cache-Control": IMMUTABLE },
+      status: 302,
+      headers: {
+        Location: link,
+        "Cache-Control": "public, max-age=86400, s-maxage=86400",
+      },
     })
   }
   const data = row.data ?? Buffer.alloc(0)

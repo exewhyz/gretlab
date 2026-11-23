@@ -28,11 +28,12 @@ for i in {1..45}; do docker exec $RIG docker version --format ok >/dev/null 2>&1
 docker save gretlab/sandbox-python:1 gretlab/sandbox-node:1 gretlab/sandbox-cpp:1 gretlab/sandbox-java:1 | docker exec -i $RIG docker load >/dev/null
 
 # File storage: S3Mock stands in for Cloudflare R2 (both buckets; it doesn't check access, so
-# R2's own refusals are checked on the real thing, README › File storage).
+# R2's own refusals are checked on the real thing, README › File storage). No R2_PUBLIC_URL, as on
+# the live site: images are reached through signed links.
 docker rm -f -v $S3 >/dev/null 2>&1
 docker run -d --name $S3 -p 127.0.0.1:9190:9090 -e initialBuckets=gretlab-public,gretlab-private adobe/s3mock:4.1.1 >/dev/null
 for i in {1..60}; do curl -sf -o /dev/null http://127.0.0.1:9190/ && break; sleep 1; done
-export STORAGE_ENDPOINT=http://127.0.0.1:9190 R2_ACCESS_KEY_ID=e2e R2_SECRET_ACCESS_KEY=e2e-secret R2_PUBLIC_BUCKET=gretlab-public R2_PRIVATE_BUCKET=gretlab-private R2_PUBLIC_URL=http://127.0.0.1:9190/gretlab-public
+export STORAGE_ENDPOINT=http://127.0.0.1:9190 R2_ACCESS_KEY_ID=e2e R2_SECRET_ACCESS_KEY=e2e-secret R2_PUBLIC_BUCKET=gretlab-public R2_PRIVATE_BUCKET=gretlab-private
 
 docker compose -f $ROOT/docker-compose.yml exec -T postgres psql -U gretlab -d gretlab -c "drop database if exists gretlab_test with (force)" -c "create database gretlab_test" >/dev/null
 (cd $ROOT/packages/db && pnpm exec tsx src/migrate.ts && pnpm exec tsx src/seed.ts)

@@ -1,7 +1,8 @@
 /**
  * File storage (apps/web/lib/storage): Cloudflare R2, with S3Mock standing in (e2e/run.sh).
- *   - an image upload lands in the public bucket; its address redirects there for good, and the
- *     bytes are the same; the same image again is one object
+ *   - an image upload lands in the public bucket; its address redirects to a link signed for 7
+ *     days (no custom domain, as on the live site), cached a day; the bytes are the same; the
+ *     same image again is one object
  *   - an image still kept in the database is served as before; the move job copies them all to
  *     the bucket, and their addresses keep working
  *   - a finished export's file goes to the private bucket; its download is a link signed for
@@ -18,7 +19,6 @@ const { encode } = createRequire(ROOT + "apps/web/")("next-auth/jwt")
 const BASE = process.argv[2] ?? "http://localhost:3100"
 const SECRET = process.env.NEXTAUTH_SECRET ?? "e2e-only-secret"
 const DB = process.env.E2E_DB ?? "gretlab_test"
-const PUBLIC = process.env.R2_PUBLIC_URL ?? "http://127.0.0.1:9190/gretlab-public"
 const S3 = (process.env.STORAGE_ENDPOINT ?? "http://127.0.0.1:9190").replace(/\/+$/, "")
 let failures = 0
 const check = (name, ok, detail = "") => {
@@ -57,7 +57,8 @@ const hash = createHash("sha256").update(png).digest("hex")
 check("an image uploads, with its usual address", /^\/api\/v1\/uploads\/[0-9a-f-]{36}$/.test(up?.url ?? ""), JSON.stringify(up))
 check("…kept in file storage, not the database", psql(`select stored_in || ':' || coalesce(key, '') || ':' || (data is null) from uploads where id = '${up.id}'`) === `r2:images/${hash}.png:true`)
 const served = await fetch(BASE + up.url, { redirect: "manual" })
-check("its address redirects to the files domain, for good", served.status === 301 && served.headers.get("location") === `${PUBLIC}/images/${hash}.png` && /immutable/.test(served.headers.get("cache-control") ?? ""), JSON.stringify({ status: served.status, location: served.headers.get("location") }))
+const imageLink = served.headers.get("location") ?? ""
+check("its address redirects to a link signed for 7 days, the redirect cached a day", served.status === 302 && imageLink.startsWith(`${S3}/gretlab-public/images/${hash}.png?`) && /X-Amz-Expires=604800/.test(imageLink) && /s-maxage=86400/.test(served.headers.get("cache-control") ?? ""), JSON.stringify({ status: served.status, location: imageLink.slice(0, 160), cache: served.headers.get("cache-control") }))
 const there = await fetch(served.headers.get("location"))
 check("…where the bytes are the same, as an image", there.status === 200 && there.headers.get("content-type") === "image/png" && Buffer.from(await there.arrayBuffer()).equals(png))
 const again = await (await api(admin, "/uploads", { method: "POST", body: form() })).json()
@@ -77,8 +78,8 @@ const moved = await waitFor(async () => {
 })
 check("the move copies every image kept in the database", moved?.status === "done" && psql(`select count(*) from uploads where stored_in = 'db'`) === "0", JSON.stringify(moved))
 const movedServe = await fetch(`${BASE}/api/v1/uploads/${oldId}`, { redirect: "manual" })
-const movedBytes = movedServe.status === 301 ? Buffer.from(await (await fetch(movedServe.headers.get("location"))).arrayBuffer()) : null
-check("…and its address still works, now from the files domain", movedServe.status === 301 && movedBytes?.equals(old))
+const movedBytes = movedServe.status === 302 ? Buffer.from(await (await fetch(movedServe.headers.get("location"))).arrayBuffer()) : null
+check("…and its address still works, now from file storage", movedServe.status === 302 && movedBytes?.equals(old))
 
 // ---------- an export's file goes to the private bucket
 const problem = psql(`select id from problems where published and listed order by slug limit 1`)
@@ -95,7 +96,7 @@ check("its download is a link signed for five minutes", download.status === 302 
 const file = await fetch(link)
 check("…which gives the same CSV as the instant download", file.status === 200 && (await file.text()) === direct)
 check("someone else gets no link", (await api(other, `/jobs/${job}/file`)).status === 404)
-check("nothing of it is in the public bucket", (await fetch(`${PUBLIC}/jobs/${job}/st-export-grades.csv`)).status === 404)
+check("nothing of it is in the public bucket", (await fetch(`${S3}/gretlab-public/jobs/${job}/st-export-grades.csv`)).status === 404)
 
 // ---------- Monitoring
 const health = await (await api(admin, "/admin/monitoring")).json()

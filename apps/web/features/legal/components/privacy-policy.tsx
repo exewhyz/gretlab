@@ -190,7 +190,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             <Item term="Google">sign-in with Google, and AdSense ads on public practice pages.</Item>
             <Item term="Our email provider">sending the emails described above.</Item>
             <Item term="GitHub">looking up the commit of a repository link you hand in for a project.</Item>
-            <Item term="Cloudflare">storing and serving files: images in problems and lessons (public, like the pages that show them), and the exports and import reports you download (private, reached only through a link that works for a few minutes). Stored in its Asia-Pacific region and served from its network near you.</Item>
+            <Item term="Cloudflare">storing and serving files: images in problems and lessons (public, like the pages that show them), and the exports and import reports you download (private, reached only through a link that works for a few minutes). Stored in its Asia-Pacific region.</Item>
           </List>
           <p>
             Because of these providers, your data may be stored and processed outside your

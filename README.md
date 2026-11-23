@@ -123,13 +123,13 @@ With this login, `runner-setup.sh` skips migrations and the starter problems: th
 
 Images in problem statements and the files people download (exports, import reports) are kept in Cloudflare R2 once it's set up; until then they stay in the database, as before. Set it up once:
 
-1. Cloudflare dashboard › R2 › Create bucket: `gretlab-public` and `gretlab-private`, location hint **Asia-Pacific**.
-2. `gretlab-public` › Settings › Custom Domains › Connect domain: `files.gretlab.grettech.com` (grettech.com's DNS is on Cloudflare, so it's one click). Leave `gretlab-private` with no public access.
-3. Rules › Transform Rules › Modify Response Header, for hostname `files.gretlab.grettech.com`: set `X-Content-Type-Options` to `nosniff` and `Content-Security-Policy` to `default-src 'none'; sandbox` (the site sent these itself when it served images; a bad file then can't run, even on its own domain).
-4. `gretlab-private` › Settings › Object lifecycle rules: delete objects with prefix `jobs/` after 2 days (the site deletes them after a day; this is the safety net).
-5. R2 › Manage API tokens › Create: **Object Read & Write**, only the two buckets. Put into Vercel (Production), never in a chat or a commit: `R2_ACCOUNT_ID` (the account id shown on the R2 page), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_BUCKET=gretlab-public`, `R2_PRIVATE_BUCKET=gretlab-private`, `R2_PUBLIC_URL=https://files.gretlab.grettech.com`. Redeploy.
-6. Check: upload an image in a problem's editor, open it, and `curl -I` its `files.` address (200, `image/…`, `nosniff`). A private file's address without a signature must answer 403.
-7. Dashboard › Monitoring › File storage › **Move them to R2** copies the images already in the database (their links keep working).
+1. Cloudflare dashboard › R2 › Create bucket: `gretlab-public` and `gretlab-private`, location hint **Asia-Pacific**. Neither needs public access.
+2. `gretlab-private` › Settings › Object lifecycle rules: delete objects with prefix `jobs/` after 2 days (the site deletes them after a day; this is the safety net).
+3. R2 › Manage API tokens › Create: **Object Read & Write**, only the two buckets. Put into Vercel (Production), never in a chat or a commit: `R2_ACCOUNT_ID` (shown on the R2 page), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_BUCKET=gretlab-public`, `R2_PRIVATE_BUCKET=gretlab-private`. Redeploy.
+4. Check: upload an image in a problem's editor and open it: its address redirects to a signed `r2.cloudflarestorage.com` link (7 days; the redirect is cached a day, so the site's code runs about once a day per image). A file's address without its signature must answer 400 or 403.
+5. Dashboard › Monitoring › File storage › **Move them to R2** copies the images already in the database (their links keep working).
+
+**Optional, later: images on their own domain**, cached in Cloudflare's cities. This needs the domain's DNS on Cloudflare (grettech.com's is at GoDaddy, so it isn't done): connect a custom domain such as `files.gretlab.grettech.com` to `gretlab-public`, add a response-header Transform Rule there (`X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`), and set `R2_PUBLIC_URL` to it. Images then redirect there for good instead.
 
 ### Settings
 
@@ -146,7 +146,7 @@ The web app reads these (in development from `apps/web/.env.local`; in productio
 | `PROXY_SECRET` | for network-limited exams behind Caddy (not on Vercel) | Shared with Caddy so the app trusts visitors' addresses ([docs/deploy-exams.md](docs/deploy-exams.md)) |
 | `RESEND_API_KEY` or `SMTP_URL`, and `MAIL_FROM` | no | Email notifications, queued and sent in batches with retries; without them, in-app only. Resend's API by default; `SMTP_URL` for any mail server |
 | `CRON_SECRET` | with email | Lets a scheduler call `POST /api/cron/outbox` to send big batches and retries (see Email below) |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_BUCKET`, `R2_PRIVATE_BUCKET`, `R2_PUBLIC_URL` | no | Files in Cloudflare R2 (File storage above); without them, images and downloads stay in the database. `STORAGE_ENDPOINT` points at another S3-compatible store instead |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_BUCKET`, `R2_PRIVATE_BUCKET` | no | Files in Cloudflare R2 (File storage above); without them, images and downloads stay in the database. `R2_PUBLIC_URL`, optional: the public bucket's custom domain. `STORAGE_ENDPOINT` points at another S3-compatible store instead |
 | `GITHUB_TOKEN` | no | Raises GitHub's limit for pinning project commits |
 | `LTI_PRIVATE_KEY`, `LTI_KEY_ID` | no | A fixed LTI signing key; otherwise one is made and kept in the database |
 | `METRICS_TOKEN` | no | Turns on `GET /api/metrics` |
