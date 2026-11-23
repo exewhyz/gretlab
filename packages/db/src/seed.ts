@@ -9,14 +9,7 @@ import { readFileSync } from "node:fs"
 import { statementToMarkdown, type ProblemCode } from "@workspace/judge"
 import { eq, sql } from "drizzle-orm"
 
-import {
-  getDb,
-  problemSlugHistory,
-  problems,
-  tags,
-  testCases,
-  units,
-} from "./index.ts"
+import { getDb, problemSlugHistory, problems, tags, testCases, units } from "./index.ts"
 import { READABLE_SLUGS_SQL } from "./readable-slugs.ts"
 
 interface RawQuestion {
@@ -145,27 +138,21 @@ for (const unit of content.units) {
 await db.execute(sql.raw(READABLE_SLUGS_SQL))
 
 // The platform's first course follows its units (as migration 0031 does for older data).
-await db.execute(
-  sql.raw(`INSERT INTO "courses" ("id", "org_id", "title", "description", "published", "sharing")
+await db.execute(sql.raw(`INSERT INTO "courses" ("id", "org_id", "title", "description", "published", "sharing")
 SELECT gen_random_uuid(), NULL, 'Programming fundamentals', 'The platform''s library outline, unit by unit.', true, 'everyone'
-WHERE EXISTS (SELECT 1 FROM "units") AND NOT EXISTS (SELECT 1 FROM "courses" WHERE "org_id" IS NULL)`)
-)
-await db.execute(
-  sql.raw(`INSERT INTO "course_modules" ("course_id", "title", "position")
+WHERE EXISTS (SELECT 1 FROM "units") AND NOT EXISTS (SELECT 1 FROM "courses" WHERE "org_id" IS NULL)`))
+await db.execute(sql.raw(`INSERT INTO "course_modules" ("course_id", "title", "position")
 SELECT c."id", u."name", u."position"
 FROM "units" u CROSS JOIN (SELECT "id" FROM "courses" WHERE "org_id" IS NULL AND "title" = 'Programming fundamentals' LIMIT 1) c
-WHERE NOT EXISTS (SELECT 1 FROM "course_modules" m WHERE m."course_id" = c."id")`)
-)
-await db.execute(
-  sql.raw(`INSERT INTO "course_items" ("module_id", "item_type", "item_id", "position")
+WHERE NOT EXISTS (SELECT 1 FROM "course_modules" m WHERE m."course_id" = c."id")`))
+await db.execute(sql.raw(`INSERT INTO "course_items" ("module_id", "item_type", "item_id", "position")
 SELECT m."id", 'problem', p."id", p."position"
 FROM "problems" p
 JOIN "units" u ON u."id" = p."unit_id"
 JOIN "course_modules" m ON m."title" = u."name" AND m."position" = u."position"
 JOIN "courses" c ON c."id" = m."course_id" AND c."org_id" IS NULL AND c."title" = 'Programming fundamentals'
 WHERE p."published" AND p."listed" AND NOT p."members_only"
-ON CONFLICT DO NOTHING`)
-)
+ON CONFLICT DO NOTHING`))
 
 console.log(`Seeded ${added} new problems`)
 process.exit(0)

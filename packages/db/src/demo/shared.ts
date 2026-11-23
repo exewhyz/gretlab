@@ -1,12 +1,6 @@
 import { scryptSync, randomBytes } from "node:crypto"
 
-import {
-  KINDS,
-  ORG_TYPE_CONFIG,
-  ROLE_TEMPLATES,
-  SYSTEM_ROLES,
-  type OrgType,
-} from "@workspace/judge"
+import { KINDS, ORG_TYPE_CONFIG, ROLE_TEMPLATES, SYSTEM_ROLES, type OrgType } from "@workspace/judge"
 
 import {
   getDb,
@@ -44,20 +38,8 @@ let hash: string | null = null
 function passwordHash() {
   if (hash) return hash
   const salt = randomBytes(16)
-  const key = scryptSync(DEMO_PASSWORD.normalize("NFKC"), salt, 32, {
-    N: 2 ** 15,
-    r: 8,
-    p: 1,
-    maxmem: 128 * 2 ** 15 * 8 * 2,
-  })
-  hash = [
-    "scrypt",
-    2 ** 15,
-    8,
-    1,
-    salt.toString("base64url"),
-    key.toString("base64url"),
-  ].join("$")
+  const key = scryptSync(DEMO_PASSWORD.normalize("NFKC"), salt, 32, { N: 2 ** 15, r: 8, p: 1, maxmem: 128 * 2 ** 15 * 8 * 2 })
+  hash = ["scrypt", 2 ** 15, 8, 1, salt.toString("base64url"), key.toString("base64url")].join("$")
   return hash
 }
 
@@ -72,10 +54,8 @@ export function random() {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 export const chance = (p: number) => random() < p
-export const int = (lo: number, hi: number) =>
-  lo + Math.floor(random() * (hi - lo + 1))
-export const pick = <T>(list: readonly T[]) =>
-  list[Math.floor(random() * list.length)]!
+export const int = (lo: number, hi: number) => lo + Math.floor(random() * (hi - lo + 1))
+export const pick = <T>(list: readonly T[]) => list[Math.floor(random() * list.length)]!
 export function shuffle<T>(list: readonly T[]) {
   const out = [...list]
   for (let i = out.length - 1; i > 0; i--) {
@@ -95,15 +75,11 @@ export function normal(mean: number, sd: number, lo: number, hi: number) {
 /* ---------- days ---------- */
 
 const DAY = 86_400_000
-export const TODAY = new Date(
-  new Date().toISOString().slice(0, 10) + "T00:00:00Z"
-)
+export const TODAY = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z")
 /** YYYY-MM-DD, `n` days from today (negative: before). */
-export const day = (n: number) =>
-  new Date(TODAY.getTime() + n * DAY).toISOString().slice(0, 10)
+export const day = (n: number) => new Date(TODAY.getTime() + n * DAY).toISOString().slice(0, 10)
 /** A moment `n` days from now, at an hour of the day (UTC). */
-export const at = (n: number, hour = 9, minute = 0) =>
-  new Date(TODAY.getTime() + n * DAY + (hour * 60 + minute) * 60_000)
+export const at = (n: number, hour = 9, minute = 0) => new Date(TODAY.getTime() + n * DAY + (hour * 60 + minute) * 60_000)
 /** The last `count` days before today that aren't Sundays (or weekends too). */
 export function pastWorkdays(count: number, saturdays = true) {
   const out: string[] = []
@@ -131,112 +107,9 @@ export function academicYear(startMonth: 4 | 7) {
 
 /* ---------- people ---------- */
 
-const MALE = [
-  "Aarav",
-  "Vivaan",
-  "Aditya",
-  "Arjun",
-  "Reyansh",
-  "Krishna",
-  "Ishaan",
-  "Rohan",
-  "Kabir",
-  "Ayaan",
-  "Dhruv",
-  "Karthik",
-  "Rahul",
-  "Siddharth",
-  "Nikhil",
-  "Pranav",
-  "Harsh",
-  "Yash",
-  "Manav",
-  "Varun",
-  "Aniket",
-  "Rajat",
-  "Imran",
-  "Joseph",
-  "Gurpreet",
-  "Sameer",
-  "Tanmay",
-  "Om",
-  "Dev",
-  "Neel",
-]
-const FEMALE = [
-  "Ananya",
-  "Diya",
-  "Saanvi",
-  "Aadhya",
-  "Isha",
-  "Priya",
-  "Kavya",
-  "Meera",
-  "Riya",
-  "Sneha",
-  "Pooja",
-  "Neha",
-  "Aishwarya",
-  "Tanvi",
-  "Shreya",
-  "Nisha",
-  "Fatima",
-  "Sara",
-  "Harleen",
-  "Lakshmi",
-  "Divya",
-  "Nandini",
-  "Anjali",
-  "Pallavi",
-  "Zoya",
-  "Mira",
-  "Aditi",
-  "Bhavna",
-  "Ira",
-  "Gauri",
-]
-const SURNAMES = [
-  "Sharma",
-  "Verma",
-  "Gupta",
-  "Iyer",
-  "Nair",
-  "Reddy",
-  "Patel",
-  "Shah",
-  "Mehta",
-  "Singh",
-  "Kaur",
-  "Das",
-  "Banerjee",
-  "Chatterjee",
-  "Mukherjee",
-  "Rao",
-  "Pillai",
-  "Menon",
-  "Joshi",
-  "Kulkarni",
-  "Deshpande",
-  "Khan",
-  "Ahmed",
-  "Fernandes",
-  "D'Souza",
-  "Bose",
-  "Agarwal",
-  "Malhotra",
-  "Kapoor",
-  "Chopra",
-  "Saxena",
-  "Mishra",
-  "Pandey",
-  "Tiwari",
-  "Yadav",
-  "Naidu",
-  "Hegde",
-  "Shetty",
-  "Gill",
-  "Sinha",
-]
+const MALE = ["Aarav", "Vivaan", "Aditya", "Arjun", "Reyansh", "Krishna", "Ishaan", "Rohan", "Kabir", "Ayaan", "Dhruv", "Karthik", "Rahul", "Siddharth", "Nikhil", "Pranav", "Harsh", "Yash", "Manav", "Varun", "Aniket", "Rajat", "Imran", "Joseph", "Gurpreet", "Sameer", "Tanmay", "Om", "Dev", "Neel"]
+const FEMALE = ["Ananya", "Diya", "Saanvi", "Aadhya", "Isha", "Priya", "Kavya", "Meera", "Riya", "Sneha", "Pooja", "Neha", "Aishwarya", "Tanvi", "Shreya", "Nisha", "Fatima", "Sara", "Harleen", "Lakshmi", "Divya", "Nandini", "Anjali", "Pallavi", "Zoya", "Mira", "Aditi", "Bhavna", "Ira", "Gauri"]
+const SURNAMES = ["Sharma", "Verma", "Gupta", "Iyer", "Nair", "Reddy", "Patel", "Shah", "Mehta", "Singh", "Kaur", "Das", "Banerjee", "Chatterjee", "Mukherjee", "Rao", "Pillai", "Menon", "Joshi", "Kulkarni", "Deshpande", "Khan", "Ahmed", "Fernandes", "D'Souza", "Bose", "Agarwal", "Malhotra", "Kapoor", "Chopra", "Saxena", "Mishra", "Pandey", "Tiwari", "Yadav", "Naidu", "Hegde", "Shetty", "Gill", "Sinha"]
 
 export interface Person {
   name: string
@@ -244,11 +117,7 @@ export interface Person {
   first: string
   last: string
 }
-export function person(
-  gender?: "male" | "female",
-  last?: string,
-  notFirst?: string
-): Person {
+export function person(gender?: "male" | "female", last?: string, notFirst?: string): Person {
   const g = gender ?? (chance(0.5) ? "male" : "female")
   let first = pick(g === "male" ? MALE : FEMALE)
   while (first === notFirst) first = pick(g === "male" ? MALE : FEMALE)
@@ -265,19 +134,14 @@ export function emailFor(local: string, org: string) {
     .replace(/[^a-z0-9.]+/g, "")
     .replace(/\.+/g, ".")
   let candidate = `${base}@${org}.${DOMAIN}`
-  for (let n = 2; used.has(candidate); n++)
-    candidate = `${base}${n}@${org}.${DOMAIN}`
+  for (let n = 2; used.has(candidate); n++) candidate = `${base}${n}@${org}.${DOMAIN}`
   used.add(candidate)
   return candidate
 }
 
 const handles = new Set<string>()
 function handleFor(email: string) {
-  const base =
-    email
-      .split("@")[0]!
-      .replace(/[^a-z0-9]+/g, "-")
-      .slice(0, 30) || "user"
+  const base = email.split("@")[0]!.replace(/[^a-z0-9]+/g, "-").slice(0, 30) || "user"
   let h = base
   for (let n = 2; handles.has(h); n++) h = `${base}-${n}`
   handles.add(h)
@@ -291,9 +155,7 @@ export interface UserRow {
 }
 
 /** Makes accounts that sign in with the demo password (address already confirmed). */
-export async function makeUsers(
-  list: { name: string; email: string }[]
-): Promise<UserRow[]> {
+export async function makeUsers(list: { name: string; email: string }[]): Promise<UserRow[]> {
   const out: UserRow[] = []
   for (const chunk of chunks(list, 500)) {
     const rows = await db
@@ -310,9 +172,7 @@ export async function makeUsers(
         }))
       )
       .returning({ id: users.id, name: users.name, email: users.email })
-    out.push(
-      ...rows.map((r) => ({ id: r.id, name: r.name ?? "", email: r.email }))
-    )
+    out.push(...rows.map((r) => ({ id: r.id, name: r.name ?? "", email: r.email })))
   }
   return out
 }
@@ -324,11 +184,7 @@ export function chunks<T>(list: readonly T[], size: number) {
 }
 
 /** Inserts many rows, a few hundred at a time. */
-export async function insertAll<T>(
-  table: Parameters<typeof db.insert>[0],
-  rows: T[],
-  size = 400
-) {
+export async function insertAll<T>(table: Parameters<typeof db.insert>[0], rows: T[], size = 400) {
   for (const chunk of chunks(rows, size)) {
     if (chunk.length) await db.insert(table).values(chunk as never)
   }
@@ -391,18 +247,12 @@ export async function makeOrg(input: {
         permissions: [...t.permissions],
       })),
     ])
-    .returning({
-      id: orgRoles.id,
-      systemKey: orgRoles.systemKey,
-      templateKey: orgRoles.templateKey,
-    })
+    .returning({ id: orgRoles.id, systemKey: orgRoles.systemKey, templateKey: orgRoles.templateKey })
   const o: Org = {
     id: org!.id,
     slug: input.slug,
     type: input.type,
-    roles: Object.fromEntries(
-      roles.map((r) => [r.systemKey ?? r.templateKey!, r.id])
-    ),
+    roles: Object.fromEntries(roles.map((r) => [r.systemKey ?? r.templateKey!, r.id])),
   }
   await join(o, [input.owner])
   await give(o, input.owner, "owner")
@@ -413,32 +263,16 @@ export async function makeOrg(input: {
 export async function join(org: Org, people: UserRow[]) {
   await insertAll(
     orgMembers,
-    people.map((p) => ({
-      orgId: org.id,
-      userId: p.id,
-      status: "active" as const,
-      joinedVia: "created",
-      createdAt: at(-int(30, 180)),
-    }))
+    people.map((p) => ({ orgId: org.id, userId: p.id, status: "active" as const, joinedVia: "created", createdAt: at(-int(30, 180)) }))
   )
   await insertAll(
     roleAssignments,
-    people.map((p) => ({
-      orgId: org.id,
-      userId: p.id,
-      roleId: org.roles.member!,
-      groupId: null,
-    }))
+    people.map((p) => ({ orgId: org.id, userId: p.id, roleId: org.roles.member!, groupId: null }))
   )
 }
 
 /** A role (built-in key or suggested-role key), across the organization or in a group. */
-export async function give(
-  org: Org,
-  who: UserRow | UserRow[],
-  role: string,
-  groupId: string | null = null
-) {
+export async function give(org: Org, who: UserRow | UserRow[], role: string, groupId: string | null = null) {
   const list = Array.isArray(who) ? who : [who]
   const roleId = org.roles[role]
   if (!roleId) throw new Error(`No role ${role} in ${org.slug}`)
@@ -453,13 +287,7 @@ export async function group(
   org: Org,
   name: string,
   parentId: string | null = null,
-  extra: {
-    startsOn?: string
-    endsOn?: string
-    leadId?: string
-    open?: boolean
-    description?: string
-  } = {}
+  extra: { startsOn?: string; endsOn?: string; leadId?: string; open?: boolean; description?: string } = {}
 ) {
   const [g] = await db
     .insert(orgGroups)
@@ -477,5 +305,4 @@ export async function seat(groupId: string, people: UserRow[]) {
 
 /** People to list at the end: who to sign in as, and what they'll see. */
 export const ACCOUNTS: { org: string; role: string; email: string }[] = []
-export const remember = (org: string, role: string, u: UserRow) =>
-  ACCOUNTS.push({ org, role, email: u.email })
+export const remember = (org: string, role: string, u: UserRow) => ACCOUNTS.push({ org, role, email: u.email })
