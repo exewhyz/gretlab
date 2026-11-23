@@ -1,9 +1,12 @@
 import { after, NextResponse } from "next/server"
 
 import { getQueueHealth } from "@/features/admin/server"
+import { runJobs } from "@/features/jobs/server"
 import { checkAlerts } from "@/features/monitoring/alerts"
 
 export const dynamic = "force-dynamic"
+
+let lastJobs = 0
 
 /** A submission waiting longer than this means the judges aren't keeping up. */
 const STUCK_SECONDS = 180
@@ -16,6 +19,11 @@ const STUCK_SECONDS = 180
 export async function GET() {
   // An uptime monitor calls this every minute or so: the alerts are checked then too.
   after(() => checkAlerts())
+  // …and background jobs move forward, at most once a minute per server.
+  if (Date.now() - lastJobs >= 60_000) {
+    lastJobs = Date.now()
+    after(() => runJobs(10_000).catch(() => {}))
+  }
   try {
     const queue = await getQueueHealth()
     const problem =

@@ -29,6 +29,7 @@ import {
 } from "@workspace/ui/components/tabs"
 
 import { DetailSheet } from "@/components/detail-sheet"
+import { JobProgress } from "@/components/job-progress"
 import { ConfirmButton } from "@/components/confirm"
 import { Markdown } from "@/components/markdown"
 import { Field, FormMessage, TextInput } from "@/components/form"
@@ -64,6 +65,15 @@ export type Gradebook = Exclude<
 
 export function AssignmentGradebook({ id }: { id: string }) {
   const owner = useOwner()
+  // The CSV is made in the background (features/jobs), so a gradebook of any size downloads.
+  const [exportJob, setExportJob] = useState<string | null>(null)
+  const startExport = useMutation({
+    mutationFn: () =>
+      api<{ job: string }>(owner.api(`/assignments/${id}/gradebook/export`), {
+        method: "POST",
+      }),
+    onSuccess: (r) => setExportJob(r.job),
+  })
   const [viewing, setViewing] = useState<{
     email: string
     problemId: string
@@ -179,19 +189,28 @@ export function AssignmentGradebook({ id }: { id: string }) {
               </Link>
             )}
             {data.can.export && (
-              <a
-                href={`/api/v1${owner.api(`/assignments/${id}/gradebook`)}?format=csv`}
-                download
-                className={cn(buttonVariants({ size: "sm" }))}
+              <Button
+                size="sm"
+                disabled={startExport.isPending || Boolean(exportJob)}
+                onClick={() => startExport.mutate()}
               >
                 Download CSV
-              </a>
+              </Button>
             )}
           </span>
         }
       >
         Gradebook: {data.assignment.title}
       </PageTitle>
+      {exportJob && (
+        <div className="mb-3 max-w-md">
+          <JobProgress
+            id={exportJob}
+            label="Gradebook export"
+            onClose={() => setExportJob(null)}
+          />
+        </div>
+      )}
       <p className="mb-3 flex flex-wrap items-center gap-2 text-caption text-body">
         <PhaseBadge phase={data.assignment.phase} />
         Due {formatDateTime(data.assignment.dueAt)}. Marks update as students

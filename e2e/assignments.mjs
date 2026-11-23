@@ -510,7 +510,12 @@ await tp.goto(`${BASE}/admin/assignments/${(await t("/admin/assignments")).json.
 await tp.getByRole("link", { name: "Gradebook" }).waitFor({ timeout: 30000 })
 await tp.getByRole("link", { name: "Gradebook" }).click()
 await tp.getByTestId("grade-row").first().waitFor({ timeout: 15000 })
-check("gradebook page with a CSV download", await tp.getByRole("link", { name: "Download CSV" }).isVisible())
+// Download CSV makes the file in the background, shows how far it has got, then downloads it.
+const download = tp.waitForEvent("download", { timeout: 30000 }).catch(() => null)
+await tp.getByRole("button", { name: "Download CSV" }).click()
+await tp.getByTestId("job-progress").getByText("Ready").waitFor({ timeout: 30000 }).catch(() => {})
+const csvFile = await download
+check("gradebook page: Download CSV makes the file and downloads it", (await tp.getByTestId("job-progress").getByText("Ready").count()) === 1 && /-grades\.csv$/.test(csvFile?.suggestedFilename() ?? ""), csvFile?.suggestedFilename())
 await tp.goto(`${BASE}/admin/assignments/${week1.json.id}/grades`)
 await tp.getByTestId("grade-row").first().waitFor({ timeout: 15000 })
 check("gradebook page shows marks", await tp.getByTestId("grade-row").filter({ hasText: "asg-a@example.com" }).getByRole("cell", { name: "100" }).first().isVisible())

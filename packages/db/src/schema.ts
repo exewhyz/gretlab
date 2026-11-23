@@ -3340,3 +3340,57 @@ export const emailTemplates = pgTable("email_templates", {
   }),
   updatedAt: updatedAt(),
 })
+
+/**
+ * Background jobs (apps/web/features/jobs; rules in packages/judge/src/jobs.ts): long work done
+ * in small steps outside the request that asked for it. `cursor` is where the next step starts;
+ * a step holds the job (`locked_by`, `locked_until`) and only its holder may save it.
+ */
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: id(),
+    kind: text("kind").notNull(),
+    /** The organization it works on; null for the platform's. */
+    orgId: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    status: text("status")
+      .$type<"queued" | "running" | "done" | "failed" | "cancelled">()
+      .notNull()
+      .default("queued"),
+    input: jsonb("input").$type<Record<string, unknown>>().notNull().default({}),
+    cursor: jsonb("cursor").$type<unknown>(),
+    progress: integer("progress").notNull().default(0),
+    total: integer("total"),
+    /** What it did: a summary line, and up to 500 lines of report. */
+    result: jsonb("result").$type<{ summary: string; lines?: string[] }>(),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lockedBy: text("locked_by"),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("jobs_due").on(table.status, table.nextAttemptAt),
+    index("jobs_by").on(table.createdBy, table.createdAt),
+  ]
+)
+
+/** A job's output file (an export), kept a day; written a part at a time. */
+export const jobFiles = pgTable("job_files", {
+  jobId: uuid("job_id")
+    .primaryKey()
+    .references(() => jobs.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  contentType: text("content_type").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: createdAt(),
+})

@@ -1039,12 +1039,10 @@ export function csvField(value: string | number | null) {
   return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
 }
 
-export async function gradebookCsv(
-  id: string,
-  orgId: string | null,
-  scope: "all" | Set<string> = "all"
-) {
-  const book = await getGradebook(id, orgId, scope)
+type Gradebook = Awaited<ReturnType<typeof getGradebook>>
+
+/** A gradebook as CSV lines: its header, and a line per student. */
+function csvLines(book: Gradebook) {
   const header = [
     "Name",
     "Email",
@@ -1060,8 +1058,7 @@ export async function gradebookCsv(
     "Problems late",
     ...(book.assignment.exam ? ["Exam", "Exam warnings"] : []),
   ]
-  const lines = [
-    header,
+  const rows = [
     ...book.rows.map((row) => [
       row.name,
       row.email,
@@ -1085,9 +1082,49 @@ export async function gradebookCsv(
         : []),
     ]),
   ].map((fields) => fields.map(csvField).join(","))
+  return { header: [...header].map(csvField).join(","), rows }
+}
+
+export async function gradebookCsv(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string> = "all"
+) {
+  const book = await getGradebook(id, orgId, scope)
+  const { header, rows } = csvLines(book)
   return {
     filename: `${book.assignment.slug}-grades.csv`,
     // A byte-order mark so Excel reads names in any script correctly.
-    body: "﻿" + lines.join("\r\n") + "\r\n",
+    body: "\ufeff" + [header, ...rows].join("\r\n") + "\r\n",
+  }
+}
+
+/**
+ * One part of the same CSV, for an export done as a job (features/jobs): the students from
+ * `offset`, in the gradebook's order (name, then email), so the parts join into exactly the
+ * file gradebookCsv makes. The first part starts with the byte-order mark and the header.
+ */
+export async function gradebookCsvPart(
+  id: string,
+  orgId: string | null,
+  scope: "all" | Set<string>,
+  offset: number,
+  size: number
+) {
+  const [assignment] = await getDb()
+    .select()
+    .from(assignments)
+    .where(and(eq(assignments.id, id), ownedBy(orgId)))
+  if (!assignment) throw notFound("Assignment not found")
+  const students = await studentsOf(assignment, scope)
+  const ids = students.slice(offset, offset + size).map((s) => s.id)
+  const book = await getGradebook(id, orgId, scope, ids)
+  const { header, rows } = csvLines(book)
+  const lines = rows.map((r) => r + "\r\n").join("")
+  return {
+    filename: `${book.assignment.slug}-grades.csv`,
+    text: offset === 0 ? "\ufeff" + header + "\r\n" + lines : lines,
+    total: students.length,
+    next: offset + ids.length,
   }
 }

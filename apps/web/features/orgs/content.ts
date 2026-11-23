@@ -63,7 +63,8 @@ import {
   importProblems,
   type ProblemSummary,
 } from "@/features/problems/server"
-import { ApiError } from "@/lib/api/route"
+import { ApiError, notFound } from "@/lib/api/route"
+import { enqueue, kickJobs } from "@/features/jobs/server"
 
 import { accessTo, narrowLanguages, viewpoint } from "./access"
 
@@ -233,6 +234,34 @@ export async function deleteOrgAssignment(
 }
 
 /** Grades of the students this person may see: everyone, or those in their groups. */
+/**
+ * The whole gradebook as CSV, made as a background job (features/jobs) so a gradebook of any
+ * size downloads: the same file as ?format=csv, for the same people.
+ */
+export async function orgGradebookExport(slug: string, user: User, id: string) {
+  const ctx = await orgContext(slug, user)
+  needAnywhere(ctx, "gradebook.export")
+  const scope = groupsFor(ctx, "gradebook.export")
+  const [found] = await getDb()
+    .select({ id: assignments.id })
+    .from(assignments)
+    .where(
+      sql.and(sql.eq(assignments.id, id), sql.eq(assignments.orgId, ctx.org.id))
+    )
+  if (!found) throw notFound("Assignment not found")
+  await writeAudit(ctx, "gradebook.export", "Downloaded a gradebook", {
+    assignment: id,
+  })
+  const job = await enqueue(getDb(), {
+    kind: "gradebook.csv",
+    orgId: ctx.org.id,
+    userId: user.id,
+    input: { assignmentId: id, scope: scope === "all" ? "all" : [...scope] },
+  })
+  kickJobs()
+  return { job }
+}
+
 export async function orgGradebook(
   slug: string,
   user: User,

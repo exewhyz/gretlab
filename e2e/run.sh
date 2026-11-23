@@ -97,6 +97,7 @@ suite trips http://localhost:3100
 suite large-org http://localhost:3100
 suite judges http://localhost:3100
 suite monitoring http://localhost:3100
+suite jobs http://localhost:3100
 suite links http://localhost:3100
 suite org-kinds http://localhost:3100
 suite college http://localhost:3100

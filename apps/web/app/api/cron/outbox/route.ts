@@ -11,6 +11,7 @@ import { drainOutbox, outboxHealth } from "@/features/notifications/outbox"
 import { reconcileJudges } from "@/features/judges/server"
 import { autoscaleJudges } from "@/features/judges/autoscale"
 import { checkAlerts } from "@/features/monitoring/alerts"
+import { runJobs, tidyJobs } from "@/features/jobs/server"
 
 export const dynamic = "force-dynamic"
 /** The drain stops itself after 25 s; this is the host's hard limit around it. */
@@ -38,6 +39,7 @@ function tokenMatches(request: NextRequest, expected: string) {
 }
 
 async function handle(request: NextRequest) {
+  const startedAt = Date.now()
   const expected = configuredSecret()
   // Says which side is wrong, so a scheduler's log is enough to fix it. Whether a secret is
   // set reveals nothing about it.
@@ -76,10 +78,19 @@ async function handle(request: NextRequest) {
   const scaling = await autoscaleJudges({ force: true })
   // Monitoring alerts: anything new, worse or fixed is emailed at once (urgent, sent here).
   const alerts = await checkAlerts({ force: true })
+  // Background jobs (exports and the like) move forward even with nobody waiting on them.
+  // Whatever is left of the minute, keeping 10 s spare (email may have used 25 s of it).
+  const left = maxDuration * 1000 - 10_000 - (Date.now() - startedAt)
+  const jobs = await runJobs(Math.min(20_000, left)).catch((error) => {
+    console.error("[jobs]", error)
+    return { steps: 0 }
+  })
+  await tidyJobs().catch(() => {})
   return NextResponse.json({
     ...done,
     judges: { ...judges, scaling: scaling.action },
     alerts,
+    jobs,
     ...(await outboxHealth()),
     digests,
     webhooks: {
