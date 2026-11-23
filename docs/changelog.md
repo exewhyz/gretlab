@@ -8,6 +8,14 @@ aren't listed.
 
 ## 23 November 2026
 
+### Big exports and years of any size
+
+- **Download CSV on gradebooks and Reports works at any size.** The file is made in the
+  background, with a progress bar, and downloads by itself when it's ready; a gradebook of 20,000
+  students takes about 15 seconds. You can leave the page: the file waits for you for a day.
+- **Making an academic year current, and promoting students, work for any number of students**
+  (they failed past about 32,000).
+
 ### Alerts when something goes wrong
 
 - **Monitoring now emails you** when something goes wrong: no judge online, code waiting for a
