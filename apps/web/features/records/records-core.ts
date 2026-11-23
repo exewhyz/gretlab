@@ -165,8 +165,15 @@ export async function syncPlaces(db: Db, ctx: OrgContext, yearId: string) {
   const rows = seats.filter((s): s is { userId: string; groupId: string } =>
     Boolean(s.groupId)
   )
-  if (rows.length)
-    await db.insert(groupMembers).values(rows).onConflictDoNothing()
+  // One statement with the lists as arrays: a row of values per person would pass Postgres's
+  // 65,535-parameter limit past about 32,000 students.
+  if (rows.length) {
+    const q = sql.sql
+    await db.execute(q`
+      insert into group_members (group_id, user_id)
+      select g, u from unnest(${q.param(rows.map((r) => r.groupId))}::uuid[], ${q.param(rows.map((r) => r.userId))}::uuid[]) as m(g, u)
+      on conflict do nothing`)
+  }
 }
 
 export async function yearOf(ctx: OrgContext, id: string) {

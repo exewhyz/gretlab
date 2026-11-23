@@ -204,22 +204,25 @@ export async function promote(
   for (const p of plan) counts[p.kind as keyof typeof counts]++
   if (!input.apply) return { applied: false, counts }
   await db.transaction(async (tx) => {
-    for (const p of plan) {
-      if (p.kind === "skipped") continue
-      if (p.kind === "graduated" || p.kind === "withdrawn") {
+    // A statement per kind, with the people as arrays, so a year of any size is a few statements.
+    const q = sql.sql
+    for (const status of ["graduated", "withdrawn"] as const) {
+      const ids = plan.filter((p) => p.kind === status).map((p) => p.id)
+      if (ids.length)
         await tx
           .update(enrolments)
-          .set({ status: p.kind })
-          .where(eq(enrolments.id, p.id))
-        continue
-      }
-      await tx.insert(enrolments).values({
-        orgId: ctx.org.id,
-        yearId: to.id,
-        userId: p.userId,
-        groupId: p.to,
-        rollNo: p.kind === "repeated" ? p.rollNo : null,
-      })
+          .set({ status })
+          .where(sql.inArray(enrolments.id, ids))
+    }
+    const moving = plan.filter(
+      (p) => p.kind === "moved" || p.kind === "repeated"
+    )
+    if (moving.length) {
+      await tx.execute(q`
+        insert into enrolments (org_id, year_id, user_id, group_id, roll_no)
+        select ${ctx.org.id}, ${to.id}, u, g, r
+        from unnest(${q.param(moving.map((p) => p.userId))}::uuid[], ${q.param(moving.map((p) => p.to))}::uuid[],
+          ${q.param(moving.map((p) => (p.kind === "repeated" ? p.rollNo : null)))}::int[]) as m(u, g, r)`)
     }
     if (input.makeCurrent) await makeCurrent(tx, ctx, to.id)
     // Graduates and leavers of the current year leave their classes now.

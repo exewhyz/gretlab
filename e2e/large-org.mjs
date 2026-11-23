@@ -8,6 +8,7 @@
  *     page at a time and searches on the server, and the CSV still has everyone
  *   - member pickers ask for a page; the whole list stays complete for integrations
  *   - the largest imports allowed (5,000 members, 3,000 student records), timed
+ *   - a year of 40,000 students made current, then promoted to the next, each in one request
  *   node e2e/large-org.mjs [base-url]
  */
 import { execFileSync } from "node:child_process"
@@ -207,6 +208,33 @@ const twins = await owner(`${O}/import`, { body: { rows: [
 ], commit: true } })
 const twinHandles = psql(`select handle from users where email like 'lo-twin@%' order by email`).split("\n")
 check("two people named lo-twin@ in one file both get in, with their own handles", twins.status === 200 && twinHandles.length === 2 && twinHandles[0] !== twinHandles[1], JSON.stringify({ status: twins.status, twinHandles, body: JSON.stringify(twins.json).slice(0, 200) }))
+
+// ---------- a year of 40,000 students: made current, then promoted
+// Past 32,768 people, anything sending one parameter per person fails (Postgres allows 65,535).
+const YEAR_STUDENTS = 40_000
+const nextYear = (await owner(`${O}/academic-years`, { body: { name: "2027-2028", startsOn: "2028-01-01", endsOn: "2028-12-31" } })).json
+const lastYear = (await owner(`${O}/academic-years`, { body: { name: "2028-2029", startsOn: "2029-01-01", endsOn: "2029-12-31" } })).json
+psql(`
+  insert into users (email, name, role, handle)
+    select 'lo-y-' || g || '@example.com', 'Lo Year ' || g, 'student', 'lo-y-' || g from generate_series(1, ${YEAR_STUDENTS}) g;
+  insert into org_members (org_id, user_id, status, joined_via)
+    select '${orgId}', id, 'active', 'created' from users where email like 'lo-y-%@example.com';
+  insert into student_records (org_id, user_id, admission_no, admitted_on)
+    select '${orgId}', id, 'Y' || substring(email from 'lo-y-([0-9]+)@'), '2026-01-01' from users where email like 'lo-y-%@example.com';
+  insert into enrolments (org_id, year_id, user_id, group_id, status)
+    select '${orgId}', '${nextYear.id}', id, (array[${sections.map((s) => `'${s.id}'::uuid`).join(",")}])[1 + (substring(email from 'lo-y-([0-9]+)@')::int % ${SECTIONS})], 'active'
+    from users where email like 'lo-y-%@example.com';
+`)
+const seated = () => Number(psql(`select count(*) from group_members gm join users u on u.id = gm.user_id where u.email like 'lo-y-%@example.com'`))
+started = Date.now()
+const madeCurrent = await owner(`${O}/academic-years/${nextYear.id}`, { method: "PATCH", body: { isCurrent: true } })
+const currentMs = Date.now() - started
+check(`making a year of ${YEAR_STUDENTS} students current places every one (${currentMs} ms)`, madeCurrent.status === 200 && seated() === YEAR_STUDENTS && currentMs < 20_000, JSON.stringify({ status: madeCurrent.status, seated: seated(), body: JSON.stringify(madeCurrent.json).slice(0, 300) }))
+started = Date.now()
+const promoted = await owner(`${O}/academic-years/promotion`, { body: { fromYearId: nextYear.id, toYearId: lastYear.id, sections: Object.fromEntries(sections.map((s) => [s.id, s.id])), exceptions: {}, apply: true, makeCurrent: true } })
+const promoteMs = Date.now() - started
+const enrolledNext = Number(psql(`select count(*) from enrolments where year_id = '${lastYear.id}'`))
+check(`promoting ${YEAR_STUDENTS} students to the next year, and making it current (${promoteMs} ms)`, promoted.status === 200 && promoted.json?.counts?.moved === YEAR_STUDENTS && enrolledNext === YEAR_STUDENTS && seated() === YEAR_STUDENTS && promoteMs < 30_000, JSON.stringify({ status: promoted.status, counts: promoted.json?.counts, enrolledNext, seated: seated(), body: JSON.stringify(promoted.json).slice(0, 300) }))
 
 cleanup()
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED")
