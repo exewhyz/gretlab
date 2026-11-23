@@ -8,6 +8,14 @@ aren't listed.
 
 ## 23 November 2026
 
+### Imports of up to 50,000 people, and faster lists
+
+- **Import members and students from files of up to 50,000 rows** (from 5,000 and 3,000). A
+  big file is sent in parts, checked in the background with a summary and the problem rows, and
+  added when you say so; the full report downloads as a file. Small files work as before.
+- **Linking parents, putting riders on buses and giving residents beds from a list are about
+  30 times faster**: 3,000 rows in under a second, where they took 20 to 25 seconds.
+
 ### Big exports and years of any size
 
 - **Download CSV on gradebooks and Reports works at any size.** The file is made in the
