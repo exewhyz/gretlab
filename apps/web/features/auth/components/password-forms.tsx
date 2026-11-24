@@ -112,6 +112,7 @@ const REASONS: Record<string, string> = {
   wrong: "That email and password don't match. Check them, or reset your password.",
   locked: "Too many wrong passwords: password sign-in is paused for 15 minutes. You can still continue with Google, or reset your password.",
   unverified: "Confirm your email first: we sent you a link when you signed up.",
+  busy: "Too many sign-in attempts from your network. Wait a few minutes and try again.",
 }
 
 export function SignInForm({ callbackUrl: next, devLogin }: { callbackUrl: string; devLogin: boolean }) {

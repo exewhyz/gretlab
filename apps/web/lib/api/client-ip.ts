@@ -26,9 +26,16 @@ function sameSecret(given: string) {
 }
 
 export function clientIp(request: NextRequest): string | null {
+  return addressFrom((name) => request.headers.get(name))
+}
+
+/** The same, from any way of reading a header (NextAuth hands authorize a plain object). */
+export function addressFrom(
+  header: (name: string) => string | null | undefined
+) {
   return visitorAddress(
     addressSourceNow(),
-    (name) => request.headers.get(name),
+    (name) => header(name) ?? null,
     sameSecret,
     process.env.CLIENT_IP_HEADER
   )

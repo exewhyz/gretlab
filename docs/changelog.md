@@ -8,6 +8,13 @@ aren't listed.
 
 ## 24 November 2026
 
+### Safer sign-in
+
+- **Too many attempts from one network are slowed down:** wrong passwords, new accounts and
+  emailed links each have a limit per network, so nobody can try passwords across many
+  accounts or flood inboxes. Past it, the page says to wait a few minutes. Right passwords
+  never count, and the limits leave room for a whole lab or cohort acting at once.
+
 ### Plans and payments
 
 - **Organizations choose and pay for their plan** under School › Plan and billing: the features

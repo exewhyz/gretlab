@@ -98,7 +98,9 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             </Item>
             <Item term="Activity and security">
               the network address and browser of actions recorded in an organization&apos;s
-              or the platform&apos;s activity log, and failed sign-in attempts.
+              or the platform&apos;s activity log, and failed sign-in attempts. To stop anyone
+              hammering the site, we count how often each network address signs in, signs up,
+              asks for emailed links or opens {site} from a learning management system.
             </Item>
             <Item term="The contact form">
               if you write to us from the front page: your name and email, your organization, its
@@ -248,6 +250,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
           </p>
           <List>
             <li>Invoices and payment records are kept for as long as India&apos;s tax and accounting laws require (up to eight years), even after an organization stops using {site}.</li>
+            <li>Those counts of how often a network address did something are deleted after a day.</li>
             <li>Emailed sign-in codes last 10 minutes, and password and confirmation links an hour or a day; each works once.</li>
             <li>Records of emails sent are deleted after 7 days, and of emails that failed after 30.</li>
             <li>An enquiry from the contact form is kept so we can follow it up; write to us to have yours deleted.</li>

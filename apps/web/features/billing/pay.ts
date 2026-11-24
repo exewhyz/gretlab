@@ -34,6 +34,7 @@ import {
 } from "@/features/orgs/server"
 import { getSettings } from "@/features/settings/server"
 import { ApiError, notFound } from "@/lib/api/route"
+import { needWithinLimit } from "@/lib/api/rate-limit"
 import {
   COLORS,
   footers,
@@ -119,6 +120,8 @@ export async function checkout(
   input: z.infer<typeof checkoutSchema>
 ) {
   const ctx = await billingContext(slug, user)
+  // Each attempt makes a Razorpay order: an organization can't flood them.
+  await needWithinLimit("checkout", ctx.org.id)
   const settings = await getSettings()
   if (!settings["billing.enabled"])
     throw new ApiError(409, "billing_off", "Billing isn't switched on.")

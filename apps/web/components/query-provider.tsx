@@ -6,8 +6,14 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query"
 import { useState, type ReactNode } from "react"
+import { z } from "zod"
 
 import { toast } from "@/lib/toast"
+
+// Zod's fast path compiles validators with `new Function`, after a probe that the
+// Content-Security-Policy reports as an eval on every page even though Zod catches it
+// (lib/csp.ts). Without it Zod validates the same, just without the compiled path.
+z.config({ jitless: true })
 
 /** A refusal or a missing thing (403, 404): retrying won't change it. */
 function refused(error: unknown) {

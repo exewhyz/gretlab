@@ -624,6 +624,13 @@
       "when": 1795464430434,
       "tag": "0088_billing_notice",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1795501934848,
+      "tag": "0089_rate_limits",
+      "breakpoints": true
     }
   ]
 }

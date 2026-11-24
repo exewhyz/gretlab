@@ -1762,6 +1762,24 @@ export const orgHolidays = pgTable(
 )
 
 /**
+ * How often one network address (or organization) did something limited, per fixed window
+ * (packages/judge/src/rate-limits.ts): `key` is "action:subject". One row per key and window,
+ * counted up in one statement; rows older than a day are deleted by the cron.
+ */
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: text("key").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    n: integer("n").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.key, table.windowStart] }),
+    index("rate_limits_window").on(table.windowStart),
+  ]
+)
+
+/**
  * A request from the landing page's contact form: someone at a college, cohort program or
  * school asking about GretLab. Emailed to the organizations contact and listed on
  * Dashboard › Landing page for follow-up. `ip` only limits how often one address can send.

@@ -13,6 +13,8 @@ import { after } from "next/server"
 import { z } from "zod"
 
 import { writeEntry } from "@/features/audit/server"
+import { needWithinLimit } from "@/lib/api/rate-limit"
+import { requestInfo } from "@/lib/api/request-context"
 import { composeEmail } from "@/features/emails/server"
 import { freeHandle } from "@/features/catalog/server"
 import { queueEmails, sendUrgent } from "@/features/notifications/outbox"
@@ -193,6 +195,7 @@ async function mayRegister(email: string) {
  * has an account, the email says so instead: the answer here is the same either way.
  */
 export async function signUp(input: z.infer<typeof signUpSchema>) {
+  await needWithinLimit("sign_up", requestInfo().ip)
   const problem = passwordProblem(input.password, input.email)
   if (problem) throw new ApiError(400, "weak_password", problem)
   if (!(await mayRegister(input.email)))
@@ -261,6 +264,7 @@ export const emailSchema = z.object({
 
 /** Sends a new confirmation link to an account that hasn't confirmed its address yet. */
 export async function resendConfirmation(email: string) {
+  await needWithinLimit("email_link", requestInfo().ip)
   const [user] = await getDb().select().from(users).where(eq(users.email, email))
   if (user && !user.disabled && !user.emailVerifiedAt && user.passwordHash && !(await sentRecently(user.id, "verify"))) {
     await mail(email, "account.confirm", { name: user.name ?? "there", link: await newLink(user.id, "verify") })
@@ -272,6 +276,7 @@ export async function resendConfirmation(email: string) {
 
 /** Emails a link to choose a new password (to any account, Google ones included). */
 export async function forgotPassword(email: string) {
+  await needWithinLimit("email_link", requestInfo().ip)
   const [user] = await getDb().select().from(users).where(eq(users.email, email))
   if (user && !user.disabled && !(await sentRecently(user.id, "reset"))) {
     const link = await newLink(user.id, "reset")

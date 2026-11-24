@@ -7,6 +7,8 @@ import GoogleProvider, { type GoogleProfile } from "next-auth/providers/google"
 import { freeHandle } from "@/features/catalog/server"
 import { getSettings } from "@/features/settings/server"
 import { isAdminEmail } from "@/lib/admin-emails"
+import { addressFrom } from "@/lib/api/client-ip"
+import { pastLimit, withinLimit } from "@/lib/api/rate-limit"
 
 import { checkPassword } from "./password"
 import { confirmApp, confirmEmail, verifySecondStep } from "./two-factor"
@@ -19,7 +21,11 @@ export const DEV_LOGIN_ENABLED =
  * Applies registration settings and records the account. Returns whether to allow sign-in.
  * `verified`: the provider vouches for the address (Google), so it counts as confirmed.
  */
-async function admit(rawEmail: string, name: string | null | undefined, verified = false) {
+async function admit(
+  rawEmail: string,
+  name: string | null | undefined,
+  verified = false
+) {
   const email = rawEmail.toLowerCase()
   const db = getDb()
   const [existing] = await db
@@ -47,7 +53,12 @@ async function admit(rawEmail: string, name: string | null | undefined, verified
       await db
         .update(authTokens)
         .set({ usedAt: new Date() })
-        .where(sql.and(sql.eq(authTokens.userId, existing.id), sql.isNull(authTokens.usedAt)))
+        .where(
+          sql.and(
+            sql.eq(authTokens.userId, existing.id),
+            sql.isNull(authTokens.usedAt)
+          )
+        )
     return true
   }
 
@@ -82,10 +93,28 @@ export const authOptions: NextAuthOptions = {
       id: "password",
       name: "Email and password",
       credentials: { email: { type: "email" }, password: { type: "password" } },
-      async authorize(credentials) {
-        const result = await checkPassword(credentials?.email ?? "", credentials?.password ?? "")
-        if (!result.ok) throw new Error(result.reason)
-        return { id: result.user.id, email: result.user.email, name: result.user.name }
+      async authorize(credentials, req) {
+        // Failed sign-ins from one address, across accounts: past the limit, refused before any
+        // password is checked. Right ones don't count, so a lab signing in together is fine.
+        const headers = (req?.headers ?? {}) as Record<
+          string,
+          string | undefined
+        >
+        const address = addressFrom((name) => headers[name])
+        if (await pastLimit("sign_in", address)) throw new Error("busy")
+        const result = await checkPassword(
+          credentials?.email ?? "",
+          credentials?.password ?? ""
+        )
+        if (!result.ok) {
+          await withinLimit("sign_in", address)
+          throw new Error(result.reason)
+        }
+        return {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name,
+        }
       },
     }),
     ...(DEV_LOGIN_ENABLED
@@ -113,7 +142,8 @@ export const authOptions: NextAuthOptions = {
         return user.email ? admit(user.email, user.name, true) : false
       }
       // The password was checked in authorize, against a confirmed account.
-      if (account?.provider === "password") return user.email ? admit(user.email, user.name) : false
+      if (account?.provider === "password")
+        return user.email ? admit(user.email, user.name) : false
       if (!(DEV_LOGIN_ENABLED && account?.provider === "dev")) return false
       return user.email ? admit(user.email, user.name) : false
     },
@@ -162,7 +192,8 @@ export const authOptions: NextAuthOptions = {
         ...session,
         mfaAt: typeof token.mfaAt === "number" ? token.mfaAt : null,
         mfaError: typeof token.mfaError === "string" ? token.mfaError : null,
-        signedInAt: typeof token.signedInAt === "number" ? token.signedInAt : null,
+        signedInAt:
+          typeof token.signedInAt === "number" ? token.signedInAt : null,
       }
     },
   },
