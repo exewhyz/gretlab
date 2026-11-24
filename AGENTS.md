@@ -1089,6 +1089,7 @@ Status is updated as items ship; anything not ticked has not been built.
 **Open follow-ups:**
 - Neon (Sydney) is kept frozen read-only as the way back until about 29 November 2026; then the owner deletes it, and the privacy policy's Neon line comes out (bump `LEGAL_UPDATED`). The wider plan (organizations of 200,000 students, judge pools per organization, Redis, a job queue, Cloudflare R2, monitoring, costs) is in the owner's "GretLab Scaling Plan" report.
 - A flaky check in `e2e/assignments.mjs`: "locked: drafts from before the exam don't come back". It fails now and then and passes when rerun alone; the cause isn't found yet (the clocks of the app and the database agreed).
+- Two more that fail now and then in runs of several suites and pass alone (24 November 2026, seen while testing step-up; also passed on the commit before it): `e2e/orgs.mjs` waiting for the library's scope note after switching to one organization (`scope-note`, a 30 s wait timed out), and `e2e/assignments.mjs` "the library page links back to its assignment". The library page is built ahead and refreshed every 60 s (`revalidate`), which is the first thing to look at.
 - Design: `/impeccable doctor` reports the skill's setup gaps.
 - About 230 hand-written client types remain where screens shape data on purpose; convert others as they're touched.
 - The problem library isn't paged on the server; it sends compact rows and pages in the browser. Revisit if a library grows past a few thousand items.
