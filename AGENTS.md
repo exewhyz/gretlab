@@ -21,11 +21,12 @@ A coding lab a teacher or institution can run for their students: practice probl
 
     | What changed | Before merging |
     | --- | --- |
-    | The judge or sandbox, the queue, sign-in and two-factor, API routes, the database (schema, migrations, queries other features rely on), permissions and access | The full regression (`pnpm test:e2e`) |
-    | App pages and components only (UI) | Typecheck, lint, the suites for that area (`E2E_ONLY=…`), and a look in the browser |
+    | The judge or sandbox, or the queue (`apps/runner`, `docker/sandbox`, claiming and judging) | The full regression (`pnpm test:e2e`) |
+    | Anything else that runs: sign-in and two-factor, API routes, the database (schema, migrations, the client), permissions, pages | Typecheck, lint, unit tests, and the suites for what changed (`E2E_ONLY=…`, plus the database tests in `packages/db` when the client or schema changes); a look in the browser for pages |
     | Docs, the changelog, AGENTS.md, DESIGN.md | The docs build |
     | The test scripts themselves (`e2e/run.sh`) | One full run, to prove they still work |
 
+    The owner's decision (24 November 2026): test what a change touches, not everything each time. Choose the suites by what the change reaches (the feature's own suite, the suites of features that call the changed code, `access-links` and `links` when permissions or pages that link change); say in the report which were run and why. Run the full regression before a release that gathers several such changes, and whenever the owner asks.
     When unsure which row a change is in, use the higher one.
   - Don't force-push.
   - A check that fails only under machine load counts as green if it passes when the suite is rerun on its own with the runner, and the report says so.
@@ -44,7 +45,7 @@ The project enables the agent-skills plugin (`.claude/settings.json`). Work in i
 2. **Test first** (`test-driven-development`): a failing test that shows the bug or the missing behaviour, then the code. Rules that are pure go in `packages/judge` unit tests (`pnpm test`); database behaviour in `tsx --test` files run by `e2e/run.sh` (`test:queue`, `test:lists`); everything a person does in an `e2e/*.mjs` suite. Prove a fix with the old code failing first.
 3. **Small slices** (`incremental-implementation`): one behaviour at a time, typecheck and the affected suites after each, a commit per slice.
 4. **Review before merge** (`code-review-and-quality`, plus `security-and-hardening` for anything touching auth, permissions, AWS, the sandbox or SQL): correctness, security, architecture, performance; findings fixed, not deferred. Raw SQL takes values only as parameters; AWS permissions are as narrow as the action needs and checked with the IAM policy simulator.
-5. **Verify** as the table under Working agreements says (the full regression for the judge, queue, API, database and permissions), and look at the screenshots.
+5. **Verify** as the table under Working agreements says (the suites a change touches; the full regression only for the judge, sandbox and queue, or before a release that gathers several changes), and look at the screenshots.
 6. **Document** in the same change: this file, the README or docs, and the changelog.
 
 ## Architecture
