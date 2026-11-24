@@ -107,6 +107,8 @@ With this login, `runner-setup.sh` skips migrations and the starter problems: th
 3. Long work isn't affected: `pnpm db:migrate` lifts it for its own session (`packages/db/src/migrate.ts`). A long query of your own in the SQL editor: put `set statement_timeout = 0;` before it.
 4. Undo, if ever needed: `alter role postgres reset statement_timeout;`
 
+The cause was found the same day: the database client pipelined queries through the transaction pooler, which Supabase's pooler can't handle (AGENTS.md › No pipelining behind a transaction pooler). Behind a pooler (`DATABASE_PREPARE=false`), it now sends one query at a time per connection. To check a pooler: `cd packages/db && DATABASE_URL='<transaction pooler>' DATABASE_PREPARE=false pnpm exec tsx src/check-connection.ts` (read-only; it reports a hang after 20 seconds instead of waiting).
+
 A stuck query looks like this in `pg_stat_activity`: application `Supavisor`, state `active`, wait event `ClientRead`, running for minutes. Ending it loses nothing (it's waiting on a caller that's gone): `select pg_terminate_backend(pid) from pg_stat_activity where application_name = 'Supavisor' and state = 'active' and wait_event = 'ClientRead' and now() - query_start > interval '1 minute';`
 
 **Watching it:**

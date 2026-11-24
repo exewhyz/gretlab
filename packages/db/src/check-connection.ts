@@ -1,7 +1,9 @@
 /**
  * Checks a database the way the web app uses it: the same client and settings (DATABASE_URL,
  * DATABASE_PREPARE, DATABASE_POOL), parallel queries that repeat with different values, a join,
- * and a transaction that writes and is rolled back. Changes nothing. Used before pointing the
+ * a transaction that writes and is rolled back, and many queries with values at once on a
+ * single connection (what Supabase's pooler hung on when they were pipelined, supabase/supavisor
+ * #1239: it should finish at once; a hang is reported after 20 seconds). Changes nothing. Used before pointing the
  * site at a new database (deploy/move-to-mumbai.md):
  *
  *   cd packages/db && DATABASE_URL='<transaction pooler>' DATABASE_PREPARE=false \
@@ -9,7 +11,14 @@
  */
 import { count, desc, eq, sql } from "drizzle-orm"
 
-import { getDb, organizations, problems, submissions, users } from "./index.ts"
+import {
+  connectTo,
+  getDb,
+  organizations,
+  problems,
+  submissions,
+  users,
+} from "./index.ts"
 
 const db = getDb()
 const started = Date.now()
@@ -63,6 +72,31 @@ try {
       if (!(error instanceof RolledBack)) throw error
     })
   console.log(`transaction ok, rolled back (${ms()})`)
+
+  // Many queries with values at once on one connection: they queue on it one at a time
+  // (max_pipeline 1 behind a pooler). Pipelined through Supavisor's transaction mode, these hung.
+  const single = connectTo(process.env.DATABASE_URL ?? "", {}, { max: 1 })
+  const many = Promise.all(
+    Array.from({ length: 40 }, (_, i) =>
+      single
+        .select({ id: problems.id })
+        .from(problems)
+        .where(eq(problems.slug, `check-${i}`))
+    )
+  )
+  const hung = new Promise((_, reject) =>
+    setTimeout(
+      () =>
+        reject(
+          new Error(
+            "40 queries on one connection hung for 20 seconds (pipelining through the pooler)"
+          )
+        ),
+      20_000
+    )
+  )
+  await Promise.race([many, hung])
+  console.log(`40 queries with values on one connection ok (${ms()})`)
   console.log("All checks passed.")
   process.exit(0)
 } catch (error) {
