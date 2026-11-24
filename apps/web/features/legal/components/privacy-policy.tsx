@@ -80,6 +80,13 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               organization keeps about you (designation, department, staff number, the date
               you joined, and a work phone, stored encrypted).
             </Item>
+            <Item term="Billing">
+              if your organization pays for a plan: the billing details it gives (legal name,
+              GSTIN, address and billing email), its plan, what each payment was for, who
+              made it and when, and its invoices. Card, UPI and bank details go straight to
+              our payment provider; we never see or keep them, only the provider&apos;s
+              reference for each payment.
+            </Item>
             <Item term="Parents and guardians">
               the link between a parent&apos;s account and their child&apos;s, made by the
               organization.
@@ -115,6 +122,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             <li>To run {site}: signing you in, running and grading code, and showing your work, marks and progress to you and to the people allowed to see them.</li>
             <li>To send the emails you&apos;d expect: confirming your address, sign-in codes, password links, security notices, and notifications you can switch off in your notification settings.</li>
             <li>To keep accounts and assessments honest and safe: two-factor sign-in, pausing sign-in after repeated wrong passwords, checking code similarity when a teacher asks, and the exam records above, which are signals for a teacher, not proof.</li>
+            <li>To bill organizations that pay for a plan: taking payments, issuing invoices with GST, and reminding those who manage billing before a period ends.</li>
             <li>To fix problems and keep the service running, using error reports and logs.</li>
             <li>To show ads on public practice pages (see <a href="#cookies" className={LINK}>Cookies and ads</a>).</li>
           </List>
@@ -189,6 +197,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             <Item term="Neon">an earlier copy of the database, in Sydney, Australia, kept until early December 2026 in case we need to move back, then deleted.</Item>
             <Item term="Google">sign-in with Google, and AdSense ads on public practice pages.</Item>
             <Item term="Our email provider">sending the emails described above.</Item>
+            <Item term="Razorpay">taking payments for organizations&apos; plans (UPI, cards and net banking), in India.</Item>
             <Item term="GitHub">looking up the commit of a repository link you hand in for a project.</Item>
             <Item term="Cloudflare">storing and serving files: images in problems and lessons (public, like the pages that show them), and the exports and import reports you download (private, reached only through a link that works for a few minutes). Stored in its Asia-Pacific region.</Item>
           </List>
@@ -238,6 +247,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             certificates are records it may need for years. Some things go sooner:
           </p>
           <List>
+            <li>Invoices and payment records are kept for as long as India&apos;s tax and accounting laws require (up to eight years), even after an organization stops using {site}.</li>
             <li>Emailed sign-in codes last 10 minutes, and password and confirmation links an hour or a day; each works once.</li>
             <li>Records of emails sent are deleted after 7 days, and of emails that failed after 30.</li>
             <li>An enquiry from the contact form is kept so we can follow it up; write to us to have yours deleted.</li>

@@ -67,6 +67,28 @@ export function Terms({ facts }: { facts: LegalFacts }) {
       ),
     },
     {
+      id: "plans",
+      title: "Plans and payments",
+      body: (
+        <>
+          <p>
+            Organizations may use {site} on a free plan or pay for one: the features, students
+            and staff they choose, at the prices shown when they choose them.
+          </p>
+          <List>
+            <li>A plan is paid for a month, a semester (six months) or a year, in advance, in Indian rupees, through our payment provider. Prices are before GST, which is added where it applies and shown on the invoice.</li>
+            <li>A period starts on the day it&apos;s paid. Adding features, students or staff during a period costs only the days left in it; a smaller plan starts at the next period. Whether you pay by the month, semester or year can change when you renew.</li>
+            <li>Payments aren&apos;t refunded, in whole or in part, including when a plan is made smaller or the organization stops using {site} during a period.</li>
+            <li>Before a period ends, whoever manages billing is reminded to pay for the next one. If it isn&apos;t paid, the plan is past due for 7 days and then paused.</li>
+            <li>When an organization goes past the students or staff its plan allows, it has 30 days to add more before adding people is paused.</li>
+            <li>A paused plan stops new members and new staff roles from being added. Nothing already there is deleted or hidden: work in progress, records and grades stay as they are, and paying restores everything at once.</li>
+            <li>Organizations above 10,000 students, and arrangements agreed with us in writing, are priced separately; what we agreed applies.</li>
+            <li>We may change prices for future periods; a period already paid for keeps its price.</li>
+          </List>
+        </>
+      ),
+    },
+    {
       id: "content",
       title: "Your content",
       body: (
@@ -155,9 +177,12 @@ export function Terms({ facts }: { facts: LegalFacts }) {
         <p>
           We keep improving {site}, so features may change, and we may pause the service
           for maintenance. We try to keep it running and your work safe, but we can&apos;t
-          promise it will always be available or free of errors. Any fees for an
-          organization are agreed with that organization in advance; nothing is charged to
-          you without your agreement.
+          promise it will always be available or free of errors. Nothing is charged to you
+          without your agreement; plans for organizations are described under{" "}
+          <a href="#plans" className={LINK}>
+            Plans and payments
+          </a>
+          .
         </p>
       ),
     },

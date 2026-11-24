@@ -131,6 +131,17 @@ Images in problem statements and the files people download (exports, import repo
 
 **Optional, later: images on their own domain**, cached in Cloudflare's cities. This needs the domain's DNS on Cloudflare (grettech.com's is at GoDaddy, so it isn't done): connect a custom domain such as `files.gretlab.grettech.com` to `gretlab-public`, add a response-header Transform Rule there (`X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; sandbox`), and set `R2_PUBLIC_URL` to it. Images then redirect there for good instead.
 
+### Payments (Razorpay)
+
+Organizations pay for their plans through Razorpay (UPI, cards, net banking), with GST invoices made here. Until it's set up, the plan page says paying online isn't set up and plans are set by hand on Dashboard › Plans. Billing itself stays off until Dashboard › Plans › Prices › **Billing is on**. Set it up once:
+
+1. Create a Razorpay account and finish its business KYC (Razorpay won't take live payments before).
+2. Test mode first: Razorpay Dashboard › Account & Settings › API keys › Generate test key. Put into Vercel (Preview, or Production while testing), never in a chat or a commit: `RAZORPAY_KEY_ID` (`rzp_test_…`) and `RAZORPAY_KEY_SECRET`. Redeploy.
+3. Razorpay Dashboard › Webhooks › Add: URL `https://gretlab.grettech.com/api/razorpay/webhook`, events **payment.captured** and **order.paid**, and a secret you make up (`openssl rand -hex 24`); put the same secret into Vercel as `RAZORPAY_WEBHOOK_SECRET`. The webhook applies a payment when the payer closes the tab before the page confirms it.
+4. Dashboard › Plans › Prices: your GSTIN and **GST registered** if you are (invoices then carry CGST and SGST, or IGST across states), and check the prices.
+5. Pay for a plan in test mode with Razorpay's test card or UPI ID: the plan changes, the payment shows under Payments and invoices, and its invoice opens as a PDF. Paying again for the same order changes nothing.
+6. Live: generate live keys and a live webhook (same URL, a new secret), replace the three settings, redeploy, and pay ₹1 worth of change once for real (refund it from Razorpay's dashboard if you like).
+
 ### Settings
 
 The web app reads these (in development from `apps/web/.env.local`; in production from the host or the `.env` that `docker-compose.prod.yml` reads). Templates: [`apps/web/.env.example`](apps/web/.env.example) and [`.env.example`](.env.example).
@@ -147,6 +158,7 @@ The web app reads these (in development from `apps/web/.env.local`; in productio
 | `RESEND_API_KEY` or `SMTP_URL`, and `MAIL_FROM` | no | Email notifications, queued and sent in batches with retries; without them, in-app only. Resend's API by default; `SMTP_URL` for any mail server |
 | `CRON_SECRET` | with email | Lets a scheduler call `POST /api/cron/outbox` to send big batches and retries (see Email below) |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_BUCKET`, `R2_PRIVATE_BUCKET` | no | Files in Cloudflare R2 (File storage above); without them, images and downloads stay in the database. `R2_PUBLIC_URL`, optional: the public bucket's custom domain. `STORAGE_ENDPOINT` points at another S3-compatible store instead |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | to take payments | Organizations pay for plans through Razorpay (Payments above). `RAZORPAY_API_URL` points tests at a fake Razorpay |
 | `GITHUB_TOKEN` | no | Raises GitHub's limit for pinning project commits |
 | `LTI_PRIVATE_KEY`, `LTI_KEY_ID` | no | A fixed LTI signing key; otherwise one is made and kept in the database |
 | `METRICS_TOKEN` | no | Turns on `GET /api/metrics` |

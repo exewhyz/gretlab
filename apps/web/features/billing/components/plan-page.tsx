@@ -84,6 +84,16 @@ function CurrentPlan({ data }: { data: Billing }) {
           {plan.periodEnd && ` · renews ${formatDate(plan.periodEnd)}`}
         </p>
       )}
+      {plan?.next && (
+        <p className="text-caption text-body" data-testid="next-plan">
+          From{" "}
+          {plan.periodEnd ? formatDate(plan.periodEnd) : "your next period"}:{" "}
+          {plan.next.students.toLocaleString("en-IN")} students,{" "}
+          {plan.next.staff.toLocaleString("en-IN")} staff,{" "}
+          {plan.next.features.map((k) => names.get(k) ?? k).join(" · ")}. The
+          plan below starts from it.
+        </p>
+      )}
       {data.limits && <LimitNote limits={data.limits} />}
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="grid gap-1">
@@ -116,23 +126,30 @@ function ChangePlan({ slug, data }: { slug: string; data: Billing }) {
   const client = useQueryClient()
   const plan = data.plan
   const start = (): PlanChoice =>
-    plan && plan.features
+    // A smaller plan already chosen for the next period is where renewing starts.
+    plan?.next
       ? {
-          features: plan.features,
-          students: Math.max(plan.students, data.usage.students),
-          staff: Math.max(plan.staff, data.usage.staff),
-          judges: plan.judges,
-          storagePacks: plan.storagePacks,
-          period: plan.period,
+          ...plan.next,
+          students: Math.max(plan.next.students, data.usage.students),
+          staff: Math.max(plan.next.staff, data.usage.staff),
         }
-      : {
-          features: data.catalogue.presets[0]?.features ?? [],
-          students: Math.max(data.usage.students, 50),
-          staff: Math.max(data.usage.staff, 5),
-          judges: 0,
-          storagePacks: 0,
-          period: "year",
-        }
+      : plan && plan.features
+        ? {
+            features: plan.features,
+            students: Math.max(plan.students, data.usage.students),
+            staff: Math.max(plan.staff, data.usage.staff),
+            judges: plan.judges,
+            storagePacks: plan.storagePacks,
+            period: plan.period,
+          }
+        : {
+            features: data.catalogue.presets[0]?.features ?? [],
+            students: Math.max(data.usage.students, 50),
+            staff: Math.max(data.usage.staff, 5),
+            judges: 0,
+            storagePacks: 0,
+            period: "year",
+          }
   const [choice, setChoice] = useState<PlanChoice>(start)
   return (
     <Card data-testid="change-plan" className="grid gap-4">

@@ -6,6 +6,23 @@ description: What's new in GretLab, newest first.
 What changed for the people using GretLab, newest first. Fixes and changes that don't show to anyone
 aren't listed.
 
+## 24 November 2026
+
+### Plans and payments
+
+- **Organizations choose and pay for their plan** under School › Plan and billing: the features
+  they use, for their students and staff, with the price shown as they choose. Pay monthly, per
+  semester or yearly through Razorpay (UPI, cards, net banking), with GST invoices to download.
+  Adding mid-period costs only the days left; a smaller plan starts at the next period.
+- **Limits with time to act:** a notice at 90% of the students or staff a plan allows, 30 days
+  past it, and a reminder a week and a day before a period ends. A plan that lapses pauses adding
+  people; nothing else stops.
+- **Nothing changes until billing is switched on.** Organizations from before keep everything.
+- **For the platform:** Dashboard › Plans lists every organization's plan, sets one by hand, edits
+  the prices, and compares each organization's revenue with what its judging costs.
+- The privacy policy names Razorpay and says how long invoices are kept; the terms describe plans
+  and payments.
+
 ## 23 November 2026
 
 ### Files on Cloudflare

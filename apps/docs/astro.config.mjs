@@ -179,6 +179,7 @@ export default defineConfig({
                 { label: "Activity log", slug: "features/platform/activity-log" },
                 { label: "Platform staff and organizations", slug: "features/platform/platform-staff" },
                 { label: "LTI 1.3", slug: "features/platform/lti" },
+                { label: "Plans and billing", slug: "features/platform/plans-and-billing" },
                 { label: "Site settings, search and legal", slug: "features/platform/site-settings" },
               ],
             },

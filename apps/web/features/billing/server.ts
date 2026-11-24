@@ -160,7 +160,8 @@ export async function orgBilling(slug: string, user: User) {
           periodEnd: sub.periodEnd,
           price: sub.price,
           discountPercent: sub.discountPercent,
-          next: sub.next,
+          /** A smaller plan chosen mid-period, starting when this period ends. */
+          next: (sub.next as PlanChoice | null) ?? null,
           overSince: sub.overSince,
         }
       : null,

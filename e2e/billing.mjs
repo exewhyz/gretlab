@@ -970,6 +970,16 @@ for (const [name, viewport] of [
     .getByTestId("plan-builder")
     .waitFor({ timeout: 30_000 })
     .catch(() => {})
+  check(
+    "the smaller plan chosen for the next period is shown, and changing the plan starts from it",
+    ((await tab.getByTestId("next-plan").textContent()) ?? "").includes(
+      "50 students"
+    ) &&
+      (await tab
+        .getByTestId("plan-builder")
+        .getByLabel("Students")
+        .inputValue()) === "50"
+  )
   await tab.getByTestId("plan-builder").getByLabel("Students").fill("600")
   await tab.getByTestId("pay").click()
   await tab
