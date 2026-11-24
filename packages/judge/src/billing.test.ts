@@ -10,6 +10,7 @@ import {
   limitState,
   periodEnd,
   priceOfPlan,
+  samePlan,
   upgradeDue,
   validGstin,
   withNeeds,
@@ -89,6 +90,27 @@ test("periods: a semester is half a year plus 10%, a month a twelfth plus 25%", 
 test("over 10,000 students is a custom quote", () => {
   assert.equal(priceOfPlan(list, plan({ students: 10_001 })).quote, true)
   assert.equal(priceOfPlan(list, plan({ students: 10_000 })).quote, false)
+})
+
+test("the same plan: features in any order and with what they need, the same counts and period", () => {
+  const plan: PlanChoice = {
+    features: ["results"],
+    students: 100,
+    staff: 5,
+    judges: 0,
+    storagePacks: 0,
+    period: "year",
+  }
+  assert.equal(
+    samePlan(list, plan, { ...plan, features: ["records", "results", "core"] }),
+    true
+  )
+  assert.equal(samePlan(list, plan, { ...plan, students: 101 }), false)
+  assert.equal(samePlan(list, plan, { ...plan, period: "month" }), false)
+  assert.equal(
+    samePlan(list, plan, { ...plan, features: ["results", "coding"] }),
+    false
+  )
 })
 
 test("a feature brings what it needs; unknown ones are dropped", () => {

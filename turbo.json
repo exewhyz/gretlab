@@ -3,23 +3,10 @@
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        ".env*"
-      ],
-      "outputs": [
-        "dist/**",
-        ".next/**",
-        "!.next/cache/**",
-        "!.next/dev/**"
-      ],
-      "env": [
-        "NEXT_PUBLIC_*",
-        "DOCS_SITE_URL"
-      ],
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "!.next/dev/**"],
+      "env": ["NEXT_PUBLIC_*", "DOCS_SITE_URL"],
       "passThroughEnv": [
         "DATABASE_*",
         "NEXTAUTH_*",
@@ -38,23 +25,18 @@
         "CRON_SECRET",
         "SITE_URL",
         "R2_*",
-        "STORAGE_ENDPOINT"
+        "STORAGE_ENDPOINT",
+        "RAZORPAY_*"
       ]
     },
     "lint": {
-      "dependsOn": [
-        "^lint"
-      ]
+      "dependsOn": ["^lint"]
     },
     "format": {
-      "dependsOn": [
-        "^format"
-      ]
+      "dependsOn": ["^format"]
     },
     "typecheck": {
-      "dependsOn": [
-        "^typecheck"
-      ]
+      "dependsOn": ["^typecheck"]
     },
     "dev": {
       "cache": false,

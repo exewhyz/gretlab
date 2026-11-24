@@ -329,23 +329,40 @@ export function OrgShell({
       title={shell?.org.name}
       badge={shell?.role}
     >
-      {shell?.planNotice && <PlanNotice slug={slug} notice={shell.planNotice} />}
+      {shell?.planNotice && (
+        <PlanNotice slug={slug} notice={shell.planNotice} />
+      )}
       {children}
     </AppFrame>
   )
 }
 
 const PLAN_NOTICE: Record<string, string> = {
-  "limit:near": "Your plan is nearly full: 90% of its students or staff are in use.",
-  "limit:over": "Your plan is over its limit. Everything works for 30 days; then adding people pauses.",
-  "limit:paused": "Adding people is paused: the plan is over its limit and its 30 days are over.",
-  "period:past_due": "Your plan is due. Pay within 7 days to keep adding people.",
-  "period:paused": "Your plan is paused until it's paid. Everything else keeps working.",
+  "limit:near":
+    "Your plan is nearly full: 90% of its students or staff are in use.",
+  "limit:over":
+    "Your plan is over its limit. Everything works for 30 days; then adding people pauses.",
+  "limit:paused":
+    "Adding people is paused: the plan is over its limit and its 30 days are over.",
+  "period:past_due":
+    "Your plan is due. Pay within 7 days to keep adding people.",
+  "period:paused":
+    "Your plan is paused until it's paid. Everything else keeps working.",
+  "renew:7":
+    "Your plan renews within a week: pay from Plan and billing to keep everything going.",
+  "renew:1":
+    "Your plan ends tomorrow: pay today to keep adding people after it.",
 }
 
 /** A bar above every page for whoever manages billing, while the plan needs attention. */
 function PlanNotice({ slug, notice }: { slug: string; notice: string }) {
-  const text = PLAN_NOTICE[notice]
+  // The most pressing first: unpaid, then the limit, then a renewal coming up.
+  const parts = notice.split("|")
+  const pick =
+    parts.find((p) => p.startsWith("period:")) ??
+    parts.find((p) => p.startsWith("limit:")) ??
+    parts.find((p) => p.startsWith("renew:"))
+  const text = pick ? PLAN_NOTICE[pick] : undefined
   if (!text) return null
   return (
     <div
@@ -354,7 +371,10 @@ function PlanNotice({ slug, notice }: { slug: string; notice: string }) {
       className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-chart-4/15 px-4 py-2 text-body-sm text-ink ring-1 ring-chart-4/40"
     >
       <span>{text}</span>
-      <Link href={orgPages(slug).manage("/billing")} className="font-medium text-primary underline">
+      <Link
+        href={orgPages(slug).manage("/billing")}
+        className="font-medium text-primary underline"
+      >
         Plan and billing
       </Link>
     </div>

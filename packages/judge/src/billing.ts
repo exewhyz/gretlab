@@ -266,6 +266,24 @@ export function withNeeds(list: PriceList, features: readonly string[]) {
   return [...out]
 }
 
+/** How many days before a period ends it can be renewed (paid for again, or its way of paying changed). */
+export const RENEW_WINDOW_DAYS = 7
+
+/** Whether two plans are the same: features (with what they need, in any order), counts and period. */
+export function samePlan(list: PriceList, a: PlanChoice, b: PlanChoice) {
+  const fa = withNeeds(list, a.features).sort()
+  const fb = withNeeds(list, b.features).sort()
+  return (
+    fa.length === fb.length &&
+    fa.every((k, i) => k === fb[i]) &&
+    a.students === b.students &&
+    a.staff === b.staff &&
+    a.judges === b.judges &&
+    a.storagePacks === b.storagePacks &&
+    a.period === b.period
+  )
+}
+
 /** Students priced in steps, like tax slabs: each step's students at that step's discount. */
 function stepped(list: PriceList, students: number, perStudent: number) {
   let left = students
@@ -469,9 +487,64 @@ export const FREE_FEATURES = ["core", "coding"] as const
 
 /** Ready-made plans: the usual features for a kind of organization, and a typical size. */
 export const PLAN_PRESETS = [
-  { key: "coding-lab", name: "Coding lab", features: ["coding", "exams_lab", "courses", "peer", "outcomes", "lti"], students: 600, staff: 25 },
-  { key: "college", name: "College", features: ["coding", "exams_lab", "courses", "outcomes", "records", "attendance", "timetable", "results", "admissions", "parents", "leave", "library", "lti"], students: 2000, staff: 120 },
-  { key: "school", name: "School", features: ["records", "attendance", "timetable", "results", "admissions", "parents", "leave", "library", "transport", "coding"], students: 800, staff: 55 },
-  { key: "coaching", name: "Coaching", features: ["coding", "exams_lab", "courses", "attendance", "runs"], students: 300, staff: 15 },
-  { key: "company", name: "Company training", features: ["courses", "training", "coding", "api"], students: 200, staff: 20 },
+  {
+    key: "coding-lab",
+    name: "Coding lab",
+    features: ["coding", "exams_lab", "courses", "peer", "outcomes", "lti"],
+    students: 600,
+    staff: 25,
+  },
+  {
+    key: "college",
+    name: "College",
+    features: [
+      "coding",
+      "exams_lab",
+      "courses",
+      "outcomes",
+      "records",
+      "attendance",
+      "timetable",
+      "results",
+      "admissions",
+      "parents",
+      "leave",
+      "library",
+      "lti",
+    ],
+    students: 2000,
+    staff: 120,
+  },
+  {
+    key: "school",
+    name: "School",
+    features: [
+      "records",
+      "attendance",
+      "timetable",
+      "results",
+      "admissions",
+      "parents",
+      "leave",
+      "library",
+      "transport",
+      "coding",
+    ],
+    students: 800,
+    staff: 55,
+  },
+  {
+    key: "coaching",
+    name: "Coaching",
+    features: ["coding", "exams_lab", "courses", "attendance", "runs"],
+    students: 300,
+    staff: 15,
+  },
+  {
+    key: "company",
+    name: "Company training",
+    features: ["courses", "training", "coding", "api"],
+    students: 200,
+    staff: 20,
+  },
 ] as const

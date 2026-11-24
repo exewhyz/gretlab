@@ -3,6 +3,7 @@
 import {
   gstSplit,
   priceOfPlan,
+  samePlan,
   upgradeDue,
   withNeeds,
   type BillingPeriod,
@@ -95,6 +96,9 @@ export function PlanBuilder({
     current?.periodStart &&
     current.periodEnd &&
     new Date(current.periodEnd) > new Date()
+  const unchanged = Boolean(
+    live && current && samePlan(list, current.choice, value)
+  )
   const dueNow =
     live && current && current.choice.period === value.period
       ? upgradeDue(
@@ -296,9 +300,11 @@ export function PlanBuilder({
                 className="mt-2 border-t border-hairline pt-2 text-caption text-body"
                 data-testid="plan-due-now"
               >
-                {dueNow > 0
-                  ? `Due now for the rest of this period: ${rupees(dueNow)} before GST.`
-                  : "Nothing due now: a smaller plan starts at your next period."}
+                {unchanged
+                  ? "This is your plan now."
+                  : dueNow > 0
+                    ? `Due now for the rest of this period: ${rupees(dueNow)} before GST.`
+                    : "Nothing due now: a smaller plan starts at your next period."}
               </p>
             )}
           </>

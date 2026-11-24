@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 
-import type { PlanChoice } from "@workspace/judge"
+import { RENEW_WINDOW_DAYS, samePlan, type PlanChoice } from "@workspace/judge"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 
@@ -52,9 +52,9 @@ export function PlanAndBilling({ slug }: { slug: string }) {
         </p>
       )}
       <CurrentPlan data={data} />
-      <ChangePlan data={data} />
+      <ChangePlan slug={slug} data={data} />
       <BillingDetails slug={slug} data={data} />
-      <Invoices data={data} />
+      <Invoices slug={slug} data={data} />
     </div>
   )
 }
@@ -112,7 +112,8 @@ function CurrentPlan({ data }: { data: Billing }) {
   )
 }
 
-function ChangePlan({ data }: { data: Billing }) {
+function ChangePlan({ slug, data }: { slug: string; data: Billing }) {
+  const client = useQueryClient()
   const plan = data.plan
   const start = (): PlanChoice =>
     plan && plan.features
@@ -166,11 +167,22 @@ function ChangePlan({ data }: { data: Billing }) {
             : null
         }
       />
-      <p className="text-body-sm text-body" data-testid="pay-note">
-        {data.canPay
-          ? "Paying online opens in the next step."
-          : "Paying online isn't set up yet. To change your plan, contact GretLab with the plan above; we'll set it for you."}
-      </p>
+      {data.enabled && data.canPay ? (
+        <PayButton
+          slug={slug}
+          choice={choice}
+          mode={payMode(data, choice)}
+          onDone={() =>
+            client.invalidateQueries({ queryKey: ["billing", slug] })
+          }
+        />
+      ) : (
+        <p className="text-body-sm text-body" data-testid="pay-note">
+          {data.enabled
+            ? "Paying online isn't set up yet. To change your plan, contact GretLab with the plan above; we'll set it for you."
+            : "Billing isn't switched on, so there's nothing to pay."}
+        </p>
+      )}
     </Card>
   )
 }
@@ -237,7 +249,7 @@ function BillingDetails({ slug, data }: { slug: string; data: Billing }) {
   )
 }
 
-function Invoices({ data }: { data: Billing }) {
+function Invoices({ slug, data }: { slug: string; data: Billing }) {
   return (
     <Card data-testid="invoices" className="grid gap-3">
       <h2 className="text-title-sm text-ink">Payments and invoices</h2>
@@ -265,7 +277,20 @@ function Invoices({ data }: { data: Billing }) {
                     ? "Failed"
                     : "Not paid"}
               </td>
-              <td className="text-body">{p.invoiceNumber ?? "—"}</td>
+              <td className="text-body">
+                {p.invoiceNumber ? (
+                  <a
+                    href={`/api/v1/orgs/${slug}/billing/invoices/${p.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline"
+                  >
+                    {p.invoiceNumber}
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </td>
             </tr>
           ))}
         </Table>
@@ -287,8 +312,174 @@ function LimitNote({ limits }: { limits: NonNullable<Billing["limits"]> }) {
         : null
   if (!text) return null
   return (
-    <p className="rounded-lg bg-chart-4/15 px-3 py-2 text-body-sm text-ink ring-1 ring-chart-4/40" data-testid="limit-note">
+    <p
+      className="rounded-lg bg-chart-4/15 px-3 py-2 text-body-sm text-ink ring-1 ring-chart-4/40"
+      data-testid="limit-note"
+    >
       {text}
     </p>
+  )
+}
+
+type Checkout =
+  | { scheduled: true; from: string }
+  | {
+      scheduled: false
+      orderId: string
+      amount: number
+      currency: string
+      keyId: string
+      name: string
+      description: string
+      prefill: { name: string; email: string }
+      total: number
+    }
+
+interface RazorpayAnswer {
+  razorpay_order_id: string
+  razorpay_payment_id: string
+  razorpay_signature: string
+}
+type RazorpayCheckout = new (options: Record<string, unknown>) => {
+  open(): void
+  on(event: string, f: (e: { error?: { description?: string } }) => void): void
+}
+
+/** Razorpay's checkout script, loaded once, when someone pays. */
+function loadRazorpay(): Promise<RazorpayCheckout> {
+  const w = window as unknown as { Razorpay?: RazorpayCheckout }
+  if (w.Razorpay) return Promise.resolve(w.Razorpay)
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script")
+    script.src = "https://checkout.razorpay.com/v1/checkout.js"
+    script.onload = () =>
+      w.Razorpay
+        ? resolve(w.Razorpay)
+        : reject(new Error("Razorpay didn't load."))
+    script.onerror = () =>
+      reject(
+        new Error(
+          "Razorpay's checkout couldn't load. Check the connection and try again."
+        )
+      )
+    document.body.appendChild(script)
+  })
+}
+
+/**
+ * Pays for the plan built above: the server prices it and makes an order, Razorpay's checkout
+ * takes the payment (UPI, cards, net banking), and the answer is confirmed on the server. A
+ * smaller plan mid-period isn't paid for: it's kept for the next period.
+ */
+/**
+ * What paying for the plan built above would do: renew it (within the week before the period
+ * ends), switch to it, or nothing (it's the plan in force, mid-period).
+ */
+function payMode(data: Billing, choice: PlanChoice): "pay" | "renew" | "same" {
+  const plan = data.plan
+  if (!plan?.features || !plan.periodEnd || plan.status !== "active")
+    return "pay"
+  const left = new Date(plan.periodEnd).getTime() - Date.now()
+  if (left <= 0) return "pay"
+  const current: PlanChoice = {
+    features: plan.features,
+    students: plan.students,
+    staff: plan.staff,
+    judges: plan.judges,
+    storagePacks: plan.storagePacks,
+    period: plan.period,
+  }
+  if (left <= RENEW_WINDOW_DAYS * 86_400_000) return "renew"
+  return samePlan(data.catalogue.list, current, choice) ? "same" : "pay"
+}
+
+function PayButton({
+  slug,
+  choice,
+  mode,
+  onDone,
+}: {
+  slug: string
+  choice: PlanChoice
+  mode: "pay" | "renew" | "same"
+  onDone: () => void
+}) {
+  const [message, setMessage] = useState<{
+    text: string
+    kind: "ok" | "err"
+  } | null>(null)
+  const pay = useMutation({
+    mutationFn: async () => {
+      const order = await api<Checkout>(`/orgs/${slug}/billing/checkout`, {
+        body: choice,
+      })
+      if (order.scheduled)
+        return `Your new plan starts on ${formatDate(order.from)}. Nothing to pay now.`
+      const Razorpay = await loadRazorpay()
+      return new Promise<string>((resolve, reject) => {
+        const checkout = new Razorpay({
+          key: order.keyId,
+          amount: order.amount,
+          currency: order.currency,
+          order_id: order.orderId,
+          name: order.name,
+          description: order.description,
+          prefill: order.prefill,
+          theme: { color: "#f54e00" },
+          handler: (answer: RazorpayAnswer) => {
+            api(`/orgs/${slug}/billing/confirm`, {
+              body: {
+                orderId: answer.razorpay_order_id,
+                paymentId: answer.razorpay_payment_id,
+                signature: answer.razorpay_signature,
+              },
+            })
+              .then(() =>
+                resolve(`Paid ${rupees(order.total)}. Your plan is updated.`)
+              )
+              .catch(reject)
+          },
+          modal: {
+            ondismiss: () =>
+              reject(new Error("Payment closed: nothing was charged.")),
+          },
+        })
+        checkout.on("payment.failed", (e) =>
+          reject(
+            new Error(
+              e.error?.description ??
+                "The payment didn't go through. Nothing was charged."
+            )
+          )
+        )
+        checkout.open()
+      })
+    },
+    onMutate: () => setMessage(null),
+    onSuccess: (text) => {
+      setMessage({ text, kind: "ok" })
+      onDone()
+    },
+    onError: (e) => setMessage({ text: e.message, kind: "err" }),
+    meta: { quiet: true },
+  })
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button
+        onClick={() => pay.mutate()}
+        disabled={pay.isPending || mode === "same"}
+        data-testid="pay"
+      >
+        {pay.isPending
+          ? "Opening the payment…"
+          : mode === "renew"
+            ? "Pay for the next period"
+            : "Pay and switch"}
+      </Button>
+      <span className="text-caption text-body">
+        UPI, cards or net banking, through Razorpay.
+      </span>
+      {message && <FormMessage message={message} />}
+    </div>
   )
 }

@@ -43,12 +43,14 @@ export const AUDIT_CATEGORIES: Record<string, string> = {
   library: "Library",
   transport: "Transport",
   hostel: "Hostel",
+  billing: "Plan and billing",
 }
 
 export const auditCategory = (action: string) => action.split(".")[0] ?? action
 
 export const categoryLabel = (category: string) =>
-  AUDIT_CATEGORIES[category] ?? category.charAt(0).toUpperCase() + category.slice(1)
+  AUDIT_CATEGORIES[category] ??
+  category.charAt(0).toUpperCase() + category.slice(1)
 
 export interface FieldChange {
   field: string
@@ -66,7 +68,8 @@ export interface ListChange {
 const shown = (value: unknown): string => {
   if (value === null || value === undefined || value === "") return "—"
   if (typeof value === "boolean") return value ? "Yes" : "No"
-  if (Array.isArray(value)) return value.length ? value.map(shown).join(", ") : "—"
+  if (Array.isArray(value))
+    return value.length ? value.map(shown).join(", ") : "—"
   if (typeof value === "object") return JSON.stringify(value)
   const text = String(value)
   // Long text (a description) is shortened: the entry says it changed, not all of it.
@@ -101,7 +104,9 @@ export function listChanges(
 }
 
 /** "Chrome on macOS", "Safari on iPhone", or null when there's nothing to tell. */
-export function describeDevice(userAgent: string | null | undefined): string | null {
+export function describeDevice(
+  userAgent: string | null | undefined
+): string | null {
   if (!userAgent) return null
   const ua = userAgent
   const browser = /Edg\//.test(ua)

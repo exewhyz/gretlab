@@ -65,26 +65,35 @@ export async function writeEntry(tx: Writer, input: AuditInput) {
 }
 
 /**
- * An entry for something GretLab did by itself (automatic scaling): no person acted, so no
- * actor id; the label says what did it. Always the platform's own log.
+ * An entry for something done without a person (automatic scaling, a payment Razorpay
+ * confirmed): no actor id; the label says what did it. The platform's own log, or with `orgId`
+ * an organization's (then its webhooks hear of it too, in the same transaction as `tx`).
  */
 export async function writeSystemEntry(
   label: string,
   action: string,
   summary: string,
-  detail?: Record<string, unknown>
+  detail?: Record<string, unknown>,
+  where: { orgId?: string; tx?: Writer } = {}
 ) {
-  await getDb()
-    .insert(auditLog)
-    .values({
-      orgId: null,
-      actorId: null,
-      actorLabel: label,
-      action,
-      category: auditCategory(action),
+  const tx = where.tx ?? getDb()
+  if (where.orgId)
+    await queueWebhooks(tx, where.orgId, {
+      event: action,
+      at: new Date().toISOString(),
       summary: summary.slice(0, 1000),
+      actor: { id: null, label },
       detail: detail ?? null,
     })
+  await tx.insert(auditLog).values({
+    orgId: where.orgId ?? null,
+    actorId: null,
+    actorLabel: label,
+    action,
+    category: auditCategory(action),
+    summary: summary.slice(0, 1000),
+    detail: detail ?? null,
+  })
 }
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)

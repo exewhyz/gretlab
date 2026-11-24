@@ -24,6 +24,7 @@ import {
 import { z } from "zod"
 
 import { usageOf } from "./limits"
+import { razorpayReady } from "./razorpay"
 import { needFor, orgContext, writeAudit } from "@/features/orgs/server"
 import { platformCan } from "@/features/platform/access"
 import { writePlatformAudit } from "@/features/platform/staff"
@@ -440,7 +441,8 @@ export async function checkPlans(now = new Date()) {
   let told = 0
   for (const { org, sub } of rows) {
     let status = sub.status
-    if (status === "active" && sub.periodEnd && sub.periodEnd < now) status = "past_due"
+    if (status === "active" && sub.periodEnd && sub.periodEnd < now)
+      status = "past_due"
     if (
       status === "past_due" &&
       sub.periodEnd &&
@@ -448,19 +450,42 @@ export async function checkPlans(now = new Date()) {
     )
       status = "paused"
     const limits = await limitsOf(org.id, now)
-    const states = limits.limited ? [limits.students.state, limits.staff.state] : []
-    const worst = (["paused", "over", "near"] as const).find((s) => states.includes(s)) ?? "ok"
+    const states = limits.limited
+      ? [limits.students.state, limits.staff.state]
+      : []
+    const worst =
+      (["paused", "over", "near"] as const).find((s) => states.includes(s)) ??
+      "ok"
     const overSince =
       worst === "over" || worst === "paused" ? (sub.overSince ?? now) : null
-    const notice =
-      status === "paused" || status === "past_due" ? `period:${status}` : worst === "ok" ? "" : `limit:${worst}`
-    if (status !== sub.status || overSince?.getTime() !== sub.overSince?.getTime() || notice !== sub.notice) {
+    // Two kinds of notice, kept apart so one never hides the other: the limit, and the period
+    // (renewal reminders 7 days and a day before it ends, then due and paused).
+    const left = sub.periodEnd ? sub.periodEnd.getTime() - now.getTime() : null
+    const period =
+      status === "paused" || status === "past_due"
+        ? `period:${status}`
+        : status === "active" && left !== null && left > 0
+          ? left <= 86_400_000
+            ? "renew:1"
+            : left <= 7 * 86_400_000
+              ? "renew:7"
+              : ""
+          : ""
+    const limit = worst === "ok" ? "" : `limit:${worst}`
+    const notice = [limit, period].filter(Boolean).join("|")
+    const before = new Set(sub.notice.split("|").filter(Boolean))
+    const fresh = [limit, period].filter((n) => n && !before.has(n))
+    if (
+      status !== sub.status ||
+      overSince?.getTime() !== sub.overSince?.getTime() ||
+      notice !== sub.notice
+    ) {
       await db
         .update(subscriptions)
         .set({ status, overSince, notice })
         .where(eq(subscriptions.orgId, org.id))
     }
-    if (notice && notice !== sub.notice) {
+    for (const key of fresh) {
       const words: Record<string, { title: string; body: string }> = {
         "limit:near": {
           title: `${org.name} is near its plan's limit`,
@@ -482,8 +507,16 @@ export async function checkPlans(now = new Date()) {
           title: `${org.name}'s plan is paused`,
           body: "It wasn't paid. Adding people is paused until it is; everything else keeps working.",
         },
+        "renew:7": {
+          title: `${org.name}'s plan renews within a week`,
+          body: `The period ends on ${sub.periodEnd?.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}. Pay from Plan and billing to keep everything going.`,
+        },
+        "renew:1": {
+          title: `${org.name}'s plan ends tomorrow`,
+          body: "Pay from Plan and billing today to keep adding people after it ends.",
+        },
       }
-      const w = words[notice]
+      const w = words[key]
       if (w) {
         const ids = await membersWhoCan(org.id, "org.billing.manage")
         await notify(ids, {
