@@ -26,14 +26,18 @@ import { orgPages } from "@/lib/paths"
 
 const { and, eq, inArray } = sql
 
-/** Built-in roles take their permissions from code, so they gain new ones automatically. */
+/**
+ * Built-in roles take their permissions from code, so they gain new ones automatically. A
+ * custom role's stored list is used as it is; anything that isn't a list (a row written outside
+ * the app) grants nothing, rather than breaking every page that reads roles.
+ */
 export function rolePermissions(role: {
   systemKey: string | null
   permissions: string[]
 }): readonly string[] {
-  return role.systemKey && role.systemKey in SYSTEM_ROLES
-    ? SYSTEM_ROLES[role.systemKey as SystemRoleKey].permissions
-    : role.permissions
+  if (role.systemKey && role.systemKey in SYSTEM_ROLES)
+    return SYSTEM_ROLES[role.systemKey as SystemRoleKey].permissions
+  return Array.isArray(role.permissions) ? role.permissions : []
 }
 
 interface OrgStanding {

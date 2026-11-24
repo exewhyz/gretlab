@@ -115,6 +115,16 @@ check("a create-groups role can add a group", allowed(made))
 check("...but can't delete one", denied(await cMg(`${O}/groups/${made.json?.id ?? lab.id}`, { method: "DELETE" })))
 check("a delete-groups role can't create", denied(await cMr(`${O}/groups`, { body: { name: "prm Nope" } })))
 
+// ---------- a custom role whose stored permissions aren't a list (written outside the app)
+// It grants nothing; pages that read roles keep working (it broke /me in production).
+const broken = await mkRole("Broken", ["gradebook.view"])
+await give("prm-s3", broken.id, null)
+psql(`update org_roles set permissions = '"gradebook.view"'::jsonb where id = '${broken.id}'`)
+const s3 = await client("prm-s3@example.com")
+const me = await s3("/me")
+check("a role stored with something other than a list doesn't break /me", me.status === 200 && me.json?.user?.teaches === false, JSON.stringify(me.json?.error ?? me.status))
+check("...nor the organization's frame, and it grants nothing", (await s3(`${O}/shell`)).json?.permissions?.includes?.("gradebook.view") !== true)
+
 cleanup()
 console.log(failures ? `\n${failures} FAILED` : "\nALL PASSED")
 process.exit(failures ? 1 : 0)
