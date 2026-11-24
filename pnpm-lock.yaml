@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  postgres@3.4.9: e232d98b6becb79824d475ea5a41b5e84abe0bb7d887ef2934fa3fd07ea4929a
+
 importers:
 
   .:
@@ -71,7 +74,7 @@ importers:
         version: link:../../packages/judge
       postgres:
         specifier: ^3.4.5
-        version: 3.4.9
+        version: 3.4.9(patch_hash=e232d98b6becb79824d475ea5a41b5e84abe0bb7d887ef2934fa3fd07ea4929a)
       tar-stream:
         specifier: ^3.1.7
         version: 3.2.2
@@ -141,7 +144,7 @@ importers:
         version: link:../../packages/ui
       drizzle-orm:
         specifier: ^0.44.7
-        version: 0.44.7(postgres@3.4.9)
+        version: 0.44.7(postgres@3.4.9(patch_hash=e232d98b6becb79824d475ea5a41b5e84abe0bb7d887ef2934fa3fd07ea4929a))
       fflate:
         specifier: 0.8.2
         version: 0.8.2
@@ -223,7 +226,7 @@ importers:
     dependencies:
       postgres:
         specifier: ^3.4.5
-        version: 3.4.9
+        version: 3.4.9(patch_hash=e232d98b6becb79824d475ea5a41b5e84abe0bb7d887ef2934fa3fd07ea4929a)
       tsx:
         specifier: ^4
         version: 4.23.15
@@ -245,10 +248,10 @@ importers:
         version: link:../judge
       drizzle-orm:
         specifier: ^0.44.0
-        version: 0.44.7(postgres@3.4.9)
+        version: 0.44.7(postgres@3.4.9(patch_hash=e232d98b6becb79824d475ea5a41b5e84abe0bb7d887ef2934fa3fd07ea4929a))
       postgres:
         specifier: ^3.4.5
-        version: 3.4.9
+        version: 3.4.9(patch_hash=e232d98b6becb79824d475ea5a41b5e84abe0bb7d887ef2934fa3fd07ea4929a)
     devDependencies:
       '@types/node':
         specifier: ^20
@@ -8836,9 +8839,9 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.23.15
 
-  drizzle-orm@0.44.7(postgres@3.4.9):
+  drizzle-orm@0.44.7(postgres@3.4.9(patch_hash=e232d98b6becb79824d475ea5a41b5e84abe0bb7d887ef2934fa3fd07ea4929a)):
     optionalDependencies:
-      postgres: 3.4.9
+      postgres: 3.4.9(patch_hash=e232d98b6becb79824d475ea5a41b5e84abe0bb7d887ef2934fa3fd07ea4929a)
 
   dset@3.1.4: {}
 
@@ -10383,7 +10386,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.2
 
-  postgres@3.4.9: {}
+  postgres@3.4.9(patch_hash=e232d98b6becb79824d475ea5a41b5e84abe0bb7d887ef2934fa3fd07ea4929a): {}
 
   powershell-utils@0.2.1: {}
 

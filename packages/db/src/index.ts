@@ -8,18 +8,17 @@ export * as sql from "./sql.ts"
 export { anyOf, noneOf } from "./lists.ts"
 
 /**
- * A database client for an address. `startup` adds connection settings (tests use it to act as
- * another role, as the judge's login test does with `options: "-c role=gretlab_judge"`).
+ * The client's settings (`startup` adds connection settings: tests use it to act as another
+ * role, as the judge's login test does with `options: "-c role=gretlab_judge"`).
  */
-export function connectTo(
-  url: string,
+export function clientOptions(
   startup: Record<string, string> = {},
   { max = Number(process.env.DATABASE_POOL ?? 10) }: { max?: number } = {}
-) {
+): postgres.Options<{}> {
   // DATABASE_PREPARE=false means a pooler in transaction mode (Supabase's, PgBouncer) sits in
   // between: it can't track prepared statements, and it mustn't get pipelined queries either.
   const pooled = process.env.DATABASE_PREPARE === "false"
-  const client = postgres(url, {
+  return {
     max,
     idle_timeout: 30,
     connect_timeout: 10,
@@ -27,13 +26,23 @@ export function connectTo(
     // Without prepared statements a query with values goes in two steps (describe, then run).
     // Pipelined behind another query, Supavisor's transaction mode hands the database
     // connection back between them and the query hangs, holding a pooled connection
-    // (supabase/supavisor#1239; the outages of 24 November 2026). One query at a time per
-    // connection avoids it; queries in parallel use the pool's other connections.
-    // postgres.js reads it (src/index.js, with its other numeric options) but its types omit it.
-    ...({ max_pipeline: pooled ? 1 : 100 } as object),
+    // (supabase/supavisor#1239; the outages of 24 November 2026). So behind a pooler, one query
+    // at a time per connection: max_pipeline 0. (1 still lets one more through while the first
+    // is answered: postgres.js counts the queries waiting behind the one running, so 1 means two
+    // in flight; pipelining.test.ts measures it.) Parallel queries use the pool's other
+    // connections. postgres.js reads it like its other numeric options; its types omit it.
+    ...({ max_pipeline: pooled ? 0 : 100 } as object),
     connection: startup,
-  })
-  return drizzle(client, { schema })
+  }
+}
+
+/** A database client for an address, with the settings above. */
+export function connectTo(
+  url: string,
+  startup: Record<string, string> = {},
+  opts: { max?: number } = {}
+) {
+  return drizzle(postgres(url, clientOptions(startup, opts)), { schema })
 }
 
 function connect() {

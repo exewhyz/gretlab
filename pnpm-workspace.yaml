@@ -8,3 +8,6 @@ allowBuilds:
   unrs-resolver: true
   msw: false
   "@parcel/watcher": false
+
+patchedDependencies:
+  postgres@3.4.9: patches/postgres@3.4.9.patch

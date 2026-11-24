@@ -9,7 +9,8 @@
     "db:migrate": "tsx --env-file-if-exists=../../.env src/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=../../.env src/seed.ts",
     "demo": "tsx --env-file-if-exists=../../.env src/demo.ts",
-    "test:lists": "tsx --test --test-reporter=spec src/lists.test.ts"
+    "test:lists": "tsx --test --test-reporter=spec src/lists.test.ts",
+    "test:pipelining": "tsx --test --test-reporter=spec src/pipelining.test.ts"
   },
   "exports": {
     ".": "./src/index.ts",
