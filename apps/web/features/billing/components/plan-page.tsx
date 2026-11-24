@@ -84,6 +84,7 @@ function CurrentPlan({ data }: { data: Billing }) {
           {plan.periodEnd && ` · renews ${formatDate(plan.periodEnd)}`}
         </p>
       )}
+      {data.limits && <LimitNote limits={data.limits} />}
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="grid gap-1">
           <span className="text-caption text-body">
@@ -270,5 +271,24 @@ function Invoices({ data }: { data: Billing }) {
         </Table>
       )}
     </Card>
+  )
+}
+
+/** What the plan's limits mean right now, in words. */
+function LimitNote({ limits }: { limits: NonNullable<Billing["limits"]> }) {
+  const states = [limits.students, limits.staff]
+  const grace = limits.graceEnds ? formatDate(limits.graceEnds) : null
+  const text = states.includes("paused")
+    ? "Adding people is paused: more are in use than the plan has, and the 30 days' grace are over. Add more below; everything else keeps working."
+    : states.includes("over")
+      ? `More are in use than the plan has. Adding people works until ${grace}; add more below before then.`
+      : states.includes("near")
+        ? "Nearly full: 90% of the plan's students or staff are in use."
+        : null
+  if (!text) return null
+  return (
+    <p className="rounded-lg bg-chart-4/15 px-3 py-2 text-body-sm text-ink ring-1 ring-chart-4/40" data-testid="limit-note">
+      {text}
+    </p>
   )
 }

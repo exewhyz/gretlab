@@ -9,6 +9,10 @@
  *     (GSTIN checked); only who manages billing sees it
  *   - Dashboard › Plans: every organization's plan, setting one by hand (its price worked out on
  *     the server), back to no limits, and the prices; only staff with the permission
+ *   - limits: past what's bought adding still works (the grace starts), after 30 days it
+ *     pauses (members, imports, staff roles) while everyone already in keeps working; a period
+ *     that ends unpaid is due, then paused; the cron tells whoever manages billing once; the
+ *     notice shows above their pages; back under, it clears; no limits for organizations without
  *   - both pages in a browser, on a laptop and a phone
  *   node e2e/billing.mjs [base-url]
  */
@@ -21,6 +25,7 @@ const { encode } = createRequire(ROOT + "apps/web/")("next-auth/jwt")
 const BASE = process.argv[2] ?? "http://localhost:3100"
 const SECRET = process.env.NEXTAUTH_SECRET ?? "e2e-only-secret"
 const DB = process.env.E2E_DB ?? "gretlab_test"
+const CRON = process.env.CRON_SECRET ?? "e2e-cron-secret-0123456789"
 const SHOTS = process.argv[3] ?? "/tmp/gretlab-e2e/billing/"
 mkdirSync(SHOTS, { recursive: true })
 const { chromium } = createRequire(ROOT + "package.json")("playwright")
@@ -39,6 +44,7 @@ const client = async (email) => {
 }
 const cleanup = () => {
   psql(`delete from organizations where slug like 'bl-%'`)
+  psql(`delete from notifications where user_id in (select id from users where email like 'bl-%@example.com')`)
   psql(`delete from users where email like 'bl-%@example.com'`)
 }
 
@@ -125,6 +131,42 @@ await admin("/admin/billing/settings", { method: "PATCH", body: { "billing.price
 check("a new price shows in the plan page's prices", (await fresh("/orgs/bl-new/billing")).json?.catalogue?.features?.find((f) => f.key === "attendance")?.price === 12)
 await admin("/admin/billing/settings", { method: "PATCH", body: { "billing.prices": {} } })
 
+// ---------- limits
+const cron = async () => (await (await fetch(`${BASE}/api/cron/outbox`, { method: "POST", headers: { authorization: `Bearer ${CRON}` } })).json().catch(() => null))?.plans
+const importOne = (email) => fresh("/orgs/bl-new/import", { body: { rows: [{ email, name: email, group: "Bl Batch", role: "" }], commit: true } })
+// The plan holds 1 student and 2 staff; 1 student (bl-stu) and 1 staff (the owner) are in.
+await setPlan({ students: 1, staff: 2 })
+psql(`update subscriptions set over_since = null, notice = '' where org_id = '${orgId}'`)
+const first = await importOne("bl-x1@example.com")
+check("past what's bought, adding still works and the grace starts", first.status === 200 && psql(`select over_since is not null from subscriptions where org_id = '${orgId}'`) === "t", JSON.stringify(first.json).slice(0, 200))
+check("…and the plan page says until when", (await fresh("/orgs/bl-new/billing")).json?.limits?.students === "over")
+// 31 days later: the grace is over.
+psql(`update subscriptions set over_since = now() - interval '31 days' where org_id = '${orgId}'`)
+const second = await importOne("bl-x2@example.com")
+check("after 30 days' grace, adding members pauses", second.status === 403 && second.json?.error?.code === "plan_full", JSON.stringify(second.json))
+check("…and nothing of them was added", psql(`select count(*) from org_members m join users u on u.id = m.user_id where u.email = 'bl-x2@example.com'`) === "0")
+check("…while everyone already in keeps working", (await student("/orgs/bl-new/home")).status === 200)
+const plans = await cron()
+check("the cron tells whoever manages billing, once", plans?.told >= 1 && psql(`select count(*) from notifications n join users u on u.id = n.user_id where u.email = 'bl-new@example.com' and n.kind = 'billing'`) === "1", JSON.stringify(plans))
+await cron()
+check("…and not again while nothing changes", psql(`select count(*) from notifications n join users u on u.id = n.user_id where u.email = 'bl-new@example.com' and n.kind = 'billing'`) === "1")
+check("the frame carries the notice for them, not for others", (await fresh("/orgs/bl-new/shell")).json?.planNotice === "limit:paused" && (await student("/orgs/bl-new/shell")).json?.planNotice === "")
+// Back under: more students bought.
+await setPlan({ students: 10, staff: 2 })
+await cron()
+check("back under the limit, the grace and notice clear", psql(`select (over_since is null) || '|' || notice from subscriptions where org_id = '${orgId}'`) === "true|")
+// A period that ended unpaid: due, then paused.
+await setPlan({ students: 10, staff: 2, periodStart: "2026-01-01T00:00:00.000Z", periodEnd: new Date(Date.now() - 2 * 86_400_000).toISOString() })
+await cron()
+check("a period that ended unpaid is due", psql(`select status from subscriptions where org_id = '${orgId}'`) === "past_due")
+psql(`update subscriptions set period_end = now() - interval '8 days' where org_id = '${orgId}'`)
+await cron()
+const paused = await importOne("bl-x3@example.com")
+check("…and 7 days on, paused: adding people stops until it's paid", psql(`select status from subscriptions where org_id = '${orgId}'`) === "paused" && paused.json?.error?.code === "plan_paused", JSON.stringify(paused.json))
+check("organizations without plan limits are never counted", (await old("/orgs/bl-old/import", { body: { rows: [{ email: "bl-y1@example.com", name: "Y", group: "", role: "" }], commit: true } })).status === 200)
+await setPlan({ students: 1, staff: 2, periodEnd: "2027-11-01T00:00:00.000Z" })
+psql(`update subscriptions set over_since = now() - interval '31 days', notice = 'limit:paused' where org_id = '${orgId}'`)
+
 // ---------- the pages
 const browser = await chromium.launch()
 for (const [name, viewport] of [["laptop", { width: 1440, height: 1000 }], ["phone", { width: 390, height: 844 }]]) {
@@ -138,6 +180,7 @@ for (const [name, viewport] of [["laptop", { width: 1440, height: 1000 }], ["pho
   const after = await tab.getByTestId("plan-total").innerText().catch(() => "")
   check(`${name}: the plan page builds a plan and its price changes as you choose`, Boolean(before) && Boolean(after) && before !== after, JSON.stringify({ before, after }))
   check(`${name}: it says paying online isn't set up yet`, await tab.getByTestId("pay-note").isVisible())
+  check(`${name}: the plan's notice shows above the page, and on the plan`, (await tab.getByTestId("plan-notice").count()) === 1 && (await tab.getByTestId("limit-note").count()) === 1)
   // The plan holds classes and attendance only: no links to pages it would refuse.
   const sidebar = tab.locator('nav[aria-label="Organization"]')
   check(`${name}: the sidebar has no Courses or Outcomes outside the plan, but has Plan and billing`, name === "phone" || ((await sidebar.getByRole("link", { name: "Courses" }).count()) === 0 && (await sidebar.getByRole("link", { name: "Outcomes" }).count()) === 0 && (await sidebar.getByRole("link", { name: "Plan and billing" }).count()) === 1))

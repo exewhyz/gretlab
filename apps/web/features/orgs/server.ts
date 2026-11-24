@@ -44,6 +44,7 @@ import type { z } from "zod"
 import { ApiError, notFound } from "@/lib/api/route"
 import { auditCsv, readAudit, type AuditFilters } from "@/features/audit/server"
 import { notify } from "@/features/notifications/server"
+import { needRoom } from "@/features/billing/limits"
 import { platformCan } from "@/features/platform/access"
 import { getSettings } from "@/features/settings/server"
 import { freeHandles } from "@/features/catalog/server"
@@ -2104,6 +2105,8 @@ export async function importMembers(
     }
     // Members now (admitMember): back to active if they'd left, or newly in; then the member role.
     const joining = todo.filter((row) => row.action !== "update").map(idOfRow)
+    // The plan needs room for them (billing), checked before anything is written.
+    if (joining.length) await needRoom(ctx.org.id, { members: joining.length })
     if (joining.length) {
       await tx.execute(q`
         update org_members set status = 'active', share_progress = false, joined_via = 'import'

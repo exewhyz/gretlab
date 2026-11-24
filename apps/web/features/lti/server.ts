@@ -1,4 +1,5 @@
 import { planIncludes } from "@workspace/judge"
+import { needRoom } from "@/features/billing/limits"
 import { randomBytes, type JsonWebKey } from "node:crypto"
 
 import {
@@ -238,6 +239,12 @@ async function personFor(platformId: string, orgId: string, claims: Record<strin
     await db.insert(ltiUsers).values({ platformId, sub, userId: user!.id }).onConflictDoNothing()
   }
   if (!user || user.disabled) throw new ApiError(403, "blocked", "This account is blocked.")
+  // Someone new to the organization needs room in its plan (billing).
+  const [member] = await db
+    .select({ status: orgMembers.status })
+    .from(orgMembers)
+    .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.userId, user.id)))
+  if (member?.status !== "active") await needRoom(orgId, { members: 1 })
   await db
     .insert(orgMembers)
     .values({ orgId, userId: user.id, status: "active", joinedVia: "lti" })

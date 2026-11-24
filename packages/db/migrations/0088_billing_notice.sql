@@ -1,0 +1,1 @@
+ALTER TABLE "subscriptions" ADD COLUMN "notice" text DEFAULT '' NOT NULL;

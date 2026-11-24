@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import {
   AirplaneTiltIcon,
   ClipboardTextIcon,
@@ -328,7 +329,34 @@ export function OrgShell({
       title={shell?.org.name}
       badge={shell?.role}
     >
+      {shell?.planNotice && <PlanNotice slug={slug} notice={shell.planNotice} />}
       {children}
     </AppFrame>
+  )
+}
+
+const PLAN_NOTICE: Record<string, string> = {
+  "limit:near": "Your plan is nearly full: 90% of its students or staff are in use.",
+  "limit:over": "Your plan is over its limit. Everything works for 30 days; then adding people pauses.",
+  "limit:paused": "Adding people is paused: the plan is over its limit and its 30 days are over.",
+  "period:past_due": "Your plan is due. Pay within 7 days to keep adding people.",
+  "period:paused": "Your plan is paused until it's paid. Everything else keeps working.",
+}
+
+/** A bar above every page for whoever manages billing, while the plan needs attention. */
+function PlanNotice({ slug, notice }: { slug: string; notice: string }) {
+  const text = PLAN_NOTICE[notice]
+  if (!text) return null
+  return (
+    <div
+      role="status"
+      data-testid="plan-notice"
+      className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-chart-4/15 px-4 py-2 text-body-sm text-ink ring-1 ring-chart-4/40"
+    >
+      <span>{text}</span>
+      <Link href={orgPages(slug).manage("/billing")} className="font-medium text-primary underline">
+        Plan and billing
+      </Link>
+    </div>
   )
 }

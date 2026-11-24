@@ -12,6 +12,7 @@ import { reconcileJudges } from "@/features/judges/server"
 import { autoscaleJudges } from "@/features/judges/autoscale"
 import { checkAlerts } from "@/features/monitoring/alerts"
 import { runJobs, tidyJobs } from "@/features/jobs/server"
+import { checkPlans } from "@/features/billing/server"
 
 export const dynamic = "force-dynamic"
 /** The drain stops itself after 25 s; this is the host's hard limit around it. */
@@ -86,11 +87,17 @@ async function handle(request: NextRequest) {
     return { steps: 0 }
   })
   await tidyJobs().catch(() => {})
+  // Plans: grace, payment due and paused, and their notices (at most what changed since).
+  const plans = await checkPlans().catch((error) => {
+    console.error("[billing]", error)
+    return null
+  })
   return NextResponse.json({
     ...done,
     judges: { ...judges, scaling: scaling.action },
     alerts,
     jobs,
+    plans,
     ...(await outboxHealth()),
     digests,
     webhooks: {

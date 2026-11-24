@@ -23,7 +23,7 @@ import {
 } from "@workspace/judge"
 import { z } from "zod"
 
-import { rolePermissions } from "@/features/orgs/access"
+import { usageOf } from "./limits"
 import { needFor, orgContext, writeAudit } from "@/features/orgs/server"
 import { platformCan } from "@/features/platform/access"
 import { writePlatformAudit } from "@/features/platform/staff"
@@ -82,51 +82,6 @@ async function catalogue() {
   }
 }
 
-/** Students (active members holding no permissions, seated in a group) and staff (any role that grants something). */
-export async function usageOf(orgId: string) {
-  const db = getDb()
-  const roles = await db
-    .select({
-      id: orgRoles.id,
-      systemKey: orgRoles.systemKey,
-      permissions: orgRoles.permissions,
-    })
-    .from(orgRoles)
-    .where(eq(orgRoles.orgId, orgId))
-  const granting = roles
-    .filter((r) => rolePermissions(r).length > 0)
-    .map((r) => r.id)
-  const isStaff = granting.length
-    ? exists(
-        db
-          .select({ x: sql.sql`1` })
-          .from(roleAssignments)
-          .where(
-            and(
-              eq(roleAssignments.orgId, orgId),
-              eq(roleAssignments.userId, orgMembers.userId),
-              inArray(roleAssignments.roleId, granting)
-            )
-          )
-      )
-    : sql.sql`false`
-  const [row] = await db
-    .select({
-      staff: count(sql.sql`case when ${isStaff} then 1 end`),
-      students: count(
-        sql.sql`case when not ${isStaff} and exists (
-          select 1 from group_members gm join org_groups g on g.id = gm.group_id
-          where gm.user_id = ${orgMembers.userId} and g.org_id = ${orgId}) then 1 end`
-      ),
-    })
-    .from(orgMembers)
-    .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.status, "active")))
-  return {
-    students: Number(row?.students ?? 0),
-    staff: Number(row?.staff ?? 0),
-  }
-}
-
 async function subscriptionOf(orgId: string) {
   const [row] = await getDb()
     .select()
@@ -159,7 +114,8 @@ async function billingContext(slug: string, user: User) {
 
 export async function orgBilling(slug: string, user: User) {
   const ctx = await billingContext(slug, user)
-  const [settings, sub, usage, cat, recent] = await Promise.all([
+  const { limitsOf } = await import("./limits")
+  const [settings, sub, usage, cat, recent, limits] = await Promise.all([
     getSettings(),
     subscriptionOf(ctx.org.id),
     usageOf(ctx.org.id),
@@ -178,6 +134,7 @@ export async function orgBilling(slug: string, user: User) {
       .where(eq(payments.orgId, ctx.org.id))
       .orderBy(desc(payments.createdAt))
       .limit(50),
+    limitsOf(ctx.org.id),
   ])
   const current = sub ? choiceOf(sub) : null
   return {
@@ -209,6 +166,14 @@ export async function orgBilling(slug: string, user: User) {
     /** What the current plan costs at today's prices (for comparing changes). */
     priceNow: current ? priceOfPlan(cat.list, current) : null,
     usage,
+    /** Against the plan: fine, near (90%), over (with grace until graceEnds), paused. */
+    limits: limits.limited
+      ? {
+          students: limits.students.state,
+          staff: limits.staff.state,
+          graceEnds: limits.graceEnds,
+        }
+      : null,
     billing: {
       legalName: sub?.legalName ?? "",
       gstin: sub?.gstin ?? "",
@@ -448,4 +413,89 @@ export async function saveBillingSettings(
     }
   )
   return billingSettings(user)
+}
+
+export { usageOf }
+
+/* ---------- the daily check (the email cron) ---------- */
+
+const PAST_DUE_DAYS = 7
+
+/**
+ * Each organization with plan limits, each time the email cron runs: grace starts or clears as its numbers go over
+ * or back under; a period that ended unpaid becomes Payment due, then Paused after 7 days; and
+ * whoever manages its billing hears once of each change (near, over, paused, due), in the bell
+ * and by email.
+ */
+export async function checkPlans(now = new Date()) {
+  const { limitsOf } = await import("./limits")
+  const { notify } = await import("@/features/notifications/server")
+  const { membersWhoCan } = await import("@/features/orgs/server")
+  const db = getDb()
+  const rows = await db
+    .select({ org: organizations, sub: subscriptions })
+    .from(subscriptions)
+    .innerJoin(organizations, eq(organizations.id, subscriptions.orgId))
+    .where(sql.isNotNull(organizations.planFeatures))
+  let told = 0
+  for (const { org, sub } of rows) {
+    let status = sub.status
+    if (status === "active" && sub.periodEnd && sub.periodEnd < now) status = "past_due"
+    if (
+      status === "past_due" &&
+      sub.periodEnd &&
+      now.getTime() - sub.periodEnd.getTime() > PAST_DUE_DAYS * 86_400_000
+    )
+      status = "paused"
+    const limits = await limitsOf(org.id, now)
+    const states = limits.limited ? [limits.students.state, limits.staff.state] : []
+    const worst = (["paused", "over", "near"] as const).find((s) => states.includes(s)) ?? "ok"
+    const overSince =
+      worst === "over" || worst === "paused" ? (sub.overSince ?? now) : null
+    const notice =
+      status === "paused" || status === "past_due" ? `period:${status}` : worst === "ok" ? "" : `limit:${worst}`
+    if (status !== sub.status || overSince?.getTime() !== sub.overSince?.getTime() || notice !== sub.notice) {
+      await db
+        .update(subscriptions)
+        .set({ status, overSince, notice })
+        .where(eq(subscriptions.orgId, org.id))
+    }
+    if (notice && notice !== sub.notice) {
+      const words: Record<string, { title: string; body: string }> = {
+        "limit:near": {
+          title: `${org.name} is near its plan's limit`,
+          body: "90% of the students or staff in your plan are in use. Add more from Plan and billing.",
+        },
+        "limit:over": {
+          title: `${org.name} is over its plan's limit`,
+          body: "More students or staff than the plan has. Everything works for 30 days; then adding people pauses until you add more.",
+        },
+        "limit:paused": {
+          title: `Adding people is paused at ${org.name}`,
+          body: "The 30 days past the plan's limit are over. Add more from Plan and billing to add people again; everything else keeps working.",
+        },
+        "period:past_due": {
+          title: `${org.name}'s plan is due`,
+          body: `The period ended. Pay within ${PAST_DUE_DAYS} days to keep adding people; everything else keeps working.`,
+        },
+        "period:paused": {
+          title: `${org.name}'s plan is paused`,
+          body: "It wasn't paid. Adding people is paused until it is; everything else keeps working.",
+        },
+      }
+      const w = words[notice]
+      if (w) {
+        const ids = await membersWhoCan(org.id, "org.billing.manage")
+        await notify(ids, {
+          kind: "billing",
+          title: w.title,
+          body: w.body,
+          href: `/orgs/${org.slug}/manage/billing`,
+          orgId: org.id,
+        })
+        told++
+      }
+    }
+  }
+  return { organizations: rows.length, told }
 }

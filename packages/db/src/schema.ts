@@ -3461,6 +3461,8 @@ export const subscriptions = pgTable("subscriptions", {
   next: jsonb("next").$type<Record<string, unknown> | null>(),
   /** When students or staff first went over what was bought (limits give 30 days' grace). */
   overSince: timestamp("over_since", { withTimezone: true }),
+  /** The last limit or payment notice sent to the owners ("students:near", "period:past_due"), so each goes once. */
+  notice: text("notice").notNull().default(""),
   notes: text("notes").notNull().default(""),
   // Who the invoices are for.
   legalName: text("legal_name").notNull().default(""),

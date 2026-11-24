@@ -1,3 +1,4 @@
+import { needRoom } from "@/features/billing/limits"
 import { randomUUID } from "node:crypto"
 
 import {
@@ -247,6 +248,8 @@ export async function createInTx(
   admissionNo: string,
   year: typeof academicYears.$inferSelect | null
 ) {
+  // The plan needs room for a new student (billing).
+  await needRoom(ctx.org.id, { members: 1 })
   const email = input.email
     ? input.email.toLowerCase()
     : noLoginEmail(randomUUID())
@@ -321,6 +324,8 @@ export async function createManyInTx(
   year: typeof academicYears.$inferSelect | null
 ) {
   if (items.length === 0) return []
+  // The plan needs room for them (billing).
+  await needRoom(ctx.org.id, { members: items.length })
   const q = sql.sql
   const rows = items.map((item) => ({
     ...item,

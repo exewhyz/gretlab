@@ -37,6 +37,7 @@ import { requestInfo } from "@/lib/api/request-context"
 import { writeEntry } from "@/features/audit/server"
 import { orgReach } from "@/features/platform/access"
 import { freeHandle } from "@/features/catalog/server"
+import { needRoom, roleGrants } from "@/features/billing/limits"
 import { kindPolicies, orgModules } from "./kinds"
 
 import { rolePermissions } from "./access"
@@ -304,6 +305,8 @@ export async function admitMember(
     .from(orgMembers)
     .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, userId)))
   if (existing?.status === "active") return existing
+  // A new active member needs room in the plan (billing; never for a pending request).
+  if (status === "active") await needRoom(org.id, { members: 1 })
   if (existing) {
     await tx
       .update(orgMembers)
@@ -329,6 +332,8 @@ export async function giveRoles(
   people: { id: string; group: string | null }[]
 ) {
   if (people.length === 0) return
+  if (await roleGrants(roleId))
+    await needRoom(orgId, { staff: new Set(people.map((p) => p.id)).size })
   const q = sql.sql
   await tx.execute(q`
     insert into role_assignments (org_id, user_id, role_id, group_id)
@@ -365,6 +370,9 @@ export async function giveRole(
       )
     )
   if (!already) {
+    // A role that grants something makes them staff: the plan needs room (billing).
+    if (role !== "member" && (role in SYSTEM_ROLES || (await roleGrants(roleId))))
+      await needRoom(orgId, { staff: 1, userId })
     await tx.insert(roleAssignments).values({ orgId, userId, roleId, groupId })
   }
 }

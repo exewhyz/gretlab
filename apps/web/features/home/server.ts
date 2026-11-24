@@ -10,6 +10,7 @@ import {
   orgRoles,
   roleAssignments,
   sql,
+  subscriptions,
   users,
   type User,
 } from "@workspace/db"
@@ -114,6 +115,8 @@ export async function orgShell(slug: string, user: User) {
     modules: [...modules],
     /** An active member here (platform staff looking in aren't): own things need it. */
     member: ctx.membership?.status === "active",
+    /** For whoever manages billing: the plan's current notice ("limit:over", "period:past_due"). */
+    planNotice: canFor(ctx, "org.billing.manage", []) ? await planNoticeOf(ctx.org.id) : "",
     /** The plan's features (billing); null: no plan limits. */
     planFeatures: readPlanFeatures(ctx.org.planFeatures),
     pending: Number(pending?.n ?? 0),
@@ -167,4 +170,13 @@ export async function orgHome(slug: string, user: User) {
 export async function homeViews(slug: string, user: User) {
   const ctx = await orgContext(slug, user).catch(() => null)
   return ctx ? viewsOf(ctx, user) : []
+}
+
+/** The last limit or payment notice of an organization's plan ("" when all is well). */
+async function planNoticeOf(orgId: string) {
+  const [row] = await getDb()
+    .select({ notice: subscriptions.notice })
+    .from(subscriptions)
+    .where(eq(subscriptions.orgId, orgId))
+  return row?.notice ?? ""
 }
