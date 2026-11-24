@@ -23,6 +23,7 @@ export async function costs() {
       createdAt: judgeMachines.createdAt,
       stageAt: judgeMachines.stageAt,
       pool: organizations.slug,
+      poolId: judgeMachines.poolOrgId,
       poolName: organizations.name,
     })
     .from(judgeMachines)
@@ -58,6 +59,7 @@ export async function costs() {
     now
   )
   const names = new Map(rows.map((r) => [r.pool, r.poolName]))
+  const ids = new Map(rows.map((r) => [r.pool, r.poolId]))
   return {
     /** "November 2026". */
     month: report.monthStart.toLocaleDateString("en-GB", {
@@ -72,8 +74,11 @@ export async function costs() {
     byPool: report.byPool.map((p) => ({
       pool: p.pool,
       name: p.pool ? (names.get(p.pool) ?? p.pool) : null,
+      /** The organization's id; null for the shared judges. */
+      id: p.pool ? (ids.get(p.pool) ?? null) : null,
       hours: p.hours,
       cost: p.cost,
+      forecast: p.forecast,
     })),
     /** US$ an hour for each size, as charged here. */
     prices: Object.fromEntries(

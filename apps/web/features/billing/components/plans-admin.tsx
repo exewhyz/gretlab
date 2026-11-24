@@ -6,6 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
+import { WarningIcon } from "@phosphor-icons/react"
 import { useEffect, useState } from "react"
 
 import type { BillingPeriod, PlanChoice } from "@workspace/judge"
@@ -33,12 +34,14 @@ import {
   Loading,
   PageTitle,
   Pager,
+  Stats,
   Table,
 } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import { formatDate } from "@/lib/format"
 import { useDebounced } from "@/lib/use-debounced"
+import type { revenue } from "@/features/billing/revenue"
 import type { allPlans } from "@/features/billing/server"
 
 import { PlanBuilder, rupees } from "./plan-builder"
@@ -46,6 +49,7 @@ import { STATUS } from "./plan-page"
 
 type Plans = ApiResult<typeof allPlans>
 type Org = Plans["items"][number]
+type Revenue = ApiResult<typeof revenue>
 
 /** Dashboard › Plans: every organization's plan, setting one by hand, and the prices. */
 export function PlansAdmin() {
@@ -55,15 +59,128 @@ export function PlansAdmin() {
       <Tabs defaultValue="orgs">
         <TabsList>
           <TabsTrigger value="orgs">Organizations</TabsTrigger>
+          <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="prices">Prices</TabsTrigger>
         </TabsList>
         <TabsContent value="orgs" className="mt-4">
           <Organizations />
         </TabsContent>
+        <TabsContent value="revenue" className="mt-4">
+          <Revenue />
+        </TabsContent>
         <TabsContent value="prices" className="mt-4">
           <Prices />
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+/**
+ * Revenue: each organization's plan a month against what its judging costs this month (its own
+ * judge machines, and its share of the shared ones by submissions), worst margins first.
+ */
+function Revenue() {
+  const { data, error } = useQuery({
+    queryKey: ["admin", "plans", "revenue"],
+    queryFn: () => api<Revenue>("/admin/billing/revenue"),
+  })
+  if (!data) return <Loading error={error} />
+  const margin = data.revenue - data.cost - data.platformCost
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-3" data-testid="revenue">
+      <Stats
+        items={[
+          {
+            label: "Plans a month",
+            value: rupees(data.revenue),
+            hint: "before GST",
+          },
+          { label: `Received in ${data.month}`, value: rupees(data.received) },
+          {
+            label: "Judging this month",
+            value: rupees(data.cost + data.platformCost),
+            hint: data.platformCost
+              ? `${rupees(data.platformCost)} of it personal practice`
+              : "forecast",
+          },
+          {
+            label: "Margin",
+            value: rupees(margin),
+            tone: margin < 0 ? "bad" : undefined,
+          },
+          {
+            label: "Cost more than they pay",
+            value: data.losing,
+            tone: data.losing ? "bad" : undefined,
+          },
+        ]}
+      />
+      <p className="text-caption text-body">
+        Judging is what Dashboard › Costs counts (judge machines started here,
+        forecast to the month&apos;s end, at ₹{data.usdRate} to the dollar): an
+        organization&apos;s own machines, plus a share of the shared ones by its
+        submissions this month. The rest of the bill (database, hosting, email)
+        isn&apos;t counted, so margins here are at most this.
+      </p>
+      {data.organizations.length === 0 ? (
+        <Card>
+          <p className="text-body-sm text-body">
+            Nothing yet: no organization pays for a plan or used the judges this
+            month.
+          </p>
+        </Card>
+      ) : (
+        <Card>
+          <Table
+            headers={[
+              "Organization",
+              "Plan a month",
+              "Judging",
+              "Margin",
+              "Submissions",
+              "",
+            ]}
+          >
+            {data.organizations.map((o) => (
+              <tr key={o.id} data-testid="revenue-row">
+                <td className="text-ink">{o.name}</td>
+                <td className="text-ink tabular-nums">{rupees(o.revenue)}</td>
+                <td className="text-body tabular-nums">
+                  {rupees(o.cost)}
+                  {o.ownJudges && (
+                    <span className="ml-1 text-caption text-body">
+                      own judges
+                    </span>
+                  )}
+                </td>
+                <td
+                  className={`tabular-nums ${o.losing ? "text-destructive" : "text-ink"}`}
+                >
+                  {rupees(o.margin)}
+                </td>
+                <td className="text-body tabular-nums">
+                  {o.submissions.toLocaleString("en-IN")}
+                </td>
+                <td>
+                  {o.losing && (
+                    <Badge variant="destructive" data-testid="losing">
+                      <WarningIcon aria-hidden />
+                      Costs more than it pays
+                    </Badge>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </Table>
+          {data.total > data.organizations.length && (
+            <p className="mt-2 text-caption text-body">
+              The {data.organizations.length} lowest margins of {data.total};
+              the figures above count all of them.
+            </p>
+          )}
+        </Card>
+      )}
     </div>
   )
 }
@@ -426,6 +543,11 @@ function Prices() {
           {numberField("billing.quote_above", "Custom quote above … students")}
           {numberField("billing.free_students", "Free plan: students")}
           {numberField("billing.free_staff", "Free plan: staff")}
+          {numberField(
+            "billing.usd_rate",
+            "Rupees to the US dollar",
+            "For Revenue: judge machines are billed in dollars."
+          )}
         </div>
       </Card>
       <Card className="grid gap-3">

@@ -231,7 +231,7 @@ export async function saveBillingProfile(
 
 /* ---------- the platform's side: Dashboard › Plans ---------- */
 
-async function needPlans(user: User) {
+export async function needPlans(user: User) {
   if (!(await platformCan(user, "platform.billing.manage")))
     throw new ApiError(
       403,

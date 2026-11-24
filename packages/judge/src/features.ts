@@ -197,7 +197,8 @@ export const SETTINGS = {
   },
   "billing.prices": {
     label: "Feature prices",
-    description: "Rupees per student per year, for each feature. Missing: the launch price.",
+    description:
+      "Rupees per student per year, for each feature. Missing: the launch price.",
     group: "Billing",
     schema: z.record(z.string(), z.number().int().min(0).max(100_000)),
     default: {} as Record<string, number>,
@@ -222,7 +223,12 @@ export const SETTINGS = {
       "Percent off the student part past each number of students, like tax slabs: [students up to, percent off], the last up to null.",
     group: "Billing",
     schema: z
-      .array(z.tuple([z.number().int().min(1).nullable(), z.number().int().min(0).max(90)]))
+      .array(
+        z.tuple([
+          z.number().int().min(1).nullable(),
+          z.number().int().min(0).max(90),
+        ])
+      )
       .min(1)
       .max(10),
     default: [
@@ -234,28 +240,32 @@ export const SETTINGS = {
   },
   "billing.semester_percent": {
     label: "Semester surcharge",
-    description: "Percent added to half the yearly price for paying by the semester.",
+    description:
+      "Percent added to half the yearly price for paying by the semester.",
     group: "Billing",
     schema: z.number().int().min(0).max(100),
     default: 10,
   },
   "billing.month_percent": {
     label: "Monthly surcharge",
-    description: "Percent added to a twelfth of the yearly price for paying by the month.",
+    description:
+      "Percent added to a twelfth of the yearly price for paying by the month.",
     group: "Billing",
     schema: z.number().int().min(0).max(100),
     default: 25,
   },
   "billing.quote_above": {
     label: "Custom quote above",
-    description: "More students than this: the builder asks them to contact you.",
+    description:
+      "More students than this: the builder asks them to contact you.",
     group: "Billing",
     schema: z.number().int().min(100).max(1_000_000),
     default: 10_000,
   },
   "billing.judge_price": {
     label: "Own judge machine",
-    description: "Rupees a year for an organization's own judge machine (class hours).",
+    description:
+      "Rupees a year for an organization's own judge machine (class hours).",
     group: "Billing",
     schema: z.number().int().min(0).max(10_000_000),
     default: 72_000,
@@ -283,10 +293,19 @@ export const SETTINGS = {
   },
   "billing.gst_registered": {
     label: "Registered for GST",
-    description: "Invoices charge GST (CGST and SGST in your state, IGST across states).",
+    description:
+      "Invoices charge GST (CGST and SGST in your state, IGST across states).",
     group: "Billing",
     schema: z.boolean(),
     default: false,
+  },
+  "billing.usd_rate": {
+    label: "Rupees to the US dollar",
+    description:
+      "For Revenue: judge machines are billed in US$. Change it when the rate moves.",
+    group: "Billing",
+    schema: z.number().int().min(1).max(1000),
+    default: 88,
   },
   "billing.gst_rate": {
     label: "GST rate",

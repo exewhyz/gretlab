@@ -548,3 +548,69 @@ export const PLAN_PRESETS = [
     staff: 20,
   },
 ] as const
+
+// ---------- revenue and margin (Dashboard › Plans › Revenue)
+
+/**
+ * What a plan brings in a month (₹, before GST): its period's price spread over the period's
+ * months, while it's paid for (active) or a deal set by hand (custom). Free, past due and
+ * paused plans bring nothing.
+ */
+export function monthlyRevenue(
+  price: number,
+  period: BillingPeriod,
+  status: "free" | "active" | "past_due" | "paused" | "custom"
+) {
+  return status === "active" || status === "custom" ? price / MONTHS[period] : 0
+}
+
+export interface MarginInput {
+  id: string
+  /** ₹ a month (monthlyRevenue). */
+  monthly: number
+  /** US$ this month for its own judge machines (forecast to the month's end). */
+  ownCost: number
+  /** Submissions (runs too) of its work this month. */
+  submissions: number
+  /** Whether it had judge machines of its own this month: its work ran on them, not the shared ones. */
+  ownJudges: boolean
+}
+
+/**
+ * Each organization's revenue against what its judging costs, in ₹: its own machines, plus the
+ * shared machines' cost split by how much of their work was its (submissions this month, among
+ * organizations without judges of their own and personal practice, the platform's own share).
+ * An estimate: the shared judges also take work from organizations whose own judges were down.
+ */
+export function margins(
+  orgs: MarginInput[],
+  shared: { sharedCost: number; platformSubmissions: number; usdRate: number }
+) {
+  const onShared =
+    orgs.reduce((n, o) => n + (o.ownJudges ? 0 : o.submissions), 0) +
+    shared.platformSubmissions
+  const shareOf = (submissions: number) =>
+    onShared > 0 ? (shared.sharedCost * submissions) / onShared : 0
+  const rows = orgs.map((o) => {
+    const usd = o.ownCost + (o.ownJudges ? 0 : shareOf(o.submissions))
+    const cost = Math.round(usd * shared.usdRate)
+    const revenue = Math.round(o.monthly)
+    return {
+      id: o.id,
+      revenue,
+      cost,
+      margin: revenue - cost,
+      /** Costs more than it pays. */
+      losing: cost > revenue,
+    }
+  })
+  return {
+    orgs: rows,
+    revenue: rows.reduce((n, r) => n + r.revenue, 0),
+    cost: rows.reduce((n, r) => n + r.cost, 0),
+    /** The shared judges' cost of personal practice and the platform's own work. */
+    platformCost: Math.round(
+      shareOf(shared.platformSubmissions) * shared.usdRate
+    ),
+  }
+}

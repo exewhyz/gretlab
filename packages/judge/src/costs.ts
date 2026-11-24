@@ -43,7 +43,10 @@ export function judgeCosts(machines: MachineSpan[], now: Date) {
   const monthEnd = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
   )
-  const byPool = new Map<string | null, { hours: number; cost: number }>()
+  const byPool = new Map<
+    string | null,
+    { hours: number; cost: number; hourly: number }
+  >()
   let soFar = 0
   let runningHourly = 0
   for (const m of machines) {
@@ -53,8 +56,11 @@ export function judgeCosts(machines: MachineSpan[], now: Date) {
     const hours = Math.max(0, to - from) / HOUR
     const cost = hours * hourlyCost(m.size)
     soFar += cost
-    if (!m.endedAt) runningHourly += hourlyCost(m.size)
-    const pool = byPool.get(m.pool) ?? { hours: 0, cost: 0 }
+    const pool = byPool.get(m.pool) ?? { hours: 0, cost: 0, hourly: 0 }
+    if (!m.endedAt) {
+      runningHourly += hourlyCost(m.size)
+      pool.hourly += hourlyCost(m.size)
+    }
     pool.hours += hours
     pool.cost += cost
     byPool.set(m.pool, pool)
@@ -66,7 +72,13 @@ export function judgeCosts(machines: MachineSpan[], now: Date) {
     runningHourly,
     forecast: soFar + runningHourly * hoursLeft,
     byPool: [...byPool.entries()]
-      .map(([pool, v]) => ({ pool, hours: v.hours, cost: v.cost }))
+      .map(([pool, v]) => ({
+        pool,
+        hours: v.hours,
+        cost: v.cost,
+        /** This month's cost if what runs now runs to the month's end. */
+        forecast: v.cost + v.hourly * hoursLeft,
+      }))
       .sort((a, b) => b.cost - a.cost),
   }
 }

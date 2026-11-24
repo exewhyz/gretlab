@@ -114,3 +114,29 @@ test("a machine never started costs nothing", () => {
     0
   )
 })
+
+test("each pool's forecast runs its own running machines to the month's end", () => {
+  const report = judgeCosts(
+    [
+      {
+        size: "c7i.large",
+        pool: "gla",
+        startedAt: at("2026-11-22T10:00:00Z"),
+        endedAt: null,
+      },
+      {
+        size: "c7i.large",
+        pool: null,
+        startedAt: at("2026-11-22T10:00:00Z"),
+        endedAt: at("2026-11-22T11:00:00Z"),
+      },
+    ],
+    NOW
+  )
+  const hourly = hourlyCost("c7i.large")
+  const left = (Date.parse("2026-12-01T00:00:00Z") - NOW.getTime()) / 3_600_000
+  const gla = report.byPool.find((p) => p.pool === "gla")!
+  const shared = report.byPool.find((p) => p.pool === null)!
+  assert.ok(Math.abs(gla.forecast - (2 + left) * hourly) < 1e-6)
+  assert.ok(Math.abs(shared.forecast - shared.cost) < 1e-9)
+})

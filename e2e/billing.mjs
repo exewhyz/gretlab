@@ -110,6 +110,7 @@ await new Promise((r) => fake.listen(3197, "127.0.0.1", r))
 const sign = (secret, text) =>
   createHmac("sha256", secret).update(text).digest("hex")
 const cleanup = () => {
+  psql(`delete from judge_machines where instance_id like 'i-bl%'`)
   psql(
     `delete from payments where org_id in (select id from organizations where slug like 'bl-%')`
   )
@@ -998,6 +999,111 @@ for (const [name, viewport] of [
   await tab.screenshot({ path: `${SHOTS}paid-laptop.png`, fullPage: true })
   await context.close()
 }
+// ---------- revenue and margin
+// bl-pay's own judge machine (c7i.large) has run two hours and still runs: its cost this month is
+// those hours plus the rest of the month, at what Dashboard › Costs charges, in rupees.
+psql(
+  `insert into judge_machines (instance_id, pool_org_id, size, stage, created_at, stage_at) values ('i-bl-own', '${payOrg}', 'c7i.large', 'ready', now() - interval '2 hours', now() - interval '2 hours')`
+)
+{
+  const rev = await admin("/admin/billing/revenue")
+  const row = rev.json?.organizations?.find((o) => o.slug === "bl-pay")
+  const price = Number(
+    psql(`select price from subscriptions where org_id = '${payOrg}'`)
+  )
+  const now = new Date()
+  const monthEnd = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+  const hourly = 0.11655 + 0.005 + (30 * 0.096) / 730
+  const expected = (2 + (monthEnd - now.getTime()) / 3_600_000) * hourly * 88
+  check(
+    "Revenue: a yearly plan counts a twelfth a month",
+    rev.status === 200 && row?.revenue === Math.round(price / 12),
+    JSON.stringify(row)
+  )
+  check(
+    "…against its own judge machine, forecast to the month's end, in rupees",
+    row?.ownJudges === true &&
+      Math.abs(row.cost - expected) <= 2 &&
+      row.margin === row.revenue - row.cost,
+    `${row?.cost} vs ${expected.toFixed(1)}`
+  )
+  check(
+    "…flagged when it costs more than it pays",
+    row?.losing === row?.cost > row?.revenue &&
+      rev.json.losing >= (row?.losing ? 1 : 0)
+  )
+  check(
+    "…and the month's payments received, before GST",
+    rev.json?.received >=
+      Number(
+        psql(
+          `select sum(amount) from payments where org_id = '${payOrg}' and status = 'paid'`
+        )
+      )
+  )
+  check(
+    "only whoever manages plans sees Revenue",
+    (await fresh("/admin/billing/revenue")).status === 403 &&
+      (await payer("/admin/billing/revenue")).status === 403
+  )
+  // A cheaper rupee makes the same machine cost more.
+  await admin("/admin/billing/settings", {
+    method: "PATCH",
+    body: { "billing.usd_rate": 176 },
+  })
+  const dearer = (
+    await admin("/admin/billing/revenue")
+  ).json?.organizations?.find((o) => o.slug === "bl-pay")
+  check(
+    "the rupee rate is a setting",
+    Math.abs(dearer?.cost - 2 * row?.cost) <= 3,
+    `${dearer?.cost} vs 2 x ${row?.cost}`
+  )
+  await admin("/admin/billing/settings", {
+    method: "PATCH",
+    body: { "billing.usd_rate": 88 },
+  })
+}
+for (const [name, viewport] of [
+  ["laptop", { width: 1440, height: 1000 }],
+  ["phone", { width: 390, height: 844 }],
+]) {
+  const context = await browser.newContext({ viewport })
+  await context.addCookies([
+    {
+      name: "next-auth.session-token",
+      value: await encode({
+        token: { email: "admin@example.com" },
+        secret: SECRET,
+      }),
+      url: BASE,
+    },
+  ])
+  const tab = await context.newPage()
+  await tab.goto(`${BASE}/admin/plans`)
+  await tab.getByRole("tab", { name: "Revenue" }).click()
+  await tab
+    .getByTestId("revenue-row")
+    .first()
+    .waitFor({ timeout: 30_000 })
+    .catch(() => {})
+  const row = tab
+    .getByTestId("revenue-row")
+    .filter({ hasText: "Bl Pay College" })
+  check(
+    `${name}: the Revenue tab lists the organization with its margin`,
+    (await row.count()) === 1
+  )
+  check(
+    `${name}: …and nothing spills sideways`,
+    await tab.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth + 1
+    )
+  )
+  await tab.screenshot({ path: `${SHOTS}revenue-${name}.png`, fullPage: true })
+  await context.close()
+}
+
 await browser.close()
 fake.close()
 

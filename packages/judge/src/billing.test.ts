@@ -8,6 +8,8 @@ import {
   gstSplit,
   invoiceNumber,
   limitState,
+  margins,
+  monthlyRevenue,
   periodEnd,
   priceOfPlan,
   samePlan,
@@ -282,4 +284,54 @@ test("features that aren't modules are checked by name", () => {
   assert.equal(planIncludes(["core", "lti"], "lti"), true)
   assert.equal(planIncludes(["core"], "api"), false)
   assert.equal(planIncludes(null, "api"), true, "no plan limits")
+})
+
+test("revenue a month: the period's price spread over its months, only while it's paid for", () => {
+  assert.equal(monthlyRevenue(12_000, "year", "active"), 1_000)
+  assert.equal(monthlyRevenue(6_600, "semester", "active"), 1_100)
+  assert.equal(monthlyRevenue(1_250, "month", "active"), 1_250)
+  assert.equal(monthlyRevenue(12_000, "year", "custom"), 1_000)
+  for (const status of ["free", "past_due", "paused"] as const)
+    assert.equal(monthlyRevenue(12_000, "year", status), 0)
+})
+
+test("margins: own judges, plus the shared judges' cost split by submissions", () => {
+  const out = margins(
+    [
+      // Its own judges, $10; the shared ones aren't shared with it.
+      {
+        id: "a",
+        monthly: 2_000,
+        ownCost: 10,
+        submissions: 500,
+        ownJudges: true,
+      },
+      // Shared judges: 300 of the 400 submissions they ran ($8).
+      {
+        id: "b",
+        monthly: 1_000,
+        ownCost: 0,
+        submissions: 300,
+        ownJudges: false,
+      },
+      { id: "c", monthly: 0, ownCost: 0, submissions: 0, ownJudges: false },
+    ],
+    { sharedCost: 8, platformSubmissions: 100, usdRate: 90 }
+  )
+  const by = new Map(out.orgs.map((o) => [o.id, o]))
+  assert.equal(by.get("a")!.cost, 900)
+  assert.equal(by.get("a")!.margin, 1_100)
+  assert.equal(by.get("b")!.cost, 540) // 8 x 300/400 x 90
+  assert.equal(by.get("b")!.losing, false)
+  assert.equal(by.get("c")!.cost, 0)
+  assert.equal(out.platformCost, 180) // the 100 submissions of personal practice
+  assert.equal(out.revenue, 3_000)
+  assert.equal(out.cost, 1_440) // the organizations only; the platform's share is apart
+  // Costs more than it pays.
+  const loss = margins(
+    [{ id: "d", monthly: 100, ownCost: 5, submissions: 0, ownJudges: true }],
+    { sharedCost: 0, platformSubmissions: 0, usdRate: 90 }
+  )
+  assert.equal(loss.orgs[0]!.losing, true)
+  assert.equal(loss.orgs[0]!.margin, -350)
 })
