@@ -11,7 +11,7 @@ import { addressFrom } from "@/lib/api/client-ip"
 import { pastLimit, withinLimit } from "@/lib/api/rate-limit"
 
 import { checkPassword } from "./password"
-import { confirmApp, confirmEmail, verifySecondStep } from "./two-factor"
+import { confirmApp, confirmEmail, confirmStepUp, verifySecondStep } from "./two-factor"
 
 /** Sign in as anyone without a password, so never available in a production build. */
 export const DEV_LOGIN_ENABLED =
@@ -167,6 +167,7 @@ export const authOptions: NextAuthOptions = {
       ) {
         const data = session as {
           secondStep?: unknown
+          stepUp?: unknown
           confirmApp?: unknown
           confirmEmail?: unknown
         }
@@ -177,7 +178,9 @@ export const authOptions: NextAuthOptions = {
               ? await confirmEmail(token.email, data.confirmEmail)
               : typeof data.secondStep === "string"
                 ? await verifySecondStep(token.email, data.secondStep)
-                : null
+                : typeof data.stepUp === "string"
+                  ? await confirmStepUp(token.email, data.stepUp)
+                  : null
         if (result?.ok) {
           token.mfaAt = result.at
           delete token.mfaError

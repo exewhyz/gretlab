@@ -9,7 +9,7 @@ export const GET = route({ access: "platform.billing.manage" }, ({ user }) =>
 )
 
 export const PATCH = route(
-  {
+  { stepUp: true,
     access: "platform.billing.manage",
     body: z.record(z.string(), z.unknown()),
   },

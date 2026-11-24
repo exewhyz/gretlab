@@ -9,9 +9,13 @@ export class ApiRequestError extends Error {
   }
 }
 
+import { askForStepUp } from "./step-up"
+
 export async function api<T>(
   path: string,
-  options: { method?: string; body?: unknown } = {}
+  options: { method?: string; body?: unknown } = {},
+  /** Already asked for a code once: a second refusal is shown, not asked again. */
+  steppedUp = false
 ): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {
     method: options.method ?? (options.body === undefined ? "GET" : "POST"),
@@ -25,6 +29,14 @@ export async function api<T>(
     error?: { code: string; message: string }
   } | null
   if (!response.ok) {
+    // A protected action wants a fresh second-factor code: ask, then do it again.
+    if (
+      response.status === 403 &&
+      data?.error?.code === "step_up_required" &&
+      !steppedUp &&
+      (await askForStepUp())
+    )
+      return api<T>(path, options, true)
     throw new ApiRequestError(
       response.status,
       data?.error?.code ?? "unknown",

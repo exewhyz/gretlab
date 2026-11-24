@@ -28,6 +28,6 @@ export const PATCH = route(
 )
 
 /** ?moveTo=<unit id>: where its problems go; without it they go to no unit. */
-export const DELETE = route({ access: "platform.library.manage" }, ({ params, query }) =>
+export const DELETE = route({ stepUp: true, access: "platform.library.manage" }, ({ params, query }) =>
   deleteUnit(params.id ?? "", query.get("moveTo") || null)
 )

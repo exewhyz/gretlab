@@ -8,6 +8,15 @@ aren't listed.
 
 ## 24 November 2026
 
+### Confirm it's you before changes that matter
+
+- **People with two-factor sign-in are asked for a fresh code** before changes that do lasting
+  harm in the wrong hands, when their last code is more than 10 minutes old: roles and
+  permissions, grade overrides, extensions and exam time, organization, LMS and platform
+  settings, API keys and webhooks, plans and prices, and deleting content. The code can come from
+  the authenticator app, an email, or a backup code; then the change goes ahead without starting
+  over. Each one is in the activity log.
+
 ### Safer sign-in
 
 - **Too many attempts from one network are slowed down:** wrong passwords, new accounts and

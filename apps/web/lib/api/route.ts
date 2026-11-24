@@ -2,7 +2,11 @@ import type { User } from "@workspace/db"
 import { after, NextResponse, type NextRequest } from "next/server"
 import { z, type ZodType } from "zod"
 
-import { isPlatformPermission, type PlatformPermission } from "@workspace/judge"
+import {
+  isPlatformPermission,
+  stepUpDue,
+  type PlatformPermission,
+} from "@workspace/judge"
 
 import { readSession } from "@/features/auth/current-user"
 import { mustUseTwoFactor } from "@/features/auth/two-factor"
@@ -99,6 +103,12 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
     body?: S
     /** Reachable by someone the platform requires to use two-factor before they have (their security page). */
     beforeTwoFactor?: boolean
+    /**
+     * A protected action (step-up, packages/judge/src/step-up.ts): someone with two-factor on
+     * must have given a code in the last 10 minutes, or gets 403 `step_up_required` and the
+     * browser asks for one (lib/api/client.ts), then repeats the request.
+     */
+    stepUp?: boolean
   },
   handler: (context: Handler<A, z.infer<S>>) => Promise<unknown>
 ) {
@@ -112,7 +122,7 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
         : null
       if (!keyed) assertSameOrigin(request)
       const session = keyed
-        ? { user: keyed.user, twoFactor: true, pending: null }
+        ? { user: keyed.user, twoFactor: true, pending: null, mfaAt: null }
         : await readSession()
       const user = session.user
       if (keyed && !(options.access === "user" || options.access === "public"))
@@ -131,6 +141,16 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
           403,
           "two_factor_required",
           "Your account needs two-factor sign-in. Turn it on under Security first."
+        )
+      }
+
+      // An API key acts for its maker without a person present; keys are made (with this check)
+      // by people who could do the same, and can't manage keys, so they pass.
+      if (options.stepUp && !keyed && stepUpDue(session.twoFactor, session.mfaAt)) {
+        throw new ApiError(
+          403,
+          "step_up_required",
+          "Confirm it's you: enter a code from your authenticator app, an emailed code, or a backup code."
         )
       }
 

@@ -7,6 +7,6 @@ import { addSuggestedRole, suggestedRoles } from "@/features/orgs/server"
 export const GET = route({ access: "user" }, ({ user, params }) => suggestedRoles(params.slug ?? "", user))
 
 /** Adds one of them. */
-export const POST = route({ access: "user", body: z.object({ key: z.string().max(40) }) }, ({ user, params, body }) =>
+export const POST = route({ stepUp: true, access: "user", body: z.object({ key: z.string().max(40) }) }, ({ user, params, body }) =>
   addSuggestedRole(params.slug ?? "", user, body.key)
 )

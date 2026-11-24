@@ -18,6 +18,6 @@ export const PATCH = route(
 )
 
 /** Deletes an unpublished exam, its papers and marks. */
-export const DELETE = route({ access: "user" }, ({ user, params }) =>
+export const DELETE = route({ stepUp: true, access: "user" }, ({ user, params }) =>
   deleteExam(params.slug ?? "", user, params.id ?? "")
 )

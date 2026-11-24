@@ -19,7 +19,7 @@ export const PUT = route(
   }
 )
 
-export const DELETE = route({ access: "platform.work.manage" }, async ({ user, params }) => {
+export const DELETE = route({ stepUp: true, access: "platform.work.manage" }, async ({ user, params }) => {
   const row = await deleteTemplate(null, params.id ?? "")
   await writePlatformAudit(user, "template.delete", `Deleted the template ${row.title}`)
 })

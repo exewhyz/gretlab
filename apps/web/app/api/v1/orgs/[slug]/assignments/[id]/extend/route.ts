@@ -4,7 +4,7 @@ import { orgExtendSitting } from "@/features/orgs/content"
 
 /** More exam time for one student. */
 export const POST = route(
-  { access: "user", body: extendSchema },
+  { stepUp: true, access: "user", body: extendSchema },
   ({ user, params, body }) =>
     orgExtendSitting(params.slug ?? "", user, params.id ?? "", body)
 )

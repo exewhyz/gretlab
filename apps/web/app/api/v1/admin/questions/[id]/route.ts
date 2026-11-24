@@ -15,6 +15,6 @@ export const PUT = route(
   ({ params, body }) => saveQuestion(params.id ?? "", body, null)
 )
 
-export const DELETE = route({ access: "platform.library.delete" }, ({ params }) =>
+export const DELETE = route({ stepUp: true, access: "platform.library.delete" }, ({ params }) =>
   deleteQuestion(params.id ?? "", null)
 )

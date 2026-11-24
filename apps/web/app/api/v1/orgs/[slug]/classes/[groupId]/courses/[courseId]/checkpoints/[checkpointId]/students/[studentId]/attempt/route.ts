@@ -10,7 +10,7 @@ const p = (params: Record<string, string | undefined>) =>
   ] as const
 
 /** Lets a student take a quiz or lab again. */
-export const DELETE = route({ access: "user" }, ({ user, params }) => {
+export const DELETE = route({ stepUp: true, access: "user" }, ({ user, params }) => {
   const [slug, groupId, courseId, checkpointId] = p(params)
   return resetAttempt(
     slug,

@@ -4,7 +4,7 @@ import { rubricMarksSchema } from "@/features/assignments/feedback-schemas"
 
 /** A teacher's rubric marks for one student on one problem. */
 export const PUT = route(
-  { access: "platform.work.grade", body: rubricMarksSchema },
+  { stepUp: true, access: "platform.work.grade", body: rubricMarksSchema },
   ({ user, params, body }) =>
     setRubricMarks(params.id ?? "", null, "all", body, user.id)
 )

@@ -17,9 +17,11 @@ export interface SessionState {
   pending: User | null
   /** Whether the signed-in person uses two-factor sign-in. */
   twoFactor: boolean
+  /** When they last gave a second-factor code (ms), if since two-factor was turned on: step-up. */
+  mfaAt: number | null
 }
 
-const NOBODY: SessionState = { user: null, pending: null, twoFactor: false }
+const NOBODY: SessionState = { user: null, pending: null, twoFactor: false, mfaAt: null }
 
 /**
  * Who the session belongs to, read from the database on every call, so a role change,
@@ -48,18 +50,21 @@ export async function readSession(): Promise<SessionState> {
   const signedInAt = (session as { signedInAt?: unknown }).signedInAt
   if (row.user.sessionsValidAfter && (typeof signedInAt !== "number" || signedInAt < row.user.sessionsValidAfter.getTime()))
     return NOBODY
-  if (!row.enabledAt) return { user: row.user, pending: null, twoFactor: false }
-  const mfaAt = (session as { mfaAt?: unknown }).mfaAt
+  const stamp = (session as { mfaAt?: unknown }).mfaAt
+  const mfaAt = typeof stamp === "number" ? stamp : null
+  if (!row.enabledAt) return { user: row.user, pending: null, twoFactor: false, mfaAt }
   const passed =
-    (typeof mfaAt === "number" && mfaAt >= row.enabledAt.getTime()) ||
+    (mfaAt !== null && mfaAt >= row.enabledAt.getTime()) ||
     // A browser they chose to trust for 30 days.
     trusted((await cookies()).get(TRUST_COOKIE)?.value, row.user, {
       enabledAt: row.enabledAt,
       trustVersion: row.trustVersion ?? 0,
     })
+  // A code from before two-factor was last turned on doesn't count for step-up either.
+  const fresh = mfaAt !== null && mfaAt >= row.enabledAt.getTime() ? mfaAt : null
   return passed
-    ? { user: row.user, pending: null, twoFactor: true }
-    : { user: null, pending: row.user, twoFactor: true }
+    ? { user: row.user, pending: null, twoFactor: true, mfaAt: fresh }
+    : { user: null, pending: row.user, twoFactor: true, mfaAt: fresh }
 }
 
 /** The signed-in user, or null (including while the second step is owed). */

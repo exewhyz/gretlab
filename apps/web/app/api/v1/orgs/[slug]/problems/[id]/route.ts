@@ -16,6 +16,6 @@ export const PUT = route(
     saveOrgProblem(params.slug ?? "", user, params.id ?? "", body)
 )
 
-export const DELETE = route({ access: "user" }, ({ user, params }) =>
+export const DELETE = route({ stepUp: true, access: "user" }, ({ user, params }) =>
   deleteOrgProblem(params.slug ?? "", user, params.id ?? "")
 )

@@ -255,7 +255,11 @@ const emailMatches = (row: Row, code: string) =>
 /** Emails a fresh code (replacing any waiting), within the sending limits. */
 async function emailCode(
   user: User,
-  why: "sign in" | "turn on email codes" | "confirm a security change"
+  why:
+    | "sign in"
+    | "turn on email codes"
+    | "confirm a security change"
+    | "confirm a protected action"
 ) {
   if (!mailEnabled())
     throw new ApiError(503, "no_mail", "This site can't send email yet.")
@@ -340,6 +344,18 @@ export async function emailConfirmCode(user: User) {
     )
   }
   return emailCode(user, "confirm a security change")
+}
+
+/** Emails a code for a protected action (step-up), to someone signed in with email codes on. */
+export async function emailStepUpCode(user: User) {
+  if (!methodsOf(await rowOf(user.id)).email) {
+    throw new ApiError(
+      400,
+      "not_on",
+      "Codes by email aren't on for this account. Use your authenticator app or a backup code."
+    )
+  }
+  return emailCode(user, "confirm a protected action")
 }
 
 /* ---------- turning methods on ---------- */
@@ -513,6 +529,19 @@ async function check(user: User, code: string): Promise<StepResult> {
 }
 
 /** The second sign-in step, from the jwt callback. */
+/**
+ * A code given for a protected action (step-up, `route({ stepUp: true })`): checked like the
+ * second sign-in step, and logged, so the activity log shows when someone confirmed it was them.
+ */
+export async function confirmStepUp(email: string, code: string): Promise<StepResult> {
+  const user = await userByEmail(email)
+  if (!user) return { ok: false, reason: "not_set_up" }
+  const result = await check(user, code)
+  if (result.ok)
+    await log(user, "security.step_up", "Confirmed with a second-factor code for a protected action")
+  return result
+}
+
 export async function verifySecondStep(
   email: string,
   code: string

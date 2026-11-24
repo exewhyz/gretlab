@@ -6,6 +6,6 @@ export const GET = route({ access: "user" }, ({ user, params, request }) =>
   orgLti(params.slug ?? "", user, request.nextUrl.origin)
 )
 
-export const POST = route({ access: "user", body: platformSchema }, ({ user, params, body }) =>
+export const POST = route({ stepUp: true, access: "user", body: platformSchema }, ({ user, params, body }) =>
   orgSavePlatform(params.slug ?? "", user, null, body)
 )

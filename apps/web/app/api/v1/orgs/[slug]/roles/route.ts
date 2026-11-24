@@ -7,6 +7,6 @@ export const GET = route({ access: "user" }, ({ user, params }) =>
 )
 
 export const POST = route(
-  { access: "user", body: roleSchema },
+  { stepUp: true, access: "user", body: roleSchema },
   ({ user, params, body }) => createRole(params.slug ?? "", user, body)
 )

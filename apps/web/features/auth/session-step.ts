@@ -9,7 +9,10 @@ import { getCsrfToken } from "next-auth/react"
  */
 export async function sendSecondStep(
   data:
-    { secondStep: string } | { confirmApp: string } | { confirmEmail: string }
+    | { secondStep: string }
+    | { stepUp: string }
+    | { confirmApp: string }
+    | { confirmEmail: string }
 ): Promise<
   "wrong_code" | "locked" | "not_set_up" | "expired" | "failed" | null
 > {
@@ -24,7 +27,10 @@ export async function sendSecondStep(
     mfaError?: string | null
   } | null
   const error = session?.mfaError
-  return error === "wrong_code" || error === "locked" || error === "not_set_up"
+  return error === "wrong_code" ||
+    error === "locked" ||
+    error === "not_set_up" ||
+    error === "expired"
     ? error
     : null
 }

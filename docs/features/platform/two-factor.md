@@ -37,6 +37,18 @@ The platform setting can require two-factor for staff, or for everyone. Someone 
 turned it on can only reach their Security page, with a banner explaining why. An admin can't require
 it before turning it on themselves.
 
+## Confirming changes that matter
+
+With two-factor on, some changes ask for a fresh code when your last one is more than 10 minutes
+old: changing roles and permissions, overriding quiz marks, giving extensions or exam time,
+organization, LMS and platform settings, API keys and webhooks, plans and prices, and deleting
+problems, questions, assignments, contests, courses, templates, units or exams.
+
+A dialog asks for a code from your authenticator app, an emailed code, or a backup code; then the
+change goes ahead without starting over. Closing the dialog leaves it undone. A browser you trust
+for 30 days still asks: trusting skips the code at sign-in only. Each confirmation is in the
+activity log. Without two-factor nothing is asked; the platform can require two-factor for staff.
+
 ## Lost every method
 
 Platform staff with "Manage users" turn the person's two-factor off from Dashboard › Users (not for

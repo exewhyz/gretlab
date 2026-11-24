@@ -8,6 +8,6 @@ export const PATCH = route(
     updateMember(params.slug ?? "", user, params.userId ?? "", body)
 )
 
-export const DELETE = route({ access: "user" }, ({ user, params }) =>
+export const DELETE = route({ stepUp: true, access: "user" }, ({ user, params }) =>
   removeMember(params.slug ?? "", user, params.userId ?? "")
 )

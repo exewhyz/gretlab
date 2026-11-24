@@ -7,6 +7,6 @@ export const GET = route({ access: "public" }, ({ user, params }) =>
 )
 
 export const PATCH = route(
-  { access: "user", body: orgSettingsSchema },
+  { stepUp: true, access: "user", body: orgSettingsSchema },
   ({ user, params, body }) => updateSettings(params.slug ?? "", user, body)
 )

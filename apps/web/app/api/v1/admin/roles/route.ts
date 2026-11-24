@@ -6,6 +6,6 @@ import { listRoles, saveRole } from "@/features/platform/staff"
 export const GET = route({ access: "platform.roles.manage" }, ({ user }) => listRoles(user))
 
 export const POST = route(
-  { access: "platform.roles.manage", body: roleSchema },
+  { stepUp: true, access: "platform.roles.manage", body: roleSchema },
   ({ user, body }) => saveRole(user, null, body)
 )

@@ -15,6 +15,6 @@ export const PUT = route(
   ({ params, body }) => saveAssignment(params.id ?? "", body, null)
 )
 
-export const DELETE = route({ access: "platform.work.delete" }, ({ params }) =>
+export const DELETE = route({ stepUp: true, access: "platform.work.delete" }, ({ params }) =>
   deleteAssignment(params.id ?? "", null)
 )

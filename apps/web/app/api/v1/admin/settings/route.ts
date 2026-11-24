@@ -10,7 +10,7 @@ export const GET = route({ access: "platform.settings.manage" }, () =>
 )
 
 export const PATCH = route(
-  {
+  { stepUp: true,
     access: "platform.settings.manage",
     body: z.record(z.string(), z.unknown()),
   },

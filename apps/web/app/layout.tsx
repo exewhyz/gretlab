@@ -9,6 +9,7 @@ import { Toaster } from "@workspace/ui/components/sonner"
 
 import { ProgressBar } from "@/components/progress-bar"
 import { QueryProvider } from "@/components/query-provider"
+import { StepUpDialog } from "@/components/step-up-dialog"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ADSENSE_CLIENT } from "@/features/ads/config"
 import { ExamLockProvider } from "@/features/exams/components/exam-lock"
@@ -56,6 +57,7 @@ export default async function RootLayout({
           <QueryProvider>
             <ProgressBar />
             <ExamLockProvider>{children}</ExamLockProvider>
+            <StepUpDialog />
             <Toaster position="bottom-right" closeButton />
           </QueryProvider>
         </ThemeProvider>

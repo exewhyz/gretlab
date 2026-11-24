@@ -94,6 +94,7 @@ suite transport http://localhost:3100
 suite hostel http://localhost:3100
 suite audit http://localhost:3100
 suite two-factor http://localhost:3100
+suite step-up http://localhost:3100
 suite home http://localhost:3100
 suite records http://localhost:3100
 suite promotion http://localhost:3100
