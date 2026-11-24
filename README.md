@@ -100,6 +100,15 @@ Supabase addresses need `?sslmode=require` at the end (its Enforce SSL is on, an
 
 With this login, `runner-setup.sh` skips migrations and the starter problems: the owner runs those.
 
+**A time limit on the website's queries** (set once, 24 November 2026). On that day, Vercel functions that froze mid-query left their queries waiting on the pooler for minutes, each holding one of its few database connections, until every request queued and timed out. A limit on the website's login cancels such a query and frees its connection after a minute. In Supabase's SQL editor:
+
+1. See what's set now: `select rolname, rolconfig from pg_roles where rolname = 'postgres';`
+2. Set it: `alter role postgres set statement_timeout = '60s';` New connections get it; the pooler's older ones as they're replaced.
+3. Long work isn't affected: `pnpm db:migrate` lifts it for its own session (`packages/db/src/migrate.ts`). A long query of your own in the SQL editor: put `set statement_timeout = 0;` before it.
+4. Undo, if ever needed: `alter role postgres reset statement_timeout;`
+
+A stuck query looks like this in `pg_stat_activity`: application `Supavisor`, state `active`, wait event `ClientRead`, running for minutes. Ending it loses nothing (it's waiting on a caller that's gone): `select pg_terminate_backend(pid) from pg_stat_activity where application_name = 'Supavisor' and state = 'active' and wait_event = 'ClientRead' and now() - query_start > interval '1 minute';`
+
 **Watching it:**
 
 - Judge logs: `ssh ubuntu@<judge address>`, then `cd /opt/gretlab && sudo docker compose -f docker-compose.runner.yml logs -f runner`. A submission stuck at "queued" means the judge is down or can't reach the database.

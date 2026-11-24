@@ -14,6 +14,10 @@ if (who?.me === "gretlab_judge") {
   await client.end()
   process.exit(0)
 }
+// The website's login has a time limit on each query (README › How the live site runs), so a
+// query stuck behind a frozen function frees its connection. Migrations may take longer: this
+// session (one connection, so every statement below) has none.
+await client`set statement_timeout = 0`
 await migrate(drizzle(client), {
   migrationsFolder: new URL("../migrations", import.meta.url).pathname,
 })
