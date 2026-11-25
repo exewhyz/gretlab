@@ -28,6 +28,7 @@ import {
   LinkIcon,
   ListChecksIcon,
   MegaphoneIcon,
+  ListNumbersIcon,
   PuzzlePieceIcon,
   QuestionIcon,
   SealCheckIcon,
@@ -147,6 +148,7 @@ const ICONS: Record<string, Icon> = {
   lms: GraduationCapIcon,
   classes: ChalkboardTeacherIcon,
   practice: PuzzlePieceIcon,
+  "study-plans": ListNumbersIcon,
   child: UserIcon,
   profile: IdentificationBadgeIcon,
   events: CalendarStarIcon,
@@ -214,6 +216,11 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
         items: [
           { key: "assignments", label: "Assignments", href: "/assignments" },
           { key: "practice", label: "Practice", href: "/problems" },
+          {
+            key: "study-plans",
+            label: "Study plans",
+            href: `${base}/study-plans`,
+          },
           { key: "contests", label: "Contests", href: "/contests" },
         ],
       })

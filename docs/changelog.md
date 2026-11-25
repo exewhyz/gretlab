@@ -8,6 +8,12 @@ aren't listed.
 
 ## 25 November 2026
 
+### Your own study plans
+
+- **Organizations make their own study plans** under Manage › Study plans: an ordered set of
+  library problems and your own members-only problems. Your members find them under Study plans
+  in the Coding lab, with what they've solved, and nobody outside sees them.
+
 ### Syllabus topics on assignments
 
 - **Tag an assignment with the syllabus topics it covers.** The assignment form's new Syllabus

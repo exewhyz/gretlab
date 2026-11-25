@@ -105,7 +105,7 @@ function needAnywhere(
  * The Coding lab module: switched off, nothing new is set or written (lists and editors are
  * gone, as in the sidebar). What exists stays readable: gradebooks, and students' own work.
  */
-function needCoding(ctx: { modules: ReadonlySet<string> }) {
+export function needCoding(ctx: { modules: ReadonlySet<string> }) {
   if (!ctx.modules.has("coding"))
     throw new ApiError(
       404,

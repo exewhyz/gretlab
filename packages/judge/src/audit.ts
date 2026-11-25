@@ -44,6 +44,7 @@ export const AUDIT_CATEGORIES: Record<string, string> = {
   transport: "Transport",
   hostel: "Hostel",
   billing: "Plan and billing",
+  study_plan: "Study plans",
 }
 
 export const auditCategory = (action: string) => action.split(".")[0] ?? action

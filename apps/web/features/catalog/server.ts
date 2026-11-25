@@ -800,10 +800,11 @@ export async function getLists(user: User | null) {
     .from(problemLists)
     .where(
       user
-        ? raw`(${problemLists.ownerId} = ${user.id} or (${problemLists.kind} = 'study_plan' and ${problemLists.published}))`
+        ? raw`(${problemLists.ownerId} = ${user.id} or (${problemLists.kind} = 'study_plan' and ${problemLists.published} and ${problemLists.orgId} is null))`
         : and(
             eq(problemLists.kind, "study_plan"),
-            eq(problemLists.published, true)
+            eq(problemLists.published, true),
+            raw`${problemLists.orgId} is null`
           )
     )
     .orderBy(asc(problemLists.kind), asc(problemLists.title))
@@ -819,8 +820,10 @@ async function findList(slug: string, viewer: User | null) {
     .select()
     .from(problemLists)
     .where(eq(problemLists.slug, slug))
+  // An organization's plans live on its own pages (catalog/org-plans.ts), never here.
   const visible =
     list &&
+    !list.orgId &&
     (list.ownerId === viewer?.id ||
       (list.kind === "study_plan" && (list.published || isStaff(viewer))) ||
       (list.kind === "custom" && list.published))
@@ -868,9 +871,11 @@ async function ownedList(slug: string, user: User) {
     .select()
     .from(problemLists)
     .where(eq(problemLists.slug, slug))
-  // Staff manage study plans; everyone else only their own lists.
+  // Staff manage study plans; everyone else only their own lists. An organization's plans are
+  // managed on its own pages (catalog/org-plans.ts).
   const allowed =
     list &&
+    !list.orgId &&
     (list.ownerId === user.id || (list.kind === "study_plan" && isStaff(user)))
   if (!list || !allowed) throw notFound("List not found")
   return list
@@ -992,7 +997,9 @@ export async function listStudyPlans() {
   return getDb()
     .select()
     .from(problemLists)
-    .where(eq(problemLists.kind, "study_plan"))
+    .where(
+      and(eq(problemLists.kind, "study_plan"), raw`${problemLists.orgId} is null`)
+    )
     .orderBy(asc(problemLists.title))
 }
 

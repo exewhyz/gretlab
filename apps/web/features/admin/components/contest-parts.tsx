@@ -36,6 +36,7 @@ export function ProblemPicker({
   orderLabel = "In the contest, in this order",
   marker = (index) => String.fromCharCode(65 + index),
   extra,
+  canCreate = true,
 }: {
   problems: StaffProblemList["problems"]
   selected: string[]
@@ -45,6 +46,11 @@ export function ProblemPicker({
   marker?: (index: number) => string
   /** Extra controls on each chosen problem, such as its points. */
   extra?: (id: string) => ReactNode
+  /**
+   * Write a problem and Import problems, which make assessment-only problems for this work.
+   * Off where those can't go (a study plan holds problems people practise).
+   */
+  canCreate?: boolean
 }) {
   const [search, setSearch] = useState("")
   const [level, setLevel] = useState("")
@@ -80,24 +86,26 @@ export function ProblemPicker({
         <div className="text-caption font-semibold text-ink">
           Problems ({selected.length})
         </div>
-        <span className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            onClick={() => setWriting(true)}
-          >
-            Write a problem
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            onClick={() => setImporting(true)}
-          >
-            Import problems
-          </Button>
-        </span>
+        {canCreate && (
+          <span className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => setWriting(true)}
+            >
+              Write a problem
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => setImporting(true)}
+            >
+              Import problems
+            </Button>
+          </span>
+        )}
       </div>
       <NewProblemDialog
         open={writing}

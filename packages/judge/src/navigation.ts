@@ -268,6 +268,16 @@ export const ORG_NAV: NavItem[] = [
     module: "coding",
   },
   {
+    // The organization's own study plans (features/catalog/org-plans.ts): managed across it.
+    key: "study-plans",
+    label: "Study plans",
+    path: "/study-plans",
+    group: "Coding lab",
+    anyOf: ["problems.manage"],
+    module: "coding",
+    wholeOrg: true,
+  },
+  {
     key: "questions",
     label: "Questions",
     path: "/questions",

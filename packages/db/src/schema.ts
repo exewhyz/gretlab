@@ -346,9 +346,19 @@ export const problemLists = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
     published: boolean("published").notNull().default(false),
+    /**
+     * An organization's own study plan (Manage › Study plans): seen by its members only, and may
+     * hold its members-only problems. Null: a person's list, or the platform's study plan.
+     */
+    orgId: uuid("org_id").references((): AnyPgColumn => organizations.id, {
+      onDelete: "cascade",
+    }),
     createdAt: createdAt(),
   },
-  (table) => [index("problem_lists_owner").on(table.ownerId)]
+  (table) => [
+    index("problem_lists_owner").on(table.ownerId),
+    index("problem_lists_org").on(table.orgId),
+  ]
 )
 
 export const problemListItems = pgTable(

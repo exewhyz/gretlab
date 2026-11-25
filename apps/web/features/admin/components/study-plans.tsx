@@ -9,6 +9,7 @@ import { Button } from "@workspace/ui/components/button"
 import { DetailSheet } from "@/components/detail-sheet"
 import { EditorSheet } from "@/components/editor-sheet"
 import { Field, FormMessage, TextArea, TextInput } from "@/components/form"
+import { useOwner } from "@/features/admin/owner"
 import { api } from "@/lib/api/client"
 
 import { ProblemPicker } from "./contests"
@@ -17,28 +18,48 @@ import { Card, Loading, PageTitle, Table } from "./shell"
 import type { ApiResult } from "@/lib/api/types"
 import type { listStudyPlans } from "@/features/catalog/server"
 import type { createList } from "@/features/catalog/server"
+import type { orgStudyPlans } from "@/features/catalog/org-plans"
 
-type Plan = ApiResult<typeof listStudyPlans>[number]
+type Plan = Pick<
+  ApiResult<typeof listStudyPlans>[number],
+  "slug" | "title" | "description" | "published"
+>
+type OrgPlans = ApiResult<typeof orgStudyPlans>
 
+/**
+ * The platform's study plans (Dashboard › Study plans, on the Problems page for everyone) or an
+ * organization's own (Manage › Study plans, for its members, with its members-only problems):
+ * the same screen, with its addresses from useOwner().
+ */
 export function AdminStudyPlans() {
   const queryClient = useQueryClient()
+  const owner = useOwner()
   const [title, setTitle] = useState("")
   const [editing, setEditing] = useState<string | null>(null)
   const { data, error } = useQuery({
-    queryKey: ["admin", "study-plans"],
-    queryFn: () => api<Plan[]>("/admin/study-plans"),
+    queryKey: owner.key("study-plans"),
+    queryFn: () =>
+      owner.orgSlug
+        ? api<OrgPlans>(owner.api("/study-plans")).then((r) => r.plans)
+        : api<Plan[]>("/admin/study-plans"),
   })
   const create = useMutation({
     mutationFn: () =>
-      api<ApiResult<typeof createList>>("/lists", {
-        body: { title, kind: "study_plan" },
-      }),
+      owner.orgSlug
+        ? api<{ slug: string }>(owner.api("/study-plans"), { body: { title } })
+        : api<ApiResult<typeof createList>>("/lists", {
+            body: { title, kind: "study_plan" },
+          }),
     onSuccess: (plan) => {
       setTitle("")
-      void queryClient.invalidateQueries({ queryKey: ["admin", "study-plans"] })
+      void queryClient.invalidateQueries({ queryKey: owner.key("study-plans") })
       setEditing(plan.slug)
     },
   })
+  const viewHref = (slug: string) =>
+    owner.orgSlug
+      ? `/orgs/${owner.orgSlug}/study-plans/${slug}`
+      : `/lists/${slug}`
   if (!data) return <Loading error={error} />
   return (
     <>
@@ -47,8 +68,9 @@ export function AdminStudyPlans() {
       <PageTitle>Study plans</PageTitle>
       <p className="mb-3 text-body-sm text-body">
         Curated, ordered sets of problems, such as &ldquo;Week 1: loops&rdquo;.
-        Published plans appear on the Problems page with each student&apos;s
-        progress.
+        {owner.orgSlug
+          ? " Published plans appear under Study plans for your members, with each one's progress. They can hold your members-only problems."
+          : " Published plans appear on the Problems page with each student's progress."}
       </p>
       {data.length > 0 && (
         <Table headers={["Plan", "Status", ""]}>
@@ -66,7 +88,7 @@ export function AdminStudyPlans() {
                 </Button>
                 <Link
                   className="ml-2 text-caption underline"
-                  href={`/lists/${plan.slug}`}
+                  href={viewHref(plan.slug)}
                 >
                   View
                 </Link>
@@ -97,13 +119,19 @@ export function AdminStudyPlans() {
 
 function PlanEditor({ slug, onDone }: { slug: string; onDone: () => void }) {
   const queryClient = useQueryClient()
+  const owner = useOwner()
+  const address = owner.orgSlug ? owner.api(`/study-plans/${slug}`) : `/lists/${slug}`
   const plan = useQuery({
-    queryKey: ["list", slug],
-    queryFn: () => api<Plan & { items: { slug: string }[] }>(`/lists/${slug}`),
+    queryKey: owner.key("study-plan", slug),
+    queryFn: () => api<Plan & { items: { slug: string }[] }>(address),
   })
   const problems = useQuery({
-    queryKey: ["admin", "problems"],
-    queryFn: () => api<StaffProblemList>("/admin/problems"),
+    queryKey: owner.key("problems", "picker"),
+    // An organization picks from the library shared with it and its own problems.
+    queryFn: () =>
+      api<StaffProblemList>(
+        owner.orgSlug ? `${owner.api("/problems")}?for=picker` : owner.api("/problems")
+      ),
   })
   if (!plan.data || !problems.data) {
     return (
@@ -116,11 +144,19 @@ function PlanEditor({ slug, onDone }: { slug: string; onDone: () => void }) {
     <PlanForm
       key={slug}
       plan={plan.data}
-      problems={problems.data.problems}
+      address={address}
+      problems={
+        owner.orgSlug
+          ? // What a plan may hold: published problems anyone can practise, or members-only ones
+            // (the picker offers only the organization's own of those).
+            problems.data.problems.filter(
+              (p) => p.published && (p.membersOnly || p.listed)
+            )
+          : problems.data.problems
+      }
       onSaved={() => {
-        void queryClient.invalidateQueries({
-          queryKey: ["admin", "study-plans"],
-        })
+        void queryClient.invalidateQueries({ queryKey: owner.key("study-plans") })
+        void queryClient.invalidateQueries({ queryKey: owner.key("study-plan", slug) })
         void queryClient.invalidateQueries({ queryKey: ["list", slug] })
         void queryClient.invalidateQueries({ queryKey: ["lists"] })
       }}
@@ -131,11 +167,14 @@ function PlanEditor({ slug, onDone }: { slug: string; onDone: () => void }) {
 
 function PlanForm({
   plan,
+  address,
   problems,
   onSaved,
   onDone,
 }: {
   plan: Plan & { items: { slug: string }[] }
+  /** Where the plan is saved: /lists/<slug>, or the organization's own address. */
+  address: string
   problems: StaffProblemList["problems"]
   onSaved: () => void
   onDone: () => void
@@ -149,7 +188,7 @@ function PlanForm({
   )
   const save = useMutation({
     mutationFn: (published: boolean) =>
-      api(`/lists/${plan.slug}`, {
+      api(address, {
         method: "PATCH",
         body: {
           title,
@@ -163,7 +202,11 @@ function PlanForm({
   return (
     <EditorSheet
       title="Edit study plan"
-      description="An ordered set of problems learners work through. Save a draft any time; Publish puts it in the library."
+      description={
+        address.startsWith("/lists/")
+          ? "An ordered set of problems learners work through. Save a draft any time; Publish puts it in the library."
+          : "An ordered set of problems your members work through. Save a draft any time; Publish shows it to them under Study plans."
+      }
       width="48rem"
       error={save.error?.message}
       notice={save.isSuccess ? "Saved." : null}
@@ -200,6 +243,9 @@ function PlanForm({
         problems={problems}
         selected={selected}
         onChange={setSelected}
+        orderLabel="In the plan, in this order"
+        marker={(index) => String(index + 1)}
+        canCreate={false}
       />
     </EditorSheet>
   )
