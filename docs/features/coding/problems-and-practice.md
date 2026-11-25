@@ -70,6 +70,23 @@ solve, with the daily challenge, personal lists and a leaderboard around it.
 
 To bring many in at once, use **Import** with the [problem file format](/problem-format/).
 
+### Share and read solutions
+
+On a library problem, the **Solutions** tab holds solutions students have shared:
+
+- Once you've solved the problem, **Share your solution**: pick one of your accepted submissions
+  (so everyone knows it passes) and explain how it works. One post per problem; writing again
+  edits it, and you can delete it.
+- You can read posts once you've solved the problem (or whenever editorials are open before
+  solving, if the platform allows that). Before then the tab only says how many there are.
+- Vote a post up (not your own), comment on it, or **Report** it. Its author is told about
+  comments.
+- Posts are closed while a contest uses the problem and during an exam, and never appear on
+  assignment, exam, contest-only or members-only problems.
+- Platform staff with **Moderate solution posts** see reported posts first under
+  **Dashboard › Solution posts** and hide them; hiding is logged. The platform can switch solution
+  posts off under Settings.
+
 ### Decide how output is checked
 
 By default a program's output must match the expected output exactly (trailing spaces and blank

@@ -523,6 +523,14 @@ export const SETTINGS = {
     schema: z.boolean(),
     default: true,
   },
+  "solutions.posts": {
+    label: "Solution posts",
+    description:
+      "Students who solve a library problem can share their accepted code with a write-up; people who've solved it read, vote and comment. Hidden while a contest uses the problem.",
+    group: "Features",
+    schema: z.boolean(),
+    default: true,
+  },
   "daily.enabled": {
     label: "Daily challenge",
     description:

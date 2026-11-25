@@ -57,8 +57,12 @@ export function SimilarPairs({
           {result.pairs.map((pair) => (
             <tr key={`${pair.a.submissionId}-${pair.b.submissionId}`}>
               <td className="font-semibold tabular-nums">{pair.score}%</td>
-              <td>{who(pair.a)}</td>
-              <td>{who(pair.b)}</td>
+              <td>
+                <Person p={pair.a} />
+              </td>
+              <td>
+                <Person p={pair.b} />
+              </td>
               <td>{pair.language}</td>
               <td>
                 <Button
@@ -179,5 +183,15 @@ function CodePane({
         })}
       </pre>
     </div>
+  )
+}
+
+/** A student in the pairs list: their name, and their email so two of one name can't be confused. */
+function Person({ p }: { p: { name: string | null; email: string } }) {
+  return (
+    <span className="grid">
+      <span>{p.name || p.email}</span>
+      {p.name && <span className="text-caption text-body">{p.email}</span>}
+    </span>
   )
 }

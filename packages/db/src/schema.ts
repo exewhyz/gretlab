@@ -3122,6 +3122,89 @@ export const templates = pgTable(
 )
 
 /**
+ * A student's write-up of how they solved a public library problem, with code copied from one of
+ * their accepted submissions (so it passes). One per person per problem. Readable by people
+ * who've solved it (features/solutions).
+ */
+export const solutionPosts = pgTable(
+  "solution_posts",
+  {
+    id: id(),
+    problemId: uuid("problem_id")
+      .notNull()
+      .references(() => problems.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    /** The write-up, in markdown. */
+    body: text("body").notNull(),
+    language: text("language").notNull(),
+    code: text("code").notNull(),
+    /** The accepted submission the code came from. */
+    submissionId: uuid("submission_id").references(() => submissions.id, {
+      onDelete: "set null",
+    }),
+    votes: integer("votes").notNull().default(0),
+    /** Readers who reported it; moderators see the most reported first. */
+    reports: integer("reports").notNull().default(0),
+    /** Hidden by a moderator: only they and the author see it. */
+    hidden: boolean("hidden").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("solution_posts_one_each").on(table.problemId, table.authorId),
+    index("solution_posts_problem").on(table.problemId, table.votes),
+  ]
+)
+
+export const solutionVotes = pgTable(
+  "solution_votes",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => solutionPosts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.postId, table.userId] })]
+)
+
+/** Who reported which post, so each person reports a post once. */
+export const solutionReports = pgTable(
+  "solution_reports",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => solutionPosts.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (table) => [primaryKey({ columns: [table.postId, table.userId] })]
+)
+
+export const solutionComments = pgTable(
+  "solution_comments",
+  {
+    id: id(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => solutionPosts.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    hidden: boolean("hidden").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (table) => [index("solution_comments_post").on(table.postId, table.createdAt)]
+)
+
+/**
  * A class's discussion: threads (no parent) and their replies. Anonymous posts hide the
  * author from classmates, never from teachers. Teachers pin, lock, hide and mark answers.
  */

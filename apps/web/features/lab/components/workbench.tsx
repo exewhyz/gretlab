@@ -1,7 +1,13 @@
 "use client"
 
 import { LegalLinks } from "@/features/legal/components/legal-page"
-import { useRef, useState, type CSSProperties, type ReactNode } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { useExamInProgress } from "@/features/exams/components/exam"
@@ -21,6 +27,8 @@ import { Notices, type Notice } from "./notices"
 import { QuestionList } from "./question-list"
 import { ResizeHandle } from "./resize-handle"
 import { EditorialPanel, useHasEditorial } from "./solution-reveal"
+import { useViewer } from "@/features/account/use-viewer"
+import { SolutionsPanel } from "@/features/solutions/components/solutions-panel"
 import { TabButton } from "./tab-button"
 import { TopBar } from "./top-bar"
 import styles from "./workbench.module.scss"
@@ -78,8 +86,14 @@ export function Workbench({
   // The open problem stays in view in a long list.
   const listBox = useRevealActive<HTMLElement>([activeId])
   const [leftTab, setLeftTab] = useState<
-    "problem" | "editorial" | "notes" | "submissions"
+    "problem" | "editorial" | "solutions" | "notes" | "submissions"
   >("problem")
+  // A link from a solution comment's notification opens the Solutions tab: read after the
+  // first render, which the server rendered on the statement, so the two agree.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "solutions")
+      setLeftTab("solutions")
+  }, [])
   // A different problem opens on its statement, never on its editorial.
   const [tabProblem, setTabProblem] = useState(current?.id)
   if (current?.id !== tabProblem) {
@@ -206,6 +220,13 @@ export function Workbench({
                 />
               )}
               {!examMode && (
+                <SolutionsTabButton
+                  libraryProblem={(current?.unitNo ?? 0) > 0}
+                  selected={leftTab === "solutions"}
+                  onClick={() => setLeftTab("solutions")}
+                />
+              )}
+              {!examMode && (
                 <TabButton
                   selected={leftTab === "notes"}
                   className="py-3"
@@ -243,6 +264,9 @@ export function Workbench({
               {children}
             </div>
             {leftTab === "editorial" && <EditorialPanel />}
+            {leftTab === "solutions" && current && (
+              <SolutionsPanel problemSlug={current.id} />
+            )}
             {leftTab === "notes" && <NotesPanel />}
             {leftTab === "submissions" && <SubmissionsPanel />}
           </article>
@@ -292,6 +316,26 @@ function EditorialTabButton({
   return (
     <TabButton selected={selected} className="py-3" onClick={onClick}>
       Editorial
+    </TabButton>
+  )
+}
+
+/** Solution posts: library problems only, for signed-in people, when the platform has them on. */
+function SolutionsTabButton({
+  libraryProblem,
+  selected,
+  onClick,
+}: {
+  libraryProblem: boolean
+  selected: boolean
+  onClick: () => void
+}) {
+  const { data: viewer } = useViewer()
+  if (!libraryProblem || !viewer?.user || !viewer.features.solutionPosts)
+    return null
+  return (
+    <TabButton selected={selected} className="py-3" onClick={onClick}>
+      Solutions
     </TabButton>
   )
 }

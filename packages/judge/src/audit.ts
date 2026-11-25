@@ -46,6 +46,7 @@ export const AUDIT_CATEGORIES: Record<string, string> = {
   billing: "Plan and billing",
   study_plan: "Study plans",
   plagiarism: "Plagiarism checks",
+  solution: "Solution posts",
   feedback_round: "Feedback rounds",
 }
 

@@ -77,6 +77,7 @@ suite virtual-contests http://localhost:3100
 suite checkers http://localhost:3100
 suite plagiarism http://localhost:3100
 suite ratings http://localhost:3100
+suite solution-posts http://localhost:3100
 suite orgs http://localhost:3100
 suite platform http://localhost:3100
 suite library http://localhost:3100

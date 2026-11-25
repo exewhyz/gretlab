@@ -47,6 +47,8 @@ export interface Viewer {
     serverExecution: boolean
     browserExecution: boolean
     showSolutions: boolean
+    /** Solution posts on library problems (features/solutions). */
+    solutionPosts: boolean
     contests: boolean
     assignments: boolean
     daily: boolean

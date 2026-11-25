@@ -220,6 +220,12 @@ export const PLATFORM_PERMISSIONS = {
     module: "Platform",
     parent: "platform.settings.manage",
   },
+  "platform.solutions.moderate": {
+    label: "Moderate solution posts",
+    description:
+      "See reported solution posts and comments, and hide or show them again. Hiding is logged.",
+    module: "Platform",
+  },
   "platform.feedback.manage": {
     label: "Manage feedback forms",
     description:
@@ -298,6 +304,7 @@ export const PLATFORM_ROLES = {
       "platform.work.manage",
       "platform.gradebook.view",
       "platform.submissions.view",
+      "platform.solutions.moderate",
     ] as PlatformPermission[],
   },
   reviewer: {

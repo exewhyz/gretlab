@@ -97,9 +97,9 @@ export const NOTIFICATION_EVENTS = {
   "discussion.reply": {
     label: "Reply in a discussion",
     description:
-      "Someone replies to a question a person asked in a class discussion.",
+      "Someone replies to a question a person asked in a class discussion, or comments on their solution post.",
     audience: "everyone",
-    kinds: ["discussion_reply"],
+    kinds: ["discussion_reply", "solution_comment"],
     emailByDefault: true,
   },
   "campus.update": {

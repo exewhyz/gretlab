@@ -94,6 +94,12 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               averages and comments, never who gave them, and nothing until at least three students
               have answered.
             </Item>
+            <Item term="Solution posts">
+              if you share a solution to a library problem: your write-up, the code from the accepted
+              submission you chose, your votes, comments and reports. People who&apos;ve solved the
+              problem see the post with your name; moderators see how often a post was reported,
+              never who reported it. You can delete your post or comments at any time.
+            </Item>
             <Item term="Parents and guardians">
               the link between a parent&apos;s account and their child&apos;s, made by the
               organization.

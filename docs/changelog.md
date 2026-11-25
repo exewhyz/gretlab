@@ -6,6 +6,18 @@ description: What's new in GretLab, newest first.
 What changed for the people using GretLab, newest first. Fixes and changes that don't show to anyone
 aren't listed.
 
+## 26 November 2026
+
+### Solution posts
+
+- **Share how you solved a problem.** On a library problem you've solved, the new **Solutions**
+  tab lets you share one of your accepted submissions with a write-up. Once you've solved it
+  yourself, read other people's, vote the good ones up and comment; the author is told. Posts stay
+  closed while a contest uses the problem and during exams.
+- Readers can report a post; platform moderators see reported posts first and hide them.
+- The plagiarism check now shows each student's email under their name, so two students with the
+  same name can't be confused.
+
 ## 25 November 2026
 
 ### Contest ratings

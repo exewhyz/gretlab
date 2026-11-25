@@ -73,6 +73,7 @@ export const GET = route({ access: "public" }, async ({ user, query }) => {
       serverExecution: settings["server_execution.enabled"],
       browserExecution: settings["browser_execution.enabled"],
       showSolutions: settings["practice.show_solutions"],
+      solutionPosts: settings["solutions.posts"],
       contests: settings["contests.enabled"],
       assignments: settings["assignments.enabled"],
       daily: settings["daily.enabled"],
