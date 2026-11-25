@@ -478,20 +478,21 @@ export function ContestEditor({
           Registration open
         </label>
 
-        <label className="inline-flex items-start gap-2 text-ink">
-          <Checkbox
-            checked={form.rated}
-            onCheckedChange={(checked) => set("rated", checked)}
-          />
-          <span>
+        <div className="grid gap-0.5">
+          <label className="inline-flex items-center gap-2 text-ink">
+            <Checkbox
+              checked={form.rated}
+              aria-describedby="contest-rated-help"
+              onCheckedChange={(checked) => set("rated", checked)}
+            />
             Rated
-            <span className="block text-caption text-body">
-              Once it ends, the final standings change everyone&apos;s contest
-              rating (shown on profiles). Leave it off for practice or class
-              contests.
-            </span>
-          </span>
-        </label>
+          </label>
+          <p id="contest-rated-help" className="ml-6 text-caption text-body">
+            Once it&apos;s over, the final standings change everyone&apos;s
+            contest rating (shown on profiles). Leave it off for practice or
+            class contests.
+          </p>
+        </div>
 
         <ExecutionFields
           value={form.run}
