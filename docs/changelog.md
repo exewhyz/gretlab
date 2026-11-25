@@ -6,6 +6,14 @@ description: What's new in GretLab, newest first.
 What changed for the people using GretLab, newest first. Fixes and changes that don't show to anyone
 aren't listed.
 
+## 25 November 2026
+
+### Syllabus topics on assignments
+
+- **Tag an assignment with the syllabus topics it covers.** The assignment form's new Syllabus
+  topics picker lists each class's topics, the classes it's for first. On a class's Classwork, each
+  syllabus topic now shows the assignments that cover it.
+
 ## 24 November 2026
 
 ### Confirm it's you before changes that matter

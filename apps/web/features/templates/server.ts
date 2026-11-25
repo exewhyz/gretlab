@@ -226,6 +226,8 @@ async function bringChanges(t: typeof templates.$inferSelect) {
           : null,
         published: use.published,
         audience: use.audience,
+        // Syllabus topics are the class's, like its course outcomes.
+        topicIds: use.topicIds,
         // Where code runs and its limit belong to each use, like its lab networks.
         execution: use.execution,
         submissionsPerMinute: use.submissionsPerMinute,
@@ -340,6 +342,8 @@ export async function applyTemplate(
         title: t.title,
         slug,
         description: t.description,
+        // A new use starts with no syllabus topics: they belong to its class.
+        topicIds: [],
         opensAt: use.opensAt,
         dueAt: use.dueAt,
         allowLate: t.content.exam ? false : t.content.allowLate,

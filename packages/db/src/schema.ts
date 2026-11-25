@@ -459,6 +459,11 @@ export const assignments = pgTable("assignments", {
     onDelete: "cascade",
   }),
   audience: jsonb("audience").$type<string[][]>().notNull().default([]),
+  /**
+   * Syllabus topics it covers, each "<class group id>:<topic id>" (`syllabi.topics`; topic ids are
+   * only unique within one class's syllabus). They're the class's: template edits keep them.
+   */
+  topicIds: jsonb("topic_ids").$type<string[]>().notNull().default([]),
   /** Students review each other's work after the due time. Null: no peer review. */
   peerReview: jsonb("peer_review").$type<PeerReviewSettings | null>(),
   /** Made from this template; until it opens, the template's edits reach it. */

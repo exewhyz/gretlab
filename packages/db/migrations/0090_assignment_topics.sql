@@ -1,0 +1,1 @@
+ALTER TABLE "assignments" ADD COLUMN "topic_ids" jsonb DEFAULT '[]'::jsonb NOT NULL;

@@ -69,6 +69,7 @@ suite features http://localhost:3100
 suite topics http://localhost:3100
 suite landing http://localhost:3100
 suite assignments http://localhost:3100
+suite assignment-topics http://localhost:3100
 suite orgs http://localhost:3100
 suite platform http://localhost:3100
 suite library http://localhost:3100

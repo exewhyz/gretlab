@@ -340,6 +340,7 @@ export async function classwork(slug: string, user: User, groupId: string) {
         id: assignments.id,
         slug: assignments.slug,
         audience: assignments.audience,
+        topicIds: assignments.topicIds,
         createdAt: assignments.createdAt,
       })
       .from(assignments)
@@ -366,7 +367,14 @@ export async function classwork(slug: string, user: User, groupId: string) {
         "assignments.manage"
       ) === "manage"
     return [
-      { ...a, id: row.id, createdAt: row.createdAt, reach: rel, canManage },
+      {
+        ...a,
+        id: row.id,
+        createdAt: row.createdAt,
+        topicIds: row.topicIds,
+        reach: rel,
+        canManage,
+      },
     ]
   })
   const events = mineC.flatMap((c) => {

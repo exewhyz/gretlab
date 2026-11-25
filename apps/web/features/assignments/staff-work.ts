@@ -10,6 +10,7 @@ import {
   problems,
   sql,
   submissions,
+  syllabi,
   type User,
 } from "@workspace/db"
 import { QUEUE_CHANNEL } from "@workspace/judge"
@@ -183,6 +184,18 @@ export async function saveAssignment(
         400,
         "unknown_outcome",
         "A chosen course outcome no longer exists."
+      )
+    }
+  }
+  // Syllabus topics: only the organization's own classes have syllabi.
+  fields.topicIds = [...new Set(fields.topicIds)]
+  if (fields.topicIds.length > 0) {
+    const known = orgId ? await syllabusTopicIds(orgId) : new Set<string>()
+    if (fields.topicIds.some((t) => !known.has(t))) {
+      throw new ApiError(
+        400,
+        "unknown_topic",
+        "A chosen syllabus topic no longer exists."
       )
     }
   }
@@ -422,4 +435,13 @@ export async function deleteAssignment(id: string, orgId: string | null) {
     .where(and(eq(assignments.id, id), ownedBy(orgId)))
     .returning({ id: assignments.id })
   if (deleted.length === 0) throw notFound("Assignment not found")
+}
+
+/** Every syllabus topic in an organization's classes, as "<class group id>:<topic id>". */
+async function syllabusTopicIds(orgId: string) {
+  const rows = await getDb()
+    .select({ groupId: syllabi.groupId, topics: syllabi.topics })
+    .from(syllabi)
+    .where(eq(syllabi.orgId, orgId))
+  return new Set(rows.flatMap((r) => r.topics.map((t) => `${r.groupId}:${t.id}`)))
 }

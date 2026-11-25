@@ -180,6 +180,8 @@ export const assignmentInputSchema = z
     published: z.boolean(),
     /** Keep rubric marks and line comments from students until released. */
     holdFeedback: z.boolean().default(false),
+    /** Syllabus topics it covers, each "<class group id>:<topic id>" (organizations only). */
+    topicIds: z.array(z.string().min(3).max(80)).max(50).default([]),
     /** Where its code runs; "browser" means Python and JavaScript only, graded provisionally. */
     execution: z.enum(["server", "browser"]).default("server"),
     /** Submissions per student per minute; null: the platform's. Checked against it on save. */

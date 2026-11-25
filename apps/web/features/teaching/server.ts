@@ -1182,3 +1182,48 @@ export async function feedbackFor(sessionIds: string[]) {
   }
   return out
 }
+
+/* ---------- syllabus topics for tagging assignments ---------- */
+
+/** A class's full name, outermost first ("CSE › 2nd Year › Sec A"). */
+function pathOf(ctx: OrgContext, groupId: string) {
+  const names: string[] = []
+  for (
+    let g = ctx.groups.find((x) => x.id === groupId);
+    g;
+    g = g.parentId ? ctx.groups.find((x) => x.id === g!.parentId) : undefined
+  )
+    names.unshift(g.name)
+  return names.join(" › ")
+}
+
+/**
+ * Every class's syllabus topics in the organization, for the assignment form's topic picker
+ * (an assignment is tagged with the topics it covers; the save checks them). For whoever may
+ * set assignments somewhere in it.
+ */
+export async function orgSyllabusTopics(slug: string, user: User) {
+  const ctx = await orgContext(slug, user)
+  if (
+    !canAnywhere(ctx, "assignments.create") &&
+    !canAnywhere(ctx, "assignments.edit")
+  )
+    throw new ApiError(
+      403,
+      "forbidden",
+      "Setting assignments isn't part of your role."
+    )
+  const rows = await getDb()
+    .select({ groupId: syllabi.groupId, topics: syllabi.topics })
+    .from(syllabi)
+    .where(eq(syllabi.orgId, ctx.org.id))
+  return rows
+    .filter((r) => r.topics.length > 0 && ctx.groups.some((g) => g.id === r.groupId))
+    .map((r) => ({
+      groupId: r.groupId,
+      group: pathOf(ctx, r.groupId),
+      // The key an assignment is tagged with: topic ids are only unique within one syllabus.
+      topics: r.topics.map(({ id, title }) => ({ id: `${r.groupId}:${id}`, title })),
+    }))
+    .sort((a, b) => byName(a.group, b.group))
+}

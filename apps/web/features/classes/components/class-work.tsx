@@ -180,16 +180,40 @@ export function Classwork({
           </p>
         ) : (
           <ol className="grid gap-1 rounded-lg border border-hairline bg-card p-3.5 text-body-sm">
-            {data.topics.map((t, i) => (
-              <li key={t.id} className="flex justify-between gap-3">
-                <span className="text-ink">
-                  {i + 1}. {t.title}
-                </span>
-                {t.plannedFor && (
-                  <span className="text-caption text-body">{t.plannedFor}</span>
-                )}
-              </li>
-            ))}
+            {data.topics.map((t, i) => {
+              // The assignments tagged with this topic (the assignment form's Syllabus topics).
+              const covering = data.assignments.filter((a) =>
+                a.topicIds.includes(`${groupId}:${t.id}`)
+              )
+              return (
+                <li key={t.id} className="grid gap-0.5" data-testid="syllabus-topic">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-ink">
+                      {i + 1}. {t.title}
+                    </span>
+                    {t.plannedFor && (
+                      <span className="text-caption text-body">
+                        {t.plannedFor}
+                      </span>
+                    )}
+                  </div>
+                  {covering.length > 0 && (
+                    <span className="flex flex-wrap gap-x-2 text-caption text-body">
+                      Assignments:
+                      {covering.map((a) => (
+                        <Link
+                          key={a.id}
+                          href={`/assignments/${a.slug}`}
+                          className="text-primary hover:underline"
+                        >
+                          {a.title}
+                        </Link>
+                      ))}
+                    </span>
+                  )}
+                </li>
+              )
+            })}
           </ol>
         )}
       </section>

@@ -34,6 +34,7 @@ import {
   projectKey,
   type ProjectDraft,
 } from "@/features/projects/components/projects"
+import { TopicTagger } from "./assignment-topics"
 import { AudiencePicker } from "./audience"
 
 import { FieldError, ProblemPicker, toLocalInput } from "./contests"
@@ -79,6 +80,8 @@ export interface AssignmentForm {
   /** Minutes after opening to press Start; empty for any time. */
   examStartWithin: string
   audience: string[][]
+  /** Syllabus topics it covers (organizations' classes). */
+  topicIds: string[]
   /** Project work handed in as GitHub repositories. */
   projects: ProjectDraft[]
   /** Peer review after the due time, as typed. */
@@ -118,6 +121,7 @@ export interface StoredAssignment {
     points: number
   }[]
   audience?: string[][]
+  topicIds?: string[]
   /** Made from a template (assignments). */
   templateId?: string | null
   /** Its problems as the picker lists them, for ones the picker no longer offers. */
@@ -147,6 +151,7 @@ export function blankForm(forClass: string | null): AssignmentForm {
     run: executionDraft(),
     problemIds: [],
     audience: forClass ? [[forClass]] : [],
+    topicIds: [],
     points: {},
     rubric: {},
     outcomes: {},
@@ -199,6 +204,7 @@ export function AssignmentEditorPage({
         ...data,
         slug: data.slug ?? "",
         audience: data.audience ?? [],
+        topicIds: data.topicIds ?? [],
         opensAt: data.opensAt ? toLocalInput(data.opensAt) : blank.opensAt,
         dueAt: data.dueAt ? toLocalInput(data.dueAt) : blank.dueAt,
         latePenaltyPercent: String(data.latePenaltyPercent),
@@ -363,6 +369,7 @@ export function AssignmentEditor({
           ? new Date(form.dueAt)
           : undefined,
       audience: template ? [] : form.audience.filter((c) => c.length > 0),
+      topicIds: template ? [] : form.topicIds,
       problems: form.problemIds.map((problemId) => ({
         problemId,
         points:
@@ -646,6 +653,14 @@ export function AssignmentEditor({
             orgSlug={owner.orgSlug}
             value={form.audience}
             onChange={(ids) => set("audience", ids)}
+          />
+        )}
+        {owner.orgSlug && !template && (
+          <TopicTagger
+            orgSlug={owner.orgSlug}
+            audience={form.audience}
+            chosen={form.topicIds}
+            onChange={(ids) => set("topicIds", ids)}
           />
         )}
 
