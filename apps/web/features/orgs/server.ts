@@ -50,6 +50,7 @@ import { notify } from "@/features/notifications/server"
 import { needRoom } from "@/features/billing/limits"
 import { platformCan } from "@/features/platform/access"
 import { getLanguages, getSettings } from "@/features/settings/server"
+import { twoFactorOn } from "@/features/auth/two-factor"
 import { freeHandles } from "@/features/catalog/server"
 import {
   kindPolicies,
@@ -1018,6 +1019,11 @@ export async function getManageSummary(slug: string, user: User) {
       },
       /** Time and memory per language for its own work, the platform's defaults and ceiling. */
       limits: await limitsView(ctx.org.limits),
+      /** Two-factor sign-in it requires, and what the platform requires anyway. */
+      twoFactor: {
+        required: ctx.org.requireTwoFactor,
+        platform: (await getSettings())["security.require_2fa"],
+      },
       /** What this org chose, over its type's defaults. */
       moduleChoices: readModuleChoices(ctx.org.modules),
       /** The modules on right now (defaults + choices, limited to the type and ready ones). */
@@ -1068,6 +1074,17 @@ export async function updateSettings(
         "Grading in the browser is turned off for the whole site, so it can't be turned on here."
       )
   }
+  // Requiring two-factor without using it yourself would lock you out at once.
+  if (
+    input.requireTwoFactor &&
+    input.requireTwoFactor !== "off" &&
+    !(await twoFactorOn([user.id])).has(user.id)
+  )
+    throw new ApiError(
+      400,
+      "two_factor_first",
+      "Turn on two-factor sign-in for yourself (Security, in your account menu) before requiring it."
+    )
   if (input.limits) {
     const limits = readOrgLimits(input.limits)
     const problem = orgLimitsProblem(
@@ -1900,6 +1917,7 @@ const SETTING_LABELS = {
   allowPaste: "Pasting in the editor",
   serverRuns: "Run code on the server",
   browserGrading: "Grading in the browser",
+  requireTwoFactor: "Two-factor sign-in required of",
 }
 
 /** Manage › Activity: a page of the organization's log, filtered. */

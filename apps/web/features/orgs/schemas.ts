@@ -76,6 +76,8 @@ export const orgSettingsSchema = z
         })
       )
       .refine((v) => Object.keys(v).length <= 50, "Too many languages"),
+    /** Two-factor sign-in it requires: of its staff, of everyone, or nothing beyond the platform's. */
+    requireTwoFactor: z.enum(["off", "staff", "everyone"]),
   })
   .partial()
 

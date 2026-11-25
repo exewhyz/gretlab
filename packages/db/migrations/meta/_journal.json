@@ -708,6 +708,13 @@
       "when": 1795633209766,
       "tag": "0100_sso",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1795634373616,
+      "tag": "0101_org_require_2fa",
+      "breakpoints": true
     }
   ]
 }

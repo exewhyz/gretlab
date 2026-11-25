@@ -29,6 +29,11 @@ export interface Summary {
       browserGrading: boolean
       platform: { server: boolean; browser: boolean; browserGrading: boolean }
     }
+    /** Two-factor sign-in it requires, and the platform's own requirement. */
+    twoFactor?: {
+      required: "off" | "staff" | "everyone"
+      platform: "off" | "staff" | "everyone"
+    }
     /** Time and memory per language for its own work (packages/judge/src/limits.ts). */
     limits?: {
       values: Record<string, { timeLimitMs?: number; memoryLimitMb?: number }>

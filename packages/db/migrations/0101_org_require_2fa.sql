@@ -1,0 +1,1 @@
+ALTER TABLE "organizations" ADD COLUMN "require_2fa" text DEFAULT 'off' NOT NULL;

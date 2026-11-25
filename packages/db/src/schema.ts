@@ -1022,6 +1022,14 @@ export const organizations = pgTable("organizations", {
     .$type<Record<string, { timeLimitMs?: number; memoryLimitMb?: number }>>()
     .notNull()
     .default({}),
+  /**
+   * Two-factor sign-in it requires of its people (features/auth/two-factor.ts): off, staff
+   * (anyone holding a role that grants something here) or everyone. Only adds to the platform's.
+   */
+  requireTwoFactor: text("require_2fa")
+    .$type<"off" | "staff" | "everyone">()
+    .notNull()
+    .default("off"),
   /** The week (its Monday, YYYY-MM-DD) of the last weekly summary sent, so each goes once. */
   digestWeek: text("digest_week"),
   createdAt: createdAt(),

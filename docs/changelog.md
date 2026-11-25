@@ -8,6 +8,11 @@ aren't listed.
 
 ## 26 November 2026
 
+### Organizations can require two-factor sign-in
+
+- Under **Manage › Settings › Two-factor sign-in**, require it of your staff or of everyone in
+  your organization. People who haven't turned it on are asked to before anything else.
+
 ### Sign in with your college
 
 - **Colleges can sign their students and staff in with their own accounts** (Microsoft 365,

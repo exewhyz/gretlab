@@ -37,6 +37,15 @@ The platform setting can require two-factor for staff, or for everyone. Someone 
 turned it on can only reach their Security page, with a banner explaining why. An admin can't require
 it before turning it on themselves.
 
+### An organization requiring it
+
+An organization can require two-factor sign-in of its own people under **Manage › Settings ›
+Two-factor sign-in**: of its staff (anyone holding a role there) or of everyone. It only adds to
+what the platform requires, never relaxes it, and someone who doesn't use two-factor themselves
+can't turn it on (so they can't lock themselves out). The change is in the organization's
+activity log. People it applies to who haven't turned two-factor on can only reach their security
+page until they do; people outside the organization aren't affected.
+
 ## Confirming changes that matter
 
 With two-factor on, some changes ask for a fresh code when your last one is more than 10 minutes

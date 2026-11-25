@@ -9,7 +9,9 @@ import {
 
 import {
   getDb,
+  orgMembers,
   orgRoles,
+  organizations,
   roleAssignments,
   sql,
   twoFactor,
@@ -61,7 +63,7 @@ import { ApiError } from "@/lib/api/errors"
  * without it can only reach their security page (lib/api/route.ts) and can't turn it off.
  */
 
-const { eq, inArray } = sql
+const { and, eq, inArray, ne } = sql
 
 const MAX_FAILURES = 5
 const LOCK_MS = 15 * 60_000
@@ -171,22 +173,46 @@ async function securityNotice(user: User, what: string) {
 
 /* ---------- who must use it ---------- */
 
-/** Whether the platform's setting requires this person to use two-factor. */
+/**
+ * Whether this person must use two-factor: the platform's setting, or one of their
+ * organizations' (which can only add to it).
+ */
 export async function mustUseTwoFactor(user: User) {
   const rule = (await getSettings())["security.require_2fa"]
-  if (rule === "off") return false
   if (rule === "everyone") return true
+  const db = getDb()
+  // The organizations they're an active member of that require it, and the roles they hold.
+  const [orgs, grants] = await Promise.all([
+    db
+      .select({ orgId: organizations.id, rule: organizations.requireTwoFactor })
+      .from(orgMembers)
+      .innerJoin(organizations, eq(orgMembers.orgId, organizations.id))
+      .where(
+        and(
+          eq(orgMembers.userId, user.id),
+          eq(orgMembers.status, "active"),
+          ne(organizations.requireTwoFactor, "off")
+        )
+      ),
+    db
+      .select({
+        orgId: orgRoles.orgId,
+        systemKey: orgRoles.systemKey,
+        permissions: orgRoles.permissions,
+      })
+      .from(roleAssignments)
+      .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
+      .where(eq(roleAssignments.userId, user.id)),
+  ])
+  const staffIn = new Set(
+    grants.filter((g) => rolePermissions(g).length > 0).map((g) => g.orgId)
+  )
+  if (orgs.some((o) => o.rule === "everyone" || staffIn.has(o.orgId))) return true
+  if (rule === "off") return false
+  // The platform requires it of staff: platform staff, teachers and anyone with a role.
   if (user.role !== "student") return true
   if ((await platformAccess(user)).permissions.length > 0) return true
-  const grants = await getDb()
-    .select({
-      systemKey: orgRoles.systemKey,
-      permissions: orgRoles.permissions,
-    })
-    .from(roleAssignments)
-    .innerJoin(orgRoles, eq(roleAssignments.roleId, orgRoles.id))
-    .where(eq(roleAssignments.userId, user.id))
-  return grants.some((g) => rolePermissions(g).length > 0)
+  return staffIn.size > 0
 }
 
 /** The security page. */

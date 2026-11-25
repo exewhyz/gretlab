@@ -258,6 +258,13 @@ export function SettingsForm({
       {initial.limits && (
         <LimitsCard slug={slug} limits={initial.limits} onSaved={onSaved} />
       )}
+      {initial.twoFactor && (
+        <TwoFactorCard
+          slug={slug}
+          twoFactor={initial.twoFactor}
+          onSaved={onSaved}
+        />
+      )}
       <ModulesCard slug={slug} org={initial} onSaved={onSaved} />
     </>
   )
@@ -457,6 +464,85 @@ function LimitsCard({
         </span>
         <Button disabled={save.isPending} onClick={() => save.mutate()}>
           Save limits
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
+/**
+ * Two-factor sign-in the organization requires of its people (features/auth/two-factor.ts).
+ * It only adds to what the platform requires.
+ */
+function TwoFactorCard({
+  slug,
+  twoFactor,
+  onSaved,
+}: {
+  slug: string
+  twoFactor: NonNullable<Summary["org"]["twoFactor"]>
+  onSaved: () => void
+}) {
+  const [required, setRequired] = useState(twoFactor.required)
+  const [message, setMessage] = useState<Message>(null)
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/orgs/${slug}`, {
+        method: "PATCH",
+        body: { requireTwoFactor: required },
+      }),
+    // Saving reloads the settings, which rebuilds this card, so success is a toast.
+    onSuccess: onSaved,
+    onError: (e) => setMessage({ text: e.message, kind: "err" }),
+    meta: { success: "Two-factor sign-in saved.", quiet: true },
+  })
+  const platform =
+    twoFactor.platform === "everyone"
+      ? "GretLab already requires it of everyone."
+      : twoFactor.platform === "staff"
+        ? "GretLab already requires it of staff."
+        : null
+  return (
+    <Card className="grid gap-3" data-testid="two-factor-card">
+      <div>
+        <h2 className="text-title-sm text-ink">Two-factor sign-in</h2>
+        <p className="text-body-sm text-body">
+          Require a second step (an authenticator app, an emailed code or a
+          passkey) when your people sign in. Those who haven&apos;t turned it on
+          can only reach their security page until they do.
+          {platform && ` ${platform}`}
+        </p>
+      </div>
+      <RadioGroup
+        value={required}
+        onValueChange={(value) => {
+          setRequired(value as typeof required)
+          setMessage(null)
+        }}
+        className="grid gap-2"
+      >
+        {(
+          [
+            ["off", "Not required here"],
+            ["staff", "Staff: anyone with a role here"],
+            ["everyone", "Everyone in the organization"],
+          ] as const
+        ).map(([value, label]) => (
+          <label
+            key={value}
+            className="flex items-center gap-2 text-body-sm text-ink"
+          >
+            <RadioGroupItem value={value} aria-label={label} />
+            {label}
+          </label>
+        ))}
+      </RadioGroup>
+      <div className="flex items-center gap-3 border-t border-hairline pt-3">
+        <span className="flex-1">
+          <FormMessage message={message} />
+        </span>
+        <Button disabled={save.isPending} onClick={() => save.mutate()}>
+          Save
         </Button>
       </div>
     </Card>
