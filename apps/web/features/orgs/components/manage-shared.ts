@@ -29,6 +29,17 @@ export interface Summary {
       browserGrading: boolean
       platform: { server: boolean; browser: boolean; browserGrading: boolean }
     }
+    /** Time and memory per language for its own work (packages/judge/src/limits.ts). */
+    limits?: {
+      values: Record<string, { timeLimitMs?: number; memoryLimitMb?: number }>
+      ceiling: { timeMs: number; memoryMb: number }
+      languages: {
+        id: string
+        label: string
+        timeLimitMs: number
+        memoryLimitMb: number
+      }[]
+    }
     moduleChoices: Partial<Record<ModuleKey, boolean>>
     modules: ModuleKey[]
     /** Modules this kind may have here, as the platform set them. */
@@ -134,9 +145,7 @@ export const useGroups = (slug: string) =>
         run?: RunInfo
         canManageAll: boolean
         groups: Group[]
-      }>(
-        `/orgs/${slug}/groups`
-      ),
+      }>(`/orgs/${slug}/groups`),
   })
 
 export const useRoles = (slug: string) =>

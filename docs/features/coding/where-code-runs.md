@@ -65,6 +65,24 @@ per minute**). An assignment or contest can set a lower limit, never a higher on
 use the platform's. It applies while students submit from the assignment's own pages, during its
 exam, and in the contest.
 
+## Time and memory limits
+
+Each language has a time and memory limit per run, set by the platform (**Dashboard › Languages**).
+An organization can change them for its own assignments, contests and members-only problems under
+**Manage › Settings › Time and memory**: type a number to replace the default, or leave the box
+empty to keep it. Anyone who can change the organization's settings can do this.
+
+- **The platform's ceiling.** Nobody can go past **Highest time limit an organization may set** and
+  **Highest memory limit an organization may set** (Dashboard › Settings › Execution; 10 seconds and
+  1,024 MB to start). If the platform lowers them later, limits already saved are held under the new
+  ceiling.
+- **A problem's own limits win.** A problem written with its own time or memory limit keeps it; the
+  organization's limit only replaces the language's default.
+- **Personal practice** in the library keeps the platform's limits.
+- A higher memory limit means each judge machine can run fewer submissions at once.
+- Each submission keeps the limits it ran under, shown on its page, so changing them never changes
+  results already given.
+
 ## Edge cases
 
 - Hidden tests' **inputs** reach the student's browser in this mode (their expected outputs never

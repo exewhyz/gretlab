@@ -66,6 +66,16 @@ export const orgSettingsSchema = z
     allowPaste: z.boolean(),
     /** Where its code runs, within the platform's settings (packages/judge/src/execution.ts). */
     execution: z.object({ server: z.boolean(), browserGrading: z.boolean() }),
+    /** Time and memory per language for its own work; a language left out uses the platform's. */
+    limits: z
+      .record(
+        z.string().max(40),
+        z.object({
+          timeLimitMs: z.number().int().optional(),
+          memoryLimitMb: z.number().int().optional(),
+        })
+      )
+      .refine((v) => Object.keys(v).length <= 50, "Too many languages"),
   })
   .partial()
 

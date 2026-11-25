@@ -6,6 +6,7 @@ import {
   contestProblems,
   contests,
   getDb,
+  organizations,
   problems,
   sql,
   submissions,
@@ -24,7 +25,9 @@ import {
   perMinuteLimit,
   QUEUE_CHANNEL,
   queueHeadStartMs,
+  readOrgLimits,
   sourceFilesSchema,
+  submissionLimits,
   type LanguageId,
   type Verdict,
 } from "@workspace/judge"
@@ -441,6 +444,17 @@ export async function createSubmission(
   // Whose judges run it: the work's organization, else the problem's (as planFor decides
   // where code runs); none for personal practice and the platform's work.
   const poolOrgId = work ? work.orgId : (problem?.orgId ?? null)
+  // Time and memory: the problem's own, else that organization's for the language, else the
+  // platform's (packages/judge/src/limits.ts).
+  const limits = submissionLimits({
+    problem: problem ?? null,
+    language,
+    org: poolOrgId ? await orgLimitsOf(poolOrgId) : null,
+    ceiling: {
+      timeMs: settings["limits.max_time_ms"],
+      memoryMb: settings["limits.max_memory_mb"],
+    },
+  })
   const perMinute = perMinuteLimit(
     settings["submissions.per_minute"],
     work?.submissionsPerMinute ?? null
@@ -468,8 +482,8 @@ export async function createSubmission(
       language: language.id,
       entry: input.entry,
       files: files.data,
-      timeLimitMs: problem.timeLimitMs ?? language.timeLimitMs,
-      memoryLimitMb: problem.memoryLimitMb ?? language.memoryLimitMb,
+      timeLimitMs: limits.timeLimitMs,
+      memoryLimitMb: limits.memoryLimitMb,
       outputs: input.browser.outputs,
       perMinute,
       maxPending: settings["submissions.max_pending"],
@@ -523,8 +537,8 @@ export async function createSubmission(
         entry: input.entry,
         files: files.data,
         runCases,
-        timeLimitMs: problem?.timeLimitMs ?? language.timeLimitMs,
-        memoryLimitMb: problem?.memoryLimitMb ?? language.memoryLimitMb,
+        timeLimitMs: limits.timeLimitMs,
+        memoryLimitMb: limits.memoryLimitMb,
         queueAt: new Date(Date.now() + headStart),
       })
       .returning({ id: submissions.id, status: submissions.status })
@@ -532,6 +546,15 @@ export async function createSubmission(
     await tx.execute(sql.sql`SELECT pg_notify(${QUEUE_CHANNEL}, '')`)
     return created
   })
+}
+
+/** An organization's own time and memory limits, by language. */
+async function orgLimitsOf(orgId: string) {
+  const [row] = await getDb()
+    .select({ limits: organizations.limits })
+    .from(organizations)
+    .where(eq(organizations.id, orgId))
+  return readOrgLimits(row?.limits)
 }
 
 /**

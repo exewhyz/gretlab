@@ -157,6 +157,22 @@ export const SETTINGS = {
     schema: z.boolean(),
     default: false,
   },
+  "limits.max_time_ms": {
+    label: "Highest time limit an organization may set (ms)",
+    description:
+      "Organizations set each language's time limit for their own work under Manage › Settings, up or down from the defaults on Languages, but never past this.",
+    group: "Execution",
+    schema: z.number().int().min(100).max(60_000),
+    default: 10_000,
+  },
+  "limits.max_memory_mb": {
+    label: "Highest memory limit an organization may set (MB)",
+    description:
+      "The same for memory. Each judge only takes work that fits its memory, so a high limit means fewer submissions judged at once.",
+    group: "Execution",
+    schema: z.number().int().min(32).max(4096),
+    default: 1024,
+  },
   "submissions.per_minute": {
     label: "Submissions per student per minute",
     description: "Protects the server from one student flooding the queue.",
@@ -326,12 +342,18 @@ export const SETTINGS = {
   // The feedback form (Dashboard › Feedback form): kept off the Settings page.
   "feedback.questions": {
     label: "Feedback form",
-    description: "The questions every new feedback round starts with; each round may change its own.",
+    description:
+      "The questions every new feedback round starts with; each round may change its own.",
     group: "Feedback",
     schema: z
       .array(
         z.object({
-          id: z.string().trim().min(1).max(40).regex(/^[\w-]+$/),
+          id: z
+            .string()
+            .trim()
+            .min(1)
+            .max(40)
+            .regex(/^[\w-]+$/),
           kind: z.enum(["rating", "comment"]),
           text: z.string().trim().min(1).max(200),
         })

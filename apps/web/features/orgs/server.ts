@@ -38,6 +38,9 @@ import {
   organizationPolicy,
   platformExecution,
   readOrgExecution,
+  orgLimitsProblem,
+  readOrgLimits,
+  type OrgLimits,
 } from "@workspace/judge"
 import type { z } from "zod"
 
@@ -46,7 +49,7 @@ import { auditCsv, readAudit, type AuditFilters } from "@/features/audit/server"
 import { notify } from "@/features/notifications/server"
 import { needRoom } from "@/features/billing/limits"
 import { platformCan } from "@/features/platform/access"
-import { getSettings } from "@/features/settings/server"
+import { getLanguages, getSettings } from "@/features/settings/server"
 import { freeHandles } from "@/features/catalog/server"
 import {
   kindPolicies,
@@ -1013,6 +1016,8 @@ export async function getManageSummary(slug: string, user: User) {
           readOrgExecution(ctx.org.execution).browserGrading === true,
         platform: platformExecution(await getSettings()),
       },
+      /** Time and memory per language for its own work, the platform's defaults and ceiling. */
+      limits: await limitsView(ctx.org.limits),
       /** What this org chose, over its type's defaults. */
       moduleChoices: readModuleChoices(ctx.org.modules),
       /** The modules on right now (defaults + choices, limited to the type and ready ones). */
@@ -1063,6 +1068,16 @@ export async function updateSettings(
         "Grading in the browser is turned off for the whole site, so it can't be turned on here."
       )
   }
+  if (input.limits) {
+    const limits = readOrgLimits(input.limits)
+    const problem = orgLimitsProblem(
+      limits,
+      (await getLanguages()).map((l) => l.id),
+      limitCeiling(await getSettings())
+    )
+    if (problem) throw new ApiError(400, "bad_limit", problem)
+    input = { ...input, limits }
+  }
   if (input.modules) {
     const type = ctx.org.type
     const platform = organizationPolicy(
@@ -1074,7 +1089,10 @@ export async function updateSettings(
     for (const [key, on] of Object.entries(input.modules)) {
       if (!on || !isModuleKey(key)) continue
       // Allowed for the kind, but the plan doesn't hold it: buy it first.
-      if (moduleAvailable(type, key, platform) && !moduleAvailable(type, key, inPlan)) {
+      if (
+        moduleAvailable(type, key, platform) &&
+        !moduleAvailable(type, key, inPlan)
+      ) {
         throw new ApiError(
           403,
           "not_in_plan",
@@ -1139,6 +1157,14 @@ export async function updateSettings(
         [...orgModules(org!, await kindPolicies())].map(moduleLabel)
       ),
     ].filter(Boolean)
+    if (input.limits)
+      changes.push(
+        ...limitChanges(
+          readOrgLimits(ctx.org.limits),
+          readOrgLimits(org!.limits),
+          await getLanguages()
+        )
+      )
     const what = [...changes.map((c) => c.field), ...lists.map((l) => l!.label)]
     await audit(
       tx,
@@ -1151,6 +1177,59 @@ export async function updateSettings(
     )
     return org!
   })
+}
+
+function limitCeiling(settings: Awaited<ReturnType<typeof getSettings>>) {
+  return {
+    timeMs: settings["limits.max_time_ms"],
+    memoryMb: settings["limits.max_memory_mb"],
+  }
+}
+
+/** The organization's limits beside each language's defaults and the platform's ceiling. */
+async function limitsView(stored: unknown) {
+  const [languages, settings] = await Promise.all([
+    getLanguages(),
+    getSettings(),
+  ])
+  return {
+    values: readOrgLimits(stored),
+    ceiling: limitCeiling(settings),
+    languages: languages
+      .filter((l) => l.enabled)
+      .map((l) => ({
+        id: l.id,
+        label: l.label,
+        timeLimitMs: l.timeLimitMs,
+        memoryLimitMb: l.memoryLimitMb,
+      })),
+  }
+}
+
+/** Limit changes in words ("Python time limit: Default → 8 s"), for the activity log. */
+function limitChanges(
+  before: OrgLimits,
+  after: OrgLimits,
+  languages: { id: string; label: string }[]
+) {
+  const shown = (value: number | undefined, unit: "s" | "MB") =>
+    value === undefined
+      ? "Default"
+      : unit === "s"
+        ? `${value / 1000} s`
+        : `${value} MB`
+  return languages.flatMap((l) =>
+    (
+      [
+        ["timeLimitMs", "time limit", "s"],
+        ["memoryLimitMb", "memory limit", "MB"],
+      ] as const
+    ).flatMap(([key, name, unit]) => {
+      const from = shown(before[l.id]?.[key], unit)
+      const to = shown(after[l.id]?.[key], unit)
+      return from === to ? [] : [{ field: `${l.label} ${name}`, from, to }]
+    })
+  )
 }
 
 /** What someone is here, for reading and filtering the members list. */

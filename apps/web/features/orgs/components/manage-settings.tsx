@@ -13,7 +13,12 @@ import {
   RadioGroupItem,
 } from "@workspace/ui/components/radio-group"
 import { Field, FormMessage, TextArea, TextInput } from "@/components/form"
-import { Card, Loading, PageTitle } from "@/features/admin/components/shell"
+import {
+  Card,
+  Loading,
+  PageTitle,
+  Table,
+} from "@/features/admin/components/shell"
 import { useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
 
@@ -250,6 +255,9 @@ export function SettingsForm({
           onSaved={onSaved}
         />
       )}
+      {initial.limits && (
+        <LimitsCard slug={slug} limits={initial.limits} onSaved={onSaved} />
+      )}
       <ModulesCard slug={slug} org={initial} onSaved={onSaved} />
     </>
   )
@@ -280,11 +288,10 @@ function ExecutionCard({
         method: "PATCH",
         body: { execution: { server, browserGrading } },
       }),
-    onSuccess: () => {
-      setMessage({ text: "Saved.", kind: "ok" })
-      onSaved()
-    },
+    // Saving reloads the settings, which rebuilds this card, so success is a toast.
+    onSuccess: onSaved,
     onError: (e) => setMessage({ text: e.message, kind: "err" }),
+    meta: { success: "Code execution saved.", quiet: true },
   })
   return (
     <Card className="grid gap-3" data-testid="execution-card">
@@ -339,6 +346,117 @@ function ExecutionCard({
         </span>
         <Button disabled={save.isPending} onClick={() => save.mutate()}>
           Save
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
+/**
+ * Time and memory per language for the organization's own work: blank keeps the platform's
+ * default, and nothing may pass the platform's ceiling. A problem's own limit still wins.
+ */
+function LimitsCard({
+  slug,
+  limits,
+  onSaved,
+}: {
+  slug: string
+  limits: NonNullable<Summary["org"]["limits"]>
+  onSaved: () => void
+}) {
+  // Seconds and megabytes as typed; blank means the platform's default.
+  const [draft, setDraft] = useState(() =>
+    Object.fromEntries(
+      limits.languages.map((l) => {
+        const own = limits.values[l.id]
+        return [
+          l.id,
+          {
+            time: own?.timeLimitMs ? String(own.timeLimitMs / 1000) : "",
+            memory: own?.memoryLimitMb ? String(own.memoryLimitMb) : "",
+          },
+        ]
+      })
+    )
+  )
+  const [message, setMessage] = useState<Message>(null)
+  const edit = (id: string, field: "time" | "memory", value: string) => {
+    setDraft({ ...draft, [id]: { ...draft[id]!, [field]: value } })
+    setMessage(null)
+  }
+  const save = useMutation({
+    mutationFn: () => {
+      const body: Record<
+        string,
+        { timeLimitMs?: number; memoryLimitMb?: number }
+      > = {}
+      for (const [id, { time, memory }] of Object.entries(draft)) {
+        const limit: { timeLimitMs?: number; memoryLimitMb?: number } = {}
+        if (time.trim()) limit.timeLimitMs = Math.round(Number(time) * 1000)
+        if (memory.trim()) limit.memoryLimitMb = Math.round(Number(memory))
+        if (Object.keys(limit).length) body[id] = limit
+      }
+      return api(`/orgs/${slug}`, { method: "PATCH", body: { limits: body } })
+    },
+    // Saving reloads the settings, which rebuilds this card, so success is a toast.
+    onSuccess: onSaved,
+    onError: (e) => setMessage({ text: e.message, kind: "err" }),
+    meta: { success: "Time and memory limits saved.", quiet: true },
+  })
+  const { ceiling } = limits
+  return (
+    <Card className="grid gap-3" data-testid="limits-card">
+      <div>
+        <h2 className="text-title-sm text-ink">Time and memory</h2>
+        <p className="text-body-sm text-body">
+          How long and how much memory each run of your assignments, contests
+          and members-only problems may use, per language. Leave a box empty for
+          the platform&apos;s default; at most {ceiling.timeMs / 1000} s and{" "}
+          {ceiling.memoryMb} MB. A problem with its own limits keeps them.
+        </p>
+      </div>
+      <Table headers={["Language", "Time (seconds)", "Memory (MB)"]}>
+        {limits.languages.map((l) => (
+          <tr key={l.id}>
+            <td>{l.label}</td>
+            <td>
+              <TextInput
+                type="number"
+                inputMode="decimal"
+                min={0.1}
+                max={ceiling.timeMs / 1000}
+                step={0.1}
+                className="w-32"
+                aria-label={`${l.label} time limit in seconds`}
+                placeholder={`${l.timeLimitMs / 1000} (default)`}
+                value={draft[l.id]?.time ?? ""}
+                onChange={(e) => edit(l.id, "time", e.target.value)}
+              />
+            </td>
+            <td>
+              <TextInput
+                type="number"
+                inputMode="numeric"
+                min={32}
+                max={ceiling.memoryMb}
+                step={1}
+                className="w-36"
+                aria-label={`${l.label} memory limit in MB`}
+                placeholder={`${l.memoryLimitMb} (default)`}
+                value={draft[l.id]?.memory ?? ""}
+                onChange={(e) => edit(l.id, "memory", e.target.value)}
+              />
+            </td>
+          </tr>
+        ))}
+      </Table>
+      <div className="flex items-center gap-3 border-t border-hairline pt-3">
+        <span className="flex-1">
+          <FormMessage message={message} />
+        </span>
+        <Button disabled={save.isPending} onClick={() => save.mutate()}>
+          Save limits
         </Button>
       </div>
     </Card>

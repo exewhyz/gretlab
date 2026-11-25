@@ -935,6 +935,14 @@ export const organizations = pgTable("organizations", {
     .$type<{ server?: boolean; browserGrading?: boolean }>()
     .notNull()
     .default({}),
+  /**
+   * Time and memory limits for its own work, by language (packages/judge/src/limits.ts):
+   * over the platform's defaults, under its ceiling; a problem's own limit still wins.
+   */
+  limits: jsonb("limits")
+    .$type<Record<string, { timeLimitMs?: number; memoryLimitMb?: number }>>()
+    .notNull()
+    .default({}),
   /** The week (its Monday, YYYY-MM-DD) of the last weekly summary sent, so each goes once. */
   digestWeek: text("digest_week"),
   createdAt: createdAt(),

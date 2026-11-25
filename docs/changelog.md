@@ -8,6 +8,14 @@ aren't listed.
 
 ## 25 November 2026
 
+### Time and memory limits per organization
+
+- **Set your own time and memory limits per language** under Manage › Settings › Time and memory,
+  for your assignments, contests and members-only problems: more time for Java, less for a speed
+  round. Leave a box empty for the platform's default. The platform sets
+  how high you may go (10 seconds and 1,024 MB to start), and a problem with its own limits keeps
+  them.
+
 ### Feedback rounds
 
 - **Ask students about their teachers.** Under Manage › Feedback rounds, open a round such as

@@ -168,6 +168,37 @@ const cupTests = (await tests(s1, { problem: "xp-org-add", contest: "xp-cup" }))
 const cupSubmit = await browserSubmit(s1, "xp-org-add", outputsFor(cupTests, sum), { contestSlug: "xp-cup" })
 check("a contest Submit graded in the browser counts on the board", cupSubmit.status === 200 && (await s1("/contests/xp-cup/leaderboard")).json?.rows?.[0]?.solved === 1, JSON.stringify((await s1("/contests/xp-cup/leaderboard")).json?.rows?.[0]))
 
+// ---------- time and memory limits for an organization's own work
+const limitsOf = async () => (await owner(`${O}/manage`)).json?.org?.limits
+const startLimits = await limitsOf()
+const jsDefault = startLimits?.languages.find((l) => l.id === "javascript")
+check("the settings show each language's defaults and the platform's ceiling", startLimits?.ceiling.timeMs === 10000 && startLimits?.ceiling.memoryMb === 1024 && jsDefault?.timeLimitMs > 0 && Object.keys(startLimits.values).length === 0, JSON.stringify(startLimits?.ceiling))
+check("a teacher can't change the limits", (await t(O, { method: "PATCH", body: { limits: { javascript: { timeLimitMs: 3000 } } } })).status === 403)
+const overTime = await owner(O, { method: "PATCH", body: { limits: { javascript: { timeLimitMs: 10_001 } } } })
+check("a time limit past the ceiling is refused", overTime.json?.error?.code === "bad_limit" && /10 s/.test(overTime.json.error.message), JSON.stringify(overTime.json))
+check("a memory limit past the ceiling is refused", (await owner(O, { method: "PATCH", body: { limits: { javascript: { memoryLimitMb: 2048 } } } })).json?.error?.code === "bad_limit")
+check("an unknown language is refused", (await owner(O, { method: "PATCH", body: { limits: { cobol: { timeLimitMs: 1000 } } } })).json?.error?.code === "bad_limit")
+check("the owner sets JavaScript's limits", (await owner(O, { method: "PATCH", body: { limits: { javascript: { timeLimitMs: 3000, memoryLimitMb: 128 } } } })).status === 200 && (await limitsOf())?.values.javascript?.timeLimitMs === 3000)
+const limitLog = psql(`select detail::text from audit_log where org_id='${orgId}' and action='org.settings' order by created_at desc limit 1`)
+check("the activity log says what changed, in words", /JavaScript[^"]* time limit/.test(limitLog) && limitLog.includes("3 s") && limitLog.includes("128 MB"), limitLog.slice(0, 300))
+// A Run's stored limits (no runner needed: the row is what the judge reads), then cleared.
+const runLimits = async (who, problemSlug) => {
+  const res = await who("/submissions", { body: { kind: "run", language: "javascript", entry: "main.js", files, problemSlug, inputs: ["2 3"] } })
+  if (!res.json?.id) return JSON.stringify(res.json)
+  const row = psql(`select time_limit_ms || '/' || memory_limit_mb from submissions where id='${res.json.id}'`)
+  psql(`delete from submissions where id='${res.json.id}'`)
+  return row
+}
+check("the school's problem runs under the school's limits", (await runLimits(s2, "xp-org-add")) === "3000/128", await runLimits(s2, "xp-org-add"))
+check("personal practice on a library problem keeps the platform's", (await runLimits(s2, "xp-add")) === `${jsDefault?.timeLimitMs}/${jsDefault?.memoryLimitMb}`)
+await owner(`${O}/problems`, { body: { ...problemBody("xp-org-own", "Xp Org Own"), timeLimitMs: 1500, listed: true } })
+check("a problem's own limit wins; the school's memory still applies", (await runLimits(s2, "xp-org-own")) === "1500/128", await runLimits(s2, "xp-org-own"))
+await owner(O, { method: "PATCH", body: { limits: { javascript: { timeLimitMs: 9000 } } } })
+await setting({ "limits.max_time_ms": 4000 })
+check("a ceiling lowered later holds a limit saved before it", (await runLimits(s2, "xp-org-add")) === `4000/${jsDefault?.memoryLimitMb}`, await runLimits(s2, "xp-org-add"))
+await setting({ "limits.max_time_ms": 10000 })
+check("clearing a language goes back to the platform's", (await owner(O, { method: "PATCH", body: { limits: {} } })).status === 200 && (await runLimits(s2, "xp-org-add")) === `${jsDefault?.timeLimitMs}/${jsDefault?.memoryLimitMb}`)
+
 // ---------- the sandbox judges provisional verdicts again (only with a runner up)
 const runnerUp = psql(`select count(*) from runners where last_seen_at > now() - interval '1 minute'`) !== "0"
 if (runnerUp) {
@@ -265,6 +296,26 @@ try {
   check("choosing the browser warns about the languages", (await o.getByRole("note").textContent()).includes("Only Python and JavaScript"))
   await o.getByTestId("execution-settings").screenshot({ path: `${SHOTS}xp-execution-settings.png` })
 
+  // Time and memory on the school's settings, as an owner sets them.
+  await o.goto(`${BASE}/orgs/xp-school/manage/settings`)
+  await o.getByTestId("limits-card").waitFor({ timeout: 30000 })
+  check("the time limit box shows the default as a hint", (await o.getByLabel(/^JavaScript.* time limit in seconds$/).getAttribute("placeholder")).includes("default"))
+  await o.getByLabel(/^JavaScript.* time limit in seconds$/).fill("2.5")
+  await o.getByLabel(/^JavaScript.* memory limit in MB$/).fill("200")
+  await o.getByRole("button", { name: "Save limits" }).click()
+  await o.getByText("Time and memory limits saved.").waitFor({ timeout: 15000 })
+  check("saving limits from the page stores them", JSON.stringify((await limitsOf())?.values.javascript) === JSON.stringify({ timeLimitMs: 2500, memoryLimitMb: 200 }), JSON.stringify((await limitsOf())?.values))
+  await o.getByLabel(/^JavaScript.* time limit in seconds$/).fill("60")
+  await o.getByRole("button", { name: "Save limits" }).click()
+  await o.getByTestId("limits-card").getByText(/at most 10 s/).waitFor({ timeout: 15000 })
+  check("past the ceiling, the page says why", true)
+  await o.getByTestId("limits-card").screenshot({ path: `${SHOTS}xp-limits.png` })
+  const op = await as("xp-o@example.com", { width: 390, height: 844 })
+  await op.goto(`${BASE}/orgs/xp-school/manage/settings`)
+  await op.getByTestId("limits-card").waitFor({ timeout: 30000 })
+  check("the limits on a phone, without sideways scrolling", await op.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+  await op.getByTestId("limits-card").screenshot({ path: `${SHOTS}xp-limits-phone.png` })
+
   const k = await as("xp-k@example.com", { width: 390, height: 844 })
   await k.goto(`${BASE}/orgs/xp-school/profile/me`)
   await k.getByTestId("student-record").waitFor({ timeout: 30000 })
@@ -288,7 +339,7 @@ try {
   await e.screenshot({ path: `${SHOTS}xp-browser-submit.png` })
   check("no page errors", errors.length === 0, errors.join(" | "))
 } finally {
-  await setting({ "server_execution.enabled": true, "browser_execution.grading": false })
+  await setting({ "server_execution.enabled": true, "browser_execution.grading": false, "limits.max_time_ms": 10000 })
   await browser.close()
   cleanup()
 }
