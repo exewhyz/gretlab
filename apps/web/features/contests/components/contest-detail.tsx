@@ -5,6 +5,16 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
@@ -21,11 +31,18 @@ import { ContestQuestions, type ContestQuestion } from "./contest-questions"
 import { Countdown } from "./countdown"
 import { PhaseBadge } from "./contest-list"
 import type { ApiResult } from "@/lib/api/types"
-import type { getContestView, getLeaderboard } from "@/features/contests/server"
+import type { getLeaderboard } from "@/features/contests/server"
+import type {
+  contestViewWithVirtual,
+  virtualLeaderboard,
+} from "@/features/contests/virtual"
 
-type ContestView = ApiResult<typeof getContestView>
+type ContestView = ApiResult<typeof contestViewWithVirtual>
 
-type Leaderboard = ApiResult<typeof getLeaderboard>
+type Leaderboard = ApiResult<typeof getLeaderboard> &
+  Partial<
+    Pick<ApiResult<typeof virtualLeaderboard>, "you" | "minute" | "running">
+  >
 
 const REFRESH_MS = 15_000
 const TABS = ["Problems", "Leaderboard", "My submissions", "Rules"] as const
@@ -40,10 +57,21 @@ export function ContestDetail({ slug }: { slug: string }) {
     queryFn: () => api<ContestView>(`/contests/${slug}`),
     refetchInterval: REFRESH_MS,
   })
+  // Someone who has taken it virtually sees their own board: the real one at the same minute.
+  const inVirtual =
+    contest?.virtual?.state === "running" || contest?.virtual?.state === "done"
   const board = useQuery({
-    queryKey: ["leaderboard", slug],
-    queryFn: () => api<Leaderboard>(`/contests/${slug}/leaderboard`),
-    refetchInterval: contest?.phase === "live" ? REFRESH_MS : false,
+    queryKey: ["leaderboard", slug, inVirtual],
+    queryFn: () =>
+      api<Leaderboard>(
+        inVirtual
+          ? `/contests/${slug}/virtual/leaderboard`
+          : `/contests/${slug}/leaderboard`
+      ),
+    refetchInterval:
+      contest?.phase === "live" || contest?.virtual?.state === "running"
+        ? REFRESH_MS
+        : false,
     enabled: tab === "Leaderboard",
   })
   const refresh = () => {
@@ -52,6 +80,11 @@ export function ContestDetail({ slug }: { slug: string }) {
     // What a contest problem allows depends on registering and on the phase.
     void queryClient.invalidateQueries({ queryKey: ["contest-problem", slug] })
   }
+  const startVirtual = useMutation({
+    mutationFn: () => api(`/contests/${slug}/virtual`, { method: "POST" }),
+    onSuccess: refresh,
+    meta: { quiet: true },
+  })
   const registration = useMutation({
     mutationFn: (register: boolean) =>
       api(`/contests/${slug}/registration`, {
@@ -65,7 +98,8 @@ export function ContestDetail({ slug }: { slug: string }) {
   return (
     <div className="min-h-dvh">
       <PageHeader />
-      <main className="mx-auto grid max-w-5xl gap-4 p-4 text-body-sm text-body">
+      {/* One column that may shrink: wide tables scroll in their own box, not the page. */}
+      <main className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)] gap-4 p-4 text-body-sm text-body">
         {!contest ? (
           <Loading error={error} />
         ) : (
@@ -117,7 +151,14 @@ export function ContestDetail({ slug }: { slug: string }) {
                 </div>
               )}
               {contest.phase === "ended" && (
-                <span>This contest has ended.</span>
+                <VirtualPanel
+                  virtual={contest.virtual}
+                  signedIn={Boolean(viewer?.user)}
+                  starting={startVirtual.isPending}
+                  error={startVirtual.error?.message ?? null}
+                  onStart={() => startVirtual.mutate()}
+                  onFinish={refresh}
+                />
               )}
               <span className="flex-1" />
               {contest.phase !== "ended" &&
@@ -249,7 +290,10 @@ function ProblemsTab({
       <ContestQuestions
         slug={slug}
         questions={contest.questions}
-        canAnswer={contest.phase === "live" && contest.registered}
+        canAnswer={
+          (contest.phase === "live" && contest.registered) ||
+          contest.virtual?.state === "running"
+        }
       />
     </>
   )
@@ -296,6 +340,13 @@ function LeaderboardTab({ board }: { board: Leaderboard }) {
   }
   return (
     <>
+      {board.you && (
+        <p className="mb-2 text-caption" data-testid="virtual-board-note">
+          {board.running
+            ? `Your virtual contest: everyone as they stood at minute ${board.minute}, with you among them.`
+            : "Your virtual contest: the final standings, with you among them. The official results don't include you."}
+        </p>
+      )}
       {board.frozen && (
         <p className="mb-2 text-caption">
           The board is frozen. Results since the freeze show as pending until
@@ -311,9 +362,22 @@ function LeaderboardTab({ board }: { board: Leaderboard }) {
         ]}
       >
         {board.rows.map((row) => (
-          <tr key={row.user.id}>
+          <tr
+            key={row.user.id}
+            className={cn(
+              row.user.id === board.you && "bg-muted/60 font-medium"
+            )}
+            data-you={row.user.id === board.you ? "" : undefined}
+          >
             <td className="tabular-nums">{row.rank}</td>
-            <td className="whitespace-nowrap">{row.user.name}</td>
+            <td className="whitespace-nowrap">
+              {row.user.name}
+              {row.user.id === board.you && (
+                <span className="ml-1.5 text-caption text-body">
+                  (you, virtual)
+                </span>
+              )}
+            </td>
             {icpc ? (
               <>
                 <td className="tabular-nums">{row.solved}</td>
@@ -357,4 +421,136 @@ function LeaderboardTab({ board }: { board: Leaderboard }) {
       </Table>
     </>
   )
+}
+
+const VIRTUAL_REASONS: Record<string, string> = {
+  took_part_live:
+    "You took part in this contest, so it can't be taken virtually.",
+}
+
+/**
+ * After a contest: taking it virtually, the attempt's clock, or how it went. Shown only to
+ * people who could have entered it.
+ */
+function VirtualPanel({
+  virtual,
+  signedIn,
+  starting,
+  error,
+  onStart,
+  onFinish,
+}: {
+  virtual: ContestView["virtual"]
+  signedIn: boolean
+  starting: boolean
+  error: string | null
+  onStart: () => void
+  onFinish: () => void
+}) {
+  if (!signedIn || !virtual) return <span>This contest has ended.</span>
+  if (virtual.state === "running")
+    return (
+      <div data-testid="virtual-running">
+        <div className="text-caption">Your virtual contest ends in</div>
+        <div className="text-display-sm text-ink">
+          <Countdown to={virtual.endsAt} onFinish={onFinish} />
+        </div>
+      </div>
+    )
+  if (virtual.state === "done")
+    return (
+      <span data-testid="virtual-result">
+        This contest has ended. Your virtual contest:{" "}
+        {virtual.result ? (
+          <b className="text-ink">
+            {ordinal(virtual.result.rank)} of {virtual.result.of}
+          </b>
+        ) : (
+          "finished"
+        )}
+        {virtual.result &&
+          (virtual.result.scoring === "icpc"
+            ? ` · ${virtual.result.solved} solved · penalty ${virtual.result.penalty}`
+            : ` · ${virtual.result.score} points`)}
+        .
+      </span>
+    )
+  if (virtual.state === "unavailable")
+    return (
+      <span>
+        This contest has ended.{" "}
+        {virtual.reason && VIRTUAL_REASONS[virtual.reason]}
+      </span>
+    )
+  return (
+    <div
+      className="flex flex-wrap items-center gap-3"
+      data-testid="virtual-offer"
+    >
+      <span className="max-w-xl">
+        This contest has ended. Take it virtually: {virtual.lengthMinutes}{" "}
+        minutes on your own clock, ranked against everyone as they stood at each
+        minute. Once only; the official results don&apos;t change.
+      </span>
+      <ConfirmStart
+        minutes={virtual.lengthMinutes ?? 0}
+        starting={starting}
+        onStart={onStart}
+      />
+      {error && (
+        <span role="alert" className="w-full text-destructive">
+          {error}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function ConfirmStart({
+  minutes,
+  starting,
+  onStart,
+}: {
+  minutes: number
+  starting: boolean
+  onStart: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button size="sm" disabled={starting} onClick={() => setOpen(true)}>
+        Take it virtually
+      </Button>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start your virtual contest now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The clock starts at once and runs for {minutes} minutes, even if
+              you leave the page. You can take it only once.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Not now</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setOpen(false)
+                onStart()
+              }}
+            >
+              Start
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}
+
+function ordinal(n: number) {
+  const s =
+    n % 100 >= 11 && n % 100 <= 13
+      ? "th"
+      : (["th", "st", "nd", "rd"][n % 10] ?? "th")
+  return `${n}${s}`
 }

@@ -48,6 +48,7 @@ import {
   workHasProblem,
 } from "./execution"
 import { contestFor } from "@/features/contests/server"
+import { inRunningVirtual } from "@/features/contests/virtual"
 import { accessTo, orgPolicy, viewpoint } from "@/features/orgs/access"
 import { cached } from "@/lib/ttl-cache"
 import { examScope, guardExamSubmission } from "@/features/exams/server"
@@ -263,10 +264,15 @@ async function resolveContest(
       "The contest hasn't started."
     )
   }
-  if (now >= contest.endsAt) {
+  // After the end, only someone in a running virtual attempt (features/contests/virtual.ts).
+  const virtual =
+    now >= contest.endsAt && (await inRunningVirtual(contest, user.id))
+  if (now >= contest.endsAt && !virtual) {
     throw new ApiError(403, "contest_over", "The contest has ended.")
   }
-  const [registered] = await db
+  const [registered] = virtual
+    ? [{ userId: user.id }]
+    : await db
     .select({ userId: contestParticipants.userId })
     .from(contestParticipants)
     .where(
@@ -288,7 +294,8 @@ async function resolveContest(
       )
     )
   if (!listed) throw notFound("That problem isn't in this contest")
-  return contest
+  // Virtual work is stored without the contest, so no official board ever counts it.
+  return { ...contest, virtual }
 }
 
 const sameInput = (a: string, b: string) =>
@@ -398,7 +405,7 @@ export async function createSubmission(
     if (!problem)
       throw new ApiError(400, "problem_required", "Choose a problem.")
     const contest = await resolveContest(user, input.contestSlug, problem.id)
-    contestId = contest.id
+    contestId = contest.virtual ? null : contest.id
     contestRules = contest
     ruledBy = contest.orgId
   } else if (problem && !(await canReachProblem(user, problem))) {

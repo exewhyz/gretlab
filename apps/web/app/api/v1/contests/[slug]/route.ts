@@ -1,8 +1,8 @@
 import { route } from "@/lib/api/route"
-import { getContestView } from "@/features/contests/server"
+import { contestViewWithVirtual } from "@/features/contests/virtual"
 import { requireFeature } from "@/features/settings/server"
 
 export const GET = route({ access: "public" }, async ({ user, params }) => {
   await requireFeature("contests.enabled")
-  return getContestView(params.slug ?? "", user)
+  return contestViewWithVirtual(params.slug ?? "", user)
 })

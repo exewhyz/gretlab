@@ -18,9 +18,9 @@ import { api } from "@/lib/api/client"
 
 import { Countdown } from "./countdown"
 import type { ApiResult } from "@/lib/api/types"
-import type { getContestProblem } from "@/features/contests/server"
+import type { contestProblemWithVirtual } from "@/features/contests/virtual"
 
-type ContestProblem = ApiResult<typeof getContestProblem>
+type ContestProblem = ApiResult<typeof contestProblemWithVirtual>
 
 export function ContestWorkbench({
   slug,
@@ -51,7 +51,9 @@ export function ContestWorkbench({
     viewer?.user?.role === "teacher" || viewer?.user?.role === "admin"
 
   const live = contest.phase === "live"
-  const counts = live && registered
+  // A virtual attempt that's running counts like the live contest (features/contests/virtual.ts).
+  const virtual = data.virtual
+  const counts = (live && registered) || Boolean(virtual)
   // Staff can always try a problem out, and so can anyone once it's public practice.
   const canPractice = Boolean(viewer?.user) && (staff || (!live && published))
   const contestPage = (
@@ -90,7 +92,10 @@ export function ContestWorkbench({
       banner={
         <div className="flex flex-none flex-wrap items-center gap-x-3 bg-ink px-4 py-2 text-caption text-canvas">
           <span className="font-semibold">{contest.title}</span>
-          {counts && "Your submissions here count toward the contest."}
+          {counts &&
+            (virtual
+              ? "Virtual contest: your submissions here count toward your attempt."
+              : "Your submissions here count toward the contest.")}
           {!counts &&
             canPractice &&
             (live
@@ -101,6 +106,12 @@ export function ContestWorkbench({
             <span>
               Ends in{" "}
               <Countdown to={contest.endsAt} onFinish={() => void refetch()} />
+            </span>
+          )}
+          {virtual && (
+            <span data-testid="virtual-clock">
+              Your attempt ends in{" "}
+              <Countdown to={virtual.endsAt} onFinish={() => void refetch()} />
             </span>
           )}
           <Link

@@ -673,6 +673,13 @@
       "when": 1795603200479,
       "tag": "0095_test_groups",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1795605404799,
+      "tag": "0096_contest_virtuals",
+      "breakpoints": true
     }
   ]
 }

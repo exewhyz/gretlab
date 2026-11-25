@@ -8,6 +8,14 @@ aren't listed.
 
 ## 25 November 2026
 
+### Virtual contests
+
+- **Take a past contest virtually.** On a contest that has ended, press **Take it virtually**:
+  you get the same problems and time on your own clock, and the leaderboard shows everyone as
+  they stood at the same minute of the real contest, with you among them. Once per contest, and
+  not if you took part live. The official results never change.
+- The contest page no longer runs wider than a phone's screen.
+
 ### Subtasks
 
 - **Group a problem's tests into subtasks.** Give tests the same group name in the problem editor

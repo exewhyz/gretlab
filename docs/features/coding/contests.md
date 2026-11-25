@@ -35,6 +35,21 @@ everyone on the platform or aimed at an organization's groups.
    contest uses.
 4. Publish. Contestants register on the contest page.
 
+## Virtual contests
+
+After a contest ends, anyone who could have entered it can **take it virtually** from its page:
+
+- It runs on their own clock for the contest's length, starting when they press **Start**, and
+  keeps running if they leave the page.
+- Their leaderboard shows the real contestants **as they stood at the same minute** of the original
+  contest, with them ranked among them; the freeze applies as it did live.
+- Each person can take a contest virtually **once**, and not at all if they took part live (made a
+  submission or answered a question during it). Only registering doesn't count.
+- Afterwards the contest page shows where they'd have finished. The official results never change,
+  and virtual work isn't counted in reports, gradebooks or the plagiarism check: it's stored as the
+  person's own practice.
+- Right answers to the contest's questions stay hidden from them until their attempt ends.
+
 ## Edge cases
 
 - Problems written for a contest are reachable only once the contest starts.

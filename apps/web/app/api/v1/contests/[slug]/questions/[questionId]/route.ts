@@ -1,9 +1,9 @@
 import { z } from "zod"
 
 import { route } from "@/lib/api/route"
-import { answerContestQuestion } from "@/features/contests/server"
+import { answerQuestion } from "@/features/contests/virtual"
 
-/** Your one answer to a contest question, marked at once. */
+/** Your one answer to a contest question, marked at once: live, or in your virtual attempt. */
 export const POST = route(
   {
     access: "user",
@@ -12,5 +12,5 @@ export const POST = route(
     }),
   },
   ({ user, params, body }) =>
-    answerContestQuestion(params.slug ?? "", params.questionId ?? "", user, body.answer)
+    answerQuestion(params.slug ?? "", params.questionId ?? "", user, body.answer)
 )

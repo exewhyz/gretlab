@@ -40,7 +40,7 @@ const { and, asc, count, desc, eq, inArray, isNull } = sql
 
 export type ContestPhase = "upcoming" | "live" | "ended"
 
-function phaseOf(contest: Contest, now = new Date()): ContestPhase {
+export function phaseOf(contest: Contest, now = new Date()): ContestPhase {
   if (now < contest.startsAt) return "upcoming"
   return now < contest.endsAt ? "live" : "ended"
 }
@@ -49,7 +49,7 @@ function phaseOf(contest: Contest, now = new Date()): ContestPhase {
  * The contest and what this person may do with it. A contest they can't take part in
  * looks the same as one that doesn't exist.
  */
-async function findContest(
+export async function findContest(
   slug: string,
   viewer: User | null
 ): Promise<{
@@ -78,7 +78,7 @@ export async function contestFor(slug: string, viewer: User) {
   return (await findContest(slug, viewer)).contest
 }
 
-async function contestProblemRows(contestId: string) {
+export async function contestProblemRows(contestId: string) {
   return getDb()
     .select({ link: contestProblems, problem: problems })
     .from(contestProblems)
@@ -321,7 +321,11 @@ export async function getLeaderboard(slug: string, viewer: User | null) {
   )
 }
 
-async function computeBoard(contest: Contest, staff: boolean) {
+/**
+ * What a contest's board is made from: its rules, the people registered, and every graded
+ * attempt and answer as board entries. Shared with virtual contests (./virtual.ts).
+ */
+export async function boardInputs(contest: Contest) {
   const db = getDb()
   const [rows, questionRows, answers] = await Promise.all([
     contestProblemRows(contest.id),
@@ -353,10 +357,6 @@ async function computeBoard(contest: Contest, staff: boolean) {
         )
       ),
   ])
-
-  const phase = phaseOf(contest)
-  // Revealed for everyone when the contest ends; staff can always see the real board.
-  const frozen = phase !== "ended" && !staff
   const config = {
     scoring: contest.scoring,
     startsAt: contest.startsAt,
@@ -366,51 +366,61 @@ async function computeBoard(contest: Contest, staff: boolean) {
     // Questions are columns too, after the problems.
     problemLabels: [...rows.map((row) => row.link.label), ...questionRows.map((q) => q.label)],
   }
+  return {
+    config,
+    /** Problem id to its label, and question id to the question, for turning work into entries. */
+    labelOf,
+    questionOf,
+    participants: participants.map((person) => ({
+      id: person.id,
+      // Display names only: other students' email addresses are never exposed.
+      user: { id: person.id, name: person.name ?? "Student" },
+    })),
+    entries: [
+      ...attempts.flatMap((attempt) => {
+        const label = attempt.problemId && labelOf.get(attempt.problemId)
+        return label
+          ? [
+              {
+                userId: attempt.userId,
+                problemLabel: label,
+                verdict: attempt.verdict,
+                score: attempt.score,
+                createdAt: attempt.createdAt,
+              },
+            ]
+          : []
+      }),
+      // A right answer is a solve (ICPC) worth the question's points (IOI).
+      ...answers.flatMap((a) => {
+        const q = questionOf.get(a.questionId)
+        return q
+          ? [
+              {
+                userId: a.userId,
+                problemLabel: q.label,
+                verdict: (a.correct ? "AC" : "WA") as "AC" | "WA",
+                score: a.correct ? q.points : 0,
+                createdAt: a.answeredAt,
+              },
+            ]
+          : []
+      }),
+    ],
+  }
+}
+
+async function computeBoard(contest: Contest, staff: boolean) {
+  const { config, participants, entries } = await boardInputs(contest)
+  const phase = phaseOf(contest)
+  // Revealed for everyone when the contest ends; staff can always see the real board.
+  const frozen = phase !== "ended" && !staff
   const cutoff = freezeTime(config)
   return {
     scoring: contest.scoring,
     problemLabels: config.problemLabels,
     frozen: frozen && cutoff !== null && new Date() >= cutoff,
-    rows: computeLeaderboard(
-      config,
-      participants.map((person) => ({
-        id: person.id,
-        // Display names only: other students' email addresses are never exposed.
-        user: { id: person.id, name: person.name ?? "Student" },
-      })),
-      [
-        ...attempts.flatMap((attempt) => {
-          const label = attempt.problemId && labelOf.get(attempt.problemId)
-          return label
-            ? [
-                {
-                  userId: attempt.userId,
-                  problemLabel: label,
-                  verdict: attempt.verdict,
-                  score: attempt.score,
-                  createdAt: attempt.createdAt,
-                },
-              ]
-            : []
-        }),
-        // A right answer is a solve (ICPC) worth the question's points (IOI).
-        ...answers.flatMap((a) => {
-          const q = questionOf.get(a.questionId)
-          return q
-            ? [
-                {
-                  userId: a.userId,
-                  problemLabel: q.label,
-                  verdict: (a.correct ? "AC" : "WA") as "AC" | "WA",
-                  score: a.correct ? q.points : 0,
-                  createdAt: a.answeredAt,
-                },
-              ]
-            : []
-        }),
-      ],
-      frozen
-    ),
+    rows: computeLeaderboard(config, participants, entries, frozen),
   }
 }
 
@@ -561,7 +571,7 @@ export async function saveContest(
 }
 
 /** A contest's questions, in order, with their points there. */
-function contestQuestionRows(contestId: string) {
+export function contestQuestionRows(contestId: string) {
   return getDb()
     .select({
       id: questions.id,

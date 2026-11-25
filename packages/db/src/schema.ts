@@ -619,6 +619,37 @@ export const contestParticipants = pgTable(
   (table) => [primaryKey({ columns: [table.contestId, table.userId] })]
 )
 
+/**
+ * A contest taken virtually after it ended (packages/judge/src/virtual.ts): once per person, on
+ * their own clock, for the contest's length. Their submissions carry no contest (so nothing
+ * virtual reaches the official board); the attempt is their submits to its problems made in
+ * the window. Answers to the contest's questions are kept here, by question id.
+ */
+export const contestVirtuals = pgTable(
+  "contest_virtuals",
+  {
+    contestId: uuid("contest_id")
+      .notNull()
+      .references(() => contests.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    answers: jsonb("answers")
+      .$type<
+        Record<
+          string,
+          { answer: string[] | string; correct: boolean; answeredAt: string }
+        >
+      >()
+      .notNull()
+      .default({}),
+  },
+  (table) => [primaryKey({ columns: [table.contestId, table.userId] })]
+)
+
 export interface StoredCaseResult {
   /** Null for a custom-input run. */
   testCaseId: string | null
