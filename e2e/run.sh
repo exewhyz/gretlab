@@ -74,6 +74,7 @@ suite org-study-plans http://localhost:3100
 suite feedback-rounds http://localhost:3100
 suite test-groups http://localhost:3100
 suite virtual-contests http://localhost:3100
+suite checkers http://localhost:3100
 suite orgs http://localhost:3100
 suite platform http://localhost:3100
 suite library http://localhost:3100

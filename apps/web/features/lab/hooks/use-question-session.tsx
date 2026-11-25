@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   isBrowserLanguage,
-  outputsMatch,
+  compareOutputs,
   overallVerdict,
   planExecution,
   type ExecutionPlan,
@@ -608,7 +608,7 @@ function useSessionState({
           ? "RE"
           : expected === null
             ? "OK"
-            : outputsMatch(result.out, expected)
+            : compareOutputs(result.out, expected, detail?.checker)
               ? "AC"
               : "WA"
       outcomes.push({

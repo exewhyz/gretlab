@@ -348,6 +348,7 @@ export async function processSubmission(
       })),
       timeLimitMs: submission.timeLimitMs,
       memoryLimitMb: submission.memoryLimitMb,
+      checker: submission.checker,
     })
     const results = toStored(cases, result)
     await finish({

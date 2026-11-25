@@ -1,9 +1,10 @@
 import {
   LANGUAGES,
   LIMITS,
-  outputsMatch,
+  compareOutputs,
   overallVerdict,
   skipsCase,
+  type Checker,
   type LanguageDefinition,
   type LanguageId,
   type SourceFile,
@@ -36,6 +37,8 @@ export interface JudgeRequest {
   cases: JudgeCase[]
   timeLimitMs: number
   memoryLimitMb: number
+  /** How output is checked (packages/judge/src/checker.ts); null or absent: exactly. */
+  checker?: Checker | null
 }
 
 export interface CaseResult {
@@ -57,7 +60,8 @@ export interface JudgeResult {
 function classify(
   result: ExecResult,
   expected: string | null,
-  memoryLimitMb: number
+  memoryLimitMb: number,
+  checker: Checker | null
 ): Verdict {
   if (result.sandboxDied === "oom") return "MLE"
   if (result.sandboxDied === "crash") return "RE"
@@ -68,7 +72,7 @@ function classify(
   if (result.exitCode === OOM_EXIT_CODE || overMemory) return "MLE"
   if (result.exitCode !== 0) return "RE"
   if (expected === null) return "OK"
-  return outputsMatch(result.stdout, expected) ? "AC" : "WA"
+  return compareOutputs(result.stdout, expected, checker) ? "AC" : "WA"
 }
 
 export async function judge(
@@ -144,7 +148,12 @@ export async function judge(
       })
       cases.push({
         caseId: testCase.id,
-        verdict: classify(result, testCase.expected, request.memoryLimitMb),
+        verdict: classify(
+          result,
+          testCase.expected,
+          request.memoryLimitMb,
+          request.checker ?? null
+        ),
         stdout: result.stdout.slice(0, OUTPUT_PREVIEW_BYTES),
         stderr: result.sandboxDied
           ? SANDBOX_DIED_MESSAGE

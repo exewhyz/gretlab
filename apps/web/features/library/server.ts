@@ -322,6 +322,7 @@ export async function copyToLibrary(
         timeLimitMs: p.timeLimitMs,
         memoryLimitMb: p.memoryLimitMb,
         allowedLanguages: p.allowedLanguages,
+        checker: p.checker ?? null,
         published: false,
         membersOnly: false,
         listed: p.listed,

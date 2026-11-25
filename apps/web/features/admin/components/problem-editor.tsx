@@ -31,6 +31,7 @@ import { usePythonEngine } from "@/features/lab/hooks/use-python-engine"
 import { slugify, type ProblemInput } from "@/features/problems/schemas"
 import { api, ApiRequestError } from "@/lib/api/client"
 
+import { CheckerSettings } from "./checker-settings"
 import { EditorSection, LanguageCode } from "./problem-editor-parts"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle } from "./shell"
@@ -68,6 +69,7 @@ const EMPTY: ProblemInput = {
   tags: [],
   timeLimitMs: null,
   memoryLimitMb: null,
+  checker: null,
   allowedLanguages: null,
   published: false,
   membersOnly: false,
@@ -537,6 +539,11 @@ function ProblemEditor({
             ))}
           </fieldset>
         </div>
+
+        <CheckerSettings
+          value={form.checker}
+          onChange={(checker) => set("checker", checker)}
+        />
 
         <div className="grid gap-2.5">
           <div>

@@ -115,6 +115,13 @@ export function ProblemView({
           )
       )}
 
+      {question.checkerNote && (
+        <section data-testid="checker-note">
+          <h2>How your output is checked</h2>
+          <p>{question.checkerNote}</p>
+        </section>
+      )}
+
       {question.samples.length > 0 && (
         <section>
           <h2>Sample Test Cases</h2>

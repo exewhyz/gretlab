@@ -8,6 +8,14 @@ aren't listed.
 
 ## 25 November 2026
 
+### How output is checked
+
+- **Problems can accept more than one way of printing the answer.** In the problem editor, under
+  **How output is checked**, tick what's allowed: numbers within a tolerance (so `0.3333333` and
+  `3.333333E-1` both pass), lines in any order, spacing that doesn't matter, or upper and lower
+  case counting as the same. Students see a line on the problem saying what's accepted. Import
+  files take it as `"checker"`.
+
 ### Virtual contests
 
 - **Take a past contest virtually.** On a contest that has ended, press **Take it virtually**:

@@ -13,10 +13,12 @@ import {
   type Problem,
 } from "@workspace/db"
 import {
+  describeChecker,
   LANGUAGE_IDS,
   joinStarter,
   LANGUAGES,
   statementToMarkdown,
+  type Checker,
   type ProblemCode,
 } from "@workspace/judge"
 import { revalidatePath } from "next/cache"
@@ -59,6 +61,10 @@ export interface ProblemDetail extends ProblemSummary {
   hiddenTestCount: number
   allowedLanguages: string[] | null
   hasSolution: boolean
+  /** How output is checked, so browser runs compare alike; null: exactly. */
+  checker: Checker | null
+  /** The same, in words for students; null when it's exact. */
+  checkerNote: string | null
   /** Starter code by language, where the problem sets its own. */
   starters: Record<string, string>
   /** The organization running this contest turned pasting off. */
@@ -201,6 +207,8 @@ export async function buildDetail(
       .map((test): [string, string] => [test.input, test.expected]),
     hiddenTestCount: tests.filter((test) => !test.isSample).length,
     allowedLanguages: problem.allowedLanguages,
+    checker: problem.checker ?? null,
+    checkerNote: describeChecker(problem.checker),
     hasSolution:
       problem.editorial.length > 0 || referenceSolutions(problem).length > 0,
     // Starter code is part of the problem, not its answer.

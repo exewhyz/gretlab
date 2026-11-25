@@ -1,4 +1,5 @@
 import {
+  checkerSchema,
   groupName,
   isNetwork,
   LANGUAGES,
@@ -86,6 +87,8 @@ export const problemInputSchema = z.object({
   timeLimitMs: z.number().int().min(100).max(60_000).nullable(),
   memoryLimitMb: z.number().int().min(32).max(4096).nullable(),
   allowedLanguages: z.array(z.string()).nullable(),
+  /** How output is checked (packages/judge/src/checker.ts); null: exactly. */
+  checker: checkerSchema.nullable().default(null),
   published: z.boolean(),
   tests: z
     .array(

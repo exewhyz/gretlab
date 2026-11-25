@@ -20,7 +20,7 @@ import {
 import {
   isBrowserLanguage,
   nextPollMs,
-  outputsMatch,
+  compareOutputs,
   overallVerdict,
   perMinuteLimit,
   QUEUE_CHANNEL,
@@ -30,6 +30,7 @@ import {
   scoreCases,
   sourceFilesSchema,
   submissionLimits,
+  type Checker,
   type LanguageId,
   type Verdict,
 } from "@workspace/judge"
@@ -493,6 +494,7 @@ export async function createSubmission(
       files: files.data,
       timeLimitMs: limits.timeLimitMs,
       memoryLimitMb: limits.memoryLimitMb,
+      checker: problem.checker ?? null,
       outputs: input.browser.outputs,
       perMinute,
       maxPending: settings["submissions.max_pending"],
@@ -548,6 +550,8 @@ export async function createSubmission(
         runCases,
         timeLimitMs: limits.timeLimitMs,
         memoryLimitMb: limits.memoryLimitMb,
+        // How output is checked, as the problem says now: all the judge reads.
+        checker: problem?.checker ?? null,
         queueAt: new Date(Date.now() + headStart),
       })
       .returning({ id: submissions.id, status: submissions.status })
@@ -581,6 +585,7 @@ async function gradeFromBrowser(
     files: Submission["files"]
     timeLimitMs: number
     memoryLimitMb: number
+    checker: Checker | null
     outputs: BrowserOutput[]
     perMinute: number
     maxPending: number
@@ -614,7 +619,7 @@ async function gradeFromBrowser(
       ? ("TLE" as const)
       : out.stderr.trim()
         ? ("RE" as const)
-        : outputsMatch(out.stdout, c.expected)
+        : compareOutputs(out.stdout, c.expected, input.checker)
           ? ("AC" as const)
           : ("WA" as const)
   })
@@ -656,6 +661,7 @@ async function gradeFromBrowser(
         files: input.files,
         timeLimitMs: input.timeLimitMs,
         memoryLimitMb: input.memoryLimitMb,
+        checker: input.checker,
         status: "done",
         provisional: true,
         verdict: cases.length ? overallVerdict(results) : "AC",

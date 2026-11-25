@@ -26,6 +26,7 @@ import type {
   PolicyOverrides,
   SourceFile,
   Verdict,
+  Checker,
 } from "@workspace/judge"
 
 const id = () => uuid("id").primaryKey().defaultRandom()
@@ -218,6 +219,11 @@ export const problems = pgTable(
     /** Null means the language default applies. */
     timeLimitMs: integer("time_limit_ms"),
     memoryLimitMb: integer("memory_limit_mb"),
+    /**
+     * How output is checked (packages/judge/src/checker.ts): built-in comparers such as numbers
+     * within a tolerance or lines in any order. Null: exact, as always.
+     */
+    checker: jsonb("checker").$type<Checker>(),
     /** Null means every enabled language. */
     allowedLanguages: jsonb("allowed_languages").$type<string[] | null>(),
     published: boolean("published").notNull().default(true),
@@ -709,6 +715,8 @@ export const submissions = pgTable(
     stdin: text("stdin"),
     timeLimitMs: integer("time_limit_ms").notNull(),
     memoryLimitMb: integer("memory_limit_mb").notNull(),
+    /** The problem's checker when it was made, which is all the judge reads. Null: exact. */
+    checker: jsonb("checker").$type<Checker>(),
 
     status: submissionStatus("status").notNull().default("queued"),
     /**

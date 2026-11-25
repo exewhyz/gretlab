@@ -1,4 +1,4 @@
-import { LANGUAGES } from "@workspace/judge"
+import { checkerSchema, LANGUAGES } from "@workspace/judge"
 import { z } from "zod"
 
 import { problemInputSchema, RESERVED_SLUGS, slugify, type ProblemInput } from "./schemas"
@@ -56,6 +56,8 @@ export const importedProblemSchema = z.object({
   memoryLimitMb: z.number().int().min(32).max(4096).nullable().default(null),
   /** Languages students may use; null or missing for all. */
   languages: z.array(z.string()).nullable().default(null),
+  /** How output is checked (packages/judge/src/checker.ts); absent or null: exactly. */
+  checker: checkerSchema.nullable().default(null),
 })
 
 export type ImportedProblem = z.infer<typeof importedProblemSchema>
@@ -111,6 +113,7 @@ export function toProblemInput(
     hints: p.hints,
     tags: p.tags,
     timeLimitMs: p.timeLimitMs,
+    checker: p.checker,
     memoryLimitMb: p.memoryLimitMb,
     allowedLanguages: p.languages,
     published: options.published,

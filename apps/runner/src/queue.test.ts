@@ -280,6 +280,39 @@ test("groups: a group scores only when all its tests pass, and a failed group's 
   assert.equal(row?.maxScore, 75)
 })
 
+test("checkers: the submission's checker decides how output is compared", async () => {
+  await clear()
+  await db.delete(problems).where(sql.eq(problems.slug, "queue-test-checker"))
+  const [problem] = await db
+    .insert(problems)
+    .values({ slug: "queue-test-checker", title: "Checker", statement: [] })
+    .returning()
+  // The program echoes its input; the expected output differs from it within 1e-6.
+  await db.insert(testCases).values({
+    problemId: problem!.id,
+    input: "0.3333333\nB 2",
+    expected: "0.333333333\nb 2",
+  })
+  const judgeOne = async (checker: Record<string, unknown> | null) => {
+    await clear()
+    const job = await enqueue({ kind: "submit", problemId: problem!.id, checker })
+    const claimed = await claimNext(db, "r1", 4096)
+    await processSubmission(db, echoBackend().backend, claimed!, "r1")
+    const [row] = await db
+      .select({ verdict: submissions.verdict })
+      .from(submissions)
+      .where(sql.eq(submissions.id, job.id))
+    return row?.verdict
+  }
+  assert.equal(await judgeOne(null), "WA", "exact by default")
+  assert.equal(await judgeOne({ numbers: { absolute: 1e-6 } }), "WA", "case still counts")
+  assert.equal(
+    await judgeOne({ numbers: { absolute: 1e-6 }, ignoreCase: true }),
+    "AC"
+  )
+  await db.delete(problems).where(sql.eq(problems.slug, "queue-test-checker"))
+})
+
 test("a late result from a runner that lost its lease is ignored", async () => {
   await clear()
   const job = await enqueue()

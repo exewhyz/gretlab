@@ -70,6 +70,24 @@ solve, with the daily challenge, personal lists and a leaderboard around it.
 
 To bring many in at once, use **Import** with the [problem file format](/problem-format/).
 
+### Decide how output is checked
+
+By default a program's output must match the expected output exactly (trailing spaces and blank
+lines at the end never matter). For problems with more than one right way to print the answer,
+tick what's allowed under **How output is checked** in the problem editor; the options combine:
+
+- **Ignore spacing:** compared value by value, so spaces and line breaks between values don't
+  matter.
+- **Numbers within a tolerance:** numbers are read as numbers, whatever their spelling
+  (`2.5E+3` matches `2500`), and accepted within an absolute or relative tolerance. Words stay
+  exact; things that aren't decimal numbers (`0xFF`, `inf`) are words.
+- **Lines in any order:** the same lines, each as often as expected.
+- **Ignore case:** `YES` and `yes` count as the same. Only words; numbers are never affected.
+
+Students see one line on the problem saying what's accepted. Each submission keeps the rule it was
+judged by, so changing it later never changes results already given. Problems whose answers need
+real checking (any valid shortest path) aren't covered yet.
+
 ### Group tests into subtasks
 
 Give tests the same **Group** name (for example "Small inputs" and "Large inputs") to score them
