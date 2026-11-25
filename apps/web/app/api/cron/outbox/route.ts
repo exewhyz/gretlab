@@ -14,6 +14,7 @@ import { checkAlerts } from "@/features/monitoring/alerts"
 import { runJobs, tidyJobs } from "@/features/jobs/server"
 import { tidyRateLimits } from "@/lib/api/rate-limit"
 import { checkPlans } from "@/features/billing/server"
+import { applyDueRatings } from "@/features/contests/ratings"
 
 export const dynamic = "force-dynamic"
 /** The drain stops itself after 25 s; this is the host's hard limit around it. */
@@ -94,8 +95,14 @@ async function handle(request: NextRequest) {
     console.error("[billing]", error)
     return null
   })
+  // Rated contests that have ended: their rating changes, once each, oldest first.
+  const ratings = await applyDueRatings().catch((error) => {
+    console.error("[ratings]", error)
+    return null
+  })
   return NextResponse.json({
     ...done,
+    ratings,
     judges: { ...judges, scaling: scaling.action },
     alerts,
     jobs,

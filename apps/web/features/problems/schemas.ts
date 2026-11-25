@@ -158,6 +158,11 @@ export const contestInputSchema = z
       .default(null),
     /** Organization groups it's for. Ignored for platform contests. */
     audience: audienceSchema,
+    /**
+     * Changes ratings once it ends. Left out: platform contests are rated when made, an
+     * organization's aren't; editing keeps it as it was.
+     */
+    rated: z.boolean().optional(),
   })
   .refine((c) => c.problemIds.length + c.questions.length > 0, {
     message: "Add at least one problem or question",

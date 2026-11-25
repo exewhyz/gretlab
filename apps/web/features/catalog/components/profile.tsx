@@ -14,6 +14,7 @@ import { formatDate } from "@/lib/format"
 
 import { Difficulty } from "./difficulty"
 import { Heatmap } from "./heatmap"
+import { RatingChart } from "./rating-chart"
 import type { ApiResult } from "@/lib/api/types"
 import type { getProfile } from "@/features/catalog/server"
 import type { getLeaderboard } from "@/features/catalog/server"
@@ -39,7 +40,8 @@ export function ProfileView({ handle }: { handle: string }) {
   if (!data) return <Loading error={error} />
   const levels = ["easy", "medium", "hard"] as const
   return (
-    <div className="grid gap-4 text-body-sm text-body">
+    // Columns that may shrink: wide tables scroll in their own box, not the page.
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 text-body-sm text-body">
       <div>
         <h1 className="text-display-lg text-ink">{data.name}</h1>
         <p className="text-caption">
@@ -110,7 +112,7 @@ export function ProfileView({ handle }: { handle: string }) {
         <h2 className="mb-2 text-title-sm text-ink">Activity</h2>
         <Heatmap counts={data.heatmap} today={data.today} />
       </Card>
-      <div className="grid gap-4 min-[901px]:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 min-[901px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div>
           <h2 className="mb-2 text-title-sm text-ink">Recently solved</h2>
           {data.recent.length === 0 ? (
@@ -135,6 +137,7 @@ export function ProfileView({ handle }: { handle: string }) {
         </div>
         <div>
           <h2 className="mb-2 text-title-sm text-ink">Contests</h2>
+          <ContestRating rating={data.rating} />
           {data.contests.length === 0 ? (
             <p>No contests yet.</p>
           ) : (
@@ -158,6 +161,56 @@ export function ProfileView({ handle }: { handle: string }) {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+/** The contest rating: now, over time, and each rated contest's change. */
+function ContestRating({ rating }: { rating: Profile["rating"] }) {
+  if (rating.rating === null)
+    return (
+      <p className="mb-3 text-caption" data-testid="contest-rating">
+        Not rated yet: a rating comes with the first rated contest.
+      </p>
+    )
+  const oldestFirst = [...rating.contests].reverse()
+  return (
+    <div className="mb-4 grid gap-3" data-testid="contest-rating">
+      <div className="flex items-baseline gap-2">
+        <span className="text-display-md text-ink tabular-nums">
+          {rating.rating}
+        </span>
+        <span className="text-caption">
+          contest rating · {rating.contests.length} rated{" "}
+          {rating.contests.length === 1 ? "contest" : "contests"}
+        </span>
+      </div>
+      <RatingChart points={oldestFirst} />
+      <Table headers={["Contest", "Rank", "Change", "Rating"]}>
+        {rating.contests.map((c) => {
+          const change = c.after - c.before
+          return (
+            <tr key={c.slug}>
+              <td>
+                <Link href={`/contests/${c.slug}`} className="hover:underline">
+                  {c.title}
+                </Link>
+              </td>
+              <td className="tabular-nums">{c.rank}</td>
+              <td
+                className={cn(
+                  "tabular-nums",
+                  change > 0 && "text-success",
+                  change < 0 && "text-destructive"
+                )}
+              >
+                {change > 0 ? `+${change}` : change}
+              </td>
+              <td className="tabular-nums">{c.after}</td>
+            </tr>
+          )
+        })}
+      </Table>
     </div>
   )
 }

@@ -687,6 +687,13 @@
       "when": 1795606398283,
       "tag": "0097_checkers",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1795630887597,
+      "tag": "0098_ratings",
+      "breakpoints": true
     }
   ]
 }

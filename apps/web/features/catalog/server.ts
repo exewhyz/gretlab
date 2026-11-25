@@ -29,6 +29,7 @@ import {
 } from "@workspace/judge"
 
 import { byName } from "@/lib/by-name"
+import { ratingHistory } from "@/features/contests/rating-history"
 import { ApiError, isStaff, notFound } from "@/lib/api/route"
 import { cached, invalidate } from "@/lib/ttl-cache"
 import { isPublicProblem } from "@/features/problems/server"
@@ -585,6 +586,8 @@ export async function getProfile(handleOrId: string) {
     }),
     contests: contestRows,
     recent: recent.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 10),
+    /** Contest rating (null until a rated contest) and its history, newest first. */
+    rating: await ratingHistory(user.id),
   }
 }
 

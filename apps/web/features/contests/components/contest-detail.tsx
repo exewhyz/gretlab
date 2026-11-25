@@ -335,6 +335,8 @@ function RulesTab({ contest }: { contest: ContestView }) {
 
 function LeaderboardTab({ board }: { board: Leaderboard }) {
   const icpc = board.scoring === "icpc"
+  // Rated and applied: each contestant's rating change (features/contests/ratings.ts).
+  const rated = board.rows.some((row) => "rating" in row && row.rating)
   if (board.rows.length === 0) {
     return <p>Nobody has registered yet.</p>
   }
@@ -359,6 +361,7 @@ function LeaderboardTab({ board }: { board: Leaderboard }) {
           "Name",
           ...(icpc ? ["Solved", "Penalty"] : ["Score"]),
           ...board.problemLabels,
+          ...(rated ? ["Rating"] : []),
         ]}
       >
         {board.rows.map((row) => (
@@ -416,6 +419,7 @@ function LeaderboardTab({ board }: { board: Leaderboard }) {
                 )}
               </td>
             ))}
+            {rated && <RatingCell rating={"rating" in row ? row.rating : null} />}
           </tr>
         ))}
       </Table>
@@ -553,4 +557,27 @@ function ordinal(n: number) {
       ? "th"
       : (["th", "st", "nd", "rd"][n % 10] ?? "th")
   return `${n}${s}`
+}
+
+/** A contestant's rating after a rated contest, and how much it moved. */
+function RatingCell({
+  rating,
+}: {
+  rating: { before: number; after: number } | null
+}) {
+  if (!rating) return <td className="text-body">—</td>
+  const change = rating.after - rating.before
+  return (
+    <td className="whitespace-nowrap tabular-nums">
+      {rating.after}{" "}
+      <span
+        className={cn(
+          change > 0 && "text-success",
+          change < 0 && "text-destructive"
+        )}
+      >
+        ({change > 0 ? `+${change}` : change})
+      </span>
+    </td>
+  )
 }

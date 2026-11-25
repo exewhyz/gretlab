@@ -454,6 +454,13 @@ export const contests = pgTable("contests", {
     .default("server"),
   /** Submissions per student per minute; null: the platform's. Never above the platform's. */
   submissionsPerMinute: integer("submissions_per_minute"),
+  /**
+   * Changes contestants' ratings once it ends (packages/judge/src/rating.ts). New platform
+   * contests are rated unless unticked; an organization's only when it ticks it.
+   */
+  rated: boolean("rated").notNull().default(false),
+  /** When its rating changes were applied: once, from the final standings. */
+  ratedAt: timestamp("rated_at", { withTimezone: true }),
   createdAt: createdAt(),
   /** For save conflicts: a form saved over a newer version is refused. */
   updatedAt: updatedAt(),
@@ -623,6 +630,30 @@ export const contestParticipants = pgTable(
       .defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.contestId, table.userId] })]
+)
+
+/**
+ * Each rated contest's change to each contestant's rating (packages/judge/src/rating.ts). A
+ * person's rating is their latest `after`; none means they haven't been rated yet.
+ */
+export const ratingChanges = pgTable(
+  "rating_changes",
+  {
+    contestId: uuid("contest_id")
+      .notNull()
+      .references(() => contests.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    rank: integer("rank").notNull(),
+    before: integer("before").notNull(),
+    after: integer("after").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.contestId, table.userId] }),
+    index("rating_changes_user").on(table.userId, table.createdAt),
+  ]
 )
 
 /**

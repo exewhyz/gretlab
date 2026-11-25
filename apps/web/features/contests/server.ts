@@ -7,6 +7,7 @@ import {
   contests,
   questions,
   getDb,
+  ratingChanges,
   organizations,
   problems,
   sql,
@@ -411,16 +412,35 @@ export async function boardInputs(contest: Contest) {
 }
 
 async function computeBoard(contest: Contest, staff: boolean) {
-  const { config, participants, entries } = await boardInputs(contest)
+  const [{ config, participants, entries }, changes] = await Promise.all([
+    boardInputs(contest),
+    contest.ratedAt
+      ? getDb()
+          .select({
+            userId: ratingChanges.userId,
+            before: ratingChanges.before,
+            after: ratingChanges.after,
+          })
+          .from(ratingChanges)
+          .where(eq(ratingChanges.contestId, contest.id))
+      : [],
+  ])
   const phase = phaseOf(contest)
   // Revealed for everyone when the contest ends; staff can always see the real board.
   const frozen = phase !== "ended" && !staff
   const cutoff = freezeTime(config)
+  const change = new Map(changes.map((c) => [c.userId, c]))
   return {
     scoring: contest.scoring,
     problemLabels: config.problemLabels,
     frozen: frozen && cutoff !== null && new Date() >= cutoff,
-    rows: computeLeaderboard(config, participants, entries, frozen),
+    rated: contest.rated,
+    /** Ended and rated, but its rating changes aren't applied yet (features/contests/ratings.ts). */
+    awaitingRatings: contest.rated && !contest.ratedAt && phase === "ended",
+    rows: computeLeaderboard(config, participants, entries, frozen).map((row) => {
+      const c = change.get(row.user.id)
+      return { ...row, rating: c ? { before: c.before, after: c.after } : null }
+    }),
   }
 }
 
@@ -516,7 +536,13 @@ export async function saveContest(
     true
   )
   await checkWorkExecution(orgId, fields)
-  const values = { ...fields, orgId, audience: orgId ? fields.audience : [] }
+  const values = {
+    ...fields,
+    orgId,
+    audience: orgId ? fields.audience : [],
+    // Platform contests are rated unless unticked; an organization's only when ticked.
+    rated: fields.rated ?? (id ? undefined : orgId === null),
+  }
   if (id) refreshLeaderboard(id)
   return getDb().transaction(async (tx) => {
     const [contest] = id

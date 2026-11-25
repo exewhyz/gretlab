@@ -8,6 +8,14 @@ aren't listed.
 
 ## 25 November 2026
 
+### Contest ratings
+
+- **Rated contests change your contest rating.** Everyone starts at 1500; finishing above people
+  rated higher than you gains more. Your profile shows your rating, a chart over time and each
+  rated contest, and a finished contest's leaderboard shows everyone's change.
+- The platform's contests are rated; an organization's contest only when its **Rated** box is
+  ticked. Virtual attempts never change a rating.
+
 ### Checking for copied code
 
 - **Teachers can check their own assignments and contests for copied code** under Coding lab ›

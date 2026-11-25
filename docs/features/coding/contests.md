@@ -35,6 +35,22 @@ everyone on the platform or aimed at an organization's groups.
    contest uses.
 4. Publish. Contestants register on the contest page.
 
+## Ratings
+
+A **rated** contest changes its contestants' contest rating once it ends:
+
+- The platform's contests are rated unless the form's **Rated** box is unticked; an
+  organization's contest only when it's ticked, so a class test never moves anyone's rating by
+  accident.
+- Everyone starts at 1500. Each contestant is compared with every other on the final standings: a
+  better rank is a win, the same rank half a win, weighed against what their ratings expected.
+  Newcomers move twice as fast for their first five rated contests, so they settle quickly.
+- Only people who tried something are rated; registering alone doesn't count. Virtual attempts
+  never are.
+- Ratings are worked out once, from the final standings (the freeze lifted), in the order contests
+  ended. The finished board shows each contestant's change, and profiles (seen by signed-in
+  people) show the rating, a chart over time and each rated contest.
+
 ## Virtual contests
 
 After a contest ends, anyone who could have entered it can **take it virtually** from its page:

@@ -49,6 +49,8 @@ export interface ContestForm {
   freezeMinutes: string
   published: boolean
   registrationOpen: boolean
+  /** Changes contestants' ratings once it ends (features/contests/ratings.ts). */
+  rated: boolean
   problemIds: string[]
   /** Bank questions that mark themselves, with points as typed. */
   questions: { questionId: string; points: string }[]
@@ -61,7 +63,11 @@ export interface ContestForm {
 export type StoredContest = ApiResult<typeof orgContest>
 
 /** A new one; made from a class page, it's for that class. */
-export function blankForm(forClass: string | null): ContestForm {
+export function blankForm(
+  forClass: string | null,
+  /** The platform's contests are rated by default; an organization's aren't. */
+  rated = false
+): ContestForm {
   const start = new Date(Date.now() + 24 * 60 * 60_000)
   start.setMinutes(0, 0, 0)
   return {
@@ -75,6 +81,7 @@ export function blankForm(forClass: string | null): ContestForm {
     freezeMinutes: "0",
     published: false,
     registrationOpen: true,
+    rated,
     problemIds: [],
     questions: [],
     audience: forClass ? [[forClass]] : [],
@@ -117,7 +124,7 @@ export function ContestEditorPage({
           points: String(q.points),
         })),
       }
-    : blankForm(forClass)
+    : blankForm(forClass, owner.orgSlug === null)
   return (
     <ContestEditor
       key={id ?? "new"}
@@ -192,6 +199,7 @@ export function ContestEditor({
       description: form.description,
       scoring: form.scoring,
       registrationOpen: form.registrationOpen,
+      rated: form.rated,
       problemIds: form.problemIds,
       questions: form.questions.map((q) => ({
         questionId: q.questionId,
@@ -468,6 +476,21 @@ export function ContestEditor({
             onCheckedChange={(checked) => set("registrationOpen", checked)}
           />
           Registration open
+        </label>
+
+        <label className="inline-flex items-start gap-2 text-ink">
+          <Checkbox
+            checked={form.rated}
+            onCheckedChange={(checked) => set("rated", checked)}
+          />
+          <span>
+            Rated
+            <span className="block text-caption text-body">
+              Once it ends, the final standings change everyone&apos;s contest
+              rating (shown on profiles). Leave it off for practice or class
+              contests.
+            </span>
+          </span>
         </label>
 
         <ExecutionFields
