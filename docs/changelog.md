@@ -8,6 +8,14 @@ aren't listed.
 
 ## 25 November 2026
 
+### Feedback rounds
+
+- **Ask students about their teachers.** Under Manage › Feedback rounds, open a round such as
+  "Semester 1 faculty feedback" for some classes: each student rates every teacher of their
+  subjects on a few questions, and the bell reminds them until they have. Teachers see their own
+  results under My feedback; you see everyone's. Nobody sees who answered, and nothing shows until
+  at least three students have.
+
 ### Your own study plans
 
 - **Organizations make their own study plans** under Manage › Study plans: an ordered set of

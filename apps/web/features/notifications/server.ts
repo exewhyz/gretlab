@@ -316,6 +316,7 @@ export interface Reminder {
     | "library_due"
     | "training_due"
     | "event_soon"
+    | "feedback_due"
   title: string
   body: string
   href: string
@@ -437,6 +438,18 @@ async function remindersFor(user: User): Promise<Reminder[]> {
       body: `${t.org}: ${t.progress.done} of ${t.progress.total} done.`,
       href: t.href,
       at: `${t.needBy ?? t.validUntil}T00:00:00.000Z`,
+    })
+  }
+  // Feedback rounds open with teachers still to rate (loaded here, like training's).
+  const { feedbackToGive } = await import("@/features/feedback-rounds/server")
+  for (const f of await feedbackToGive(user).catch(() => [])) {
+    out.push({
+      id: `feedback:${f.roundId}`,
+      kind: "feedback_due",
+      title: `${f.title}: ${f.left} ${f.left === 1 ? "teacher" : "teachers"} to rate`,
+      body: `Closes ${f.closesAt.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}. Nobody sees who answered.`,
+      href: `/orgs/${f.slug}/feedback`,
+      at: f.closesAt.toISOString(),
     })
   }
   return out.sort((a, b) => a.at.localeCompare(b.at))

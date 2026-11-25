@@ -180,6 +180,12 @@ export const PERMISSIONS = {
       "See attendance registers and reports for the groups this applies to.",
     module: "Teaching",
   },
+  "feedback_rounds.manage": {
+    label: "Run feedback rounds",
+    description:
+      "Open feedback rounds where students rate the teachers of their subjects, and see every teacher's results (never who answered).",
+    module: "Teaching",
+  },
   "reports.view": {
     label: "See reports",
     description:

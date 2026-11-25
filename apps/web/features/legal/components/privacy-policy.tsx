@@ -87,6 +87,13 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               our payment provider; we never see or keep them, only the provider&apos;s
               reference for each payment.
             </Item>
+            <Item term="Feedback on teachers">
+              if your organization runs feedback rounds: your ratings and comments about the
+              teachers of your subjects. They&apos;re kept with your account only so you answer once
+              and are reminded until you have; teachers and the people running the round see
+              averages and comments, never who gave them, and nothing until at least three students
+              have answered.
+            </Item>
             <Item term="Parents and guardians">
               the link between a parent&apos;s account and their child&apos;s, made by the
               organization.

@@ -28,6 +28,7 @@ import {
   LinkIcon,
   ListChecksIcon,
   MegaphoneIcon,
+  ChatCircleTextIcon,
   ListNumbersIcon,
   PuzzlePieceIcon,
   QuestionIcon,
@@ -149,6 +150,9 @@ const ICONS: Record<string, Icon> = {
   classes: ChalkboardTeacherIcon,
   practice: PuzzlePieceIcon,
   "study-plans": ListNumbersIcon,
+  feedback: ChatCircleTextIcon,
+  "feedback-rounds": ChatCircleTextIcon,
+  "my-feedback": ChatCircleTextIcon,
   child: UserIcon,
   profile: IdentificationBadgeIcon,
   events: CalendarStarIcon,
@@ -207,6 +211,9 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
           : []),
         ...(shell.modules.includes("exams")
           ? [{ key: "results", label: "Results", href: `${base}/results/me` }]
+          : []),
+        ...(shell.modules.includes("subjects")
+          ? [{ key: "feedback", label: "Feedback", href: `${base}/feedback` }]
           : []),
       ],
     })

@@ -351,6 +351,25 @@ export const ORG_NAV: NavItem[] = [
   },
 
   {
+    // Feedback rounds (features/feedback-rounds): who teaches whom comes from Subjects.
+    key: "feedback-rounds",
+    label: "Feedback rounds",
+    path: "/feedback-rounds",
+    group: "Academics",
+    anyOf: ["feedback_rounds.manage"],
+    module: "subjects",
+    wholeOrg: true,
+  },
+  {
+    // A teacher's own results from feedback rounds.
+    key: "my-feedback",
+    label: "My feedback",
+    path: "/feedback-rounds/mine",
+    group: "Academics",
+    anyOf: ["teaching.log", "feedback_rounds.manage"],
+    module: "subjects",
+  },
+  {
     key: "holidays",
     label: "Holidays",
     path: "/holidays",

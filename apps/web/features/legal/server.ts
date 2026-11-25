@@ -9,7 +9,7 @@ import { DEFAULT_SITE, siteSettings } from "@/lib/seo/config"
  */
 
 /** When the privacy policy and terms were last changed (YYYY-MM-DD). */
-export const LEGAL_UPDATED = "2026-11-24"
+export const LEGAL_UPDATED = "2026-11-25"
 
 export interface LegalFacts {
   site: string

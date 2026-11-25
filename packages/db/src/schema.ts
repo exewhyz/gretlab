@@ -2146,6 +2146,62 @@ export const timetableSlots = pgTable(
   ]
 )
 
+/**
+ * A feedback round (features/feedback; rules packages/judge/src/feedback.ts): students of its
+ * classes rate each teacher of their subjects between two dates, on its questions.
+ */
+export const feedbackRounds = pgTable(
+  "feedback_rounds",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    /** The classes it's for; their students and the groups inside them answer. */
+    groupIds: jsonb("group_ids").$type<string[]>().notNull().default([]),
+    questions: jsonb("questions")
+      .$type<{ id: string; kind: "rating" | "comment"; text: string }[]>()
+      .notNull(),
+    opensAt: timestamp("opens_at", { withTimezone: true }).notNull(),
+    closesAt: timestamp("closes_at", { withTimezone: true }).notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [index("feedback_rounds_org").on(table.orgId, table.closesAt)]
+)
+
+/**
+ * One student's answers about one teacher of one subject in one class. Who answered is kept only so
+ * each answers once and the bell knows who hasn't; it's never shown, and results appear only from
+ * MIN_RESPONSES answers.
+ */
+export const feedbackResponses = pgTable(
+  "feedback_responses",
+  {
+    roundId: uuid("round_id")
+      .notNull()
+      .references(() => feedbackRounds.id, { onDelete: "cascade" }),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    classSubjectId: uuid("class_subject_id")
+      .notNull()
+      .references(() => classSubjects.id, { onDelete: "cascade" }),
+    /** The teacher as it was when answered (a subject can change teacher). */
+    teacherId: uuid("teacher_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    answers: jsonb("answers").$type<Record<string, number | string>>().notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.roundId, table.studentId, table.classSubjectId] }),
+    index("feedback_responses_teacher").on(table.roundId, table.teacherId),
+  ]
+)
+
 /** A student's rating of a class they were in. Teachers see averages and comments, not names. */
 export const sessionFeedback = pgTable(
   "session_feedback",
