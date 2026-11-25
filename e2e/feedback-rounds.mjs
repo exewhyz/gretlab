@@ -45,6 +45,10 @@ const psql = (q) =>
     .trim()
 
 const cleanup = () => {
+  psql(
+    `delete from platform_staff where user_id in (select id from users where email like 'fb-%@example.com')`
+  )
+  psql(`delete from platform_roles where name like 'Fb %'`)
   psql(`delete from organizations where slug like 'fb-%'`)
   psql(`delete from users where email like 'fb-%@example.com'`)
 }
@@ -61,6 +65,7 @@ const people = [
   "fb-s3",
   "fb-s4",
   "fb-out",
+  "fb-plat",
 ]
 for (const h of people)
   psql(
@@ -296,6 +301,129 @@ check(
   !JSON.stringify(all).includes(uid("fb-s1"))
 )
 
+// ---------- results by subject, every teacher and class together (for whoever runs rounds)
+const bySubject = (await owner(`${R}/results`)).json?.bySubject ?? []
+check(
+  "results by subject for whoever runs rounds",
+  bySubject.map((s) => s.subject).join() === "Maths,Science" &&
+    bySubject.find((s) => s.subject === "Maths")?.shown === true &&
+    bySubject.find((s) => s.subject === "Science")?.shown === false,
+  JSON.stringify(bySubject)
+)
+check(
+  "…not for a teacher",
+  (await as["fb-maths"](`${R}/results`)).json?.bySubject?.length === 0
+)
+
+// ---------- a round for chosen subjects
+check(
+  "a round's subjects must be this organization's",
+  (
+    await owner(`${O}/feedback-rounds`, {
+      body: {
+        ...roundBody,
+        title: "Fb Wrong",
+        subjectIds: ["00000000-0000-4000-8000-000000000000"],
+      },
+    })
+  ).json?.error?.code === "unknown_subject"
+)
+const onlyMaths = (
+  await owner(`${O}/feedback-rounds`, {
+    body: { ...roundBody, title: "Fb Maths only", subjectIds: [maths.id] },
+  })
+).json
+const mathsRound = (
+  await as["fb-s2"](`${O}/feedback-rounds/to-give`)
+).json?.find((r) => r.id === onlyMaths?.id)
+check(
+  "a round for chosen subjects rates only their teachers",
+  mathsRound?.targets?.map((t) => t.subject).join() === "Maths",
+  JSON.stringify(mathsRound)
+)
+await owner(`${O}/feedback-rounds/${onlyMaths.id}`, { method: "DELETE" })
+
+// ---------- the platform's feedback form, and platform staff running rounds
+const originalForm = (await admin("/admin/feedback-form")).json
+const fbRole = (
+  await admin("/admin/roles", {
+    body: {
+      name: "Fb Feedback staff",
+      permissions: ["platform.feedback.manage"],
+    },
+  })
+).json
+await admin("/admin/staff", {
+  method: "PUT",
+  body: { email: "fb-plat@example.com", role: fbRole?.id },
+})
+const plat = as["fb-plat"]
+const form = [
+  { id: "fair", kind: "rating", text: "Marks fairly" },
+  { id: "note", kind: "comment", text: "Say more" },
+]
+check(
+  "an organization's owner can't change the platform's form",
+  (
+    await owner("/admin/feedback-form", {
+      method: "PUT",
+      body: { questions: form },
+    })
+  ).status === 403
+)
+check(
+  "platform staff with 'Manage feedback forms' change it",
+  (
+    await plat("/admin/feedback-form", {
+      method: "PUT",
+      body: { questions: form },
+    })
+  ).status === 200
+)
+check(
+  "…a form without a rating is refused",
+  (
+    await plat("/admin/feedback-form", {
+      method: "PUT",
+      body: { questions: [form[1]] },
+    })
+  ).status === 400
+)
+check(
+  "a new round starts from the platform's form",
+  JSON.stringify((await owner(`${O}/feedback-rounds/form`)).json) ===
+    JSON.stringify(form)
+)
+check(
+  "…a round already opened keeps its own questions",
+  psql(
+    `select questions->0->>'id' from feedback_rounds where id = '${round.id}'`
+  ) === "clear"
+)
+const platRound = await plat(`${O}/feedback-rounds`, {
+  body: { ...roundBody, title: "Fb Platform round" },
+})
+check(
+  "those staff open rounds in any organization",
+  platRound.status === 200,
+  JSON.stringify(platRound.json)
+)
+check(
+  "…and read every teacher's results there",
+  (await plat(`${R}/results`)).json?.lines?.length === 2
+)
+check(
+  "…and it's logged",
+  Number(
+    psql(`select count(*) from audit_log where action = 'feedback_round.form'`)
+  ) >= 1
+)
+await plat(`${O}/feedback-rounds/${platRound.json?.id}`, { method: "DELETE" })
+await admin("/admin/feedback-form", {
+  method: "PUT",
+  body: { questions: originalForm },
+})
+
 // ---------- once answered, closed
 check(
   "once answered, the questions can't change",
@@ -418,6 +546,16 @@ const tabFor = async (email, viewport) => {
   check(
     "laptop: the results sheet shows each teacher",
     (await tab.getByTestId("round-results").getByText("Maths").count()) >= 1
+  )
+  await tab.getByRole("tab", { name: "By subject" }).click()
+  await tab
+    .getByTestId("subject-line")
+    .first()
+    .waitFor({ timeout: 10_000 })
+    .catch(() => {})
+  check(
+    "laptop: …and each subject",
+    (await tab.getByTestId("subject-line").count()) === 2
   )
   await tab.screenshot({ path: `${SHOTS}results-laptop.png` })
   await context.close()

@@ -86,7 +86,7 @@ export function StepUpDialog() {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && finish(false)}>
       {/* Above any sheet or dialog that's open: the action it holds up is usually in one. */}
-      <DialogContent className="z-[100] sm:max-w-md" data-testid="step-up">
+      <DialogContent className="z-100 sm:max-w-md" data-testid="step-up">
         <form onSubmit={submit} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>Confirm it&apos;s you</DialogTitle>

@@ -1,0 +1,1 @@
+ALTER TABLE "feedback_rounds" ADD COLUMN "subject_ids" jsonb DEFAULT '[]'::jsonb NOT NULL;

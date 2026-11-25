@@ -2161,6 +2161,8 @@ export const feedbackRounds = pgTable(
     description: text("description").notNull().default(""),
     /** The classes it's for; their students and the groups inside them answer. */
     groupIds: jsonb("group_ids").$type<string[]>().notNull().default([]),
+    /** Only these subjects' teachers are rated; empty: every subject. */
+    subjectIds: jsonb("subject_ids").$type<string[]>().notNull().default([]),
     questions: jsonb("questions")
       .$type<{ id: string; kind: "rating" | "comment"; text: string }[]>()
       .notNull(),

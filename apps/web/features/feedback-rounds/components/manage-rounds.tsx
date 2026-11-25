@@ -3,18 +3,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
-import {
-  DEFAULT_FEEDBACK_QUESTIONS,
-  MIN_RESPONSES,
-  type FeedbackQuestion,
-} from "@workspace/judge"
+import { MIN_RESPONSES, type FeedbackQuestion } from "@workspace/judge"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
+import { Checkbox } from "@workspace/ui/components/checkbox"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 
 import { ConfirmButton } from "@/components/confirm"
 import { DetailSheet } from "@/components/detail-sheet"
 import { EditorSheet } from "@/components/editor-sheet"
-import { Field, SelectInput, TextArea, TextInput } from "@/components/form"
+import { Field, TextArea, TextInput } from "@/components/form"
 import {
   Card,
   Loading,
@@ -27,6 +30,7 @@ import type {
   roundResults,
 } from "@/features/feedback-rounds/server"
 import { GroupChecklist } from "@/features/orgs/components/group-checklist"
+import { QuestionsEditor } from "./questions-editor"
 import type { listGroups } from "@/features/orgs/server"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
@@ -102,7 +106,14 @@ export function ManageFeedbackRounds({ slug }: { slug: string }) {
                     {PHASE[r.phase]}
                   </Badge>
                 </td>
-                <td className="text-body">{r.classes.join(", ")}</td>
+                <td className="text-body">
+                  {r.classes.join(", ")}
+                  <div className="text-caption">
+                    {r.subjects.length
+                      ? r.subjects.join(", ")
+                      : "Every subject"}
+                  </div>
+                </td>
                 <td className="text-body">
                   {formatDate(r.opensAt)} to {formatDate(r.closesAt)}
                 </td>
@@ -142,6 +153,7 @@ export function ManageFeedbackRounds({ slug }: { slug: string }) {
   )
 }
 
+/** A new round starts from the platform's feedback form (Dashboard › Feedback form). */
 function RoundEditor({
   slug,
   round,
@@ -149,6 +161,43 @@ function RoundEditor({
 }: {
   slug: string
   round: Round | null
+  onDone: () => void
+}) {
+  const form = useQuery({
+    queryKey: ["org", slug, "feedback-form"],
+    queryFn: () =>
+      api<FeedbackQuestion[]>(`/orgs/${slug}/feedback-rounds/form`),
+    enabled: round === null,
+  })
+  if (round)
+    return (
+      <RoundForm
+        slug={slug}
+        round={round}
+        start={round.questions as FeedbackQuestion[]}
+        onDone={onDone}
+      />
+    )
+  if (!form.data)
+    return (
+      <DetailSheet title="New feedback round" onClose={onDone}>
+        <Loading error={form.error} />
+      </DetailSheet>
+    )
+  return (
+    <RoundForm slug={slug} round={null} start={form.data} onDone={onDone} />
+  )
+}
+
+function RoundForm({
+  slug,
+  round,
+  start,
+  onDone,
+}: {
+  slug: string
+  round: Round | null
+  start: FeedbackQuestion[]
   onDone: () => void
 }) {
   const client = useQueryClient()
@@ -160,22 +209,30 @@ function RoundEditor({
   const [title, setTitle] = useState(round?.title ?? "")
   const [description, setDescription] = useState(round?.description ?? "")
   const [groupIds, setGroupIds] = useState<string[]>(round?.groupIds ?? [])
+  const [subjectIds, setSubjectIds] = useState<string[]>(
+    round?.subjectIds ?? []
+  )
+  const subjects = useQuery({
+    queryKey: ["org", slug, "feedback-rounds", "subjects"],
+    queryFn: () =>
+      api<{ id: string; name: string }[]>(
+        `/orgs/${slug}/feedback-rounds/subjects`
+      ),
+  })
   const [opensAt, setOpensAt] = useState(
     toLocalInput(round?.opensAt ?? new Date())
   )
   const [closesAt, setClosesAt] = useState(
     toLocalInput(round?.closesAt ?? week)
   )
-  const [questions, setQuestions] = useState<FeedbackQuestion[]>(
-    (round?.questions as FeedbackQuestion[] | undefined) ??
-      DEFAULT_FEEDBACK_QUESTIONS
-  )
+  const [questions, setQuestions] = useState<FeedbackQuestion[]>(start)
   const save = useMutation({
     mutationFn: () => {
       const body = {
         title,
         description,
         groupIds,
+        subjectIds,
         questions,
         opensAt: new Date(opensAt),
         closesAt: new Date(closesAt),
@@ -195,8 +252,6 @@ function RoundEditor({
     },
     meta: { quiet: true },
   })
-  const setQuestion = (i: number, patch: Partial<FeedbackQuestion>) =>
-    setQuestions(questions.map((q, j) => (j === i ? { ...q, ...patch } : q)))
   return (
     <EditorSheet
       title={round ? `Edit ${round.title}` : "New feedback round"}
@@ -256,58 +311,45 @@ function RoundEditor({
           <Loading error={groups.error} />
         )}
       </Field>
-      <div className="grid gap-2" data-testid="round-questions">
-        <div className="text-caption font-semibold text-ink">Questions</div>
-        {questions.map((q, i) => (
-          <div
-            key={q.id}
-            className="grid grid-cols-[1fr_auto_auto] items-center gap-2"
-          >
-            <TextInput
-              aria-label={`Question ${i + 1}`}
-              value={q.text}
-              onChange={(e) => setQuestion(i, { text: e.target.value })}
-            />
-            <SelectInput
-              aria-label={`Kind of question ${i + 1}`}
-              value={q.kind}
-              onChange={(e) =>
-                setQuestion(i, {
-                  kind: e.target.value as FeedbackQuestion["kind"],
-                })
-              }
+      <Field
+        label="Subjects"
+        help="Only these subjects' teachers are rated. None ticked: every subject."
+      >
+        {subjects.data ? (
+          subjects.data.length === 0 ? (
+            <p className="text-caption">
+              No subjects yet: add them under Subjects, with their teachers.
+            </p>
+          ) : (
+            <div
+              className="flex flex-wrap gap-x-4 gap-y-2"
+              data-testid="round-subjects"
             >
-              <option value="rating">Rating 1 to 5</option>
-              <option value="comment">Comment</option>
-            </SelectInput>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              disabled={questions.length === 1}
-              onClick={() => setQuestions(questions.filter((_, j) => j !== i))}
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
-        <div>
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            disabled={questions.length >= 20}
-            onClick={() =>
-              setQuestions([
-                ...questions,
-                { id: `q${Date.now().toString(36)}`, kind: "rating", text: "" },
-              ])
-            }
-          >
-            Add a question
-          </Button>
-        </div>
-      </div>
+              {subjects.data.map((x) => (
+                <label
+                  key={x.id}
+                  className="flex items-center gap-2 text-body-sm"
+                >
+                  <Checkbox
+                    checked={subjectIds.includes(x.id)}
+                    onCheckedChange={(on) =>
+                      setSubjectIds(
+                        on
+                          ? [...subjectIds, x.id]
+                          : subjectIds.filter((id) => id !== x.id)
+                      )
+                    }
+                  />
+                  {x.name}
+                </label>
+              ))}
+            </div>
+          )
+        ) : (
+          <Loading error={subjects.error} />
+        )}
+      </Field>
+      <QuestionsEditor questions={questions} onChange={setQuestions} />
     </EditorSheet>
   )
 }
@@ -333,7 +375,22 @@ function RoundResults({
       onClose={onClose}
       testId="round-results"
     >
-      {!data ? <Loading error={error} /> : <ResultLines lines={data.lines} />}
+      {!data ? (
+        <Loading error={error} />
+      ) : (
+        <Tabs defaultValue="teachers">
+          <TabsList>
+            <TabsTrigger value="teachers">By teacher</TabsTrigger>
+            <TabsTrigger value="subjects">By subject</TabsTrigger>
+          </TabsList>
+          <TabsContent value="teachers" className="mt-3">
+            <ResultLines lines={data.lines} />
+          </TabsContent>
+          <TabsContent value="subjects" className="mt-3">
+            <SubjectLines lines={data.bySubject} />
+          </TabsContent>
+        </Tabs>
+      )}
     </DetailSheet>
   )
 }
@@ -392,6 +449,57 @@ export function ResultLines({ lines }: { lines: Results["lines"] }) {
                 </ul>
               )}
             </>
+          )}
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+/** Each subject across all its teachers and classes (for whoever runs rounds). */
+function SubjectLines({ lines }: { lines: Results["bySubject"] }) {
+  if (lines.length === 0)
+    return <p className="text-body-sm text-body">No answers yet.</p>
+  return (
+    <div className="grid gap-3">
+      {lines.map((l) => (
+        <Card key={l.subjectId} data-testid="subject-line">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="text-ink">
+              {l.subject}{" "}
+              <span className="text-caption text-body">
+                ({l.teachers} {l.teachers === 1 ? "teacher" : "teachers"})
+              </span>
+            </div>
+            <div className="text-caption text-body">
+              {l.responses} {l.responses === 1 ? "answer" : "answers"}
+              {l.overall !== null && (
+                <>
+                  {" · "}
+                  <span className="font-semibold text-ink">
+                    {l.overall.toFixed(1)}
+                  </span>{" "}
+                  out of 5
+                </>
+              )}
+            </div>
+          </div>
+          {!l.shown ? (
+            <p className="mt-2 text-caption text-body">
+              Shown once {MIN_RESPONSES} students have answered, so nobody can
+              be picked out.
+            </p>
+          ) : (
+            <dl className="mt-2 grid gap-1 text-body-sm">
+              {l.questions.map((q) => (
+                <div key={q.id} className="flex justify-between gap-3">
+                  <dt className="text-body">{q.text}</dt>
+                  <dd className="text-ink tabular-nums">
+                    {q.average.toFixed(1)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           )}
         </Card>
       ))}

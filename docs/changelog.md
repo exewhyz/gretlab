@@ -13,8 +13,10 @@ aren't listed.
 - **Ask students about their teachers.** Under Manage › Feedback rounds, open a round such as
   "Semester 1 faculty feedback" for some classes: each student rates every teacher of their
   subjects on a few questions, and the bell reminds them until they have. Teachers see their own
-  results under My feedback; you see everyone's. Nobody sees who answered, and nothing shows until
-  at least three students have.
+  results under My feedback; you see everyone's, by teacher and by subject. A round can be limited
+  to some subjects. Nobody sees who answered, and nothing shows until at least three students have.
+- **The platform sets the feedback form** every new round starts with (Dashboard › Feedback form);
+  each round can still change its own questions.
 
 ### Your own study plans
 

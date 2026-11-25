@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { DEFAULT_FEEDBACK_QUESTIONS } from "./feedback.ts"
+
 /**
  * Everything an admin can switch or tune from the dashboard. To add a setting, add it
  * here with a default and a label; the dashboard and API pick it up automatically.
@@ -320,6 +322,23 @@ export const SETTINGS = {
     group: "Billing",
     schema: z.string().trim().max(15),
     default: "",
+  },
+  // The feedback form (Dashboard › Feedback form): kept off the Settings page.
+  "feedback.questions": {
+    label: "Feedback form",
+    description: "The questions every new feedback round starts with; each round may change its own.",
+    group: "Feedback",
+    schema: z
+      .array(
+        z.object({
+          id: z.string().trim().min(1).max(40).regex(/^[\w-]+$/),
+          kind: z.enum(["rating", "comment"]),
+          text: z.string().trim().min(1).max(200),
+        })
+      )
+      .min(1)
+      .max(20),
+    default: DEFAULT_FEEDBACK_QUESTIONS,
   },
   // Judge machines (Dashboard › Judges, "Judge settings"): kept off the Settings page.
   "judges.max_running": {

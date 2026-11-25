@@ -28,6 +28,9 @@ import {
   writeAudit,
   type OrgContext,
 } from "@/features/orgs/server"
+import { platformCan } from "@/features/platform/access"
+import { writePlatformAudit } from "@/features/platform/staff"
+import { getSettings, updateSettings } from "@/features/settings/server"
 import { ApiError, notFound } from "@/lib/api/route"
 
 /*
@@ -52,12 +55,26 @@ const question = z.object({
   text: z.string().trim().min(1, "Write the question").max(200),
 })
 
+/** A round's questions, or the platform's feedback form: 1 to 20, own ids, at least one rating. */
+export const questionsSchema = z
+  .array(question)
+  .min(1)
+  .max(20)
+  .refine((qs) => new Set(qs.map((q) => q.id)).size === qs.length, {
+    message: "Each question needs its own id",
+  })
+  .refine((qs) => qs.some((q) => q.kind === "rating"), {
+    message: "Ask at least one rating question",
+  })
+
 export const roundSchema = z
   .object({
     title: z.string().trim().min(1, "Give the round a title").max(120),
     description: z.string().trim().max(2000).default(""),
     groupIds: z.array(z.uuid()).min(1, "Choose the classes it's for").max(500),
-    questions: z.array(question).min(1).max(20),
+    /** Only these subjects' teachers; empty: every subject. */
+    subjectIds: z.array(z.uuid()).max(200).default([]),
+    questions: questionsSchema,
     opensAt: z.coerce.date(),
     closesAt: z.coerce.date(),
   })
@@ -65,25 +82,20 @@ export const roundSchema = z
     message: "It must close after it opens",
     path: ["closesAt"],
   })
-  .refine(
-    (r) => new Set(r.questions.map((q) => q.id)).size === r.questions.length,
-    {
-      message: "Each question needs its own id",
-      path: ["questions"],
-    }
-  )
-  .refine((r) => r.questions.some((q) => q.kind === "rating"), {
-    message: "Ask at least one rating question",
-    path: ["questions"],
-  })
 
 export const answerSchema = z.object({
   classSubjectId: z.uuid(),
   answers: z.record(z.string(), z.union([z.number(), z.string()])),
 })
 
-async function context(slug: string, user: User) {
-  const ctx = await orgContext(slug, user)
+/** The organization's context, and whether a platform role runs feedback rounds everywhere. */
+type FeedbackContext = OrgContext & { platformFeedback: boolean }
+
+async function context(slug: string, user: User): Promise<FeedbackContext> {
+  const [ctx, platformFeedback] = await Promise.all([
+    orgContext(slug, user),
+    platformCan(user, "platform.feedback.manage"),
+  ])
   // Who teaches whom comes from Subjects.
   if (!ctx.modules.has("subjects"))
     throw new ApiError(
@@ -91,17 +103,34 @@ async function context(slug: string, user: User) {
       "module_off",
       "Feedback rounds need the Subjects module."
     )
-  return ctx
+  return { ...ctx, platformFeedback }
 }
 
-const manages = (ctx: OrgContext) => canFor(ctx, "feedback_rounds.manage", [])
+/** Runs this organization's rounds: its own "Run feedback rounds", or "Manage feedback forms" on the platform. */
+const manages = (ctx: FeedbackContext) =>
+  ctx.platformFeedback || canFor(ctx, "feedback_rounds.manage", [])
 
-function needManage(ctx: OrgContext) {
+function needManage(ctx: FeedbackContext) {
   if (!manages(ctx))
     throw new ApiError(
       403,
       "forbidden",
       "Running feedback rounds isn't part of your role here."
+    )
+}
+
+/** Chosen subjects must be this organization's. */
+async function needSubjects(ctx: OrgContext, ids: string[]) {
+  if (ids.length === 0) return
+  const found = await getDb()
+    .select({ id: subjects.id })
+    .from(subjects)
+    .where(and(eq(subjects.orgId, ctx.org.id), inArray(subjects.id, ids)))
+  if (found.length !== new Set(ids).size)
+    throw new ApiError(
+      400,
+      "unknown_subject",
+      "A chosen subject isn't in this organization."
     )
 }
 
@@ -112,6 +141,50 @@ async function roundIn(ctx: OrgContext, id: string) {
     .where(and(eq(feedbackRounds.id, id), eq(feedbackRounds.orgId, ctx.org.id)))
   if (!round) throw notFound("Feedback round not found")
   return round
+}
+
+/* ---------- the platform's feedback form ---------- */
+
+/** The questions every new round starts with (Dashboard › Feedback form). */
+export async function feedbackForm() {
+  return (await getSettings())["feedback.questions"]
+}
+
+/** The form, for someone about to open a round in this organization. */
+export async function orgFeedbackForm(slug: string, user: User) {
+  const ctx = await context(slug, user)
+  needManage(ctx)
+  return feedbackForm()
+}
+
+/** Changes the platform's feedback form: rounds already open keep their own questions. */
+export async function saveFeedbackForm(
+  user: User,
+  questions: z.infer<typeof questionsSchema>
+) {
+  if (!(await platformCan(user, "platform.feedback.manage")))
+    throw new ApiError(
+      403,
+      "forbidden",
+      "Managing the feedback form isn't part of your role."
+    )
+  await updateSettings({ "feedback.questions": questions })
+  await writePlatformAudit(
+    user,
+    "feedback_round.form",
+    "Changed the feedback form new rounds start with"
+  )
+}
+
+/** The organization's subjects, for choosing which a round covers. */
+export async function subjectOptions(slug: string, user: User) {
+  const ctx = await context(slug, user)
+  needManage(ctx)
+  const rows = await getDb()
+    .select({ id: subjects.id, name: subjects.name })
+    .from(subjects)
+    .where(eq(subjects.orgId, ctx.org.id))
+  return rows.sort((a, b) => byName(a.name, b.name))
 }
 
 /* ---------- managing rounds ---------- */
@@ -138,11 +211,23 @@ export async function listRounds(slug: string, user: User) {
         .groupBy(feedbackResponses.roundId)
     : []
   const now = new Date()
+  const subjectNames = new Map(
+    (
+      await db
+        .select({ id: subjects.id, name: subjects.name })
+        .from(subjects)
+        .where(eq(subjects.orgId, ctx.org.id))
+    ).map((x) => [x.id, x.name])
+  )
   const name = (id: string) => ctx.groups.find((g) => g.id === id)?.name ?? "?"
   return rounds.map((r) => ({
     ...r,
     phase: roundPhase(r.opensAt, r.closesAt, now),
     classes: r.groupIds.map(name).sort(byName),
+    /** Empty: every subject. */
+    subjects: r.subjectIds
+      .map((id) => subjectNames.get(id) ?? "?")
+      .sort(byName),
     responses: Number(counts.find((c) => c.roundId === r.id)?.n ?? 0),
   }))
 }
@@ -160,6 +245,7 @@ export async function createRound(
       "unknown_group",
       "A chosen class isn't in this organization."
     )
+  await needSubjects(ctx, input.subjectIds)
   const [round] = await getDb()
     .insert(feedbackRounds)
     .values({ ...input, orgId: ctx.org.id, createdBy: user.id })
@@ -187,6 +273,7 @@ export async function updateRound(
       "unknown_group",
       "A chosen class isn't in this organization."
     )
+  await needSubjects(ctx, input.subjectIds)
   // Once anyone has answered, the questions stay as they were answered.
   const [answered] = await getDb()
     .select({ n: sql.count() })
@@ -232,7 +319,7 @@ export async function deleteRound(slug: string, user: User, id: string) {
  */
 async function targetsIn(
   ctx: OrgContext,
-  round: { groupIds: string[] },
+  round: { groupIds: string[]; subjectIds: string[] },
   userId: string
 ) {
   const seats = (
@@ -263,7 +350,11 @@ async function targetsIn(
     .where(
       and(
         eq(classSubjects.orgId, ctx.org.id),
-        inArray(classSubjects.groupId, groupIds)
+        inArray(classSubjects.groupId, groupIds),
+        // A round for chosen subjects rates only their teachers.
+        ...(round.subjectIds.length
+          ? [inArray(classSubjects.subjectId, round.subjectIds)]
+          : [])
       )
     )
     .orderBy(asc(subjects.name))
@@ -402,7 +493,48 @@ export async function roundResults(slug: string, user: User, roundId: string) {
       questions: round.questions,
     },
     lines: await linesOf(ctx, round.questions as FeedbackQuestion[], rows),
+    /** Each subject across all its teachers and classes: for whoever runs rounds. */
+    bySubject: everyone
+      ? await bySubjectOf(round.questions as FeedbackQuestion[], rows)
+      : [],
   }
+}
+
+/** One line per subject, every teacher and class together; hidden below MIN_RESPONSES too. */
+async function bySubjectOf(
+  questions: FeedbackQuestion[],
+  rows: { classSubjectId: string; teacherId: string; answers: Answers }[]
+) {
+  if (rows.length === 0) return []
+  const links = await getDb()
+    .select({
+      id: classSubjects.id,
+      subjectId: subjects.id,
+      subject: subjects.name,
+    })
+    .from(classSubjects)
+    .innerJoin(subjects, eq(classSubjects.subjectId, subjects.id))
+    .where(
+      inArray(classSubjects.id, [...new Set(rows.map((r) => r.classSubjectId))])
+    )
+  const subjectOf = new Map(links.map((l) => [l.id, l]))
+  const ids = [...new Set(links.map((l) => l.subjectId))]
+  return ids
+    .map((subjectId) => {
+      const mine = rows.filter(
+        (r) => subjectOf.get(r.classSubjectId)?.subjectId === subjectId
+      )
+      return {
+        subjectId,
+        subject: links.find((l) => l.subjectId === subjectId)?.subject ?? "",
+        teachers: new Set(mine.map((r) => r.teacherId)).size,
+        ...summarizeFeedback(
+          questions,
+          mine.map((r) => r.answers)
+        ),
+      }
+    })
+    .sort((a, b) => byName(a.subject, b.subject))
 }
 
 async function linesOf(

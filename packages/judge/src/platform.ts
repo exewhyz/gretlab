@@ -220,6 +220,12 @@ export const PLATFORM_PERMISSIONS = {
     module: "Platform",
     parent: "platform.settings.manage",
   },
+  "platform.feedback.manage": {
+    label: "Manage feedback forms",
+    description:
+      "Edit the feedback form every new feedback round starts with, and open, change and read the results of feedback rounds in any organization (never who answered).",
+    module: "Platform",
+  },
   "platform.emails.manage": {
     label: "Manage email templates",
     description:

@@ -28,6 +28,7 @@ import {
   CpuIcon,
   CurrencyDollarIcon,
   ReceiptIcon,
+  ChatCircleTextIcon,
   SquaresFourIcon,
   StackIcon,
   TrophyIcon,
@@ -181,6 +182,12 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         icon: ReceiptIcon,
         label: "Plans",
         needs: ["platform.billing.manage"],
+      },
+      {
+        href: "/admin/feedback-form",
+        icon: ChatCircleTextIcon,
+        label: "Feedback form",
+        needs: ["platform.feedback.manage"],
       },
       {
         href: "/admin/judges",
