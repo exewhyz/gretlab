@@ -7,6 +7,7 @@ import {
   overallVerdict,
   planExecution,
   type ExecutionPlan,
+  type GroupScore,
   type SourceFile,
   type Verdict,
 } from "@workspace/judge"
@@ -61,6 +62,8 @@ export interface TestOutcome {
   stderr: string | null
   wallMs?: number
   maxRssKb?: number | null
+  /** Its test group (subtask), if any. */
+  group?: string | null
 }
 
 export type TestRun =
@@ -74,6 +77,8 @@ export type TestRun =
       score: number | null
       maxScore: number | null
       outcomes: TestOutcome[]
+      /** Its test groups (subtasks): what each earned of what it's worth. */
+      groups: GroupScore[]
       submissionId: string | null
       /** Graded in the browser; the server judges it again once it can. */
       provisional: boolean
@@ -87,6 +92,7 @@ interface SubmissionResponse {
   maxScore: number | null
   compileOutput: string | null
   provisional?: boolean
+  groups?: GroupScore[]
   results: (TestOutcome & { number: number })[]
 }
 
@@ -623,6 +629,7 @@ function useSessionState({
       compileOutput: null,
       score: null,
       maxScore: null,
+      groups: [],
       outcomes,
       submissionId: null,
       provisional: false,
@@ -700,6 +707,7 @@ function presentResult(
     maxScore: result.maxScore,
     submissionId: kind === "submit" ? result.id : null,
     outcomes: result.results,
+    groups: result.groups ?? [],
     provisional: result.provisional ?? false,
   }
 }

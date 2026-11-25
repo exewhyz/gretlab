@@ -35,7 +35,11 @@ import { EditorSection, LanguageCode } from "./problem-editor-parts"
 import type { StaffProblemList } from "./problems"
 import { Card, Loading, PageTitle } from "./shell"
 
-type TestDraft = ProblemInput["tests"][number] & { key: number }
+type TestDraft = Omit<ProblemInput["tests"][number], "group"> & {
+  key: number
+  /** As typed; blank means no group. */
+  group: string
+}
 
 /** Where a new problem's statement starts. */
 const DESCRIPTION_TEMPLATE = `Describe the task: what the program reads, and what it prints.
@@ -68,7 +72,7 @@ const EMPTY: ProblemInput = {
   published: false,
   membersOnly: false,
   listed: true,
-  tests: [{ input: "", expected: "", isSample: true, points: 1 }],
+  tests: [{ input: "", expected: "", isSample: true, points: 1, group: null }],
 }
 
 /** A problem written inside an assignment, exam or contest form: ready, and not in the library. */
@@ -184,6 +188,7 @@ function ProblemEditor({
       expected: test.expected,
       isSample: test.isSample,
       points: test.points,
+      group: test.group ?? "",
       key,
     }))
   )
@@ -262,11 +267,12 @@ function ProblemEditor({
           .split(/\n\s*\n/)
           .map((hint) => hint.trim())
           .filter(Boolean),
-        tests: tests.map(({ input, expected, isSample, points }) => ({
+        tests: tests.map(({ input, expected, isSample, points, group }) => ({
           input,
           expected,
           isSample,
           points,
+          group: group || null,
         })),
       }
       return id
@@ -539,9 +545,11 @@ function ProblemEditor({
             </div>
             <div className="text-xs">
               Samples are public. All others stay on the server: students only
-              see whether they passed.
+              see whether they passed. Tests with the same group (a subtask)
+              earn their points only when all of them pass.
             </div>
           </div>
+          <TestGroupTotals tests={tests} />
           {tests.map((test, index) => (
             <div
               key={test.key}
@@ -568,6 +576,19 @@ function ProblemEditor({
                       updateTest(test.key, {
                         points: Number(event.target.value),
                       })
+                    }
+                  />
+                </label>
+                <label className="inline-flex items-center gap-1.5 font-normal">
+                  Group
+                  <TextInput
+                    className="w-32 py-0.5"
+                    maxLength={40}
+                    placeholder="None"
+                    aria-label={`Test ${index + 1} group`}
+                    value={test.group}
+                    onChange={(event) =>
+                      updateTest(test.key, { group: event.target.value })
                     }
                   />
                 </label>
@@ -621,6 +642,7 @@ function ProblemEditor({
                     expected: "",
                     isSample: false,
                     points: 1,
+                    group: "",
                   },
                 ])
                 setNextKey(nextKey + 1)
@@ -686,5 +708,32 @@ function ProblemEditor({
         </div>
       </Card>
     </>
+  )
+}
+
+/** Each group's tests and what it's worth, so the author sees the subtasks add up. */
+function TestGroupTotals({ tests }: { tests: TestDraft[] }) {
+  const groups = new Map<string, { tests: number; points: number }>()
+  for (const test of tests) {
+    const name = test.group.trim()
+    if (!name) continue
+    const g = groups.get(name) ?? { tests: 0, points: 0 }
+    g.tests += 1
+    g.points += Number(test.points) || 0
+    groups.set(name, g)
+  }
+  if (!groups.size) return null
+  return (
+    <ul className="flex flex-wrap gap-2 text-xs" data-testid="test-groups">
+      {[...groups].map(([name, g]) => (
+        <li
+          key={name}
+          className="rounded-md border border-hairline px-2 py-1 text-ink"
+        >
+          {name}: {g.tests} {g.tests === 1 ? "test" : "tests"}, {g.points}{" "}
+          {g.points === 1 ? "point" : "points"}
+        </li>
+      ))}
+    </ul>
   )
 }

@@ -11,6 +11,7 @@ import {
   QUEUE_CHANNEL,
   RUNNER_ONLINE_MS,
   isLanguageId,
+  scoreCases,
   type LanguageId,
 } from "@workspace/judge"
 
@@ -253,6 +254,7 @@ async function casesFor(db: Database, submission: Submission) {
       expected: item.expected,
       isSample: false,
       points: 0,
+      group: null,
       run: item,
     }))
   }
@@ -268,6 +270,7 @@ async function casesFor(db: Database, submission: Submission) {
     expected: row.expected,
     isSample: row.isSample,
     points: row.points,
+    group: row.group,
     run: null,
   }))
 }
@@ -276,6 +279,14 @@ function toStored(
   cases: Awaited<ReturnType<typeof casesFor>>,
   result: JudgeResult
 ): StoredCaseResult[] {
+  // A group's points count only when every test in it passed (packages/judge/src/test-groups.ts).
+  const scored = scoreCases(
+    result.cases.map((caseResult, index) => ({
+      group: cases[index]?.group ?? null,
+      points: cases[index]?.points ?? 0,
+      verdict: caseResult.verdict,
+    }))
+  )
   return result.cases.map((caseResult, index) => {
     const testCase = cases[index]
     return {
@@ -286,7 +297,10 @@ function toStored(
       stderr: caseResult.stderr,
       wallMs: caseResult.wallMs,
       maxRssKb: caseResult.maxRssKb,
-      points: caseResult.verdict === "AC" ? (testCase?.points ?? 0) : 0,
+      points: scored.points[index] ?? 0,
+      ...(testCase?.group
+        ? { group: testCase.group, worth: testCase.points }
+        : {}),
       ...(testCase?.run ?? {}),
     }
   })
@@ -326,7 +340,12 @@ export async function processSubmission(
       language,
       files: submission.files,
       entry: submission.entry,
-      cases: cases.map(({ id, input, expected }) => ({ id, input, expected })),
+      cases: cases.map(({ id, input, expected, group }) => ({
+        id,
+        input,
+        expected,
+        group,
+      })),
       timeLimitMs: submission.timeLimitMs,
       memoryLimitMb: submission.memoryLimitMb,
     })

@@ -9,6 +9,8 @@ export const VERDICTS = {
   RE: "Runtime error",
   CE: "Compilation error",
   SE: "System error",
+  /** A test not run because an earlier test in its group failed (packages/judge/src/test-groups.ts). */
+  SK: "Skipped",
 } as const
 
 export type Verdict = keyof typeof VERDICTS

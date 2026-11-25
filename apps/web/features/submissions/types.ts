@@ -1,5 +1,5 @@
 import type { LineComment } from "@/features/feedback/components/commented-code"
-import type { SourceFile, Verdict } from "@workspace/judge"
+import type { GroupScore, SourceFile, Verdict } from "@workspace/judge"
 
 import type { TestOutcome } from "@/features/lab/hooks/use-question-session"
 
@@ -31,6 +31,8 @@ export interface SubmissionDetail extends SubmissionRow {
   timeLimitMs: number
   memoryLimitMb: number
   results: (TestOutcome & { number: number })[]
+  /** Its test groups (subtasks): what each earned of what it's worth. */
+  groups?: GroupScore[]
   author: { name: string | null; email: string } | null
   problem: never
   contest: never

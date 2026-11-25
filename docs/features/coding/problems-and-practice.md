@@ -70,6 +70,20 @@ solve, with the daily challenge, personal lists and a leaderboard around it.
 
 To bring many in at once, use **Import** with the [problem file format](/problem-format/).
 
+### Group tests into subtasks
+
+Give tests the same **Group** name (for example "Small inputs" and "Large inputs") to score them
+together, the way programming olympiads give partial marks:
+
+- A group is worth the sum of its tests' points and earns them **only when every test in it
+  passes**. The editor shows each group's tests and total as you type.
+- Once a test in a group fails, the group's remaining tests are **Skipped**: they can't change its
+  score, so the judge doesn't spend time on them.
+- Tests without a group score one by one, as before; "Accepted" still means every test passed.
+- Students see each group's points and where it failed on their submission, never the hidden tests
+  themselves. IOI contests and assignments' partial credit use the groups' score.
+- Changing groups affects new submissions only; earlier ones keep the score they were given.
+
 ## Who sees what
 
 | Who | Sees |

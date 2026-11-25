@@ -8,6 +8,14 @@ aren't listed.
 
 ## 25 November 2026
 
+### Subtasks
+
+- **Group a problem's tests into subtasks.** Give tests the same group name in the problem editor
+  (or `"group"` in an import file): a group earns its points only when every test in it passes,
+  the way olympiads give partial marks. Once one test in a group fails, the rest of that group are
+  skipped, so wrong solutions take less of the judge's time. Students see each group's points and
+  where it failed. IOI contests and assignments' partial marks follow the groups.
+
 ### Time and memory limits per organization
 
 - **Set your own time and memory limits per language** under Manage › Settings › Time and memory,

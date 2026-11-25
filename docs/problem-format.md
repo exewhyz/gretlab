@@ -25,7 +25,7 @@ A bare list of problems, or a single problem object, is accepted too. At most 10
 | `statement` | yes | The problem in Markdown: GitHub tables, lists, code blocks. Raw HTML is shown as text. Images: upload them in the editor after importing. |
 | `input`, `output`, `constraints` | no | Input format, output format and constraints, shown under their own headings. A list of lines, or one string with a line each. Keep them out of the statement. |
 | `samples` | yes, one or more | `{ "input": "...", "output": "...", "points": 1 }`. Shown to students as examples, and graded. |
-| `tests` | no | Hidden tests, same shape. Students see only pass/fail and timing. |
+| `tests` | no | Hidden tests, same shape. Students see only pass/fail and timing. A sample or test may add `"group": "Subtask 1"`: tests sharing a group earn their points only when every one of them passes, and once one fails the rest of its group are skipped. Tests without a group score one by one. |
 | `code` | no | Per language (`python`, `javascript`, `c`, `cpp`, `java`): `{ "starter": "...", "solution": "..." }`. The starter is exactly what a student's editor opens with; the solution is shown under the editorial's rules and is never sent to students otherwise. |
 | `hints` | no | Up to 10, Markdown, revealed one at a time. |
 | `editorial` | no | Markdown, unlocked by the practice rules. |

@@ -9,7 +9,10 @@ import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { CommentedCode } from "@/features/feedback/components/commented-code"
-import { OutcomeBrowser } from "@/features/lab/components/test-results"
+import {
+  GroupScores,
+  OutcomeBrowser,
+} from "@/features/lab/components/test-results"
 import styles from "@/features/lab/components/workbench.module.scss"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
@@ -160,7 +163,8 @@ export function SubmissionDetailView({
           />
           <Stat label="Runtime" value={formatRuntime(submission.runtimeMs)} />
           <Stat label="Memory" value={formatMemory(submission.memoryKb)} />
-          {submission.contest?.scoring === "ioi" ? (
+          {submission.contest?.scoring === "ioi" ||
+          (submission.groups?.length ?? 0) > 0 ? (
             <Stat
               label="Score"
               value={`${submission.score ?? 0} / ${submission.maxScore ?? 0}`}
@@ -186,6 +190,7 @@ export function SubmissionDetailView({
       {results.length > 0 && (
         <div>
           <h3 className="mb-2 text-title-sm text-ink">Tests</h3>
+          <GroupScores groups={submission.groups ?? []} outcomes={results} />
           <OutcomeBrowser outcomes={results} />
         </div>
       )}

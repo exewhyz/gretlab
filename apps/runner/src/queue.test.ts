@@ -8,9 +8,11 @@ import { after, before, test } from "node:test"
 import {
   getDb,
   organizations,
+  problems,
   runners,
   sql,
   submissions,
+  testCases,
   users,
 } from "@workspace/db"
 
@@ -63,6 +65,7 @@ after(async () => {
   await db
     .delete(organizations)
     .where(sql.inArray(organizations.slug, ["pool-a", "pool-b", "pool-c"]))
+  await db.delete(problems).where(sql.eq(problems.slug, "queue-test-groups"))
   process.exit(0)
 })
 
@@ -192,6 +195,89 @@ test("infrastructure failure: retried, then a system error", async () => {
     .where(sql.eq(submissions.id, job.id))
   assert.equal(row?.status, "done")
   assert.equal(row?.verdict, "SE")
+})
+
+/** A sandbox whose program prints its input back, counting the tests it ran. */
+function echoBackend() {
+  const ran: string[] = []
+  const done = {
+    stderr: "",
+    exitCode: 0,
+    wallMs: 1,
+    maxRssKb: 1000,
+    timedOut: false,
+    outputLimitExceeded: false,
+    sandboxDied: null,
+  }
+  const backend = {
+    verify: async () => {},
+    sweepOrphans: async () => {},
+    create: async () => ({
+      upload: async () => {},
+      build: async () => ({ ...done, stdout: "" }),
+      freeze: async () => {},
+      run: async (_command: string[], options: { stdin?: string }) => {
+        ran.push(options.stdin ?? "")
+        return { ...done, stdout: options.stdin ?? "" }
+      },
+      destroy: async () => {},
+    }),
+  } satisfies SandboxBackend
+  return { backend, ran }
+}
+
+test("groups: a group scores only when all its tests pass, and a failed group's rest are skipped", async () => {
+  await clear()
+  await db.delete(problems).where(sql.eq(problems.slug, "queue-test-groups"))
+  const [problem] = await db
+    .insert(problems)
+    .values({ slug: "queue-test-groups", title: "Groups", statement: [] })
+    .returning()
+  // The program echoes its input, so a test passes when expected equals input.
+  const tests: [string, string, string | null, number][] = [
+    ["s", "s", null, 0], // a sample, ungrouped
+    ["a1", "a1", "A", 10], // group A passes
+    ["a2", "a2", "A", 10],
+    ["b1", "b1", "B", 15], // group B fails on its second test
+    ["b2", "nope", "B", 15],
+    ["b3", "b3", "B", 15], // skipped, not run
+    ["c", "nope", null, 5], // ungrouped, fails alone
+    ["d", "d", null, 5],
+  ]
+  await db.insert(testCases).values(
+    tests.map(([input, expected, group, points], position) => ({
+      problemId: problem!.id,
+      position,
+      input,
+      expected,
+      group,
+      points,
+    }))
+  )
+  const job = await enqueue({ kind: "submit", problemId: problem!.id })
+  const claimed = await claimNext(db, "r1", 4096)
+  assert.equal(claimed?.id, job.id)
+  const { backend, ran } = echoBackend()
+  await processSubmission(db, backend, claimed!, "r1")
+  const [row] = await db
+    .select()
+    .from(submissions)
+    .where(sql.eq(submissions.id, job.id))
+  assert.equal(row?.status, "done")
+  assert.equal(row?.verdict, "WA")
+  assert.deepEqual(ran, ["s", "a1", "a2", "b1", "b2", "c", "d"], "b3 isn't run")
+  assert.deepEqual(
+    row?.results?.map((r) => r.verdict),
+    ["AC", "AC", "AC", "AC", "WA", "SK", "WA", "AC"]
+  )
+  assert.deepEqual(
+    row?.results?.map((r) => r.points),
+    [0, 10, 10, 0, 0, 0, 0, 5]
+  )
+  assert.equal(row?.results?.[1]?.group, "A")
+  assert.equal(row?.results?.[0]?.group, undefined)
+  assert.equal(row?.score, 25)
+  assert.equal(row?.maxScore, 75)
 })
 
 test("a late result from a runner that lost its lease is ignored", async () => {

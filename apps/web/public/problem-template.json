@@ -14,8 +14,9 @@
         { "input": "-4\n10", "output": "6" }
       ],
       "tests": [
-        { "input": "0\n0", "output": "0" },
-        { "input": "1000000000\n1000000000", "output": "2000000000", "points": 2 }
+        { "input": "0\n0", "output": "0", "group": "Small numbers" },
+        { "input": "7\n-7", "output": "0", "group": "Small numbers" },
+        { "input": "1000000000\n1000000000", "output": "2000000000", "points": 2, "group": "Large numbers" }
       ],
       "code": {
         "python": {

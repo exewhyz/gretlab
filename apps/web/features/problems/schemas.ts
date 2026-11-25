@@ -1,4 +1,9 @@
-import { isNetwork, LANGUAGES } from "@workspace/judge"
+import {
+  groupName,
+  isNetwork,
+  LANGUAGES,
+  MAX_GROUP_NAME,
+} from "@workspace/judge"
 import { z } from "zod"
 
 import { expectedUpdatedAt } from "@/lib/api/version"
@@ -89,6 +94,15 @@ export const problemInputSchema = z.object({
         expected: z.string().min(1, "Every test needs an expected output"),
         isSample: z.boolean(),
         points: z.number().int().min(0).max(1000),
+        /** Its group (subtask): earns its tests' points only when all pass. Blank: none. */
+        group: z
+          .string()
+          .max(
+            MAX_GROUP_NAME,
+            `A group name can be at most ${MAX_GROUP_NAME} characters`
+          )
+          .nullish()
+          .transform((v) => groupName(v)),
       })
     )
     .min(1, "Add at least one test case")

@@ -25,7 +25,9 @@ import {
   perMinuteLimit,
   QUEUE_CHANNEL,
   queueHeadStartMs,
+  groupSummary,
   readOrgLimits,
+  scoreCases,
   sourceFilesSchema,
   submissionLimits,
   type LanguageId,
@@ -585,6 +587,7 @@ async function gradeFromBrowser(
       expected: testCases.expected,
       isSample: testCases.isSample,
       points: testCases.points,
+      group: testCases.group,
     })
     .from(testCases)
     .where(eq(testCases.problemId, input.problemId))
@@ -597,15 +600,27 @@ async function gradeFromBrowser(
       "The problem's tests changed. Reload the page and submit again."
     )
   }
-  const results = cases.map((c) => {
+  // The browser ran every test; groups score as on the server (packages/judge/src/test-groups.ts).
+  const verdicts = cases.map((c) => {
     const out = sent.get(c.id)!
-    const verdict: Verdict = out.timeout
-      ? "TLE"
+    return out.timeout
+      ? ("TLE" as const)
       : out.stderr.trim()
-        ? "RE"
+        ? ("RE" as const)
         : outputsMatch(out.stdout, c.expected)
-          ? "AC"
-          : "WA"
+          ? ("AC" as const)
+          : ("WA" as const)
+  })
+  const scored = scoreCases(
+    cases.map((c, i) => ({
+      group: c.group,
+      points: c.points,
+      verdict: verdicts[i]!,
+    }))
+  )
+  const results = cases.map((c, i) => {
+    const out = sent.get(c.id)!
+    const verdict: Verdict = verdicts[i]!
     return {
       testCaseId: c.id,
       isSample: c.isSample,
@@ -614,7 +629,8 @@ async function gradeFromBrowser(
       stderr: out.stderr.slice(0, OUTPUT_PREVIEW_CHARS),
       wallMs: Math.max(0, Math.round(out.wallMs ?? 0)),
       maxRssKb: null,
-      points: verdict === "AC" ? c.points : 0,
+      points: scored.points[i] ?? 0,
+      ...(c.group ? { group: c.group, worth: c.points } : {}),
     }
   })
   const now = new Date()
@@ -781,6 +797,8 @@ export async function presentSubmission(submission: Submission, viewer: User) {
     contest: contest ?? null,
     author: author ?? null,
     files,
+    /** Its test groups (subtasks), each with what it earned of what it's worth. */
+    groups: groupSummary(submission.results ?? []),
     results: (submission.results ?? []).map((item, index) => {
       const fromRun = item.testCaseId === null
       const revealed = staff || item.isSample || fromRun
@@ -796,6 +814,7 @@ export async function presentSubmission(submission: Submission, viewer: User) {
               : `Hidden test ${++hiddenNo}`),
         isSample: item.isSample,
         hidden: !fromRun && !item.isSample,
+        group: item.group ?? null,
         verdict: item.verdict,
         wallMs: item.wallMs,
         maxRssKb: item.maxRssKb,

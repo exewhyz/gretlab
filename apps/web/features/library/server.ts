@@ -330,6 +330,7 @@ export async function copyToLibrary(
           expected: t.expected,
           isSample: t.isSample,
           points: t.points,
+          group: t.group,
         })),
       },
       orgId

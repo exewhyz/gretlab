@@ -3,6 +3,7 @@ import {
   LIMITS,
   outputsMatch,
   overallVerdict,
+  skipsCase,
   type LanguageDefinition,
   type LanguageId,
   type SourceFile,
@@ -24,6 +25,8 @@ export interface JudgeCase {
   input: string
   /** Null for a plain run with custom input, which nothing is compared against. */
   expected: string | null
+  /** Its test group: once one of a group's tests fails, the rest are skipped, not run. */
+  group?: string | null
 }
 
 export interface JudgeRequest {
@@ -101,7 +104,27 @@ export async function judge(
 
     const cases: CaseResult[] = []
     const deadline = Date.now() + JOB_DEADLINE_MS
-    for (const testCase of request.cases) {
+    const groups = request.cases.map((c) => ({ group: c.group ?? null }))
+    for (const [index, testCase] of request.cases.entries()) {
+      // A group that has already failed can't score: don't spend the time running the rest.
+      if (
+        skipsCase(
+          groups,
+          index,
+          cases.map((c) => c.verdict)
+        )
+      ) {
+        cases.push({
+          caseId: testCase.id,
+          verdict: "SK",
+          stdout: "",
+          stderr: "",
+          wallMs: 0,
+          maxRssKb: null,
+          exitCode: null,
+        })
+        continue
+      }
       if (Date.now() > deadline) {
         cases.push({
           caseId: testCase.id,

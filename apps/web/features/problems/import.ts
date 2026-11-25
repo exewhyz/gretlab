@@ -21,6 +21,8 @@ const caseSchema = z.object({
   input: text(1024 * 1024).default(""),
   output: text(1024 * 1024),
   points: z.number().int().min(0).max(1000).optional(),
+  /** Its group (subtask): earns its tests' points only when every test in it passes. */
+  group: z.string().trim().max(40).optional(),
 })
 
 export const importedProblemSchema = z.object({
@@ -119,6 +121,7 @@ export function toProblemInput(
       expected: c.output.replace(/\n+$/, ""),
       isSample: c.isSample,
       points: c.points ?? 1,
+      group: c.group ?? null,
     })),
   })
 }

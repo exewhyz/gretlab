@@ -262,6 +262,11 @@ export const testCases = pgTable(
     isSample: boolean("is_sample").notNull().default(false),
     /** Points toward an IOI-scored contest. */
     points: integer("points").notNull().default(1),
+    /**
+     * Its group (subtask), or null: a group earns its tests' points only when all of them pass,
+     * and its later tests are skipped once one fails (packages/judge/src/test-groups.ts).
+     */
+    group: text("group_name"),
   },
   (table) => [index("test_cases_problem").on(table.problemId, table.position)]
 )
@@ -624,6 +629,10 @@ export interface StoredCaseResult {
   wallMs: number
   maxRssKb: number | null
   points: number
+  /** Its test group (subtask), if any; its points count only when the whole group passed. */
+  group?: string | null
+  /** A grouped test's full points, whatever it earned, so the group's worth can be shown. */
+  worth?: number
   /** Set for Run cases, which aren't in test_cases. */
   label?: string
   input?: string

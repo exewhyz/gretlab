@@ -72,11 +72,14 @@ export function AdminSubmissions() {
           onChange={(event) => setVerdict(event.target.value)}
         >
           <option value="">Any result</option>
-          {Object.entries(VERDICTS).map(([code, label]) => (
-            <option key={code} value={code}>
-              {label}
-            </option>
-          ))}
+          {/* Skipped is only ever one test's result, never a submission's. */}
+          {Object.entries(VERDICTS)
+            .filter(([code]) => code !== "SK")
+            .map(([code, label]) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
         </SelectInput>
       </div>
       {!rows ? (
