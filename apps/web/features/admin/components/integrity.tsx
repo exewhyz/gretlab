@@ -1,7 +1,6 @@
 "use client"
 
 import { useMutation, useQuery } from "@tanstack/react-query"
-import Link from "next/link"
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
@@ -11,12 +10,16 @@ import { Field, SelectInput } from "@/components/form"
 import { api } from "@/lib/api/client"
 
 import type { StaffProblemList } from "./problems"
-import { Card, Loading, PageTitle, Table } from "./shell"
+import { Card, Loading, PageTitle } from "./shell"
 import type { ApiResult } from "@/lib/api/types"
-import type { findSimilarSubmissions } from "@/features/catalog/server"
 import type { listOwnedContests } from "@/features/contests/server"
+import {
+  SimilarPairs,
+  type PairDetail,
+} from "@/features/plagiarism/components/similar-pairs"
+import type { platformSimilarity } from "@/features/plagiarism/server"
 
-type Result = ApiResult<typeof findSimilarSubmissions>
+type Result = Exclude<ApiResult<typeof platformSimilarity>, { pair: unknown }>
 
 export function AdminIntegrity() {
   const problems = useQuery({
@@ -107,47 +110,19 @@ export function AdminIntegrity() {
         </p>
       )}
       {check.data && (
-        <>
-          <p className="mb-2 text-body-sm text-body">
-            Compared the latest accepted code of {check.data.compared} students.{" "}
-            {check.data.pairs.length === 0
-              ? "No pairs at this level of similarity."
-              : `${check.data.pairs.length} pair(s) to review.`}
-          </p>
-          {check.data.pairs.length > 0 && (
-            <Table
-              headers={[
-                "Similarity",
-                "First student",
-                "Second student",
-                "Language",
-              ]}
-            >
-              {check.data.pairs.map((pair) => (
-                <tr key={`${pair.a.submissionId}-${pair.b.submissionId}`}>
-                  <td className="font-semibold tabular-nums">{pair.score}%</td>
-                  <td>
-                    <Link
-                      className="underline-offset-2 hover:underline"
-                      href={`/submissions/${pair.a.submissionId}`}
-                    >
-                      {pair.a.email}
-                    </Link>
-                  </td>
-                  <td>
-                    <Link
-                      className="underline-offset-2 hover:underline"
-                      href={`/submissions/${pair.b.submissionId}`}
-                    >
-                      {pair.b.email}
-                    </Link>
-                  </td>
-                  <td>{pair.language}</td>
-                </tr>
-              ))}
-            </Table>
-          )}
-        </>
+        <SimilarPairs
+          result={check.data}
+          compare={(a, b) =>
+            api<{ pair: PairDetail }>("/admin/similarity", {
+              body: {
+                problemSlug,
+                contestSlug: contestSlug || null,
+                threshold: threshold / 100,
+                compare: { a, b },
+              },
+            })
+          }
+        />
       )}
     </>
   )

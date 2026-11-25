@@ -80,6 +80,19 @@ problems (reopening them after feedback is resubmission).
 - A save made while someone else edited the same assignment is refused, with **Load their version** or
   **Keep mine**.
 
+## Checking for copied code
+
+**Coding lab › Plagiarism check** (anyone who can see grades, or who runs a contest) compares
+students' latest accepted code for one problem of an assignment or contest:
+
+- Only the students you grade are compared, in the same language. Renaming variables,
+  reformatting or adding comments doesn't hide a copy; a different approach isn't flagged.
+- Each pair shows how similar it is. **Compare** opens both programs side by side with the
+  stretches they share coloured and numbered on both sides.
+- Every check and comparison is recorded in the activity log.
+- A match is a reason to look closer and talk to the students, never proof: short or standard
+  solutions can look alike.
+
 ## Related
 
 - [Quizzes and the question bank](/features/coding/quizzes/)

@@ -23,7 +23,6 @@ import {
 import {
   dayIn,
   earnedBadges,
-  findSimilarPairs,
   pickDaily,
   markQuestion,
   streaks,
@@ -1004,78 +1003,6 @@ export async function listStudyPlans() {
 }
 
 /* ---------- integrity ---------- */
-
-/**
- * Pairs of students whose accepted code for the same problem is unusually similar. Each
- * student's latest accepted submission is compared. A lead for a teacher, not a verdict.
- */
-export async function findSimilarSubmissions(input: {
-  problemSlug: string
-  contestSlug: string | null
-  threshold: number
-}) {
-  const db = getDb()
-  const problemId = await problemIdOf(input.problemSlug)
-  let contestId: string | null = null
-  if (input.contestSlug) {
-    const [contest] = await db
-      .select({ id: contests.id })
-      .from(contests)
-      .where(eq(contests.slug, input.contestSlug))
-    if (!contest) throw notFound("Contest not found")
-    contestId = contest.id
-  }
-  const rows = await db
-    .selectDistinctOn([submissions.userId], {
-      id: submissions.id,
-      userId: submissions.userId,
-      email: users.email,
-      language: submissions.language,
-      files: submissions.files,
-      createdAt: submissions.createdAt,
-    })
-    .from(submissions)
-    .innerJoin(users, eq(submissions.userId, users.id))
-    .where(
-      and(
-        eq(submissions.problemId, problemId),
-        eq(submissions.kind, "submit"),
-        eq(submissions.verdict, "AC"),
-        contestId ? eq(submissions.contestId, contestId) : undefined
-      )
-    )
-    .orderBy(submissions.userId, desc(submissions.createdAt))
-  const byId = new Map(rows.map((row) => [row.id, row]))
-  // Only the same language is comparable.
-  const pairs = ["python", "javascript", "c", "cpp", "java"].flatMap(
-    (language) =>
-      findSimilarPairs(
-        rows
-          .filter((row) => row.language === language)
-          .map((row) => ({
-            key: row.id,
-            code: row.files.map((file) => file.content).join("\n"),
-          })),
-        input.threshold
-      )
-  )
-  return {
-    compared: rows.length,
-    pairs: pairs
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 200)
-      .map((pair) => {
-        const a = byId.get(pair.a)
-        const b = byId.get(pair.b)
-        return {
-          score: Math.round(pair.score * 100),
-          language: a?.language ?? "",
-          a: { submissionId: pair.a, email: a?.email ?? "", at: a?.createdAt },
-          b: { submissionId: pair.b, email: b?.email ?? "", at: b?.createdAt },
-        }
-      }),
-  }
-}
 
 /* ---------- handles ---------- */
 

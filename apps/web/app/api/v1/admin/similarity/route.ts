@@ -1,16 +1,11 @@
-import { z } from "zod"
-
 import { route } from "@/lib/api/route"
-import { findSimilarSubmissions } from "@/features/catalog/server"
+import {
+  platformRequest,
+  platformSimilarity,
+} from "@/features/plagiarism/server"
 
+/** Similar accepted code for a problem (optionally in one contest), or one pair side by side. */
 export const POST = route(
-  {
-    access: "platform.submissions.view",
-    body: z.object({
-      problemSlug: z.string(),
-      contestSlug: z.string().nullable(),
-      threshold: z.number().min(0.3).max(1),
-    }),
-  },
-  ({ body }) => findSimilarSubmissions(body)
+  { access: "platform.submissions.view", body: platformRequest },
+  ({ body }) => platformSimilarity(body)
 )

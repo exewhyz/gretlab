@@ -8,6 +8,14 @@ aren't listed.
 
 ## 25 November 2026
 
+### Checking for copied code
+
+- **Teachers can check their own assignments and contests for copied code** under Coding lab ›
+  Plagiarism check, comparing only the students they grade.
+- **Compare a pair side by side.** Both programs open next to each other with the stretches they
+  share coloured and numbered, so you can see what matched before talking to the students. The
+  platform's check has it too.
+
 ### How output is checked
 
 - **Problems can accept more than one way of printing the answer.** In the problem editor, under

@@ -268,6 +268,15 @@ export const ORG_NAV: NavItem[] = [
     module: "coding",
   },
   {
+    // Similar code among one assignment's or contest's students (features/plagiarism).
+    key: "plagiarism",
+    label: "Plagiarism check",
+    path: "/plagiarism",
+    group: "Coding lab",
+    anyOf: ["gradebook.view", "contests.manage"],
+    module: "coding",
+  },
+  {
     // The organization's own study plans (features/catalog/org-plans.ts): managed across it.
     key: "study-plans",
     label: "Study plans",
