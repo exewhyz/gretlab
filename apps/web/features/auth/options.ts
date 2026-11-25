@@ -1,3 +1,4 @@
+import { ssoRequiredFor } from "@/features/sso/server"
 import { authTokens, getDb, sql, users } from "@workspace/db"
 import { emailDomainAllowed } from "@workspace/judge"
 import type { NextAuthOptions } from "next-auth"
@@ -102,6 +103,9 @@ export const authOptions: NextAuthOptions = {
         >
         const address = addressFrom((name) => headers[name])
         if (await pastLimit("sign_in", address)) throw new Error("busy")
+        // A college that requires its single sign-on: no passwords for its addresses.
+        if (await ssoRequiredFor(credentials?.email ?? "", "password"))
+          throw new Error("use_sso")
         const result = await checkPassword(
           credentials?.email ?? "",
           credentials?.password ?? ""
@@ -139,6 +143,9 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === "google") {
         const google = profile as GoogleProfile | undefined
         if (!google?.email_verified) return false
+        // A college that requires its own sign-in (unless that's Google itself).
+        if (user.email && (await ssoRequiredFor(user.email, "google")))
+          return "/sign-in?error=use_sso"
         return user.email ? admit(user.email, user.name, true) : false
       }
       // The password was checked in authorize, against a confirmed account.

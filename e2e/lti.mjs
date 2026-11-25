@@ -78,6 +78,8 @@ const cleanup = () => {
 }
 cleanup()
 psql(`delete from lti_keys`)
+// Its own platform admin, so it doesn't depend on another suite having made one.
+psql(`insert into users(email,name,role) values ('admin@example.com','Admin','admin') on conflict (email) do nothing`)
 for (const h of ["lti-admin"]) psql(`insert into users(email,name,role,handle) values ('${h}@example.com','${h}','student','${h}')`)
 const cookieFor = async (email) => `next-auth.session-token=${await encode({ token: { email }, secret: SECRET })}`
 const client = (cookie) => async (path, { method, body } = {}) => {

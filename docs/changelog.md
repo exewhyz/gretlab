@@ -8,6 +8,15 @@ aren't listed.
 
 ## 26 November 2026
 
+### Sign in with your college
+
+- **Colleges can sign their students and staff in with their own accounts** (Microsoft 365,
+  Google Workspace, Okta or any OpenID Connect provider): **Sign in with your college** on the
+  sign-in page, and they become members as they do. Two-factor still applies. A college can
+  require it for its email domains. GretLab confirms which domains a college owns first.
+- Fixed: people who had reset their password were signed out again every time they opened GretLab
+  from their LMS.
+
 ### Solution posts
 
 - **Share how you solved a problem.** On a library problem you've solved, the new **Solutions**

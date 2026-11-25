@@ -94,6 +94,11 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               averages and comments, never who gave them, and nothing until at least three students
               have answered.
             </Item>
+            <Item term="College sign-in">
+              if your college signs you in to GretLab: the identifier its sign-in service gives you,
+              linked to your account so you&apos;re recognised next time, and your name and email
+              address from it. Your college&apos;s password never reaches GretLab.
+            </Item>
             <Item term="Solution posts">
               if you share a solution to a library problem: your write-up, the code from the accepted
               submission you chose, your votes, comments and reports. People who&apos;ve solved the

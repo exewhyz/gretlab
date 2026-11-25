@@ -22,6 +22,7 @@ import { KindPicker } from "@/features/orgs/components/kind-picker"
 
 import { Card, Loading, PageTitle, Pager, Table } from "./shell"
 import { OrgFeaturesDialog } from "./org-features"
+import { SsoDomainsDialog } from "@/features/sso/components/sso-domains-dialog"
 import { useViewer } from "@/features/account/use-viewer"
 import { grantsPlatformPermission } from "@workspace/judge"
 import { orgPages } from "@/lib/paths"
@@ -56,6 +57,7 @@ export function AdminOrganizations() {
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
   const [featuresFor, setFeaturesFor] = useState<string | null>(null)
+  const [ssoFor, setSsoFor] = useState<string | null>(null)
   const { data: viewer } = useViewer()
   const held = viewer?.user?.platform.permissions ?? []
   const decidesModules =
@@ -220,6 +222,15 @@ export function AdminOrganizations() {
                     Modules
                   </Button>
                 )}
+                {grantsPlatformPermission(held, "platform.orgs.manage") && (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => setSsoFor(org.id)}
+                  >
+                    SSO domains
+                  </Button>
+                )}
                 {org.active ? (
                   <ConfirmButton
                     size="xs"
@@ -262,6 +273,13 @@ export function AdminOrganizations() {
         <p className="mt-3 text-body-sm text-body">
           {search ? "No organization matches." : "No organizations yet."}
         </p>
+      )}
+      {ssoFor && (
+        <SsoDomainsDialog
+          orgId={ssoFor}
+          open
+          onOpenChange={(open) => !open && setSsoFor(null)}
+        />
       )}
       {featuresFor && (
         <OrgFeaturesDialog

@@ -1,6 +1,6 @@
 "use client"
 
-import { EyeIcon, EyeSlashIcon, GoogleLogoIcon } from "@phosphor-icons/react"
+import { BuildingsIcon, EyeIcon, EyeSlashIcon, GoogleLogoIcon } from "@phosphor-icons/react"
 import { passwordProblem, PASSWORD } from "@workspace/judge"
 import Link from "next/link"
 import { signIn } from "next-auth/react"
@@ -34,6 +34,44 @@ export function GoogleButton({ next, label = "Continue with Google" }: { next: s
       <GoogleLogoIcon weight="bold" aria-hidden />
       {label}
     </Button>
+  )
+}
+
+/**
+ * Sign in with your college's single sign-on (features/sso): its email address finds the
+ * college, and the browser goes to the college's identity provider.
+ */
+export function CollegeButton({ next }: { next: string }) {
+  const [open, setOpen] = useState(false)
+  const [email, setEmail] = useState("")
+  if (!open)
+    return (
+      <Button type="button" variant="outline" className="w-full" onClick={() => setOpen(true)}>
+        <BuildingsIcon weight="bold" aria-hidden />
+        Sign in with your college
+      </Button>
+    )
+  return (
+    <form
+      className="grid gap-2"
+      data-testid="college-sign-in"
+      onSubmit={(e) => {
+        e.preventDefault()
+        window.location.href = `/api/v1/sso/start?${new URLSearchParams({ email, next })}`
+      }}
+    >
+      <TextField
+        label="Your college email"
+        type="email"
+        autoComplete="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
+      <Button type="submit" disabled={!email.includes("@")}>
+        Continue to your college
+      </Button>
+    </form>
   )
 }
 
@@ -113,6 +151,7 @@ const REASONS: Record<string, string> = {
   locked: "Too many wrong passwords: password sign-in is paused for 15 minutes. You can still continue with Google, or reset your password.",
   unverified: "Confirm your email first: we sent you a link when you signed up.",
   busy: "Too many sign-in attempts from your network. Wait a few minutes and try again.",
+  use_sso: "Your college signs you in to GretLab: use Sign in with your college.",
 }
 
 export function SignInForm({ callbackUrl: next, devLogin }: { callbackUrl: string; devLogin: boolean }) {
@@ -144,6 +183,7 @@ export function SignInForm({ callbackUrl: next, devLogin }: { callbackUrl: strin
   return (
     <div className="grid gap-4">
       <GoogleButton next={next} />
+      <CollegeButton next={next} />
       <Divider />
       <form className="grid gap-3" onSubmit={submit} data-testid="password-sign-in">
         <TextField

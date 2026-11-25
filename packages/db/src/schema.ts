@@ -3439,6 +3439,62 @@ export const ltiPlatforms = pgTable(
   ]
 )
 
+/**
+ * A college's single sign-on with OpenID Connect (features/sso). The organization sets the
+ * identity provider; the domains it may vouch for are set by platform staff, so a college can
+ * never claim someone else's address. Staff may give domains before the IdP is set up, so the
+ * IdP's fields start empty; it can't be switched on until they're filled.
+ */
+export const orgSso = pgTable("org_sso", {
+  orgId: uuid("org_id")
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  issuer: text("issuer").notNull().default(""),
+  clientId: text("client_id").notNull().default(""),
+  /** Sealed (lib/sealed.ts, purpose "sso"); never sent back to anyone. */
+  clientSecret: text("client_secret").notNull().default(""),
+  /** From the issuer's discovery document, read when saved. */
+  authorizationEndpoint: text("authorization_endpoint").notNull().default(""),
+  tokenEndpoint: text("token_endpoint").notNull().default(""),
+  jwksUri: text("jwks_uri").notNull().default(""),
+  /** Email domains it may sign in, set by platform staff (platform.orgs.manage). */
+  domains: text("domains").array().notNull().default([]),
+  enabled: boolean("enabled").notNull().default(false),
+  /** Addresses on its domains may only sign in through it: no password, no other Google. */
+  required: boolean("required").notNull().default(false),
+  updatedAt: updatedAt(),
+})
+
+/** A college sign-in in flight: state, nonce and PKCE verifier, used once within minutes. */
+export const ssoStates = pgTable("sso_states", {
+  state: text("state").primaryKey(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  nonce: text("nonce").notNull(),
+  verifier: text("verifier").notNull(),
+  /** Where to go afterwards: a path on this site. */
+  next: text("next").notNull().default("/home"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+})
+
+/** Who a college's IdP says someone is (its stable subject), linked to their account. */
+export const ssoUsers = pgTable(
+  "sso_users",
+  {
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    sub: text("sub").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (table) => [primaryKey({ columns: [table.orgId, table.sub] })]
+)
+
 /** A sign-in handshake in flight: state and nonce, used once, short-lived. */
 export const ltiStates = pgTable("lti_states", {
   state: text("state").primaryKey(),

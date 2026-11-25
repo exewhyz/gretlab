@@ -1,3 +1,4 @@
+import { ssoRequiredFor } from "@/features/sso/server"
 import { createHash, randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from "node:crypto"
 
 import { authTokens, emailOutbox, getDb, sql, users, type User } from "@workspace/db"
@@ -194,10 +195,15 @@ async function mayRegister(email: string) {
  * Makes an account and emails a link to confirm the address. For an address that already
  * has an account, the email says so instead: the answer here is the same either way.
  */
+/** A college requires its single sign-on for this address (features/sso). */
+const useSso = () =>
+  new ApiError(409, "use_sso", "Your college signs you in to GretLab: use Sign in with your college.")
+
 export async function signUp(input: z.infer<typeof signUpSchema>) {
   await needWithinLimit("sign_up", requestInfo().ip)
   const problem = passwordProblem(input.password, input.email)
   if (problem) throw new ApiError(400, "weak_password", problem)
+  if (await ssoRequiredFor(input.email, "password")) throw useSso()
   if (!(await mayRegister(input.email)))
     throw new ApiError(403, "registration_closed", "New accounts can't be made with this address here.")
   const db = getDb()
@@ -277,6 +283,7 @@ export async function resendConfirmation(email: string) {
 /** Emails a link to choose a new password (to any account, Google ones included). */
 export async function forgotPassword(email: string) {
   await needWithinLimit("email_link", requestInfo().ip)
+  if (await ssoRequiredFor(email, "password")) throw useSso()
   const [user] = await getDb().select().from(users).where(eq(users.email, email))
   if (user && !user.disabled && !(await sentRecently(user.id, "reset"))) {
     const link = await newLink(user.id, "reset")

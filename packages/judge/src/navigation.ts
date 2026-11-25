@@ -411,6 +411,15 @@ export const ORG_NAV: NavItem[] = [
     wholeOrg: true,
   },
   {
+    // College single sign-on with OpenID Connect (features/sso).
+    key: "sso",
+    label: "Single sign-on",
+    path: "/sso",
+    group: "School",
+    anyOf: ["org.settings.manage"],
+    wholeOrg: true,
+  },
+  {
     key: "lms",
     feature: "lti",
     label: "LMS (LTI)",

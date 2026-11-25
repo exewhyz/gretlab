@@ -53,7 +53,9 @@ export function stateCookie(response: NextResponse, state: string) {
 export async function signIn(response: NextResponse, user: User) {
   const maxAge = 30 * 24 * 60 * 60
   const token = await encode({
-    token: { email: user.email, name: user.name, sub: user.id },
+    // signedInAt as a sign-in records it, or a password reset ("sign out everywhere") would
+    // leave every later LMS sign-in signed out (features/auth/current-user.ts).
+    token: { email: user.email, name: user.name, sub: user.id, signedInAt: Date.now() },
     secret: process.env.NEXTAUTH_SECRET ?? "",
     maxAge,
   })
