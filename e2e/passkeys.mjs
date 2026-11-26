@@ -57,6 +57,17 @@ try {
   check("it's logged", psql(`select count(*) from audit_log where action='security.2fa_on' and summary like '%passkey%'`) === "1")
   await page.screenshot({ path: `${SHOTS}pk-security.png`, fullPage: true })
 
+  // ---------- with two-factor on, adding another asks first (before the device makes anything)
+  psql(`update two_factor set enabled_at = now() - interval '2 hours' where user_id='${uid}'`)
+  const start = async (extra) =>
+    fetch(`${BASE}/api/v1/me/security/passkeys`, {
+      method: "POST",
+      headers: { cookie: `next-auth.session-token=${await encode({ token: { email: "pk-a@example.com", signedInAt: Date.now(), ...extra }, secret: SECRET })}`, origin: BASE, "content-type": "application/json" },
+    })
+  const stale = await start({ mfaAt: Date.now() - 30 * 60_000 })
+  check("another passkey, from an old sign-in: confirm it's you first, before anything is made", stale.status === 403 && (await stale.json())?.error?.code === "step_up_required")
+  check("...and from a fresh second step, it starts", (await start({ mfaAt: Date.now() })).status === 200)
+
   // ---------- a session waiting for its second step can't add one
   const pending = await encode({ token: { email: "pk-a@example.com", signedInAt: Date.now() }, secret: SECRET })
   const refused = await fetch(`${BASE}/api/v1/me/security/passkeys`, { method: "POST", headers: { cookie: `next-auth.session-token=${pending}`, origin: BASE, "content-type": "application/json" } })

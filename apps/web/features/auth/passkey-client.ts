@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  sendSignal,
   startAuthentication,
   startRegistration,
   type PublicKeyCredentialCreationOptionsJSON,
@@ -117,5 +118,13 @@ export async function addPasskey(
   const problem = await sendSecondStep({
     registerPasskey: { challengeId: options.challengeId, name, response },
   })
+  // The device already made it: tell its password manager we didn't keep it, so no stray
+  // GretLab passkey is left there (browsers that support the signal remove it).
+  if (problem && options.options.rp.id)
+    await sendSignal({
+      signalName: "unknownCredential",
+      rpID: options.options.rp.id,
+      credentialID: response.id,
+    }).catch(() => {})
   return { problem, backupCodes: problem ? null : options.backupCodes }
 }

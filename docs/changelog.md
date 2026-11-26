@@ -8,6 +8,13 @@ aren't listed.
 
 ## 26 November 2026
 
+### Adding a passkey asks first
+
+- With two-step verification already on, **Add a passkey** now asks you to confirm it's you
+  before your device makes the passkey, instead of after (which left a passkey in your password
+  manager that GretLab hadn't kept). If one is ever refused, GretLab tells your browser to forget
+  it.
+
 ### A stricter browser security policy
 
 - The site's Content-Security-Policy is now enforced: browsers only load scripts, frames and
