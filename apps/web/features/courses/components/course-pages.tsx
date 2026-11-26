@@ -139,8 +139,8 @@ export function CoursesPage() {
       </PageTitle>
       <p className="mb-3 max-w-3xl text-body-sm text-body">
         {platform
-          ? "A course is an outline of modules, each with problems and questions from the library. Write it once; colleges give it to their classes."
-          : "A course is an outline of modules with problems and questions from your library. Write it once and give it to any number of classes from their Course tab. Courses the platform shares with you are here too."}
+          ? "A course is an outline of modules (readings, practice and marked checkpoints) that opens as a class goes. Write it once; colleges give it to their classes. For practice on one's own, use a study plan."
+          : "A course is an outline of modules (readings, practice and marked checkpoints) that opens as a class goes. Write it once and give it to any number of classes from their Course tab. Courses the platform shares with you are here too. For practice on one's own, use a study plan."}
       </p>
       <Table
         headers={[

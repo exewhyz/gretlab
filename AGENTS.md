@@ -222,6 +222,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 ## Units
 
 - Units are the platform's course outline for the library (Unit 1 · Basics, …); organizations' problems stand alone. Dashboard › Units (`features/admin/components/units.tsx`): add, reorder (↑ ↓), delete (asking where its problems go: another unit, or none). A unit's Edit dialog renames it and sets exactly which problems are in it and their order: add from any unit (it moves), move a problem to another unit or to none, undo before saving (`setUnitProblems`, one transaction). The problem editor can also set a problem's unit. Reordering units lists every unit once (`bad_order` otherwise).
+- **Units are not courses** (audited 27 November 2026): units order the public problem library and label its problems ("Unit 1 · Basics"); a course is what a class takes (modules, release dates, checkpoints); a study plan is an ordered list for practising alone. The three pages say so. The platform's first course was copied from the units once (migration 0031) and is edited apart from them.
 - Admin lists that could grow (units, the daily challenge's days) stay one line per row, with the details edited in a dialog.
 
 ## Problem code per language

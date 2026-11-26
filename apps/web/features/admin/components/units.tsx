@@ -71,8 +71,10 @@ export function AdminUnits() {
     <>
       <PageTitle>Units</PageTitle>
       <p className="mb-3 max-w-3xl text-body-sm text-body">
-        The course outline of the problem library: units in order, and the
-        problems inside each.
+        The sections of the public problem library, in order, and the problems
+        in each: what visitors and students see on Problems (&ldquo;Unit 1 ·
+        Basics&rdquo;). Not courses: a course is what a class takes, with
+        modules and release dates, under Courses.
         {data.unplaced > 0 && ` ${data.unplaced} problems are in no unit.`} Add,
         remove and move problems from a unit's Edit.
       </p>

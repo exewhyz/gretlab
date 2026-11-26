@@ -67,7 +67,9 @@ export function AdminStudyPlans() {
       {editing && <PlanEditor slug={editing} onDone={() => setEditing(null)} />}
       <PageTitle>Study plans</PageTitle>
       <p className="mb-3 text-body-sm text-body">
-        Curated, ordered sets of problems, such as &ldquo;Week 1: loops&rdquo;.
+        Curated, ordered sets of problems for practising on your own, such as
+        &ldquo;Week 1: loops&rdquo;. Unlike a course, a plan has no modules,
+        release dates or marked work, and isn't given to a class.
         {owner.orgSlug
           ? " Published plans appear under Study plans for your members, with each one's progress. They can hold your members-only problems."
           : " Published plans appear on the Problems page with each student's progress."}

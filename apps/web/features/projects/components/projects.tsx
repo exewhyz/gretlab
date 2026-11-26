@@ -1,5 +1,6 @@
 "use client"
 
+import { atCommit, HandedInRepo } from "./handed-in"
 import { GithubLogoIcon } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
@@ -194,8 +195,7 @@ interface StudentProject {
   } | null
 }
 
-const atCommit = (s: { repoUrl: string; commitSha: string | null; ref: string | null }) =>
-  s.commitSha ? `${s.repoUrl}/tree/${s.commitSha}` : s.ref ? `${s.repoUrl}/tree/${s.ref}` : s.repoUrl
+
 
 /** The assignment page's projects: instructions, handing in, and the mark once out. */
 export function StudentProjects({
@@ -251,17 +251,7 @@ function ProjectCard({
       {p.instructions && <Markdown text={p.instructions} />}
       {s && (
         <div className="grid gap-1 rounded-md bg-canvas-soft p-2 text-body-sm" data-testid="project-submission">
-          <a href={atCommit(s)} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1.5 text-ink underline-offset-2 hover:underline">
-            <GithubLogoIcon className="size-4" />
-            {s.repoUrl.replace("https://github.com/", "")}
-            {s.ref && ` · ${s.ref}`}
-            {s.commitSha && <span className="font-mono text-xs text-body">@{s.commitSha.slice(0, 7)}</span>}
-          </a>
-          <span className="text-caption">
-            Handed in {formatDateTime(s.submittedAt)}
-            {s.late && " · late"}
-            {!s.commitSha && " · couldn't pin a commit (GitHub didn't answer); your teacher sees the branch as it is"}
-          </span>
+          <HandedInRepo submission={s} />
           {s.feedback && (
             <div className="border-t border-hairline pt-1">
               <Markdown text={s.feedback} />

@@ -1,5 +1,6 @@
 "use client"
 
+import { HandedInRepo } from "@/features/projects/components/handed-in"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useEffect, useState } from "react"
@@ -335,23 +336,7 @@ function ProjectHandIn({
     <section className="grid gap-3" data-testid="project-hand-in">
       {project && (
         <div className="grid gap-1 rounded-lg border border-hairline bg-card p-4 text-body-sm">
-          <div>
-            Handed in {formatDate(String(project.submittedAt))}:{" "}
-            <a
-              href={project.repoUrl}
-              className="text-ink underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              {project.repoUrl.replace("https://github.com/", "")}
-            </a>
-            {project.commitSha && (
-              <span className="text-caption">
-                {" "}
-                at {project.commitSha.slice(0, 7)}
-              </span>
-            )}
-          </div>
+          <HandedInRepo submission={project} />
           <div data-testid="project-mark">
             {project.mark === null
               ? "Waiting to be marked."
