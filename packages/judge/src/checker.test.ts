@@ -1,7 +1,14 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { checkerSchema, compareOutputs, describeChecker } from "./checker.ts"
+import {
+  CHECKER_MESSAGE_CHARS,
+  checkerSchema,
+  compareOutputs,
+  describeChecker,
+  needsSandbox,
+  readCheckerResult,
+} from "./checker.ts"
 
 test("no checker: exact, ignoring trailing spaces and blank lines, as before", () => {
   assert.equal(compareOutputs("a b  \n\n", "a b", null), true)
@@ -121,5 +128,104 @@ test("what students are told about how output is checked", () => {
       numbers: { absolute: 0.001, relative: 1e-9 },
     }),
     "Spacing and line breaks between values don't matter. Numbers within 0.001, or within 1e-9 of the expected value relatively, are accepted."
+  )
+})
+
+/* ---------- checker programs written by teachers ---------- */
+
+test("a checker program: a language and its code, and nothing else beside it", () => {
+  const program = { language: "python", code: "import sys\nsys.exit(0)\n" }
+  assert.equal(checkerSchema.safeParse({ program }).success, true)
+  assert.equal(
+    checkerSchema.safeParse({ program: { ...program, language: "cobol" } })
+      .success,
+    false
+  )
+  assert.equal(
+    checkerSchema.safeParse({ program: { ...program, code: "  " } }).success,
+    false
+  )
+  assert.equal(
+    checkerSchema.safeParse({
+      program: { ...program, code: "x".repeat(20_001) },
+    }).success,
+    false
+  )
+  // Comparers and a program don't mix: the program decides.
+  assert.equal(
+    checkerSchema.safeParse({ program, spacing: true }).success,
+    false
+  )
+})
+
+test("a program needs the sandbox: nothing compares in JavaScript", () => {
+  const checker = { program: { language: "python" as const, code: "pass" } }
+  assert.equal(needsSandbox(checker), true)
+  assert.equal(needsSandbox({ spacing: true }), false)
+  assert.equal(needsSandbox(null), false)
+  assert.throws(() => compareOutputs("1", "1", checker))
+})
+
+test("students are told a program checks their answer", () => {
+  assert.match(
+    describeChecker({ program: { language: "python", code: "pass" } }) ?? "",
+    /any correct answer/i
+  )
+})
+
+test("reading a checker program's answer: exit 0 right, 1 wrong", () => {
+  assert.deepEqual(
+    readCheckerResult({ exitCode: 0, stdout: "", timedOut: false }),
+    { verdict: "AC", fraction: 1, message: "" }
+  )
+  assert.deepEqual(
+    readCheckerResult({
+      exitCode: 1,
+      stdout: "Line 2: 7 isn't reachable\n",
+      timedOut: false,
+    }),
+    { verdict: "WA", fraction: 0, message: "Line 2: 7 isn't reachable" }
+  )
+})
+
+test("exit 3 is partly right: the first line is the share, the rest the message", () => {
+  assert.deepEqual(
+    readCheckerResult({
+      exitCode: 3,
+      stdout: "0.5\nhalf the pairs\n",
+      timedOut: false,
+    }),
+    { verdict: "PC", fraction: 0.5, message: "half the pairs" }
+  )
+  // A share of 1 is right, of 0 wrong.
+  assert.equal(
+    readCheckerResult({ exitCode: 3, stdout: "1", timedOut: false }).verdict,
+    "AC"
+  )
+  assert.equal(
+    readCheckerResult({ exitCode: 3, stdout: "0", timedOut: false }).verdict,
+    "WA"
+  )
+})
+
+test("a checker that fails is a system error, never the student's fault", () => {
+  for (const r of [
+    { exitCode: 3, stdout: "lots\n", timedOut: false },
+    { exitCode: 3, stdout: "1.5\n", timedOut: false },
+    { exitCode: 2, stdout: "", timedOut: false },
+    { exitCode: null, stdout: "", timedOut: true },
+    { exitCode: 137, stdout: "", timedOut: false },
+  ])
+    assert.equal(readCheckerResult(r).verdict, "SE", JSON.stringify(r))
+})
+
+test("its message is kept short", () => {
+  assert.equal(
+    readCheckerResult({
+      exitCode: 1,
+      stdout: "x".repeat(5000),
+      timedOut: false,
+    }).message.length,
+    CHECKER_MESSAGE_CHARS
   )
 })

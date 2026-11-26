@@ -31,7 +31,7 @@ A bare list of problems, or a single problem object, is accepted too. At most 10
 | `editorial` | no | Markdown, unlocked by the practice rules. |
 | `tags` | no | Up to 10 names. |
 | `timeLimitMs`, `memoryLimitMb` | no | `null` for the defaults. |
-| `checker` | no | How output is checked; leave it out to compare exactly. Any of `"spacing": true` (value by value, spacing and line breaks don't matter), `"numbers": { "absolute": 1e-6, "relative": 1e-9 }` (numbers within either tolerance; `2.5E+3` matches `2500`), `"unordered": true` (lines in any order), `"ignoreCase": true` (words only; numbers are never affected). |
+| `checker` | no | How output is checked; leave it out to compare exactly. Any of `"spacing": true` (value by value, spacing and line breaks don't matter), `"numbers": { "absolute": 1e-6, "relative": 1e-9 }` (numbers within either tolerance; `2.5E+3` matches `2500`), `"unordered": true` (lines in any order), `"ignoreCase": true` (words only; numbers are never affected). Or a checker program instead: `"program": { "language": "python", "code": "…" }` (see Problems and practice › Write a checker program). |
 | `languages` | no | Languages students may use, e.g. `["python", "cpp"]`; `null` for all. |
 
 Outputs are compared the same way as in the editor: trailing spaces and the final newline don't matter.

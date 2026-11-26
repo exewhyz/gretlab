@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   isBrowserLanguage,
   compareOutputs,
+  needsSandbox,
   overallVerdict,
   planExecution,
   type ExecutionPlan,
@@ -64,6 +65,8 @@ export interface TestOutcome {
   maxRssKb?: number | null
   /** Its test group (subtask), if any. */
   group?: string | null
+  /** What the problem's checker program said, where the test is shown. */
+  checkerMessage?: string | null
 }
 
 export type TestRun =
@@ -606,7 +609,8 @@ function useSessionState({
         ? "TLE"
         : result.failed
           ? "RE"
-          : expected === null
+          : // A checker program runs only on the server: nothing to compare with here.
+            expected === null || needsSandbox(detail?.checker)
             ? "OK"
             : compareOutputs(result.out, expected, detail?.checker)
               ? "AC"

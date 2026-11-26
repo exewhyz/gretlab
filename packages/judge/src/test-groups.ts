@@ -44,7 +44,13 @@ export type GroupScore = {
 
 /** Each test's points, the total and each group's result, groups in the order they first appear. */
 export function scoreCases(
-  cases: readonly { group: string | null; points: number; verdict: Verdict }[]
+  cases: readonly {
+    group: string | null
+    points: number
+    verdict: Verdict
+    /** A partly right test's share (a checker program's, verdict PC). */
+    fraction?: number
+  }[]
 ): { points: number[]; score: number; maxScore: number; groups: GroupScore[] } {
   const groups = new Map<string, GroupScore>()
   for (const c of cases) {
@@ -69,7 +75,10 @@ export function scoreCases(
         : 0
       : passed(c.verdict)
         ? c.points
-        : 0
+        : // Partly right, alone: its share, in whole points as scores are kept.
+          c.verdict === "PC"
+          ? Math.floor(c.points * Math.min(1, Math.max(0, c.fraction ?? 0)))
+          : 0
   )
   return {
     points,

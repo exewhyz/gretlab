@@ -96,3 +96,28 @@ test("a submission's groups, read back from its stored results", () => {
     []
   )
 })
+
+test("a partly right test earns its share of the points, rounded down to whole points", () => {
+  const scored = scoreCases([
+    { group: null, points: 10, verdict: "PC", fraction: 0.55 },
+    { group: null, points: 1, verdict: "PC", fraction: 0.9 },
+    { group: null, points: 4, verdict: "AC" },
+  ])
+  assert.deepEqual(scored.points, [5, 0, 4])
+  assert.equal(scored.score, 9)
+})
+
+test("in a group, partly right is a failure: the group earns nothing and the rest are skipped", () => {
+  const scored = scoreCases([
+    { group: "g", points: 5, verdict: "AC" },
+    { group: "g", points: 5, verdict: "PC", fraction: 0.8 },
+  ])
+  assert.deepEqual(scored.points, [0, 0])
+  assert.equal(
+    skipsCase([{ group: "g" }, { group: "g" }, { group: "g" }], 2, [
+      "AC",
+      "PC",
+    ]),
+    true
+  )
+})

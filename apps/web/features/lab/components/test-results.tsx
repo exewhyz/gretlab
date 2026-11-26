@@ -100,10 +100,20 @@ export function OutcomeDetail({ outcome }: { outcome: TestOutcome }) {
           <Block label="Expected output" value={outcome.expected} />
         )}
       </div>
-      {wrong && outcome.expected !== null && (
-        <p className="mb-2.5 text-caption text-body">
-          {describeFirstDifference(outcome.stdout ?? "", outcome.expected)}
-        </p>
+      {outcome.checkerMessage ? (
+        // A checker program judged it: its words, not a line-by-line difference.
+        <Block
+          label="The checker says"
+          testId="checker-message"
+          value={outcome.checkerMessage}
+        />
+      ) : (
+        wrong &&
+        outcome.expected !== null && (
+          <p className="mb-2.5 text-caption text-body">
+            {describeFirstDifference(outcome.stdout ?? "", outcome.expected)}
+          </p>
+        )
       )}
       {outcome.stderr && (
         <Block label="Error" value={outcome.stderr} tone="error" />

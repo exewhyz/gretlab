@@ -8,7 +8,7 @@ import {
   settings as settingsTable,
   sql,
 } from "@workspace/db"
-import { QUEUE_CHANNEL, resolveSettings } from "@workspace/judge"
+import { jobMemoryMb, QUEUE_CHANNEL, resolveSettings } from "@workspace/judge"
 import postgres from "postgres"
 
 import {
@@ -217,7 +217,7 @@ while (!stopping) {
       await sleepUntilWoken(POLL_MS)
       continue
     }
-    running.set(job.id, job.memoryLimitMb)
+    running.set(job.id, jobMemoryMb(job.memoryLimitMb, job.checker))
     void processSubmission(db, backend, job, runnerId).finally(() => {
       running.delete(job.id)
       wakeNow()

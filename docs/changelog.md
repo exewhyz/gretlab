@@ -8,6 +8,20 @@ aren't listed.
 
 ## 26 November 2026
 
+### JavaScript runs in the browser again
+
+- Since the stricter browser security policy came in this morning, running JavaScript in the
+  browser (where the server isn't used) failed with an error. It works again: only the
+  JavaScript runner may evaluate code, the rest of the site still can't.
+
+### Checker programs
+
+- A problem can now be checked by a small program its author writes, for answers with many right
+  forms (any shortest path, any valid order). It reads the test's input, the student's output and
+  the expected answer, and says right, wrong, or partly right with a share of the points (shown as
+  **Partially correct**).
+- Students never see the checker's code; its messages show to staff, and to students on samples.
+
 ### Your logo and colour
 
 - Organizations can set their own logo and brand colour under **Settings › Branding**. They show

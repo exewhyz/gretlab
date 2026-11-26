@@ -12,6 +12,7 @@ import {
   type User,
 } from "@workspace/db"
 import {
+  needsSandbox,
   planExecution,
   platformExecution,
   readOrgExecution,
@@ -67,13 +68,18 @@ export async function planFor(
   const all = settings ?? (await getSettings())
   const work = ctx.contest ?? ctx.assignment
   const orgId = work ? work.orgId : (ctx.problem?.orgId ?? null)
-  return planExecution({
+  const plan = planExecution({
     platform: platformExecution(all),
     org: await orgExecution(orgId),
     work: (work?.execution as WorkExecution | undefined) ?? null,
     context: ctx.contest ? "contest" : ctx.assignment ? "assignment" : "practice",
     signedIn: user !== null,
   })
+  // A checker program runs only in the judge's sandbox: such a problem is never graded in the
+  // browser (packages/judge/src/checker.ts).
+  return needsSandbox(ctx.problem?.checker) && plan.submit === "browser"
+    ? { ...plan, submit: "none" }
+    : plan
 }
 
 /**

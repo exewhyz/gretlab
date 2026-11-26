@@ -102,6 +102,16 @@ test("a job too big for free memory is left for later, and smaller ones go ahead
   assert.equal((await claimNext(db, "a", 4096))?.id, big.id)
 })
 
+test("a job with a checker program counts its checker's memory too", async () => {
+  await clear()
+  const job = await enqueue({
+    memoryLimitMb: 256,
+    checker: { program: { language: "python", code: "pass" } },
+  })
+  assert.equal(await claimNext(db, "r1", 600), null, "256 + 512 doesn't fit in 600")
+  assert.equal((await claimNext(db, "r1", 800))?.id, job.id)
+})
+
 test("a dead runner's job returns to the queue; a live runner's doesn't", async () => {
   await clear()
   const dead = await enqueue()
@@ -311,6 +321,109 @@ test("checkers: the submission's checker decides how output is compared", async 
     "AC"
   )
   await db.delete(problems).where(sql.eq(problems.slug, "queue-test-checker"))
+})
+
+test("checker programs: run in their own sandbox with the three files, and decide each test", async () => {
+  await clear()
+  await db.delete(problems).where(sql.eq(problems.slug, "queue-test-program"))
+  const [problem] = await db
+    .insert(problems)
+    .values({ slug: "queue-test-program", title: "Program", statement: [] })
+    .returning()
+  // The student's program echoes its input; the fake checker answers by what it printed.
+  const tests: [string, number][] = [
+    ["right", 4],
+    ["half", 10],
+    ["wrong", 3],
+    ["none", 0], // a sample: no points
+  ]
+  for (const [i, [input, points]] of tests.entries())
+    await db.insert(testCases).values({
+      problemId: problem!.id,
+      input,
+      expected: `secret-${input}`,
+      points,
+      position: i,
+      isSample: points === 0,
+    })
+  const sandboxes: { uploads: string[]; stdins: string[] }[] = []
+  const done = {
+    stderr: "",
+    wallMs: 1,
+    maxRssKb: 1000,
+    timedOut: false,
+    outputLimitExceeded: false,
+    sandboxDied: null,
+  }
+  const backend = {
+    verify: async () => {},
+    sweepOrphans: async () => {},
+    create: async () => {
+      const seen = { uploads: [] as string[], stdins: [] as string[] }
+      sandboxes.push(seen)
+      let files: Record<string, string> = {}
+      return {
+        upload: async (list: { path: string; content: string }[]) => {
+          for (const f of list) {
+            seen.uploads.push(`${f.path}=${f.content}`)
+            files[f.path] = f.content
+          }
+        },
+        build: async () => ({ ...done, exitCode: 0, stdout: "" }),
+        freeze: async () => {},
+        run: async (_command: string[], options: { stdin?: string }) => {
+          seen.stdins.push(options.stdin ?? "")
+          if (!("answer.txt" in files))
+            return { ...done, exitCode: 0, stdout: options.stdin ?? "" }
+          const out = files["output.txt"]
+          const ok = files["answer.txt"] === `secret-${files["input.txt"]}`
+          if (!ok) return { ...done, exitCode: 2, stdout: "" }
+          if (out === "right") return { ...done, exitCode: 0, stdout: "" }
+          if (out === "half") return { ...done, exitCode: 3, stdout: "0.5\nhalf of it" }
+          if (out === "wrong") return { ...done, exitCode: 1, stdout: "not a path" }
+          return { ...done, exitCode: 1, stdout: "" }
+        },
+        destroy: async () => {
+          files = {}
+        },
+      }
+    },
+  } satisfies SandboxBackend
+  const job = await enqueue({
+    kind: "submit",
+    problemId: problem!.id,
+    checker: { program: { language: "python", code: "import sys" } },
+  })
+  const claimed = await claimNext(db, "r1", 4096)
+  await processSubmission(db, backend, claimed!, "r1")
+  const [row] = await db
+    .select()
+    .from(submissions)
+    .where(sql.eq(submissions.id, job.id))
+  assert.equal(sandboxes.length, 2, "the student's sandbox and the checker's")
+  const [student, checker] = sandboxes as [
+    (typeof sandboxes)[number],
+    (typeof sandboxes)[number],
+  ]
+  assert.ok(
+    !student.uploads.some((u) => u.includes("secret")) &&
+      !student.stdins.some((s) => s.includes("secret")),
+    "expected outputs never reach the student's sandbox"
+  )
+  assert.ok(checker.uploads.includes("main.py=import sys"), "the checker's code")
+  assert.ok(checker.uploads.includes("answer.txt=secret-half"))
+  assert.deepEqual(
+    row?.results?.map((r) => r.verdict),
+    ["AC", "PC", "WA", "WA"]
+  )
+  assert.deepEqual(row?.results?.map((r) => r.points), [4, 5, 0, 0])
+  assert.equal(row?.results?.[1]?.fraction, 0.5)
+  assert.equal(row?.results?.[1]?.checkerMessage, "half of it")
+  assert.equal(row?.results?.[2]?.checkerMessage, "not a path")
+  assert.equal(row?.verdict, "PC")
+  assert.equal(row?.score, 9)
+  assert.equal(row?.passedTests, 1)
+  await db.delete(problems).where(sql.eq(problems.slug, "queue-test-program"))
 })
 
 test("a late result from a runner that lost its lease is ignored", async () => {

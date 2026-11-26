@@ -13,6 +13,7 @@ import {
   type Problem,
 } from "@workspace/db"
 import {
+  withoutProgramCode,
   describeChecker,
   LANGUAGE_IDS,
   joinStarter,
@@ -207,7 +208,8 @@ export async function buildDetail(
       .map((test): [string, string] => [test.input, test.expected]),
     hiddenTestCount: tests.filter((test) => !test.isSample).length,
     allowedLanguages: problem.allowedLanguages,
-    checker: problem.checker ?? null,
+    // Never a checker program's code: it may hold the answer.
+    checker: withoutProgramCode(problem.checker),
     checkerNote: describeChecker(problem.checker),
     hasSolution:
       problem.editorial.length > 0 || referenceSolutions(problem).length > 0,

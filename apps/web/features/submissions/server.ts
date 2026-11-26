@@ -834,6 +834,8 @@ export async function presentSubmission(submission: Submission, viewer: User) {
         points: item.points,
         stdout: revealed ? item.stdout : null,
         stderr: revealed ? item.stderr : null,
+        /** What a checker program said: staff always, students only where the test is shown. */
+        checkerMessage: revealed ? (item.checkerMessage ?? null) : null,
         input: item.input ?? source?.input ?? null,
         expected: item.expected ?? source?.expected ?? null,
       }

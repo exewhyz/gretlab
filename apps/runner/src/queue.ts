@@ -8,6 +8,7 @@ import {
   type Submission,
 } from "@workspace/db"
 import {
+  CHECKER_MEMORY_MB,
   QUEUE_CHANNEL,
   RUNNER_ONLINE_MS,
   isLanguageId,
@@ -66,7 +67,10 @@ export async function claimNext(
         submissions.id,
         sql.sql`(
           SELECT s.id FROM submissions s
-          WHERE s.status = 'queued' AND s.memory_limit_mb <= ${freeMemoryMb}
+          WHERE s.status = 'queued'
+            -- A checker program has a sandbox of its own (jobMemoryMb).
+            AND s.memory_limit_mb + (CASE WHEN s.checker -> 'program' IS NOT NULL
+              THEN ${CHECKER_MEMORY_MB} ELSE 0 END) <= ${freeMemoryMb}
             AND ${pool ? sql.sql`(s.pool_org_id = ${pool} OR ${shared})` : shared}
           ORDER BY ${pool ? sql.sql`(s.pool_org_id IS NOT DISTINCT FROM ${pool}) DESC,` : sql.sql``} s.queue_at
           FOR UPDATE OF s SKIP LOCKED
@@ -285,6 +289,7 @@ function toStored(
       group: cases[index]?.group ?? null,
       points: cases[index]?.points ?? 0,
       verdict: caseResult.verdict,
+      fraction: caseResult.fraction,
     }))
   )
   return result.cases.map((caseResult, index) => {
@@ -298,6 +303,10 @@ function toStored(
       wallMs: caseResult.wallMs,
       maxRssKb: caseResult.maxRssKb,
       points: scored.points[index] ?? 0,
+      ...(caseResult.verdict === "PC" ? { fraction: caseResult.fraction } : {}),
+      ...(caseResult.checkerMessage
+        ? { checkerMessage: caseResult.checkerMessage }
+        : {}),
       ...(testCase?.group
         ? { group: testCase.group, worth: testCase.points }
         : {}),

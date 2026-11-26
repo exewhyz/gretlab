@@ -102,8 +102,31 @@ tick what's allowed under **How output is checked** in the problem editor; the o
 - **Ignore case:** `YES` and `yes` count as the same. Only words; numbers are never affected.
 
 Students see one line on the problem saying what's accepted. Each submission keeps the rule it was
-judged by, so changing it later never changes results already given. Problems whose answers need
-real checking (any valid shortest path) aren't covered yet.
+judged by, so changing it later never changes results already given.
+
+### Write a checker program
+
+For answers that need real checking (any valid shortest path, any order of a set, any pair adding
+up to n), choose **A checker program decides** and write a small program in any of GretLab's
+languages (**Start from an example** gives you one). For each test it reads three files:
+
+- `input.txt`: the test's input;
+- `output.txt`: what the student's program printed;
+- `answer.txt`: the test's expected output (one correct answer).
+
+It **exits 0** if the answer is right and **1** if it's wrong. For partly right, it prints a share
+from 0 to 1 on its first line and **exits 3**: the test earns that share of its points, rounded down
+to whole points, so give such tests enough points (10, say). Anything else it prints is a message:
+staff see it on every test, students only on samples.
+
+- It runs in a sandbox of its own, never the student's, with no network, for at most 10 seconds a
+  test. The expected answer goes only there.
+- A checker that crashes, exits with another code or doesn't compile gives **System error**, never
+  Wrong answer, and staff see why. In Python an uncaught error exits 1, which counts as wrong:
+  check the student's output carefully (as the example does).
+- Students never see the checker's code. Such a problem is graded only on the server, never in the
+  browser.
+- In a test group, a partly right test counts as failing the group.
 
 ### Group tests into subtasks
 

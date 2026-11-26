@@ -703,6 +703,10 @@ export interface StoredCaseResult {
   group?: string | null
   /** A grouped test's full points, whatever it earned, so the group's worth can be shown. */
   worth?: number
+  /** A checker program's share of the points (verdict PC). */
+  fraction?: number
+  /** What a checker program said about it: for staff, and students only on samples. */
+  checkerMessage?: string
   /** Set for Run cases, which aren't in test_cases. */
   label?: string
   input?: string

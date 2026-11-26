@@ -3,6 +3,8 @@ export const VERDICTS = {
   /** The program finished, but there was no expected output to compare it with. */
   OK: "Finished",
   WA: "Wrong answer",
+  /** A checker program gave part of a test's points (packages/judge/src/checker.ts). */
+  PC: "Partially correct",
   TLE: "Time limit exceeded",
   MLE: "Memory limit exceeded",
   OLE: "Output limit exceeded",
