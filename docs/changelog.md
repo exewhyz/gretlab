@@ -8,6 +8,13 @@ aren't listed.
 
 ## 26 November 2026
 
+### Fixes
+
+- The problem library no longer fails to load on a day without a daily challenge.
+- A problem's assignments are listed soonest due first.
+- Code saved during a lab exam is told apart from code saved before it by the database's clock,
+  the same clock the exam runs by.
+
 ### Suggestions in C, C++ and Java
 
 - The editor now suggests as you type in C, C++ and Java, as it already did in Python and

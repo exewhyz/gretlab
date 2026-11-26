@@ -76,9 +76,11 @@ export async function saveDraft(
     )
   }
   const db = getDb()
-  const now = new Date()
-  await db.transaction(async (tx) => {
-    await tx
+  // The database's clock, not this server's: an exam's sitting starts by it, and drafts from
+  // before the sitting are told apart from those during it by comparing the two (exams/server.ts).
+  const now = sql.sql<Date>`now()`
+  return db.transaction(async (tx) => {
+    const [saved] = await tx
       .insert(drafts)
       .values({
         userId: user.id,
@@ -90,6 +92,7 @@ export async function saveDraft(
         target: [drafts.userId, drafts.problemId, drafts.language],
         set: { files: input.files, entry: input.entry, updatedAt: now },
       })
+      .returning({ updatedAt: drafts.updatedAt })
     // A snapshot only when the code actually changed since the last one.
     const where = and(
       eq(draftSnapshots.userId, user.id),
@@ -102,7 +105,8 @@ export async function saveDraft(
       .where(where)
       .orderBy(desc(draftSnapshots.at))
       .limit(1)
-    if (JSON.stringify(last?.files) === JSON.stringify(input.files)) return
+    const result = { updatedAt: saved!.updatedAt }
+    if (JSON.stringify(last?.files) === JSON.stringify(input.files)) return result
     await tx.insert(draftSnapshots).values({
       userId: user.id,
       problemId: problem.id,
@@ -116,8 +120,8 @@ export async function saveDraft(
         where user_id = ${user.id} and problem_id = ${problem.id} and language = ${input.language}
         order by at desc offset ${KEEP_SNAPSHOTS}
       )`)
+    return result
   })
-  return { updatedAt: now }
 }
 
 /** A student's most recent draft on a problem, in whichever language they used last. */

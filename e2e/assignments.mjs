@@ -151,6 +151,8 @@ await putDraft(a, DRAFT2)
 const myDraft = (await a("/problems/p1/draft")).json.drafts
 check("and comes back, on any computer", myDraft?.length === 1 && myDraft[0].files[0].content === DRAFT2, JSON.stringify(myDraft))
 check("other students don't get it", (await b("/problems/p1/draft")).json.drafts.length === 0)
+// Stamped by the database's clock, which exam sittings start by: never this machine's, which drifts.
+check("a draft's time is the database's", psql(`select bool_and(d.updated_at <= now() and d.updated_at = (select max(s.at) from draft_snapshots s where s.user_id = d.user_id and s.problem_id = d.problem_id)) from drafts d join users u on u.id = d.user_id where u.email = 'asg-a@example.com'`) === "t")
 check("a draft needs a real language", (await putDraft(a, "x", { language: "cobol" })).status === 400)
 check("and a problem the student can open", (await a("/problems/no-such-problem/draft")).status === 404)
 const attemptsPath = `/admin/assignments/${week1.json.id}/attempts?student=asg-a@example.com&problem=${id("p1")}`
@@ -435,7 +437,7 @@ check("an assignment's problems open on its own pages, numbered by it", assignme
 await s.screenshot({ path: SHOTS + "assignment-problem.png" })
 await s.goto(`${BASE}/problems/p1`)
 await s.getByTestId("assignment-chip").first().waitFor({ timeout: 30000 })
-check("the library page links back to its assignment", (await s.getByTestId("assignment-chip").first().textContent()).includes("Week 1"))
+check("the library page links back to its assignment", (await s.getByTestId("assignment-chip").allTextContents()).some((t) => t.includes("Week 1")), (await s.getByTestId("assignment-chip").allTextContents()).join(" | "))
 
 const tp = await open("asg-t@example.com")
 await tp.goto(`${BASE}/admin/assignments/new`)

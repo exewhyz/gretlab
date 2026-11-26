@@ -131,6 +131,11 @@ check("a right answer keeps the streak", (await b("/daily")).json.streak >= 1)
 await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: null, questionIds: [dq2.id] } })
 const qOnly = (await c("/daily")).json
 check("or questions alone", qOnly.problem === null && qOnly.questions.length === 1)
+// A day set to questions alone whose questions are gone has no challenge: a real null, not
+// { ok: true }, which the library page read as a challenge and crashed on.
+psql(`delete from daily_questions where day = '${today.day}'`)
+const none = await c("/daily")
+check("a day with nothing left answers null", none.status === 200 && none.json === null, JSON.stringify(none.json))
 await admin("/admin/daily", { method: "PUT", body: { day: today.day, problemSlug: "p1" } })
 psql(`delete from daily_answers where question_id in ('${dq1.id}','${dq2.id}','${written.id}')`)
 psql(`delete from questions where id in ('${dq1.id}','${dq2.id}','${written.id}')`)
