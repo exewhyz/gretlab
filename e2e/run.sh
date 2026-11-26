@@ -78,6 +78,7 @@ suite contest-replay http://localhost:3100
 suite branding http://localhost:3100
 suite checkers http://localhost:3100
 suite checker-programs http://localhost:3100
+suite completion http://localhost:3100
 suite plagiarism http://localhost:3100
 suite ratings http://localhost:3100
 suite solution-posts http://localhost:3100

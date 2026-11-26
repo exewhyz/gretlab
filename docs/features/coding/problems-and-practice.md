@@ -40,6 +40,13 @@ solve, with the daily challenge, personal lists and a leaderboard around it.
 - **Statements are Markdown**, with input format, output format and constraints kept as their own
   fields and samples taken from the tests. Raw HTML is shown as text, never run, so organizations can
   write problems safely. Images are uploaded and served by GretLab itself.
+- **Suggestions as you type**, in every language. In C, C++ and Java the editor reads your code
+  as you write it: after a dot it lists what that variable has (`nums.` on a `vector` offers
+  `push_back`, `size`…; `sc.` on a `Scanner` offers `nextInt`, `nextLine`…; `Math.` offers `max`,
+  `sqrt`…), including your own structs and classes and the elements of vectors and arrays. It also
+  offers your own variables and functions, headers after `#include <`, Java imports, keywords and
+  snippets (`for`, `main`, `fastio`, `sout`). It all runs in your browser, so it works offline and
+  on college networks; it doesn't check your code for errors.
 
 ## Around the library
 

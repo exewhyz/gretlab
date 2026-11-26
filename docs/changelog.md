@@ -8,6 +8,13 @@ aren't listed.
 
 ## 26 November 2026
 
+### Suggestions in C, C++ and Java
+
+- The editor now suggests as you type in C, C++ and Java, as it already did in Python and
+  JavaScript: what a variable has after a dot (a vector's `push_back`, a Scanner's `nextInt`,
+  `Math.max`, your own structs' fields), your own names, headers, imports, keywords and snippets.
+  It runs in the browser, with nothing to install.
+
 ### JavaScript runs in the browser again
 
 - Since the stricter browser security policy came in this morning, running JavaScript in the

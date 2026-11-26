@@ -10,7 +10,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./totp": "./src/totp.ts",
-    "./integrations": "./src/integrations.ts"
+    "./integrations": "./src/integrations.ts",
+    "./completion": "./src/completion.ts"
   },
   "dependencies": {
     "zod": "^4.6.7"

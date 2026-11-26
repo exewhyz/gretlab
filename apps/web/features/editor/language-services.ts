@@ -1,4 +1,5 @@
 import type { SourceFile } from "@workspace/judge"
+import { completeAt, type CompletionKind } from "@workspace/judge/completion"
 import type * as Monaco from "monaco-editor"
 
 import { LAB_CONFIG } from "@/features/lab/config"
@@ -87,31 +88,6 @@ function requestPythonCompletions(
   })
 }
 
-/* ---------- keyword snippets, for languages with no in-browser language server ---------- */
-
-const CPP_SNIPPETS: Record<string, string> = {
-  for: "for (int ${1:i} = 0; $1 < ${2:n}; $1++) {\n\t$0\n}",
-  while: "while (${1:condition}) {\n\t$0\n}",
-  if: "if (${1:condition}) {\n\t$0\n}",
-  main: "int main() {\n\t$0\n\treturn 0;\n}",
-  cout: "std::cout << ${1:value} << '\\n';",
-  cin: "std::cin >> ${1:value};",
-  vector: "std::vector<${1:int}> ${2:name};",
-  printf: 'printf("${1:%d}\\n", ${2:value});',
-  scanf: 'scanf("${1:%d}", &${2:value});',
-  include: "#include <${1:iostream}>",
-}
-
-const JAVA_SNIPPETS: Record<string, string> = {
-  for: "for (int ${1:i} = 0; $1 < ${2:n}; $1++) {\n\t$0\n}",
-  while: "while (${1:condition}) {\n\t$0\n}",
-  if: "if (${1:condition}) {\n\t$0\n}",
-  main: "public static void main(String[] args) {\n\t$0\n}",
-  sout: "System.out.println(${1:value});",
-  scanner: "java.util.Scanner ${1:in} = new java.util.Scanner(System.in);",
-  class: "public class ${1:Name} {\n\t$0\n}",
-}
-
 /* ---------- registration ---------- */
 
 type FilesGetter = () => SourceFile[]
@@ -182,28 +158,59 @@ export function registerLanguageServices(monaco: typeof Monaco) {
     },
   })
 
-  const snippets: [string, Record<string, string>][] = [
-    ["c", CPP_SNIPPETS],
-    ["cpp", CPP_SNIPPETS],
-    ["java", JAVA_SNIPPETS],
-  ]
-  for (const [language, table] of snippets) {
+  // C, C++ and Java: read from the student's files in the browser (packages/judge/src/completion.ts).
+  const kinds: Record<CompletionKind, Monaco.languages.CompletionItemKind> = {
+    keyword: monaco.languages.CompletionItemKind.Keyword,
+    snippet: monaco.languages.CompletionItemKind.Snippet,
+    function: monaco.languages.CompletionItemKind.Function,
+    method: monaco.languages.CompletionItemKind.Method,
+    field: monaco.languages.CompletionItemKind.Field,
+    variable: monaco.languages.CompletionItemKind.Variable,
+    class: monaco.languages.CompletionItemKind.Class,
+    module: monaco.languages.CompletionItemKind.Module,
+    constant: monaco.languages.CompletionItemKind.Constant,
+  }
+  for (const language of ["c", "cpp", "java"] as const) {
     monaco.languages.registerCompletionItemProvider(language, {
+      triggerCharacters: language === "java" ? ["."] : [".", ">", ":", "<"],
       provideCompletionItems(model, position) {
+        const path = pathOfModel(model)
+        const files = getFiles().map((file) =>
+          file.path === path ? { ...file, content: model.getValue() } : file
+        )
+        if (!files.some((file) => file.path === path))
+          files.push({ path, content: model.getValue() })
+        const items = completeAt({
+          language,
+          files,
+          path,
+          offset: model.getOffsetAt(position),
+        })
         const word = model.getWordUntilPosition(position)
+        // Header names hold "/", "+" and ".": replace everything typed since the "<".
+        const line = model.getLineContent(position.lineNumber)
+        const angle = line.lastIndexOf("<", position.column - 2)
+        const startColumn =
+          /^\s*#\s*include\s*</.test(line) && angle >= 0
+            ? angle + 2
+            : word.startColumn
         const range = new monaco.Range(
           position.lineNumber,
-          word.startColumn,
+          startColumn,
           position.lineNumber,
-          word.endColumn
+          position.column
         )
         return {
-          suggestions: Object.entries(table).map(([label, insertText]) => ({
-            label,
-            kind: monaco.languages.CompletionItemKind.Snippet,
-            insertText,
-            insertTextRules:
-              monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          suggestions: items.map((item, index) => ({
+            label: item.label,
+            kind: kinds[item.kind],
+            detail: item.detail,
+            insertText: item.insert,
+            insertTextRules: item.snippet
+              ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+              : undefined,
+            // Keep the engine's order: the student's own names first.
+            sortText: String(index).padStart(4, "0"),
             range,
           })),
         }
