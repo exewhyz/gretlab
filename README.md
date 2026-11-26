@@ -175,7 +175,7 @@ The web app reads these (in development from `apps/web/.env.local`; in productio
 | `METRICS_TOKEN` | no | Turns on `GET /api/metrics` |
 | `NEXT_PUBLIC_ADSENSE_*` | no | Ads on public practice pages (see Ads) |
 | `SANDBOX_RUNTIME`, `RUNNER_CONCURRENCY`, `RUNNER_MEMORY_MB` | runner | Sandbox runtime (`runsc` in production) and capacity |
-| `AUTH_DEV_LOGIN`, `GITHUB_LOOKUP=off`, `LTI_ALLOW_HTTP` | development and tests only | Sign-in without Google, skipping GitHub lookups, http LMS addresses |
+| `AUTH_DEV_LOGIN`, `GITHUB_LOOKUP=off`, `LTI_ALLOW_HTTP`, `SSO_ALLOW_HTTP`, `SSO_DNS_SERVER` | development and tests only | Sign-in without Google, skipping GitHub lookups, http LMS and identity-provider addresses, a DNS server to prove SSO domains with (the tests' fake one) |
 
 ## Add things
 

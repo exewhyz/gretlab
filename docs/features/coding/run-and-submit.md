@@ -40,18 +40,22 @@ The labels below are the app's own (`packages/judge/src/verdicts.ts`).
 | Accepted | A submission passed every test (Submit only) |
 | Sample cases passed | A Run whose sample cases all matched (never called Accepted) |
 | Finished | A Run on your own input, with nothing to compare against |
-| Wrong answer | Output differed from the expected output on a test |
+| Wrong answer | Output differed from the expected output on a test (or the problem's checker program said it's wrong) |
+| Partially correct | The problem's checker program gave part of a test's points |
 | Time limit exceeded | A test ran longer than its limit |
 | Memory limit exceeded | A test used more memory than allowed |
 | Output limit exceeded | The program printed more than allowed |
 | Runtime error | The program crashed |
 | Compilation error | The code didn't compile |
-| System error | The judge failed, not your code; graded work is retried automatically |
+| System error | The judge failed, not your code (or the problem's checker program did); graded work is retried automatically |
+| Skipped | A test not run because an earlier test in its group failed (shown per test, never for a whole submission) |
 
 ## Hidden tests
 
 For hidden tests, students see the verdict and timing only, never the input, output or expected output.
-Staff see everything. The expected output never enters the sandbox: the runner compares outside it.
+Staff see everything. The expected output never enters the sandbox that runs the student's code: the
+runner compares outside it, or, for a problem with a checker program, hands it only to the checker's
+own sandbox (see [Write a checker program](/features/coding/problems-and-practice/#write-a-checker-program)).
 
 ## Where code runs
 

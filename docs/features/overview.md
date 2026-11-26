@@ -11,7 +11,9 @@ organization, and **the lab**, the coding judge. This page maps them; each has i
 The `coding` module: on for every kind from the start, and switchable off.
 
 - [Problems and practice](/features/coding/problems-and-practice/): the public library, members-only
-  problems, the daily challenge, lists, study plans, profiles and the leaderboard.
+  problems, the daily challenge, lists, study plans, profiles and the leaderboard; solution posts,
+  suggestions as you type in every language, and how output is checked (tolerances, any order,
+  test groups, checker programs).
 - [Run and Submit](/features/coding/run-and-submit/): trying code on the samples, and grading it on
   every test.
 - [Where code runs](/features/coding/where-code-runs/): the server or the student's browser, set by the
@@ -22,8 +24,9 @@ The `coding` module: on for every kind from the start, and switchable off.
   in assignments, exams, contests and the daily challenge.
 - [Lab exams](/features/coding/lab-exams/): one timed sitting per student, limited to the lab's
   network, with the whole site locked to the exam.
-- [Contests](/features/coding/contests/): ICPC or IOI scoring, a scoreboard that can freeze, and
-  questions beside problems.
+- [Contests](/features/coding/contests/): ICPC or IOI scoring, a scoreboard that can freeze,
+  questions beside problems, ratings, virtual contests, and organizers replaying how code was
+  written.
 
 - [Templates](/features/coding/templates/): an assignment or exam written once, used for many classes.
 - [Courses](/features/coding/courses/): modules of practice with release rules.
@@ -85,4 +88,6 @@ The `coding` module: on for every kind from the start, and switchable off.
 - [Sign-in and two-factor](/features/platform/two-factor/), [Activity log](/features/platform/activity-log/),
   [Platform staff and organizations](/features/platform/platform-staff/), [LTI 1.3](/features/platform/lti/)
   and [Site settings, search and legal](/features/platform/site-settings/).
+- [College single sign-on](/features/platform/single-sign-on/), [Your logo and colour](/features/platform/branding/)
+  and [Plans and billing](/features/platform/plans-and-billing/).
 - The [organization API](/api/) has its own guide.

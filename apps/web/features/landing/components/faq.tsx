@@ -24,16 +24,17 @@ const QUESTIONS: Question[] = [
     q: "What is GretLab?",
     a: "A coding lab for colleges and cohort programs. Students write code in the browser, a judge runs it against hidden tests, and the mark lands in the gradebook the same minute. Attendance, semesters and cohort runs live around it.",
   },
-  { q: "Which languages can students use?", a: "Python, JavaScript, C, C++ and Java, in an editor that saves as they type and follows them to any computer." },
+  { q: "Which languages can students use?", a: "Python, JavaScript, C, C++ and Java, in an editor that suggests as they type, saves as they go and follows them to any computer." },
   {
     q: "Is it safe to run students' code?",
-    a: "Every run on the server happens in a throwaway gVisor container with no network, a read-only system, and limits on memory, time and processes. Hidden tests and reference solutions never go inside it.",
+    a: "Every run on the server happens in a throwaway gVisor container with no network, a read-only system, and limits on memory, time and processes. Hidden tests and reference solutions never go inside a student's container.",
   },
   {
     q: "Can we hold lab exams on it?",
     a: "Yes. Each student gets one timed sitting, which can be limited to your lab's network. While it runs, the rest of the site is locked to the exam, and leaving the tab or full screen, or pasting, is recorded for the teacher.",
   },
-  { q: "How do you catch copied code?", a: "Similarity checks compare every submission in a class or cohort and still find code whose names have been changed." },
+  { q: "How do you catch copied code?", a: "Similarity checks compare every submission in a class or cohort, still find code whose names have been changed, and show a pair side by side. Contest organizers can also play back how each solution was written, with sudden pastes pointed out." },
+  { q: "Can a problem accept more than one right answer?", a: "Yes. Numbers can be accepted within a tolerance, lines in any order, spacing and case ignored, or a teacher can write a small checker program that decides, with partial marks." },
   {
     q: "Does it handle semesters and credits?",
     a: "Yes: semesters, course credits, SGPA and CGPA on a grade card, attendance by course with a minimum to sit exams, and course and program outcome (CO–PO) attainment.",
@@ -46,7 +47,7 @@ const QUESTIONS: Question[] = [
   { q: "Can students practise on their own?", a: "Yes. A public problem library with hints, editorials and a daily challenge is free with an account." },
   {
     q: "Who can see our data?",
-    a: "Only your organization, and inside it only the people each role allows; it's checked on every request. Two-factor sign-in and an activity log are built in.",
+    a: "Only your organization, and inside it only the people each role allows; it's checked on every request. Two-factor sign-in (passkeys too), college single sign-on and an activity log are built in.",
     link: { href: "/privacy", label: "Read the privacy policy" },
   },
 ]
