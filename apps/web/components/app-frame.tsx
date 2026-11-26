@@ -134,6 +134,8 @@ export function AppFrame({
   brand: {
     /** Initials on a tile, or "logo" for GretLab's own mark. */
     mark: string
+    /** An organization's own logo, shown in place of the initials. */
+    logo?: string | null
     title?: string
     subtitle?: string
     href: string
@@ -171,6 +173,14 @@ export function AppFrame({
                 >
                   {brand.mark === "logo" ? (
                     <LogoMark className="size-8 shrink-0 text-ink" />
+                  ) : brand.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- an uploaded image, served by redirect
+                    <img
+                      src={brand.logo}
+                      alt=""
+                      data-testid="org-logo"
+                      className="size-8 shrink-0 rounded-md bg-card object-contain"
+                    />
                   ) : (
                     <span
                       aria-hidden="true"

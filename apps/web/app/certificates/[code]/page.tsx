@@ -1,4 +1,7 @@
 import type { Metadata } from "next"
+import type { CSSProperties } from "react"
+
+import { accentVars } from "@workspace/judge"
 
 import { verifyCertificate } from "@/features/certificates/server"
 import { getSettings } from "@/features/settings/server"
@@ -23,12 +26,24 @@ export default async function Page({ params }: { params: Promise<{ code: string 
       </main>
     )
   }
+  // The organization's colour in place of GretLab's, on the certificate only (checked when saved).
+  const accent = c.brand?.accent ? (accentVars(c.brand.accent) as CSSProperties) : undefined
   return (
     <main className="mx-auto grid min-h-dvh max-w-3xl content-center gap-4 p-6 print:p-0">
       <article
         data-testid="certificate"
+        style={accent}
         className="grid gap-5 rounded-2xl border-4 border-double border-primary/50 bg-card p-10 text-center shadow-sm print:shadow-none"
       >
+        {c.brand?.logo && (
+          // eslint-disable-next-line @next/next/no-img-element -- an uploaded image, served by redirect
+          <img
+            src={c.brand.logo}
+            alt={c.org ?? ""}
+            data-testid="certificate-logo"
+            className="mx-auto size-16 object-contain"
+          />
+        )}
         <p className="text-caption-upper tracking-widest text-primary uppercase">
           Certificate{c.org ? ` · ${c.org}` : ""}
         </p>

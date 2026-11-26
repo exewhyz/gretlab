@@ -13,7 +13,7 @@ import { createRequire } from "node:module"
 const ROOT = new URL("../", import.meta.url).pathname
 const { chromium } = createRequire(ROOT + "package.json")("playwright")
 const { encode } = createRequire(ROOT + "apps/web/")("next-auth/jwt")
-const { PDFDocument } = createRequire(ROOT + "apps/web/")("pdf-lib")
+const { PDFDocument, PDFName } = createRequire(ROOT + "apps/web/")("pdf-lib")
 const BASE = process.argv[2] ?? "http://localhost:3100"
 const SHOTS = process.argv[3] ?? "/tmp/gretlab-e2e/"
 const SECRET = process.env.NEXTAUTH_SECRET ?? "e2e-only-secret"
@@ -132,6 +132,29 @@ check("a teacher of the section can print them", (await teacher.pdf(`${O}/studen
 check("a student can't", (await k1.pdf(`${O}/students/id-cards/pdf?groupId=${a.id}`)).status === 403)
 check("a grade isn't a section", (await owner.pdf(`${O}/students/id-cards/pdf?groupId=${g.id}`)).status === 404)
 check("a section is needed", (await owner.pdf(`${O}/students/id-cards/pdf`)).status === 400)
+
+// ---------- branded: the school's logo and colour on its documents
+// Images drawn, not counting a PNG's transparency, which pdf-lib keeps as a second image (its SMask).
+const images = (r) => {
+  if (!r.doc) return -1
+  const all = r.doc.context.enumerateIndirectObjects().filter(([, o]) => o?.dict?.get?.(PDFName.of("Subtype"))?.toString() === "/Image")
+  const masks = new Set(all.map(([, o]) => o.dict.get(PDFName.of("SMask"))?.toString()).filter(Boolean))
+  return all.filter(([ref]) => !masks.has(ref.toString())).length
+}
+check("unbranded documents carry no image", images(ids) === 0 && images(tcPdf) === 0)
+const logoForm = new FormData()
+logoForm.append("file", new Blob([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64")], { type: "image/png" }), "logo.png")
+const ownerCookie = `next-auth.session-token=${await encode({ token: { email: "pdf-o@example.com" }, secret: SECRET })}`
+const logoSaved = await fetch(`${BASE}/api/v1${O}/branding/logo`, { method: "POST", headers: { cookie: ownerCookie, origin: BASE }, body: logoForm })
+await owner(`${O}/branding`, { method: "PUT", body: { accent: "#2f6fde" } })
+check("the school sets a logo and colour", logoSaved.ok)
+const brandedIds = await owner.pdf(`${O}/students/id-cards/pdf?groupId=${a.id}`)
+const brandedTc = await owner.pdf(`${O}/transfer-certificates/${tc.id}/pdf`)
+const brandedCard = await owner.pdf(`${O}/report-cards/class/${a.id}/pdf?yearId=${year.id}`)
+save("id-cards-branded.pdf", brandedIds)
+save("transfer-certificate-branded.pdf", brandedTc)
+check("its ID cards, transfer certificates and report cards carry the logo (embedded once each)", images(brandedIds) === 1 && images(brandedTc) === 1 && images(brandedCard) === 1, [images(brandedIds), images(brandedTc), images(brandedCard)].join(","))
+check("...and still print on the same pages", brandedIds.doc?.getPageCount() === 1 && brandedTc.doc?.getPageCount() === 1)
 
 // ---------- the buttons
 const browser = await chromium.launch()

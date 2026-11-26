@@ -291,6 +291,15 @@ export function OrgProfileView({ slug }: { slug: string }) {
         ← Organizations
       </Link>
       <div className="mt-2 mb-1 flex flex-wrap items-center gap-3">
+        {data.brand.logo && (
+          // eslint-disable-next-line @next/next/no-img-element -- an uploaded image, served by redirect
+          <img
+            src={data.brand.logo}
+            alt=""
+            data-testid="org-public-logo"
+            className="size-12 rounded-md border border-hairline bg-card object-contain p-1"
+          />
+        )}
         <h1 className="text-display-lg text-ink">{data.name}</h1>
         <TypeBadge type={data.type} />
       </div>

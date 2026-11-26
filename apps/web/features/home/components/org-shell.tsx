@@ -48,9 +48,15 @@ import {
   type Icon,
 } from "@phosphor-icons/react"
 import { useQuery } from "@tanstack/react-query"
-import { KINDS, ORG_NAV, visibleOrgNav, type OrgType } from "@workspace/judge"
+import {
+  accentVars,
+  KINDS,
+  ORG_NAV,
+  visibleOrgNav,
+  type OrgType,
+} from "@workspace/judge"
 import { usePathname } from "next/navigation"
-import type { ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 
 import { AppFrame } from "@/components/app-frame"
 import { api } from "@/lib/api/client"
@@ -300,6 +306,26 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
 }
 
 /**
+ * Wears the organization's brand colour in place of GretLab's while its pages are open: set on
+ * the document, so dialogs, sheets and menus (rendered outside the frame) wear it too, and taken
+ * off when leaving them.
+ */
+function useBrandColour(accent: string | null) {
+  useEffect(() => {
+    if (!accent) return
+    const root = document.documentElement
+    const vars = accentVars(accent)
+    for (const [name, value] of Object.entries(vars))
+      root.style.setProperty(name, value)
+    root.dataset.brand = accent
+    return () => {
+      for (const name of Object.keys(vars)) root.style.removeProperty(name)
+      delete root.dataset.brand
+    }
+  }, [accent])
+}
+
+/**
  * The frame of every school page: a sidebar shaped by who you are here (full on laptops
  * and PCs, an icon rail on tablets, a slide-out menu on phones) and a header with the
  * school, your role, notifications, theme and account (components/app-frame.tsx).
@@ -312,6 +338,7 @@ export function OrgShell({
   children: ReactNode
 }) {
   const { data: shell } = useShell(slug)
+  useBrandColour(shell?.org.brand.accent ?? null)
   const pathname = usePathname()
   const groups = shell ? navFor(shell) : []
   const isActive = (href: string) =>
@@ -322,6 +349,7 @@ export function OrgShell({
     <AppFrame
       brand={{
         mark: (shell?.org.name ?? "·").slice(0, 2).toUpperCase(),
+        logo: shell?.org.brand.logo,
         title: shell?.org.name,
         subtitle: shell
           ? `${shell.role}${!shell.org.active ? " · Suspended" : ""}`

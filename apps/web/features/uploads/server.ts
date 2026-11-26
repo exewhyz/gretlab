@@ -47,6 +47,19 @@ export async function saveUpload(user: User, file: File) {
       "Only people who write content can upload images."
     )
   }
+  return storeImage(user, file)
+}
+
+/**
+ * Stores an image once its uploader is allowed (the caller decides who may): checked by its
+ * bytes, counted against the uploader's day, kept once per content. `only` narrows the types
+ * (logos are PNG or JPEG, which PDFs can hold).
+ */
+export async function storeImage(
+  user: User,
+  file: File,
+  only?: { types: readonly string[]; message: string }
+) {
   if (file.size > MAX_UPLOAD_BYTES) {
     throw new ApiError(413, "too_large", "Images can be up to 2 MB.")
   }
@@ -59,6 +72,8 @@ export async function saveUpload(user: User, file: File) {
       "Upload a PNG, JPEG, GIF or WebP image."
     )
   }
+  if (only && !only.types.includes(contentType))
+    throw new ApiError(415, "unsupported_image", only.message)
   const db = getDb()
   const [today] = await db
     .select({ total: count() })
@@ -166,4 +181,38 @@ export async function uploadResponse(id: string) {
       "Content-Disposition": "inline",
     },
   })
+}
+
+/**
+ * An uploaded image's bytes and type, for drawing it into a PDF (an organization's logo); null
+ * when it's gone or can't be read, so a document is never refused for its decoration.
+ */
+export async function imageBytes(id: string) {
+  if (!UUID.test(id)) return null
+  const [row] = await getDb()
+    .select({
+      contentType: uploads.contentType,
+      data: uploads.data,
+      storedIn: uploads.storedIn,
+      key: uploads.key,
+    })
+    .from(uploads)
+    .where(eq(uploads.id, id))
+  if (!row) return null
+  if (row.storedIn === "r2" && row.key) {
+    try {
+      const link = await signedUrl("public", row.key, 60, "logo", true)
+      const res = await fetch(link, { signal: AbortSignal.timeout(4000) })
+      if (!res.ok) return null
+      return {
+        contentType: row.contentType,
+        bytes: new Uint8Array(await res.arrayBuffer()),
+      }
+    } catch {
+      return null
+    }
+  }
+  return row.data
+    ? { contentType: row.contentType, bytes: new Uint8Array(row.data) }
+    : null
 }

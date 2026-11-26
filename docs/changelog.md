@@ -8,6 +8,13 @@ aren't listed.
 
 ## 26 November 2026
 
+### Your logo and colour
+
+- Organizations can set their own logo and brand colour under **Settings › Branding**. They show
+  on the organization's pages (the sidebar, buttons and links), its public profile, its
+  certificates, and its report cards, transfer certificates and ID cards.
+- The colour is checked so it shows up on both the light and dark page.
+
 ### Watch how contest code was written
 
 - Whoever runs a contest can open any cell of its leaderboard to play back how that contestant

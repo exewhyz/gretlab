@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { pdfBrand } from "@/features/orgs/pdf-brand"
 import { route } from "@/lib/api/route"
 import { today } from "@/features/catalog/server"
 import { reportCardsPdf } from "@/features/results/pdf"
@@ -18,7 +19,11 @@ export const GET = route(
       params.studentId ?? "",
       yearId
     )
-    const doc = await reportCardsPdf([card], printedDay(await today()))
+    const doc = await reportCardsPdf(
+      [card],
+      printedDay(await today()),
+      await pdfBrand(params.slug ?? "")
+    )
     return pdfResponse(
       doc,
       `report-card-${card.student.name}-${card.year.name}.pdf`

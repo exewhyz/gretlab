@@ -2,6 +2,7 @@ import { printedDay } from "@/lib/pdf/dates"
 import {
   A4,
   COLORS,
+  embedBrand,
   fit,
   footers,
   letterhead,
@@ -27,7 +28,9 @@ const GENDER: Record<string, string> = {
 }
 
 export async function transferCertificatePdf(
-  tc: Awaited<ReturnType<typeof transferCertificate>>
+  tc: Awaited<ReturnType<typeof transferCertificate>>,
+  /** The organization's logo and colour (features/orgs/pdf-brand.ts). */
+  branding: Parameters<typeof embedBrand>[1] = null
 ) {
   const d = tc.details
   const { doc, fonts } = await newDocument({
@@ -35,7 +38,13 @@ export async function transferCertificatePdf(
     author: tc.org.name,
   })
   const w = new Writer(doc, fonts, { margin: mm(20) })
-  letterhead(w, tc.org.name, "Transfer certificate")
+  letterhead(
+    w,
+    tc.org.name,
+    "Transfer certificate",
+    undefined,
+    await embedBrand(doc, branding)
+  )
   w.text(`No. ${tc.number}`, { bold: true, size: 10 })
   w.text(`Issued on ${printedDay(tc.issuedOn)}`, {
     size: 9,
@@ -102,7 +111,9 @@ export async function transferCertificatePdf(
 
 export async function idCardsPdf(
   data: Awaited<ReturnType<typeof idCardData>>,
-  printedOn: string
+  printedOn: string,
+  /** The organization's logo and colour (features/orgs/pdf-brand.ts). */
+  branding: Parameters<typeof embedBrand>[1] = null
 ) {
   const { doc, fonts } = await newDocument({
     title: `ID cards: ${data.class}, ${data.year}`,
@@ -118,6 +129,9 @@ export async function idCardsPdf(
   const top = A4.height - (A4.height - rows * cardH - (rows - 1) * gapY) / 2
   const perPage = cols * rows
   const t = (s: string) => printable(fonts, s)
+  const brand = await embedBrand(doc, branding)
+  // Room on the band for the logo, at its right.
+  const logoBox = brand.image ? mm(9) : 0
   let page = doc.addPage([A4.width, A4.height])
   data.students.forEach((s, i) => {
     if (i > 0 && i % perPage === 0) page = doc.addPage([A4.width, A4.height])
@@ -140,21 +154,41 @@ export async function idCardsPdf(
       y: y + cardH - band,
       width: cardW,
       height: band,
-      color: COLORS.primary,
+      color: brand.color,
     })
-    page.drawText(fit(fonts.bold, t(data.org.name), 9.5, cardW - mm(8)), {
-      x: x + mm(4),
-      y: y + cardH - mm(5.6),
-      size: 9.5,
-      font: fonts.bold,
-      color: COLORS.white,
-    })
+    if (brand.image) {
+      const size = brand.image.scaleToFit(mm(9), mm(9))
+      // A white tile under it, so a logo of any colour shows on the band.
+      page.drawRectangle({
+        x: x + cardW - mm(11),
+        y: y + cardH - mm(10),
+        width: mm(9),
+        height: mm(9),
+        color: COLORS.white,
+      })
+      page.drawImage(brand.image, {
+        x: x + cardW - mm(11) + (mm(9) - size.width) / 2,
+        y: y + cardH - mm(10) + (mm(9) - size.height) / 2,
+        width: size.width,
+        height: size.height,
+      })
+    }
+    page.drawText(
+      fit(fonts.bold, t(data.org.name), 9.5, cardW - mm(8) - logoBox),
+      {
+        x: x + mm(4),
+        y: y + cardH - mm(5.6),
+        size: 9.5,
+        font: fonts.bold,
+        color: brand.onColor,
+      }
+    )
     page.drawText(t(`Student ID card · ${data.year}`), {
       x: x + mm(4),
       y: y + cardH - mm(9.2),
       size: 6.5,
       font: fonts.regular,
-      color: COLORS.white,
+      color: brand.onColor,
     })
     // A circle with initials where a photo would go.
     const r = mm(9)

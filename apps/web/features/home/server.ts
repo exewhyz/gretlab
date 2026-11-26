@@ -3,6 +3,7 @@
  * each view live here; the dashboards themselves are in admin-home, teacher-home,
  * member-home (student and parent) and staff-home, on shared helpers in home-core.
  */
+import { brandOf } from "@/features/orgs/brand"
 import {
   getDb,
   guardians,
@@ -99,6 +100,8 @@ export async function orgShell(slug: string, user: User) {
       name: ctx.org.name,
       type: ctx.org.type,
       active: ctx.org.active,
+      /** Its logo and colour, worn by the frame (features/orgs/brand.ts). */
+      brand: brandOf(ctx.org),
     },
     views,
     /** How the header names you here: your roles, else what you are. */

@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { pdfBrand } from "@/features/orgs/pdf-brand"
 import { ApiError, route } from "@/lib/api/route"
 import { today } from "@/features/catalog/server"
 import { idCardsPdf } from "@/features/records/pdf"
@@ -15,7 +16,11 @@ export const GET = route(
     if (!groupId) throw new ApiError(400, "bad_filter", "Choose a section.")
     const data = await idCardData(params.slug ?? "", user, groupId)
     return pdfResponse(
-      await idCardsPdf(data, printedDay(await today())),
+      await idCardsPdf(
+        data,
+        printedDay(await today()),
+        await pdfBrand(params.slug ?? "")
+      ),
       `id-cards-${data.class}-${data.year}.pdf`
     )
   }

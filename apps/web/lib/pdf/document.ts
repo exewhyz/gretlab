@@ -1,5 +1,13 @@
 import fontkit from "@pdf-lib/fontkit"
-import { PDFDocument, rgb, type PDFFont, type PDFPage, type RGB } from "pdf-lib"
+import {
+  PDFDocument,
+  rgb,
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+  type RGB,
+} from "pdf-lib"
+import { onAccent } from "@workspace/judge"
 
 import { NOTO_SANS_BOLD, NOTO_SANS_REGULAR } from "./fonts"
 
@@ -12,7 +20,7 @@ import { NOTO_SANS_BOLD, NOTO_SANS_REGULAR } from "./fonts"
 export const A4 = { width: 595.28, height: 841.89 }
 export const mm = (n: number) => (n * 72) / 25.4
 
-const hex = (h: string): RGB =>
+export const hex = (h: string): RGB =>
   rgb(
     parseInt(h.slice(1, 3), 16) / 255,
     parseInt(h.slice(3, 5), 16) / 255,
@@ -50,6 +58,49 @@ export async function newDocument(meta: { title: string; author: string }) {
   doc.setCreator("GretLab")
   doc.setProducer("GretLab")
   return { doc, fonts: { regular, bold } satisfies Fonts }
+}
+
+/** An organization's branding as a document draws it: its logo and its colour. */
+export interface DocBrand {
+  image: PDFImage | null
+  /** The strip and bands; GretLab's orange without one. */
+  color: RGB
+  /** Text on the colour. */
+  onColor: RGB
+}
+
+/**
+ * Embeds an organization's logo (PNG or JPEG) and colour once per document. A logo that won't
+ * embed is left out rather than failing the document.
+ */
+export async function embedBrand(
+  doc: PDFDocument,
+  brand: {
+    logo: { bytes: Uint8Array; contentType: string } | null
+    accent: string | null
+  } | null
+): Promise<DocBrand> {
+  let image: PDFImage | null = null
+  if (brand?.logo) {
+    try {
+      image =
+        brand.logo.contentType === "image/png"
+          ? await doc.embedPng(brand.logo.bytes)
+          : brand.logo.contentType === "image/jpeg"
+            ? await doc.embedJpg(brand.logo.bytes)
+            : null
+    } catch {
+      image = null
+    }
+  }
+  return {
+    image,
+    color: brand?.accent ? hex(brand.accent) : COLORS.primary,
+    onColor:
+      brand?.accent && onAccent(brand.accent) !== "#ffffff"
+        ? COLORS.ink
+        : COLORS.white,
+  }
 }
 
 /** The PDF as a download (or shown inline in the browser). */
@@ -331,20 +382,35 @@ export class Writer {
   }
 }
 
-/** The school's name and the document's title across the top of a page. */
+/**
+ * The school's name and the document's title across the top of a page: its colour along the
+ * top edge and its logo above the name, when it has them.
+ */
 export function letterhead(
   w: Writer,
   school: string,
   title: string,
-  sub?: string
+  sub?: string,
+  brand?: DocBrand
 ) {
   w.page.drawRectangle({
     x: 0,
     y: A4.height - 6,
     width: A4.width,
     height: 6,
-    color: COLORS.primary,
+    color: brand?.color ?? COLORS.primary,
   })
+  if (brand?.image) {
+    const size = brand.image.scaleToFit(mm(40), mm(16))
+    w.ensure(size.height + 6)
+    w.page.drawImage(brand.image, {
+      x: (A4.width - size.width) / 2,
+      y: w.y - size.height,
+      width: size.width,
+      height: size.height,
+    })
+    w.gap(size.height + 6)
+  }
   w.gap(4)
   w.text(school, { size: 16, bold: true, align: "center" })
   w.text(title.toUpperCase(), { size: 9, color: COLORS.muted, align: "center" })

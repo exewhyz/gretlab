@@ -1,5 +1,6 @@
 import { randomInt } from "node:crypto"
 
+import { brandOf } from "@/features/orgs/brand"
 import { certificates, getDb, organizations, sql, users, type User } from "@workspace/db"
 import { KINDS } from "@workspace/judge"
 
@@ -182,7 +183,7 @@ export async function verifyCertificate(code: string) {
   if (!/^[2-9A-Z]{5}-[2-9A-Z]{5}$/.test(clean)) return null
   const issuer = sql.sql<string | null>`(select coalesce(name, email) from users where id = ${certificates.issuedBy})`
   const [row] = await getDb()
-    .select({ c: certificates, name: users.name, handle: users.handle, org: organizations.name, issuer })
+    .select({ c: certificates, name: users.name, handle: users.handle, org: organizations.name, branding: organizations.branding, issuer })
     .from(certificates)
     .innerJoin(users, eq(certificates.userId, users.id))
     .leftJoin(organizations, eq(certificates.orgId, organizations.id))
@@ -195,6 +196,8 @@ export async function verifyCertificate(code: string) {
     title: row.c.title,
     detail: row.c.detail,
     org: row.org,
+    /** The organization's logo and colour, worn by the certificate (features/orgs/brand.ts). */
+    brand: row.branding ? brandOf({ branding: row.branding }) : null,
     issuer: row.issuer?.includes("@") ? null : row.issuer,
     issuedAt: row.c.issuedAt,
     revokedAt: row.c.revokedAt,

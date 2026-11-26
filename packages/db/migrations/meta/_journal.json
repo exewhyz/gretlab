@@ -729,6 +729,13 @@
       "when": 1795666149431,
       "tag": "0103_sso_domain_claims",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1795670730101,
+      "tag": "0104_org_branding",
+      "breakpoints": true
     }
   ]
 }

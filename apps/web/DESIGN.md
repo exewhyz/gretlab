@@ -206,6 +206,7 @@ A warm paper-and-ink neutral range with one saturated orange, plus three status 
 
 ### Primary
 - **Signal Orange** (`primary`): the primary button, the check in the mark, the first chart series, selected and current markers, and links that are the main action. It's the same in both themes.
+- **An organization's colour**: an organization may set its own brand colour (Settings › Branding), which replaces `primary`, `primary-active` (15% darker), `primary-foreground` (white or ink, whichever contrasts more) and the sidebar's on its pages, its certificates and its PDFs (`accentVars` in `packages/judge/src/branding.ts`, set on the document by `OrgShell`). It must reach 3:1 against both canvases, so everything that uses `primary` keeps working in both themes. Don't build anything that only works in orange.
 - **Pressed Orange** (`primary-active`): hover and pressed state of orange surfaces, and orange text that has to read on cream (`text-primary-active`).
 
 ### Neutral

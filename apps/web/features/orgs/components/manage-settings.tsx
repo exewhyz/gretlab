@@ -22,6 +22,7 @@ import {
 import { useViewer } from "@/features/account/use-viewer"
 import { api } from "@/lib/api/client"
 
+import { BrandingCard } from "./branding-card"
 import { ORG_TYPE } from "./public"
 
 import { useSummary, type Message, type Summary } from "./manage-shared"
@@ -265,6 +266,7 @@ export function SettingsForm({
           onSaved={onSaved}
         />
       )}
+      <BrandingCard slug={slug} />
       <ModulesCard slug={slug} org={initial} onSaved={onSaved} />
     </>
   )

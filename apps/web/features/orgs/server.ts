@@ -16,6 +16,7 @@ import {
   type Organization,
   type User,
 } from "@workspace/db"
+import { brandOf } from "@/features/orgs/brand"
 import {
   FREE_FEATURES,
   ancestry,
@@ -522,6 +523,8 @@ export async function getOrganization(slug: string, viewer: User | null) {
     type: org.type,
     description: org.description,
     website: org.website,
+    /** Its logo and colour (features/orgs/brand.ts). */
+    brand: brandOf(org),
     groupLevels: org.groupLevels,
     members: counted?.total ?? 0,
     joinOption: joinOptionFor(org, viewer),

@@ -28,6 +28,7 @@ import type {
   SourceFile,
   Verdict,
   Checker,
+  Branding,
 } from "@workspace/judge"
 
 const id = () => uuid("id").primaryKey().defaultRandom()
@@ -1031,6 +1032,11 @@ export const organizations = pgTable("organizations", {
     .$type<"off" | "staff" | "everyone">()
     .notNull()
     .default("off"),
+  /**
+   * Its logo (an upload) and brand colour, worn on its pages, certificates and PDFs in place of
+   * GretLab's orange (packages/judge/src/branding.ts, apps/web/features/orgs/branding.ts).
+   */
+  branding: jsonb("branding").$type<Branding>().notNull().default({}),
   /** The week (its Monday, YYYY-MM-DD) of the last weekly summary sent, so each goes once. */
   digestWeek: text("digest_week"),
   createdAt: createdAt(),

@@ -2,6 +2,7 @@ import { type RGB } from "pdf-lib"
 
 import {
   COLORS,
+  embedBrand,
   footers,
   letterhead,
   newDocument,
@@ -32,7 +33,9 @@ const RESULT: Record<string, { label: string; color: RGB }> = {
 
 export async function reportCardsPdf(
   cards: (ReportCardData & { credits?: CreditCardData | null })[],
-  printedOn: string
+  printedOn: string,
+  /** The organization's logo and colour (features/orgs/pdf-brand.ts). */
+  branding: Parameters<typeof embedBrand>[1] = null
 ) {
   const first = cards[0]
   const { doc, fonts } = await newDocument({
@@ -43,9 +46,10 @@ export async function reportCardsPdf(
       : "Report cards",
     author: first?.org.name ?? "GretLab",
   })
+  const brand = await embedBrand(doc, branding)
   for (const card of cards) {
     const w = new Writer(doc, fonts)
-    letterhead(w, card.org.name, "Report card", card.year.name)
+    letterhead(w, card.org.name, "Report card", card.year.name, brand)
     w.facts(
       [
         ["Student", card.student.name],
