@@ -54,9 +54,18 @@ plus 10%; a month is a twelfth of it plus 25%. Payments go through Razorpay: UPI
 banking. GretLab never sees your card or bank details.
 
 - **A period starts the day you pay.** Payments aren't refunded.
-- **Adding** features, students or staff during a period costs only the days left in it.
-- **A smaller plan** costs nothing now and starts at your next period; the page shows it, and
-  renewing starts from it.
+- **Adding** features, students or staff during a period costs only the days left in it, and
+  applies at once.
+- **Removing or lowering** anything waits for your next period: nothing is refunded, and you keep
+  it until then. A change that does both is split: what it adds applies now (and is all you pay
+  for), what it removes waits. The page's **What changes** panel shows both before you pay.
+- **A smaller plan** costs nothing now and starts at your next period; the page shows it, renewing
+  starts from it, and **Keep my current plan** cancels it.
+- **The same plan again** is refused while it's in force. If you open payment in two tabs, the
+  same change shares one payment; a different change replaces the first, and a replaced payment
+  that goes through anyway isn't applied and is refunded.
+- **Only what your kind of organization can use** is offered: a college isn't sold assigned
+  training, a company isn't sold hostels. Those show as "Not for a …".
 - **Monthly, semester or yearly** can be changed in the week before your period renews.
 - You're reminded **a week and a day** before your period ends. Unpaid, the plan is past due for 7
   days, then paused: adding members and staff roles stops until it's paid. Work, records and grades

@@ -8,13 +8,14 @@ import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 
 import { Field, FormMessage, TextArea, TextInput } from "@/components/form"
+import { Figure, Figures } from "@/components/figures"
 import {
   Card,
   Loading,
   PageTitle,
-  PercentBar,
   Table,
 } from "@/features/admin/components/shell"
+import { Meter } from "@/features/home/components/home-parts"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import { formatDate, formatDateTime } from "@/lib/format"
@@ -29,7 +30,7 @@ export const STATUS: Record<
   { label: string; tone: "default" | "secondary" | "destructive" | "outline" }
 > = {
   free: { label: "Free plan", tone: "secondary" },
-  active: { label: "Paid", tone: "default" },
+  active: { label: "Paid", tone: "secondary" },
   past_due: { label: "Payment due", tone: "destructive" },
   paused: { label: "Paused", tone: "destructive" },
   custom: { label: "Set by GretLab", tone: "outline" },
@@ -43,7 +44,7 @@ export function PlanAndBilling({ slug }: { slug: string }) {
   })
   if (!data) return <Loading error={error} />
   return (
-    <div className="mx-auto grid w-full max-w-6xl min-w-0 gap-4">
+    <div className="mx-auto grid w-full max-w-6xl min-w-0 gap-6">
       <PageTitle>Plan and billing</PageTitle>
       {!data.enabled && (
         <p className="text-body-sm text-body" data-testid="billing-off">
@@ -51,7 +52,7 @@ export function PlanAndBilling({ slug }: { slug: string }) {
           charged.
         </p>
       )}
-      <CurrentPlan data={data} />
+      <CurrentPlan slug={slug} data={data} />
       <ChangePlan slug={slug} data={data} />
       <BillingDetails slug={slug} data={data} />
       <Invoices slug={slug} data={data} />
@@ -59,66 +60,116 @@ export function PlanAndBilling({ slug }: { slug: string }) {
   )
 }
 
-function CurrentPlan({ data }: { data: Billing }) {
+/** The plan in force: what it is, when it renews, and how much of it is used. */
+function CurrentPlan({ slug, data }: { slug: string; data: Billing }) {
+  const client = useQueryClient()
   const plan = data.plan
   const status = STATUS[plan?.status ?? "custom"] ?? STATUS.custom!
   const names = new Map(data.catalogue.features.map((f) => [f.key, f.name]))
   const limitless = !plan || plan.features === null
-  const bar = (used: number, bought: number) =>
-    bought > 0 ? Math.round((100 * used) / bought) : null
+  const share = (used: number, bought: number) =>
+    bought > 0 ? (100 * used) / bought : 0
+  const daysLeft = plan?.periodEnd
+    ? Math.ceil((new Date(plan.periodEnd).getTime() - Date.now()) / 86_400_000)
+    : null
+  const keep = useMutation({
+    mutationFn: () => api(`/orgs/${slug}/billing/next`, { method: "DELETE" }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["billing", slug] }),
+    meta: { success: "Your plan renews as it is." },
+  })
+  const usage = (label: string, used: number, bought: number) => (
+    <Figure
+      label={label}
+      value={
+        <span className="tabular-nums">
+          {used.toLocaleString("en-IN")}
+          {!limitless && (
+            <span className="text-body-sm font-normal text-muted-foreground">
+              {" "}
+              of {bought.toLocaleString("en-IN")}
+            </span>
+          )}
+        </span>
+      }
+      tone={!limitless && used > bought ? "bad" : undefined}
+      hint={
+        limitless ? (
+          "No limit"
+        ) : (
+          <Meter value={share(used, bought)} bad={used > bought} />
+        )
+      }
+    />
+  )
   return (
-    <Card data-testid="current-plan" className="grid gap-3">
+    <section data-testid="current-plan" className="grid gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-title-sm text-ink">Your plan</h2>
         <Badge variant={status.tone}>{status.label}</Badge>
       </div>
-      <p>
-        {limitless
-          ? "Every feature, with no limits (your plan from before billing, or one set by GretLab)."
-          : (plan?.features ?? []).map((k) => names.get(k) ?? k).join(" · ")}
-      </p>
-      {plan && !limitless && (
+      <Figures>
+        <Figure
+          label="Plan"
+          value={
+            limitless ? "Everything" : plan?.price ? rupees(plan.price) : "Free"
+          }
+          hint={
+            limitless
+              ? "No limits: from before billing, or set by GretLab"
+              : `${PERIOD_LABEL[plan!.period]}${plan?.price ? ", before GST" : ""}`
+          }
+        />
+        <Figure
+          label="Renews"
+          value={plan?.periodEnd ? formatDate(plan.periodEnd) : "—"}
+          hint={
+            daysLeft === null
+              ? undefined
+              : daysLeft > 0
+                ? `In ${daysLeft} day${daysLeft === 1 ? "" : "s"}`
+                : "Ended"
+          }
+          tone={daysLeft !== null && daysLeft <= 0 ? "bad" : undefined}
+        />
+        {usage("Students", data.usage.students, plan?.students ?? 0)}
+        {usage("Staff", data.usage.staff, plan?.staff ?? 0)}
+      </Figures>
+      {!limitless && (
         <p className="text-caption text-body">
-          {PERIOD_LABEL[plan.period]} ·{" "}
-          {plan.price ? `${rupees(plan.price)} before GST` : "no charge"}
-          {plan.periodEnd && ` · renews ${formatDate(plan.periodEnd)}`}
-        </p>
-      )}
-      {plan?.next && (
-        <p className="text-caption text-body" data-testid="next-plan">
-          From{" "}
-          {plan.periodEnd ? formatDate(plan.periodEnd) : "your next period"}:{" "}
-          {plan.next.students.toLocaleString("en-IN")} students,{" "}
-          {plan.next.staff.toLocaleString("en-IN")} staff,{" "}
-          {plan.next.features.map((k) => names.get(k) ?? k).join(" · ")}. The
-          plan below starts from it.
+          <span className="text-muted-foreground">Included: </span>
+          {(plan?.features ?? []).map((k) => names.get(k) ?? k).join(" · ")}
         </p>
       )}
       {data.limits && <LimitNote limits={data.limits} />}
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div className="grid gap-1">
-          <span className="text-caption text-body">
-            Students: {data.usage.students.toLocaleString("en-IN")}
-            {!limitless && ` of ${plan!.students.toLocaleString("en-IN")}`}
-          </span>
-          {!limitless && (
-            <PercentBar
-              value={bar(data.usage.students, plan!.students)}
-              low={-1}
-            />
-          )}
+      {plan?.next && (
+        <div
+          className="flex flex-wrap items-center gap-3 rounded-lg bg-card px-4 py-3 ring-1 ring-foreground/10"
+          data-testid="next-plan"
+        >
+          <p className="min-w-0 flex-1 text-body-sm text-ink">
+            <span className="font-medium">
+              Changing on{" "}
+              {plan.periodEnd ? formatDate(plan.periodEnd) : "your next period"}
+              :
+            </span>{" "}
+            <span className="text-body">
+              {plan.next.students.toLocaleString("en-IN")} students,{" "}
+              {plan.next.staff.toLocaleString("en-IN")} staff,{" "}
+              {plan.next.features.map((k) => names.get(k) ?? k).join(" · ")}.
+              The plan below starts from it.
+            </span>
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={keep.isPending}
+            onClick={() => keep.mutate()}
+          >
+            Keep my current plan
+          </Button>
         </div>
-        <div className="grid gap-1">
-          <span className="text-caption text-body">
-            Staff: {data.usage.staff.toLocaleString("en-IN")}
-            {!limitless && ` of ${plan!.staff.toLocaleString("en-IN")}`}
-          </span>
-          {!limitless && (
-            <PercentBar value={bar(data.usage.staff, plan!.staff)} low={-1} />
-          )}
-        </div>
-      </div>
-    </Card>
+      )}
+    </section>
   )
 }
 
@@ -151,17 +202,33 @@ function ChangePlan({ slug, data }: { slug: string; data: Billing }) {
             period: "year",
           }
   const [choice, setChoice] = useState<PlanChoice>(start)
+  const footer =
+    data.enabled && data.canPay ? (
+      <PayButton
+        slug={slug}
+        choice={choice}
+        mode={payMode(data, choice)}
+        onDone={() => client.invalidateQueries({ queryKey: ["billing", slug] })}
+      />
+    ) : (
+      <p className="text-caption text-body" data-testid="pay-note">
+        {data.enabled
+          ? "Paying online isn't set up yet. To change your plan, contact GretLab with this plan; we'll set it for you."
+          : "Billing isn't switched on, so there's nothing to pay."}
+      </p>
+    )
   return (
-    <Card data-testid="change-plan" className="grid gap-4">
+    <section data-testid="change-plan" className="grid gap-3">
       <div>
         <h2 className="text-title-sm text-ink">Change your plan</h2>
         <p className="text-caption text-body">
-          Choose features, students and staff, and see the price as you go.
-          Adding mid-period costs only the days left; a smaller plan starts at
-          your next period.
+          What you add applies now, for the days left in this period. What you
+          remove or lower waits for renewal; nothing is refunded.
         </p>
       </div>
       <PlanBuilder
+        kindLabel={data.kind.label}
+        footer={footer}
         catalogue={data.catalogue}
         value={choice}
         onChange={setChoice}
@@ -184,23 +251,7 @@ function ChangePlan({ slug, data }: { slug: string; data: Billing }) {
             : null
         }
       />
-      {data.enabled && data.canPay ? (
-        <PayButton
-          slug={slug}
-          choice={choice}
-          mode={payMode(data, choice)}
-          onDone={() =>
-            client.invalidateQueries({ queryKey: ["billing", slug] })
-          }
-        />
-      ) : (
-        <p className="text-body-sm text-body" data-testid="pay-note">
-          {data.enabled
-            ? "Paying online isn't set up yet. To change your plan, contact GretLab with the plan above; we'll set it for you."
-            : "Billing isn't switched on, so there's nothing to pay."}
-        </p>
-      )}
-    </Card>
+    </section>
   )
 }
 
@@ -255,7 +306,11 @@ function BillingDetails({ slug, data }: { slug: string; data: Billing }) {
         </Field>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+        <Button
+          variant="outline"
+          onClick={() => save.mutate()}
+          disabled={save.isPending}
+        >
           Save billing details
         </Button>
         {save.error && (
@@ -266,15 +321,24 @@ function BillingDetails({ slug, data }: { slug: string; data: Billing }) {
   )
 }
 
+const PAYMENT_STATUS: Record<string, string> = {
+  paid: "Paid",
+  failed: "Failed",
+  created: "Not paid",
+  refund_due: "Refund due (replaced by a later change)",
+}
+
 function Invoices({ slug, data }: { slug: string; data: Billing }) {
+  // Orders replaced before they were paid are nothing to anyone; one paid anyway is a refund.
+  const shown = data.payments.filter((p) => p.status !== "abandoned")
   return (
     <Card data-testid="invoices" className="grid gap-3">
       <h2 className="text-title-sm text-ink">Payments and invoices</h2>
-      {data.payments.length === 0 ? (
+      {shown.length === 0 ? (
         <p>No payments yet.</p>
       ) : (
         <Table headers={["Date", "For", "Amount", "Status", "Invoice"]}>
-          {data.payments.map((p) => (
+          {shown.map((p) => (
             <tr key={p.id}>
               <td className="text-body">
                 {formatDateTime(p.paidAt ?? p.createdAt)}
@@ -288,11 +352,7 @@ function Invoices({ slug, data }: { slug: string; data: Billing }) {
               </td>
               <td className="text-ink tabular-nums">{rupees(p.total)}</td>
               <td className="text-body">
-                {p.status === "paid"
-                  ? "Paid"
-                  : p.status === "failed"
-                    ? "Failed"
-                    : "Not paid"}
+                {PAYMENT_STATUS[p.status] ?? "Not paid"}
               </td>
               <td className="text-body">
                 {p.invoiceNumber ? (
@@ -444,15 +504,26 @@ function PayButton({
           prefill: order.prefill,
           theme: { color: "#f54e00" },
           handler: (answer: RazorpayAnswer) => {
-            api(`/orgs/${slug}/billing/confirm`, {
-              body: {
-                orderId: answer.razorpay_order_id,
-                paymentId: answer.razorpay_payment_id,
-                signature: answer.razorpay_signature,
-              },
-            })
-              .then(() =>
-                resolve(`Paid ${rupees(order.total)}. Your plan is updated.`)
+            api<{ paid: boolean; replaced: boolean }>(
+              `/orgs/${slug}/billing/confirm`,
+              {
+                body: {
+                  orderId: answer.razorpay_order_id,
+                  paymentId: answer.razorpay_payment_id,
+                  signature: answer.razorpay_signature,
+                },
+              }
+            )
+              .then((result) =>
+                result.replaced
+                  ? reject(
+                      new Error(
+                        "That payment was for a change you replaced in another tab. It wasn't applied, and GretLab will refund it."
+                      )
+                    )
+                  : resolve(
+                      `Paid ${rupees(order.total)}. Your plan is updated.`
+                    )
               )
               .catch(reject)
           },
@@ -481,11 +552,12 @@ function PayButton({
     meta: { quiet: true },
   })
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="grid gap-2">
       <Button
         onClick={() => pay.mutate()}
         disabled={pay.isPending || mode === "same"}
         data-testid="pay"
+        className="w-full"
       >
         {pay.isPending
           ? "Opening the payment…"

@@ -1,9 +1,12 @@
 "use client"
 
+import type { ReactNode } from "react"
+
 import {
   gstSplit,
   priceOfPlan,
   samePlan,
+  splitChange,
   upgradeDue,
   withNeeds,
   type BillingPeriod,
@@ -11,11 +14,13 @@ import {
   type PriceList,
 } from "@workspace/judge"
 
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { Field, SelectInput, TextInput } from "@/components/form"
+import { formatDate } from "@/lib/format"
 
 /*
  * The plan builder (Manage › Plan and billing, Dashboard › Plans): ready-made plans, counts,
@@ -33,6 +38,8 @@ export interface Catalogue {
     price: number
     always: boolean
     needs: string[]
+    /** False when the organization's kind can't use it (it isn't sold to it). */
+    available?: boolean
   }[]
   presets: {
     key: string
@@ -54,6 +61,13 @@ const PER: Record<BillingPeriod, string> = {
   year: "a year",
 }
 
+/** "Not for a college", "Not for an …"; plain "Not available" without a kind or for Other. */
+function notFor(kind?: string) {
+  const k = kind?.toLowerCase()
+  if (!k || k === "other") return "Not available"
+  return `Not for ${/^[aeiou]/.test(k) ? "an" : "a"} ${k}`
+}
+
 export const rupees = (n: number) =>
   (n < 0 ? "−₹" : "₹") + Math.abs(Math.round(n)).toLocaleString("en-IN")
 
@@ -64,6 +78,8 @@ export function PlanBuilder({
   gst,
   buyerGstin,
   current,
+  kindLabel,
+  footer,
 }: {
   catalogue: Catalogue
   value: PlanChoice
@@ -77,6 +93,10 @@ export function PlanBuilder({
     periodStart: string | null
     periodEnd: string | null
   } | null
+  /** The organization's kind ("College"), to say what isn't for it. */
+  kindLabel?: string
+  /** Under the price: the pay button and its note. */
+  footer?: ReactNode
 }) {
   const list = catalogue.list
   const chosen = new Set(withNeeds(list, value.features))
@@ -111,6 +131,43 @@ export function PlanBuilder({
           new Date()
         )
       : null
+  // Mid-period, what the change adds applies now and what it removes waits for renewal.
+  const split =
+    live && current && current.choice.period === value.period && !unchanged
+      ? splitChange(list, current.choice, value)
+      : null
+  const nameOf = (k: string) =>
+    catalogue.features.find((f) => f.key === k)?.name ?? k
+  const changes = split
+    ? (() => {
+        const before = new Set(withNeeds(list, current!.choice.features))
+        const after = new Set(withNeeds(list, value.features))
+        const now: string[] = []
+        const later: string[] = []
+        for (const k of split.now.features)
+          if (!before.has(k)) now.push(nameOf(k))
+        for (const k of before) if (!after.has(k)) later.push(nameOf(k))
+        const counts: [keyof PlanChoice, string][] = [
+          ["students", "Students"],
+          ["staff", "Staff"],
+          ["judges", "Own judge machines"],
+          ["storagePacks", "Storage packs"],
+        ]
+        const nowCounts: string[] = []
+        const laterCounts: string[] = []
+        for (const [key, label] of counts) {
+          const a = current!.choice[key] as number
+          const b = value[key] as number
+          const line = `${label}: ${a.toLocaleString("en-IN")} → ${b.toLocaleString("en-IN")}`
+          if (b > a) nowCounts.push(line)
+          if (b < a) laterCounts.push(line)
+        }
+        return {
+          now: [...nowCounts, ...now.map((n) => `Add ${n}`)],
+          later: [...laterCounts, ...later.map((n) => `Remove ${n}`)],
+        }
+      })()
+    : null
   const groups = [...new Set(catalogue.features.map((f) => f.group))]
   const set = (patch: Partial<PlanChoice>) => onChange({ ...value, ...patch })
   const toggle = (key: string, on: boolean) => {
@@ -149,10 +206,11 @@ export function PlanBuilder({
     >
       <div className="grid min-w-0 content-start gap-4">
         <div
-          className="flex flex-wrap gap-2"
+          className="flex flex-wrap items-center gap-2"
           role="group"
           aria-label="Start from a plan"
         >
+          <span className="text-caption text-muted-foreground">Start from</span>
           {catalogue.presets.map((preset) => (
             <Button
               key={preset.key}
@@ -172,62 +230,97 @@ export function PlanBuilder({
             </Button>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
           {count("students", "Students")}
           {count("staff", "Staff", `${p.freeStaff} free`)}
           {count("judges", "Own judge machines")}
           {count("storagePacks", "Extra storage", "50 GB packs")}
+          <Field label="Pay">
+            <SelectInput
+              value={value.period}
+              onChange={(e) => set({ period: e.target.value as BillingPeriod })}
+            >
+              {(["year", "semester", "month"] as const).map((period) => (
+                <option key={period} value={period}>
+                  {PERIOD_LABEL[period]}
+                  {list.periods[period] ? ` (+${list.periods[period]}%)` : ""}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
         </div>
-        <Field label="Pay">
-          <SelectInput
-            value={value.period}
-            onChange={(e) => set({ period: e.target.value as BillingPeriod })}
-          >
-            {(["year", "semester", "month"] as const).map((period) => (
-              <option key={period} value={period}>
-                {PERIOD_LABEL[period]}
-                {list.periods[period] ? ` (+${list.periods[period]}%)` : ""}
-              </option>
-            ))}
-          </SelectInput>
-        </Field>
         <div className="grid gap-4">
           {groups.map((group) => (
-            <fieldset key={group} className="grid gap-1">
-              <legend className="mb-1 text-caption font-semibold tracking-wide text-muted-foreground uppercase">
+            <fieldset
+              key={group}
+              className="grid overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10"
+            >
+              <legend className="sr-only">{group}</legend>
+              <div
+                aria-hidden
+                className="border-b border-hairline bg-muted/50 px-3 py-2 text-caption font-semibold text-ink"
+              >
                 {group}
-              </legend>
+              </div>
               {catalogue.features
                 .filter((f) => f.group === group)
-                .map((f) => (
-                  <label
-                    key={f.key}
-                    className={cn(
-                      "flex items-start gap-3 border-b border-hairline py-2 last:border-0",
-                      f.always && "opacity-80"
-                    )}
-                    data-testid={`feature-${f.key}`}
-                  >
-                    <Checkbox
-                      aria-label={f.name}
-                      checked={chosen.has(f.key)}
-                      disabled={f.always}
-                      onCheckedChange={(on) => toggle(f.key, Boolean(on))}
-                      className="mt-0.5"
-                    />
-                    <span className="grid min-w-0 flex-1 gap-0.5">
-                      <span className="text-body-sm text-ink">{f.name}</span>
-                      <span className="text-xs text-body">
-                        {f.what}
-                        {f.needs.length > 0 &&
-                          ` · needs ${f.needs.map((n) => catalogue.features.find((x) => x.key === n)?.name ?? n).join(", ")}`}
+                .map((f) => {
+                  const unusable = f.available === false
+                  return (
+                    <label
+                      key={f.key}
+                      className={cn(
+                        "flex items-start gap-3 border-b border-hairline px-3 py-2.5 last:border-0",
+                        !unusable &&
+                          !f.always &&
+                          "cursor-pointer hover:bg-muted/40",
+                        unusable && "bg-muted/30"
+                      )}
+                      data-testid={`feature-${f.key}`}
+                    >
+                      <Checkbox
+                        aria-label={f.name}
+                        checked={!unusable && chosen.has(f.key)}
+                        disabled={f.always || unusable}
+                        onCheckedChange={(on) => toggle(f.key, Boolean(on))}
+                        className="mt-0.5"
+                      />
+                      <span className="grid min-w-0 flex-1 gap-0.5">
+                        <span
+                          className={cn(
+                            "text-body-sm",
+                            unusable ? "text-muted-foreground" : "text-ink"
+                          )}
+                        >
+                          {f.name}
+                          {f.always && (
+                            <span className="ml-2 text-caption text-muted-foreground">
+                              Always included
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-caption text-body">
+                          {f.what}
+                          {f.needs.length > 0 &&
+                            ` · needs ${f.needs.map(nameOf).join(", ")}`}
+                        </span>
                       </span>
-                    </span>
-                    <span className="text-xs whitespace-nowrap text-ink tabular-nums">
-                      {rupees(f.price)} / student
-                    </span>
-                  </label>
-                ))}
+                      {unusable ? (
+                        <Badge variant="outline" className="shrink-0">
+                          {notFor(kindLabel)}
+                        </Badge>
+                      ) : (
+                        <span className="shrink-0 text-caption whitespace-nowrap text-ink tabular-nums">
+                          {rupees(f.price)}
+                          <span className="text-muted-foreground">
+                            {" "}
+                            / student
+                          </span>
+                        </span>
+                      )}
+                    </label>
+                  )
+                })}
             </fieldset>
           ))}
         </div>
@@ -237,9 +330,7 @@ export function PlanBuilder({
         aria-live="polite"
         data-testid="plan-price"
       >
-        <span className="text-caption font-semibold tracking-wide text-muted-foreground uppercase">
-          Your plan
-        </span>
+        <h3 className="text-title-sm text-ink">Price</h3>
         {p.quote ? (
           <>
             <span className="text-display-sm text-ink">Talk to us</span>
@@ -297,18 +388,65 @@ export function PlanBuilder({
               )}
             </dl>
             {dueNow !== null && (
-              <p
-                className="mt-2 border-t border-hairline pt-2 text-caption text-body"
+              <div
+                className="mt-2 grid gap-2 border-t border-hairline pt-3 text-caption"
                 data-testid="plan-due-now"
               >
-                {unchanged
-                  ? "This is your plan now."
-                  : dueNow > 0
-                    ? `Due now for the rest of this period: ${rupees(dueNow)} before GST.`
-                    : "Nothing due now: a smaller plan starts at your next period."}
-              </p>
+                <h3 className="text-title-sm text-ink">What changes</h3>
+                {unchanged ? (
+                  <p className="text-body">This is your plan now.</p>
+                ) : (
+                  <>
+                    {changes && changes.now.length > 0 && (
+                      <div className="grid gap-1">
+                        <span className="font-medium text-ink">Now</span>
+                        <ul className="grid gap-0.5 text-body">
+                          {changes.now.map((c) => (
+                            <li key={c}>{c}</li>
+                          ))}
+                        </ul>
+                        <span className="text-ink tabular-nums">
+                          {dueNow > 0
+                            ? `Due now for the rest of this period: ${rupees(dueNow)} before GST.`
+                            : "Nothing to pay now."}
+                        </span>
+                      </div>
+                    )}
+                    {changes && changes.later.length > 0 && (
+                      <div className="grid gap-1">
+                        <span className="font-medium text-ink">
+                          At renewal
+                          {current?.periodEnd &&
+                            `, ${formatDate(current.periodEnd)}`}
+                        </span>
+                        <ul className="grid gap-0.5 text-body">
+                          {changes.later.map((c) => (
+                            <li key={c}>{c}</li>
+                          ))}
+                        </ul>
+                        {changes.now.length === 0 && (
+                          <span className="text-body">
+                            Nothing due now: a smaller plan starts at your next
+                            period. Nothing is refunded.
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {!changes && (
+                      <p className="text-body">
+                        The way you pay changes at renewal.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </>
+        )}
+        {footer && (
+          <div className="mt-2 grid gap-2 border-t border-hairline pt-3">
+            {footer}
+          </div>
         )}
       </aside>
     </div>

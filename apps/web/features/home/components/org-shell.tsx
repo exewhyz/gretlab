@@ -371,7 +371,8 @@ export function OrgShell({
       title={shell?.org.name}
       badge={shell?.role}
     >
-      {shell?.planNotice && (
+      {/* On the plan page itself the page says it, with what to do. */}
+      {shell?.planNotice && !pathname.endsWith("/manage/billing") && (
         <PlanNotice slug={slug} notice={shell.planNotice} />
       )}
       {children}

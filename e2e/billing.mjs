@@ -947,9 +947,18 @@ for (const [name, viewport] of [
     `${name}: it offers paying online`,
     await tab.getByTestId("pay").isVisible()
   )
+  const elsewhere = await tab.context().newPage()
+  await elsewhere.goto(`${BASE}/orgs/bl-new/manage/members`)
+  const barElsewhere = await elsewhere
+    .getByTestId("plan-notice")
+    .waitFor({ timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false)
+  await elsewhere.close()
   check(
-    `${name}: the plan's notice shows above the page, and on the plan`,
-    (await tab.getByTestId("plan-notice").count()) === 1 &&
+    `${name}: the plan's notice shows on other pages, and on the plan page only once, with what to do`,
+    barElsewhere &&
+      (await tab.getByTestId("plan-notice").count()) === 0 &&
       (await tab.getByTestId("limit-note").count()) === 1
   )
   // The plan holds classes and attendance only: no links to pages it would refuse.

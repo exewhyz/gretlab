@@ -8,6 +8,15 @@ aren't listed.
 
 ## 26 November 2026
 
+### Changing a plan, clearer
+
+- A change that adds and removes is split: what you add (students, features) applies at once and
+  is all you pay for; what you remove waits for renewal, and you keep it until then.
+- Features your kind of organization can't use are no longer offered.
+- Paying in two tabs can't charge twice for the same change, and a waiting change can be cancelled.
+- The plan page is laid out afresh: your plan at a glance, the price beside the builder, and what
+  changes now and at renewal before you pay.
+
 ### Fixes
 
 - The problem library no longer fails to load on a day without a daily challenge.
