@@ -18,9 +18,9 @@ import { slugify } from "@/features/problems/schemas"
 import { api } from "@/lib/api/client"
 import { useDebounced } from "@/lib/use-debounced"
 import { formatDate } from "@/lib/format"
-import { KindPicker } from "@/features/orgs/components/kind-picker"
 
 import { Card, Loading, PageTitle, Pager, Table } from "./shell"
+import { NewOrganizationSheet } from "./new-organization"
 import { OrgFeaturesDialog } from "./org-features"
 import { SsoDomainsDialog } from "@/features/sso/components/sso-domains-dialog"
 import { useViewer } from "@/features/account/use-viewer"
@@ -42,14 +42,7 @@ interface OrgRow {
 
 export function AdminOrganizations() {
   const queryClient = useQueryClient()
-  const [form, setForm] = useState({
-    name: "",
-    slug: "",
-    type: "college" as OrgType,
-    ownerEmail: "",
-  })
-  const [slugTouched, setSlugTouched] = useState(false)
-  const [kindConfirmed, setKindConfirmed] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [message, setMessage] = useState<{
     text: string
     kind?: "ok" | "err"
@@ -83,22 +76,6 @@ export function AdminOrganizations() {
     placeholderData: keepPreviousData,
   })
   const data = found?.organizations
-  const create = useMutation({
-    mutationFn: () => api<OrgRow>("/admin/organizations", { body: form }),
-    onSuccess: (org) => {
-      void queryClient.invalidateQueries({
-        queryKey: ["admin", "organizations"],
-      })
-      setMessage({
-        text: `Created ${org.name}. Its owner manages it from /orgs/${org.slug}/manage.`,
-        kind: "ok",
-      })
-      setForm({ name: "", slug: "", type: form.type, ownerEmail: "" })
-      setKindConfirmed(false)
-      setSlugTouched(false)
-    },
-    onError: (e) => setMessage({ text: e.message, kind: "err" }),
-  })
   const toggle = useMutation({
     mutationFn: (org: OrgRow) =>
       api(`/admin/organizations/${org.id}`, {
@@ -114,57 +91,27 @@ export function AdminOrganizations() {
 
   return (
     <>
-      <PageTitle>Organizations</PageTitle>
-      <Card className="mb-5 grid gap-3">
-        <h2 className="text-title-sm text-ink">New organization</h2>
-        <div className="grid gap-3 min-[901px]:grid-cols-3">
-          <Field label="Name">
-            <TextInput
-              value={form.name}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  name: e.target.value,
-                  slug: slugTouched
-                    ? form.slug
-                    : slugify(e.target.value).slice(0, 48),
-                })
-              }
-            />
-          </Field>
-          <Field label="Address" help={`/orgs/${form.slug || "address"}`}>
-            <TextInput
-              value={form.slug}
-              onChange={(e) => {
-                setSlugTouched(true)
-                setForm({ ...form, slug: e.target.value })
-              }}
-            />
-          </Field>
-          <Field label="Owner's email" help="They manage it after signing in.">
-            <TextInput
-              type="email"
-              value={form.ownerEmail}
-              onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
-            />
-          </Field>
-        </div>
-        <KindPicker
-          value={form.type}
-          onChange={(type) => setForm({ ...form, type })}
-          confirmed={kindConfirmed}
-          onConfirm={setKindConfirmed}
-        />
-        <div className="flex items-center gap-3">
-          <Button
-            disabled={create.isPending || !kindConfirmed}
-            onClick={() => create.mutate()}
-          >
-            Create organization
-          </Button>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <PageTitle>Organizations</PageTitle>
+        <Button onClick={() => setCreating(true)}>New organization</Button>
+      </div>
+      {message && (
+        <div className="mb-4">
           <FormMessage message={message} />
         </div>
-      </Card>
+      )}
+      {creating && (
+        <NewOrganizationSheet
+          onClose={() => setCreating(false)}
+          onCreated={(org) => {
+            setCreating(false)
+            setMessage({
+              text: `Created ${org.name}. Its owner manages it from /orgs/${org.slug}/manage.`,
+              kind: "ok",
+            })
+          }}
+        />
+      )}
       <div className="mb-3 max-w-sm">
         <TextInput
           aria-label="Search organizations"

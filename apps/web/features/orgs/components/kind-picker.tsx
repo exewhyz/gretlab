@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react"
 import { KINDS, ORG_TYPES, type OrgType } from "@workspace/judge"
 
+import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { Check } from "@/components/form"
@@ -28,23 +29,20 @@ const ICONS: Record<OrgType, Icon> = {
 }
 
 /**
- * Choosing the kind of a new organization: each kind with what it's for, then what the
- * chosen one decides and a warning that it can't be changed, to be confirmed.
+ * Choosing the kind of a new organization: each kind with what it's for, then what the chosen
+ * one decides (its groups, words and features). Confirming that it can't be changed comes at
+ * the end of the flow (KindConfirm).
  */
 export function KindPicker({
   value,
   onChange,
-  confirmed,
-  onConfirm,
 }: {
   value: OrgType
   onChange: (kind: OrgType) => void
-  confirmed: boolean
-  onConfirm: (yes: boolean) => void
 }) {
   const kind = KINDS[value]
   return (
-    <div className="grid gap-3" data-testid="kind-picker">
+    <div className="grid gap-4" data-testid="kind-picker">
       <div
         role="radiogroup"
         aria-label="Kind of organization"
@@ -54,50 +52,44 @@ export function KindPicker({
           const I = ICONS[t]
           const on = t === value
           return (
-            <button
+            <Button
               key={t}
               type="button"
+              variant="outline"
               role="radio"
               aria-checked={on}
               data-testid={`kind-${t}`}
-              onClick={() => {
-                onChange(t)
-                onConfirm(false)
-              }}
+              onClick={() => onChange(t)}
               className={cn(
-                "flex items-start gap-3 rounded-xl border bg-card p-3 text-left transition-colors",
-                on
-                  ? "border-primary ring-2 ring-primary/30"
-                  : "border-hairline hover:border-hairline-strong"
+                "h-auto items-start justify-start gap-3 rounded-lg p-3 text-left whitespace-normal",
+                on && "border-ink bg-card ring-1 ring-ink hover:bg-card"
               )}
             >
               <span
                 className={cn(
                   "flex size-9 shrink-0 items-center justify-center rounded-md",
-                  on
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-ink"
+                  on ? "bg-ink text-canvas" : "bg-muted text-ink"
                 )}
               >
                 <I className="size-4" />
               </span>
-              <span className="min-w-0">
-                <span className="block text-body-sm font-semibold text-ink">
+              <span className="grid min-w-0 gap-0.5">
+                <span className="text-body-sm font-semibold text-ink">
                   {KINDS[t].label}
                 </span>
-                <span className="block text-xs text-muted-foreground">
+                <span className="text-caption font-normal text-muted-foreground">
                   {KINDS[t].description}
                 </span>
               </span>
-            </button>
+            </Button>
           )
         })}
       </div>
       <div
-        className="grid gap-2 rounded-xl border border-hairline bg-canvas-soft p-4"
+        className="grid gap-2 rounded-lg bg-card p-4 ring-1 ring-foreground/10"
         data-testid="kind-decides"
       >
-        <div className="text-body-sm font-semibold text-ink">
+        <div className="text-title-sm text-ink">
           A {kind.label.toLowerCase()} works like this
         </div>
         <div className="text-caption text-muted-foreground">
@@ -113,26 +105,69 @@ export function KindPicker({
           {kind.terms.instructors.toLowerCase()}; groups are{" "}
           {kind.terms.groups.toLowerCase()} ({kind.groupLevels.join(" › ")}).
         </div>
-        <div
-          role="note"
-          className="mt-1 flex gap-2 rounded-lg border border-primary/40 bg-primary/5 p-3 text-body-sm text-ink"
-        >
+        <p className="flex gap-2 text-caption text-body">
           <WarningIcon
-            className="mt-0.5 size-4 shrink-0 text-primary"
+            className="mt-0.5 size-4 shrink-0 text-chart-4"
             aria-hidden="true"
           />
-          <span>
-            The kind can&apos;t be changed after the organization is created:
-            its structure, words and modules depend on it. To be a different
-            kind later, a new organization has to be made.
-          </span>
-        </div>
-        <Check
-          label={`I understand this will be a ${kind.label.toLowerCase()}, and that can't be changed`}
-          checked={confirmed}
-          onCheckedChange={onConfirm}
-        />
+          The kind can&apos;t be changed after the organization is created.
+        </p>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The last step's confirmation: the kind can't be changed later, ticked before creating.
+ */
+export function KindConfirm({
+  kind,
+  confirmed,
+  onConfirm,
+}: {
+  kind: OrgType
+  confirmed: boolean
+  onConfirm: (yes: boolean) => void
+}) {
+  const label = KINDS[kind].label.toLowerCase()
+  return (
+    <div
+      role="note"
+      className="grid gap-3 rounded-lg bg-card p-4 ring-1 ring-foreground/10"
+      data-testid="kind-confirm"
+    >
+      <p className="flex gap-2 text-body-sm text-ink">
+        <WarningIcon
+          className="mt-0.5 size-4 shrink-0 text-chart-4"
+          aria-hidden="true"
+        />
+        <span>
+          The kind can&apos;t be changed after the organization is created: its
+          structure, words and features depend on it. To be a different kind
+          later, a new organization has to be made.
+        </span>
+      </p>
+      <Check
+        label={`I understand this will be a ${label}, and that can't be changed`}
+        checked={confirmed}
+        onCheckedChange={onConfirm}
+      />
+    </div>
+  )
+}
+
+/** One line of a review: what was chosen, and its value. */
+export function ReviewRow({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="grid gap-1 border-b border-hairline py-2.5 last:border-0 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-3">
+      <dt className="text-caption text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 text-body-sm break-words text-ink">{children}</dd>
     </div>
   )
 }

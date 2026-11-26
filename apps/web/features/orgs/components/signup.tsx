@@ -18,10 +18,17 @@ import {
 import { Check, Field, FormMessage, TextInput } from "@/components/form"
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
-import { KindPicker } from "@/features/orgs/components/kind-picker"
+import {
+  KindConfirm,
+  KindPicker,
+  ReviewRow,
+} from "@/features/orgs/components/kind-picker"
+import { Steps } from "@/components/steps"
 import { orgPages } from "@/lib/paths"
 import type { ApiResult } from "@/lib/api/types"
 import type { signUpOrganization } from "@/features/orgs/server"
+
+const STEPS = ["Kind", "Details", "Set-up", "Review"] as const
 
 const toSlug = (name: string) =>
   name
@@ -43,6 +50,7 @@ export function SchoolSignup() {
     slug: "",
     type: "school" as OrgType,
   })
+  const [step, setStep] = useState(0)
   const [slugTouched, setSlugTouched] = useState(false)
   const [kindConfirmed, setKindConfirmed] = useState(false)
   const [withYear, setWithYear] = useState(true)
@@ -115,10 +123,23 @@ export function SchoolSignup() {
       ? Math.max(0, Number(grades.to) - Number(grades.from) + 1) *
         sections.length
       : 0
+  const detailsOk =
+    form.name.trim().length > 0 && /^[a-z0-9][a-z0-9-]*$/.test(form.slug)
+  const last = step === STEPS.length - 1
+  const why =
+    step === 1 && !detailsOk
+      ? !form.name.trim()
+        ? "Give it a name."
+        : "The address takes small letters, numbers and dashes."
+      : null
   return (
     <form
       className="grid gap-5"
-      onSubmit={(e) => (e.preventDefault(), send.mutate())}
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (last) send.mutate()
+        else if (step !== 1 || detailsOk) setStep(step + 1)
+      }}
     >
       <div>
         <h1 className="text-display-sm text-ink">Register your school</h1>
@@ -128,167 +149,211 @@ export function SchoolSignup() {
             "A platform admin approves it before it opens."}
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>About it</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          <Field label="Name">
-            <TextInput
-              value={form.name}
-              placeholder="Greenfield Public School"
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  name: e.target.value,
-                  slug: slugTouched ? form.slug : toSlug(e.target.value),
-                })
-              }
-            />
-          </Field>
-          <Field
-            label="Web address"
-            help={`Its pages will be at /orgs/${form.slug || "your-school"}`}
-          >
-            <TextInput
-              value={form.slug}
-              onChange={(e) => {
-                setSlugTouched(true)
-                setForm({ ...form, slug: e.target.value.toLowerCase() })
-              }}
-            />
-          </Field>
-        </CardContent>
-      </Card>
-      <Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>What kind of organization is it?</CardTitle>
-            <CardDescription>
-              This decides how it's organized, what it calls things, and which
-              features it has.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Steps steps={STEPS} current={step} onStep={setStep} />
+      <div className="grid gap-4">
+        {step === 0 && (
+          <>
+            <div>
+              <h2 className="text-title-sm text-ink">
+                What kind of organization is it?
+              </h2>
+              <p className="text-caption text-body">
+                This decides how it&apos;s organized, what it calls things, and
+                which features it has.
+              </p>
+            </div>
             <KindPicker
               value={form.type}
-              onChange={(type) => setForm({ ...form, type })}
+              onChange={(type) => {
+                setForm({ ...form, type })
+                setKindConfirmed(false)
+              }}
+            />
+          </>
+        )}
+        {step === 1 && (
+          <div className="grid max-w-lg gap-4">
+            <Field label="Name">
+              <TextInput
+                autoFocus
+                value={form.name}
+                placeholder="Greenfield Public School"
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    name: e.target.value,
+                    slug: slugTouched ? form.slug : toSlug(e.target.value),
+                  })
+                }
+              />
+            </Field>
+            <Field
+              label="Web address"
+              help={`Its pages will be at /orgs/${form.slug || "your-school"}`}
+            >
+              <TextInput
+                value={form.slug}
+                onChange={(e) => {
+                  setSlugTouched(true)
+                  setForm({ ...form, slug: e.target.value.toLowerCase() })
+                }}
+              />
+            </Field>
+          </div>
+        )}
+        {step === 2 && (
+          <>
+            <div>
+              <h2 className="text-title-sm text-ink">Set it up now</h2>
+              <p className="text-caption text-body">
+                Optional; everything can be changed later.
+              </p>
+            </div>
+            <Check
+              label="Add this academic year"
+              checked={withYear}
+              onCheckedChange={setWithYear}
+            />
+            {withYear && (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field label="Year">
+                  <TextInput
+                    value={yearForm.name}
+                    onChange={(e) =>
+                      setYearForm({ ...yearForm, name: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Starts">
+                  <TextInput
+                    type="date"
+                    value={yearForm.startsOn}
+                    onChange={(e) =>
+                      setYearForm({ ...yearForm, startsOn: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Ends">
+                  <TextInput
+                    type="date"
+                    value={yearForm.endsOn}
+                    onChange={(e) =>
+                      setYearForm({ ...yearForm, endsOn: e.target.value })
+                    }
+                  />
+                </Field>
+              </div>
+            )}
+            {twoLevels && (
+              <>
+                <Check
+                  label={`Add ${grade.toLowerCase()}s and ${levels[1]!.toLowerCase()}s`}
+                  checked={withGrades}
+                  onCheckedChange={setWithGrades}
+                />
+                {withGrades && (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field label={`First ${grade.toLowerCase()}`}>
+                      <TextInput
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={grades.from}
+                        onChange={(e) =>
+                          setGrades({ ...grades, from: e.target.value })
+                        }
+                      />
+                    </Field>
+                    <Field label={`Last ${grade.toLowerCase()}`}>
+                      <TextInput
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={grades.to}
+                        onChange={(e) =>
+                          setGrades({ ...grades, to: e.target.value })
+                        }
+                      />
+                    </Field>
+                    <Field
+                      label={`${levels[1]}s in each`}
+                      help="Separate with commas."
+                    >
+                      <TextInput
+                        value={grades.sections}
+                        onChange={(e) =>
+                          setGrades({ ...grades, sections: e.target.value })
+                        }
+                      />
+                    </Field>
+                  </div>
+                )}
+                {count > 0 && (
+                  <p
+                    className="text-caption text-muted-foreground"
+                    data-testid="signup-preview"
+                  >
+                    {grade} {grades.from} to {grade} {grades.to}, each with{" "}
+                    {sections.join(", ")}: {count} {levels[1]!.toLowerCase()}
+                    s.
+                  </p>
+                )}
+              </>
+            )}
+          </>
+        )}
+        {last && (
+          <>
+            <dl className="rounded-lg px-4 ring-1 ring-foreground/10">
+              <ReviewRow label="Kind">
+                {ORG_TYPE_CONFIG[form.type].label}
+              </ReviewRow>
+              <ReviewRow label="Name">{form.name}</ReviewRow>
+              <ReviewRow label="Web address">/orgs/{form.slug}</ReviewRow>
+              <ReviewRow label="Academic year">
+                {withYear ? yearForm.name : "Not now"}
+              </ReviewRow>
+              {twoLevels && (
+                <ReviewRow label={`${grade}s and ${levels[1]!.toLowerCase()}s`}>
+                  {withGrades && count > 0
+                    ? `${grade} ${grades.from} to ${grades.to}, ${count} ${levels[1]!.toLowerCase()}s`
+                    : "Not now"}
+                </ReviewRow>
+              )}
+            </dl>
+            <KindConfirm
+              kind={form.type}
               confirmed={kindConfirmed}
               onConfirm={setKindConfirmed}
             />
-          </CardContent>
-        </Card>
-        <CardHeader>
-          <CardTitle>Set it up now</CardTitle>
-          <CardDescription>
-            Optional; everything can be changed later.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <Check
-            label="Add this academic year"
-            checked={withYear}
-            onCheckedChange={setWithYear}
-          />
-          {withYear && (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Year">
-                <TextInput
-                  value={yearForm.name}
-                  onChange={(e) =>
-                    setYearForm({ ...yearForm, name: e.target.value })
-                  }
-                />
-              </Field>
-              <Field label="Starts">
-                <TextInput
-                  type="date"
-                  value={yearForm.startsOn}
-                  onChange={(e) =>
-                    setYearForm({ ...yearForm, startsOn: e.target.value })
-                  }
-                />
-              </Field>
-              <Field label="Ends">
-                <TextInput
-                  type="date"
-                  value={yearForm.endsOn}
-                  onChange={(e) =>
-                    setYearForm({ ...yearForm, endsOn: e.target.value })
-                  }
-                />
-              </Field>
-            </div>
-          )}
-          {twoLevels && (
-            <>
-              <Check
-                label={`Add ${grade.toLowerCase()}s and ${levels[1]!.toLowerCase()}s`}
-                checked={withGrades}
-                onCheckedChange={setWithGrades}
-              />
-              {withGrades && (
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <Field label={`First ${grade.toLowerCase()}`}>
-                    <TextInput
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={grades.from}
-                      onChange={(e) =>
-                        setGrades({ ...grades, from: e.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field label={`Last ${grade.toLowerCase()}`}>
-                    <TextInput
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={grades.to}
-                      onChange={(e) =>
-                        setGrades({ ...grades, to: e.target.value })
-                      }
-                    />
-                  </Field>
-                  <Field
-                    label={`${levels[1]}s in each`}
-                    help="Separate with commas."
-                  >
-                    <TextInput
-                      value={grades.sections}
-                      onChange={(e) =>
-                        setGrades({ ...grades, sections: e.target.value })
-                      }
-                    />
-                  </Field>
-                </div>
-              )}
-              {count > 0 && (
-                <p
-                  className="text-caption text-muted-foreground"
-                  data-testid="signup-preview"
-                >
-                  {grade} {grades.from} to {grade} {grades.to}, each with{" "}
-                  {sections.join(", ")}: {count} {levels[1]!.toLowerCase()}s.
-                </p>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-      {send.error && (
-        <FormMessage message={{ text: send.error.message, kind: "err" }} />
-      )}
-      <div>
+          </>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {step > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setStep(step - 1)}
+          >
+            Back
+          </Button>
+        )}
         <Button
           type="submit"
           disabled={
-            send.isPending || !form.name || !form.slug || !kindConfirmed
+            send.isPending ||
+            (step === 1 && !detailsOk) ||
+            (last && !kindConfirmed)
           }
         >
-          Register
+          {last ? "Register" : "Next"}
         </Button>
+        {(send.error || why) && (
+          <FormMessage
+            message={{ text: send.error?.message ?? why!, kind: "err" }}
+          />
+        )}
       </div>
     </form>
   )

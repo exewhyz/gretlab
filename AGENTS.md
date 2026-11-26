@@ -353,7 +353,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 
 - **Every organization is one kind, chosen at creation and never changed.** The kinds are school, college, coaching institute, cohort program, company, community and other.
   - `updateSettings` refuses a different `type` (409 `kind_locked`), platform admins included, and Settings shows the kind read-only.
-  - The create form (Admin › Organizations) and school sign-up use `KindPicker`, which shows each kind, what the chosen one decides, and a warning. Create stays off until "I understand this can't be changed" is ticked.
+  - Creating one is a guided flow (`components/steps.tsx`): Admin › Organizations › New organization opens `NewOrganizationSheet` (Kind · Details · Review), and school sign-up is the page `SchoolSignup` (Kind · Details · Set-up · Review). `KindPicker` shows each kind and what the chosen one decides; the review lists what will be made (`ReviewRow`) and `KindConfirm` holds the "I understand this can't be changed" tick, without which Create stays off. The warning is ochre, never orange.
 - **Each kind is one file in `packages/judge/src/kinds/`** (a `KindDefinition`), the only place a kind's differences live:
   - its label, the noun its people use ("the institute"), a description, examples, and what it decides (shown before creating);
   - its words (`terms`: learner(s), instructor(s), guardian(s), group(s), group lead, period(s), assessment(s));

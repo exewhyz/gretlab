@@ -8,6 +8,12 @@ aren't listed.
 
 ## 26 November 2026
 
+### Creating an organization, step by step
+
+- Making an organization (from the dashboard) or registering a school now goes in short steps:
+  the kind first, then the name and address, then the set-up, then a review to confirm before
+  creating.
+
 ### A simpler module editor
 
 - A course module now opens beside the outline in three tabs: **Details**, **Content** (readings
