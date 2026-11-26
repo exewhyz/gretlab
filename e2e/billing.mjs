@@ -741,6 +741,104 @@ check(
     })
   ).json?.error?.code === "change_period_at_renewal"
 )
+// ---------- a change that adds and removes: additions now, removals at renewal
+const subNow = () =>
+  psql(
+    `select s.students || '|' || o.plan_features::text || '|' || coalesce(s.next->>'students', '') || '|' || coalesce((s.next->'features')::text, '') from subscriptions s join organizations o on o.id = s.org_id where s.org_id = '${payOrg}'`
+  )
+const mixed = (
+  await payer("/orgs/bl-pay/billing/checkout", {
+    body: { ...want, features: ["coding"], students: 250 },
+  })
+).json
+await payer("/orgs/bl-pay/billing/confirm", {
+  body: {
+    orderId: mixed?.orderId,
+    paymentId: "pay_mixed",
+    signature: sign(RZP_SECRET, `${mixed?.orderId}|pay_mixed`),
+  },
+})
+check(
+  "more students and a feature dropped: the students now, attendance kept until renewal",
+  mixed?.scheduled === false &&
+    subNow() ===
+      `250|["core", "coding", "attendance"]|250|["core", "coding"]`,
+  `${JSON.stringify(mixed).slice(0, 120)} · ${subNow()}`
+)
+const nextCancelled = await payer("/orgs/bl-pay/billing/next", {
+  method: "DELETE",
+})
+check(
+  "the waiting change can be cancelled: the plan renews as it is",
+  nextCancelled.status === 200 && subNow().endsWith("||"),
+  subNow()
+)
+// Two tabs: the same change reuses its order; another change abandons it.
+const tabA = (
+  await payer("/orgs/bl-pay/billing/checkout", {
+    body: { ...want, students: 260 },
+  })
+).json
+const tabB = (
+  await payer("/orgs/bl-pay/billing/checkout", {
+    body: { ...want, students: 260 },
+  })
+).json
+check(
+  "the same change twice reuses one order",
+  tabA?.orderId && tabA.orderId === tabB?.orderId,
+  `${tabA?.orderId} ${tabB?.orderId}`
+)
+const tabC = (
+  await payer("/orgs/bl-pay/billing/checkout", {
+    body: { ...want, students: 270 },
+  })
+).json
+const late = await payer("/orgs/bl-pay/billing/confirm", {
+  body: {
+    orderId: tabA.orderId,
+    paymentId: "pay_late",
+    signature: sign(RZP_SECRET, `${tabA.orderId}|pay_late`),
+  },
+})
+check(
+  "a replaced order paid late isn't applied: it's kept to refund, and logged",
+  tabC?.orderId !== tabA.orderId &&
+    late.json?.replaced === true &&
+    psql(
+      `select status from payments where razorpay_order_id = '${tabA.orderId}'`
+    ) === "refund_due" &&
+    subNow().startsWith("250|") &&
+    psql(
+      `select count(*) from audit_log where org_id = '${payOrg}' and action = 'billing.refund_due'`
+    ) === "1",
+  JSON.stringify(late.json)
+)
+// Only what a college can use.
+const notForCollege = await payer("/orgs/bl-pay/billing/checkout", {
+  body: { ...want, features: ["coding", "training"] },
+})
+check(
+  "a feature this kind can't use isn't sold to it",
+  notForCollege.status === 400 &&
+    notForCollege.json?.error?.code === "not_for_kind",
+  JSON.stringify(notForCollege.json)
+)
+const offer = (await payer("/orgs/bl-pay/billing")).json
+check(
+  "the plan page marks what the kind can't use, and offers only plans it can buy",
+  offer?.kind?.key === "college" &&
+    offer.catalogue.features.find((f) => f.key === "training")?.available ===
+      false &&
+    offer.catalogue.features.find((f) => f.key === "hostel")?.available ===
+      true &&
+    offer.catalogue.presets.every((p) => !p.features.includes("training")),
+  JSON.stringify(offer?.catalogue?.features?.map((f) => [f.key, f.available]))
+)
+// Back to the smaller plan waiting for the next period, which the pages below show.
+await payer("/orgs/bl-pay/billing/checkout", {
+  body: { ...want, students: 50 },
+})
 check(
   "plans past 10,000 students are a custom quote",
   (

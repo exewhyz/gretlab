@@ -3885,7 +3885,8 @@ export const payments = pgTable(
     sgst: integer("sgst").notNull().default(0),
     igst: integer("igst").notNull().default(0),
     total: integer("total").notNull(),
-    status: text("status").$type<"created" | "paid" | "failed">().notNull().default("created"),
+    // abandoned: replaced by another change before it was paid; refund_due: paid anyway, to refund.
+    status: text("status").$type<"created" | "paid" | "failed" | "abandoned" | "refund_due">().notNull().default("created"),
     razorpayOrderId: text("razorpay_order_id").unique(),
     razorpayPaymentId: text("razorpay_payment_id"),
     invoiceNumber: text("invoice_number").unique(),

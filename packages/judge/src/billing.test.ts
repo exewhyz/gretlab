@@ -3,6 +3,8 @@ import { test } from "node:test"
 
 import {
   DEFAULT_PRICE_LIST,
+  featureAvailable,
+  splitChange,
   planIncludes,
   planModulePolicy,
   gstSplit,
@@ -334,4 +336,94 @@ test("margins: own judges, plus the shared judges' cost split by submissions", (
   )
   assert.equal(loss.orgs[0]!.losing, true)
   assert.equal(loss.orgs[0]!.margin, -350)
+})
+
+/* ---------- a change: additions now, removals at renewal ---------- */
+
+const choiceOf = (over: Partial<Parameters<typeof priceOfPlan>[1]> = {}) => ({
+  features: ["core", "coding", "attendance"],
+  students: 100,
+  staff: 5,
+  judges: 0,
+  storagePacks: 0,
+  period: "year" as const,
+  ...over,
+})
+
+test("more students and a feature dropped: the students now, the drop at renewal", () => {
+  const current = choiceOf()
+  const choice = choiceOf({ features: ["core", "coding"], students: 300 })
+  const { now, next } = splitChange(DEFAULT_PRICE_LIST, current, choice)
+  assert.equal(now.students, 300)
+  assert.deepEqual([...now.features].sort(), ["attendance", "coding", "core"])
+  assert.deepEqual(next, choice)
+})
+
+test("only additions: all of it now, nothing waiting", () => {
+  const choice = choiceOf({
+    features: ["core", "coding", "attendance", "parents"],
+    staff: 9,
+  })
+  const { now, next } = splitChange(DEFAULT_PRICE_LIST, choiceOf(), choice)
+  assert.ok(samePlan(DEFAULT_PRICE_LIST, now, choice))
+  assert.equal(next, null)
+})
+
+test("only removals: nothing changes now, the smaller plan waits", () => {
+  const choice = choiceOf({ students: 50 })
+  const { now, next } = splitChange(DEFAULT_PRICE_LIST, choiceOf(), choice)
+  assert.ok(samePlan(DEFAULT_PRICE_LIST, now, choiceOf()))
+  assert.deepEqual(next, choice)
+})
+
+test("what's added is charged for the days left; nothing for a removal", () => {
+  const start = new Date("2026-01-01")
+  const end = new Date("2027-01-01")
+  const half = new Date("2026-07-02")
+  const choice = choiceOf({ features: ["core", "coding"], students: 300 })
+  const { now } = splitChange(DEFAULT_PRICE_LIST, choiceOf(), choice)
+  const due = upgradeDue(DEFAULT_PRICE_LIST, choiceOf(), now, start, end, half)
+  const studentsOnly = upgradeDue(
+    DEFAULT_PRICE_LIST,
+    choiceOf(),
+    choiceOf({ students: 300 }),
+    start,
+    end,
+    half
+  )
+  assert.equal(
+    due,
+    studentsOnly,
+    "the dropped feature isn't netted against the students"
+  )
+})
+
+/* ---------- features a kind can use ---------- */
+
+test("a feature is offered only to kinds that can run it", () => {
+  assert.equal(featureAvailable("hostel", "company"), false)
+  assert.equal(featureAvailable("hostel", "college"), true)
+  assert.equal(featureAvailable("training", "company"), true)
+  assert.equal(featureAvailable("training", "school"), false)
+  // Cohort runs need group dates: cohorts and coaching only.
+  assert.equal(featureAvailable("runs", "cohort"), true)
+  assert.equal(featureAvailable("runs", "college"), false)
+  // Everyone may have the coding lab, the core and connections.
+  for (const key of ["core", "coding", "lti", "api"])
+    assert.equal(featureAvailable(key, "community"), true, key)
+})
+
+test("a module the platform switched off for a kind isn't sold to it", () => {
+  assert.equal(
+    featureAvailable("attendance", "college", { attendance: "off" }),
+    false
+  )
+  assert.equal(
+    featureAvailable("attendance", "college", { attendance: "optional" }),
+    true
+  )
+})
+
+test("a feature needing one the kind can't have isn't offered either", () => {
+  assert.equal(featureAvailable("results", "company"), false, "needs records")
 })

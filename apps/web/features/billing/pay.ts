@@ -9,7 +9,11 @@ import {
 } from "@workspace/db"
 import {
   BILLING_PERIODS,
+  featureAvailable,
   financialYear,
+  KINDS,
+  organizationPolicy,
+  splitChange,
   gstSplit,
   invoiceNumber,
   periodEnd,
@@ -20,6 +24,7 @@ import {
   withNeeds,
   type BillingPeriod,
   type PlanChoice,
+  type PriceList,
 } from "@workspace/judge"
 import { z } from "zod"
 
@@ -32,6 +37,7 @@ import {
   orgContext,
   writeAudit,
 } from "@/features/orgs/server"
+import { kindPolicies } from "@/features/orgs/kinds"
 import { getSettings } from "@/features/settings/server"
 import { ApiError, notFound } from "@/lib/api/route"
 import { needWithinLimit } from "@/lib/api/rate-limit"
@@ -75,11 +81,25 @@ export const checkoutSchema = z.object({
 
 type Change = {
   choice: PlanChoice
+  /** A smaller plan for the next period, when the change also removed or lowered something. */
+  next?: PlanChoice | null
   periodStart: string
   periodEnd: string
   /** Rupees one period of the plan costs (what the subscription records). */
   periodPrice: number
   describe: string
+}
+
+/** Two changes alike (stored ones come back with their keys reordered, so not by text). */
+function sameChange(list: PriceList, a: Change, b: Change) {
+  const bothOrNone = (x?: PlanChoice | null, y?: PlanChoice | null) =>
+    !x || !y ? !x && !y : samePlan(list, x, y)
+  return (
+    samePlan(list, a.choice, b.choice) &&
+    bothOrNone(a.next, b.next) &&
+    a.periodStart === b.periodStart &&
+    a.periodEnd === b.periodEnd
+  )
 }
 
 const PERIOD_WORD: Record<BillingPeriod, string> = {
@@ -136,6 +156,21 @@ export async function checkout(
     ...input,
     features: withNeeds(list, input.features),
   }
+  // Only what this kind of organization can use (the kind, and the platform's policy for it).
+  const policy = organizationPolicy(
+    ctx.org.type,
+    (await kindPolicies())[ctx.org.type],
+    ctx.org.platformModules
+  )
+  const unusable = choice.features.filter(
+    (f) => !featureAvailable(f, ctx.org.type, policy)
+  )
+  if (unusable.length)
+    throw new ApiError(
+      400,
+      "not_for_kind",
+      `A ${KINDS[ctx.org.type].label.toLowerCase()} can't use: ${unusable.join(", ")}.`
+    )
   const price = priceOfPlan(list, choice)
   if (price.quote)
     throw new ApiError(
@@ -182,10 +217,12 @@ export async function checkout(
         "same_plan",
         "That's your plan now. Change something to pay for it."
       )
+    // What's added applies now, for the days left; what's removed or lowered waits for renewal.
+    const split = splitChange(list, current, choice)
     const due = upgradeDue(
       list,
       current,
-      choice,
+      split.now,
       sub!.periodStart!,
       sub!.periodEnd!,
       now
@@ -210,11 +247,12 @@ export async function checkout(
     kind = "upgrade"
     amount = due
     change = {
-      choice,
+      choice: split.now,
+      next: split.next,
       periodStart: sub!.periodStart!.toISOString(),
       periodEnd: sub!.periodEnd!.toISOString(),
-      periodPrice: price.price,
-      describe: `Added for the rest of the period: ${describe(choice, now, sub!.periodEnd!)}`,
+      periodPrice: priceOfPlan(list, split.now).price,
+      describe: `Added for the rest of the period: ${describe(split.now, now, sub!.periodEnd!)}`,
     }
   } else {
     // A new period: from now, or from when the current one ends (renewing early).
@@ -243,6 +281,45 @@ export async function checkout(
       "There's nothing to pay for that plan."
     )
   const tax = gstSplit(amount, await seller(), sub?.gstin || null)
+  // One open order at a time: the same change again reuses it (a second tab, a retry); another
+  // change abandons it, so two can't both be paid and applied (applyPayment).
+  const open = await getDb()
+    .select()
+    .from(payments)
+    .where(
+      and(
+        eq(payments.orgId, ctx.org.id),
+        eq(payments.status, "created"),
+        sql.sql`${payments.createdAt} > now() - interval '30 minutes'`
+      )
+    )
+  const same = open.find(
+    (p) =>
+      p.kind === kind &&
+      p.total === tax.total &&
+      p.razorpayOrderId &&
+      sameChange(list, p.change as Change, change)
+  )
+  if (same)
+    return {
+      scheduled: false as const,
+      paymentId: same.id,
+      orderId: same.razorpayOrderId!,
+      amount: tax.total * 100,
+      currency: "INR",
+      keyId: razorpayKeyId(),
+      name: (await seller()).name,
+      description: change.describe.slice(0, 250),
+      prefill: {
+        name: user.name ?? "",
+        email: sub?.billingEmail || user.email,
+      },
+      total: tax.total,
+    }
+  await getDb()
+    .update(payments)
+    .set({ status: "abandoned" })
+    .where(and(eq(payments.orgId, ctx.org.id), eq(payments.status, "created")))
   const [payment] = await getDb()
     .insert(payments)
     .values({
@@ -311,7 +388,14 @@ export async function confirm(
     )
   if (!own) throw notFound("Payment not found")
   const applied = await applyPayment(input.orderId, input.paymentId)
-  return { paid: true, invoiceNumber: applied?.invoiceNumber ?? null }
+  // An order replaced by a later change was paid: it isn't applied, and is refunded.
+  if (applied && "replaced" in applied && applied.replaced)
+    return { paid: false, replaced: true, invoiceNumber: null }
+  return {
+    paid: true,
+    replaced: false,
+    invoiceNumber: applied?.invoiceNumber ?? null,
+  }
 }
 
 /**
@@ -338,6 +422,28 @@ export async function applyPayment(orderId: string, razorpayPaymentId: string) {
       invoice_number: string | null
     }[]
     if (!payment) return null
+    // Paid for a change that was replaced by another: kept on record for a refund, never applied.
+    if (payment.status === "abandoned" || payment.status === "refund_due") {
+      if (payment.status === "abandoned") {
+        await tx
+          .update(payments)
+          .set({ status: "refund_due", razorpayPaymentId, paidAt: new Date() })
+          .where(eq(payments.id, payment.id))
+        await writeSystemEntry(
+          "Razorpay",
+          "billing.refund_due",
+          `A replaced order was paid (₹${payment.total.toLocaleString("en-IN")}): refund it`,
+          { paymentId: payment.id },
+          { orgId: payment.org_id, tx }
+        )
+      }
+      return {
+        invoiceNumber: null,
+        orgId: payment.org_id,
+        fresh: false,
+        replaced: true,
+      }
+    }
     if (payment.status === "paid")
       return {
         invoiceNumber: payment.invoice_number,
@@ -415,7 +521,11 @@ export async function applyPayment(orderId: string, razorpayPaymentId: string) {
         periodEnd: new Date(change.periodEnd),
         price: change.periodPrice,
         prices: list as unknown as Record<string, unknown>,
-        next: null,
+        // What the change lowered, for the next period (none for a plain upgrade or renewal).
+        next: (change.next ?? null) as unknown as Record<
+          string,
+          unknown
+        > | null,
         overSince: null,
         notice: "",
         updatedAt: now,

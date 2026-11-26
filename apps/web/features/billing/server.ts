@@ -10,6 +10,9 @@ import {
   type User,
 } from "@workspace/db"
 import {
+  featureAvailable,
+  KINDS,
+  organizationPolicy,
   BILLING_PERIODS,
   DEFAULT_FEATURES,
   DEFAULT_PRICE_LIST,
@@ -25,6 +28,7 @@ import { z } from "zod"
 
 import { usageOf } from "./limits"
 import { razorpayReady } from "./razorpay"
+import { kindPolicies } from "@/features/orgs/kinds"
 import { needFor, orgContext, writeAudit } from "@/features/orgs/server"
 import { platformCan } from "@/features/platform/access"
 import { writePlatformAudit } from "@/features/platform/staff"
@@ -138,8 +142,22 @@ export async function orgBilling(slug: string, user: User) {
     limitsOf(ctx.org.id),
   ])
   const current = sub ? choiceOf(sub) : null
+  // Only what this kind of organization can use is offered (packages/judge/src/billing.ts).
+  const policy = organizationPolicy(
+    ctx.org.type,
+    (await kindPolicies())[ctx.org.type],
+    ctx.org.platformModules
+  )
+  const usable = (key: string) => featureAvailable(key, ctx.org.type, policy)
+  const offered = {
+    ...cat,
+    features: cat.features.map((f) => ({ ...f, available: usable(f.key) })),
+    presets: cat.presets.filter((p) => p.features.every(usable)),
+  }
   return {
     enabled: settings["billing.enabled"],
+    /** The organization's kind, for "Not for a company" beside what it can't use. */
+    kind: { key: ctx.org.type, label: KINDS[ctx.org.type].label },
     /** Whether the organization can pay online (Razorpay set up on this server). */
     canPay: Boolean(
       process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET
@@ -183,7 +201,7 @@ export async function orgBilling(slug: string, user: User) {
       billingEmail: sub?.billingEmail ?? "",
     },
     payments: recent,
-    catalogue: cat,
+    catalogue: offered,
     free: {
       students: settings["billing.free_students"],
       staff: settings["billing.free_staff"],
@@ -532,4 +550,21 @@ export async function checkPlans(now = new Date()) {
     }
   }
   return { organizations: rows.length, told }
+}
+
+/** Cancels a smaller plan kept for the next period: the plan renews as it is. */
+export async function cancelNextPlan(slug: string, user: User) {
+  const ctx = await billingContext(slug, user)
+  const sub = await subscriptionOf(ctx.org.id)
+  if (!sub?.next) return { next: null }
+  await getDb()
+    .update(subscriptions)
+    .set({ next: null, updatedAt: new Date(), updatedBy: user.id })
+    .where(eq(subscriptions.orgId, ctx.org.id))
+  await writeAudit(
+    ctx,
+    "billing.scheduled_cancel",
+    "Cancelled the plan change waiting for the next period"
+  )
+  return { next: null }
 }

@@ -6,7 +6,13 @@
  * Amounts are whole rupees (an invoice rounds once, at the end).
  */
 
-import { MODULE_KEYS, type ModuleKey } from "./org-types.ts"
+import {
+  MODULE_KEYS,
+  moduleAvailable,
+  type KindPolicy,
+  type ModuleKey,
+  type OrgType,
+} from "./org-types.ts"
 
 export type BillingPeriod = "month" | "semester" | "year"
 export const BILLING_PERIODS: readonly BillingPeriod[] = [
@@ -60,6 +66,8 @@ export interface FeatureInfo {
   group: string
   /** The organization modules it switches on, if any. */
   modules?: string[]
+  /** For a feature that isn't a module: the only kinds of organization that can use it. */
+  onlyKinds?: OrgType[]
 }
 
 /** The launch price list (24 November 2026), set against Indian school and college ERP prices. */
@@ -206,6 +214,8 @@ export const DEFAULT_FEATURES: (PricedFeature & FeatureInfo)[] = [
     what: "Run dates, mentors, graduation",
     group: "Companies, cohorts, communities",
     price: 5,
+    // Runs need group dates (KindDefinition.groupDates).
+    onlyKinds: ["cohort", "coaching"],
   },
   {
     key: "events",
@@ -264,6 +274,59 @@ export function withNeeds(list: PriceList, features: readonly string[]) {
   }
   for (const key of features) add(key)
   return [...out]
+}
+
+/**
+ * Whether an organization of this kind can use a feature, and so buy it: its modules must be
+ * ones the kind runs and the platform hasn't switched off for it (`policy`, org_kind_policies),
+ * a feature that isn't a module must suit the kind, and so must everything it needs.
+ */
+export function featureAvailable(
+  key: string,
+  kind: OrgType,
+  policy?: KindPolicy | null,
+  seen = new Set<string>()
+): boolean {
+  const info = DEFAULT_FEATURES.find((f) => f.key === key)
+  if (!info) return false
+  if (seen.has(key)) return true
+  seen.add(key)
+  if (info.onlyKinds && !info.onlyKinds.includes(kind)) return false
+  if (
+    info.modules &&
+    !info.modules.some((m) => moduleAvailable(kind, m as ModuleKey, policy))
+  )
+    return false
+  return (info.needs ?? []).every((n) =>
+    featureAvailable(n, kind, policy, seen)
+  )
+}
+
+/**
+ * A change to a plan during its period. What it adds (features, more students, staff, judges,
+ * storage) applies now, paid for the days left; what it removes or lowers waits for renewal,
+ * since nothing is refunded. `now` is the plan from today; `next` the choice, kept for the next
+ * period when it differs from `now` (null otherwise).
+ */
+export function splitChange(
+  list: PriceList,
+  current: PlanChoice,
+  choice: PlanChoice
+): { now: PlanChoice; next: PlanChoice | null } {
+  const now: PlanChoice = {
+    features: [
+      ...new Set([
+        ...withNeeds(list, current.features),
+        ...withNeeds(list, choice.features),
+      ]),
+    ],
+    students: Math.max(current.students, choice.students),
+    staff: Math.max(current.staff, choice.staff),
+    judges: Math.max(current.judges, choice.judges),
+    storagePacks: Math.max(current.storagePacks, choice.storagePacks),
+    period: current.period,
+  }
+  return { now, next: samePlan(list, now, choice) ? null : choice }
 }
 
 /** How many days before a period ends it can be renewed (paid for again, or its way of paying changed). */
