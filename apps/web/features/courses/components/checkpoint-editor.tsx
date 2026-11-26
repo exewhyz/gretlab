@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 
+import { XIcon } from "@phosphor-icons/react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 
@@ -109,23 +110,14 @@ export function CheckpointsEditor({
   }
   if (readOnly && value.length === 0) return null
   return (
-    <section className="grid gap-2" data-testid="module-checkpoints-editor">
-      <div className="text-caption font-medium text-ink">
-        Quiz, lab and project
-      </div>
-      {!readOnly && (
-        <p className="text-caption">
-          Attach the ones that fit this module. Each counts toward the course
-          grade by its weight.
-        </p>
-      )}
+    <section className="grid gap-3" data-testid="module-checkpoints-editor">
       {KINDS.map((kind) => {
         const c = value.find((x) => x.kind === kind)
         if (readOnly && !c) return null
         return (
           <div
             key={kind}
-            className="grid gap-2 rounded-md border border-hairline p-2"
+            className="grid gap-3 rounded-lg bg-card p-3 ring-1 ring-foreground/10"
           >
             {readOnly ? (
               <div className="flex items-center gap-2 text-body-sm">
@@ -278,16 +270,25 @@ function CheckpointFields({
       </div>
       {c.kind !== "project" && (
         <>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-caption font-medium text-ink">
+              {noun.charAt(0).toUpperCase() + noun.slice(1)} in the{" "}
+              {KIND_NAME[c.kind].toLowerCase()}
+            </span>
+            <span className="text-caption text-muted-foreground tabular-nums">
+              Out of {total}
+            </span>
+          </div>
           <ol
-            className="grid gap-0.5 rounded-md border border-hairline p-1"
+            className="grid overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10"
             data-testid="checkpoint-items"
           >
             {c.items.map((item, index) => (
               <li
                 key={item.id}
-                className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 hover:bg-muted"
+                className="flex items-center gap-2 border-b border-hairline px-3 py-1.5 last:border-0"
               >
-                <span className="w-6 text-caption tabular-nums">
+                <span className="w-5 text-caption text-muted-foreground tabular-nums">
                   {index + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-body-sm text-ink">
@@ -323,31 +324,34 @@ function CheckpointFields({
                     })
                   }
                 >
-                  ✕
+                  <XIcon aria-hidden />
                 </Button>
               </li>
             ))}
             {c.items.length === 0 && (
-              <li className="px-1.5 py-1 text-caption">No {noun} yet.</li>
+              <li className="px-3 py-3 text-caption text-body">
+                No {noun} yet: add them from the library below.
+              </li>
             )}
           </ol>
+          <span className="text-caption font-medium text-ink">Add {noun}</span>
           <TextInput
             aria-label={`Search ${noun} for the ${KIND_NAME[c.kind].toLowerCase()}`}
             placeholder={`Search ${noun} by title or tag`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <ul className="grid max-h-40 gap-0.5 overflow-y-auto rounded-md border border-hairline p-1">
+          <ul className="grid max-h-48 overflow-y-auto rounded-lg bg-card ring-1 ring-foreground/10">
             {!library && <li className="px-1.5 py-1 text-caption">Loading…</li>}
             {candidates.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 hover:bg-muted"
+                className="flex items-center gap-2 border-b border-hairline px-3 py-1.5 last:border-0"
               >
                 <span className="min-w-0 flex-1 truncate text-body-sm text-ink">
                   {item.title}
                 </span>
-                <span className="text-xs text-body capitalize">
+                <span className="text-caption text-body capitalize">
                   {item.detail}
                 </span>
                 <Button
@@ -379,12 +383,14 @@ function CheckpointFields({
           </ul>
         </>
       )}
-      <p className="text-caption">
-        Out of {total}
-        {checkpointProblem(c) && (
-          <span className="text-destructive"> · {checkpointProblem(c)}</span>
-        )}
-      </p>
+      {c.kind === "project" && (
+        <p className="text-caption text-muted-foreground tabular-nums">
+          Out of {total}
+        </p>
+      )}
+      {checkpointProblem(c) && (
+        <p className="text-caption text-destructive">{checkpointProblem(c)}</p>
+      )}
     </div>
   )
 }

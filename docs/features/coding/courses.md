@@ -48,11 +48,13 @@ graded and make up the course grade.
 
 ## Step by step
 
-1. **Academics › Courses › New course:** add modules, and open each to write its readings
-   (**Write a reading**) and choose its problems and questions.
-2. In a module, tick **Add a quiz**, **Add a lab** or **Add a project** where they fit. Name each,
-   add instructions, a time limit and a weight, and choose its questions or problems with their
-   points (a project: what it's out of).
+1. **Academics › Courses › New course:** add modules. Each opens beside the outline in three tabs:
+   - **Details:** its name, a summary, and when it opens;
+   - **Content:** its lessons in order: readings you write (**Write a reading**) and practice
+     problems and questions from the library, which nobody marks;
+   - **Checkpoints:** the marked work, each optional: tick **Add a quiz**, **Add a lab** or **Add a
+     project**, name it, add instructions, a time limit and a weight, and choose its questions or
+     problems with their points (a project: what it's out of).
 3. On a class's **Course** tab, give it a course and a start day.
 4. Teachers see every module and how many finished; students see modules as they open and take
    their quizzes, labs and projects from them.

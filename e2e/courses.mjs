@@ -148,6 +148,7 @@ check("the course page lists its modules", (await editor.getByTestId("course-mod
 await editor.getByRole("button", { name: "Add module" }).click()
 const dialog = editor.getByTestId("module-dialog")
 await dialog.getByLabel("Module name").fill("Practice set")
+await dialog.getByRole("tab", { name: /^Content/ }).click()
 await dialog.getByLabel("Search problems and questions").fill("crs Later")
 await dialog.getByRole("button", { name: "Add crs Later" }).click()
 await editor.waitForTimeout(300)

@@ -8,6 +8,12 @@ aren't listed.
 
 ## 26 November 2026
 
+### A simpler module editor
+
+- A course module now opens beside the outline in three tabs: **Details**, **Content** (readings
+  and practice, in order) and **Checkpoints** (the marked quiz, lab and project), instead of one
+  long form. Done says what's missing when it can't be pressed.
+
 ### Changing a plan, clearer
 
 - A change that adds and removes is split: what you add (students, features) applies at once and

@@ -5,7 +5,14 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 
+import { ArrowDownIcon, ArrowUpIcon, XIcon } from "@phosphor-icons/react"
 import { Button } from "@workspace/ui/components/button"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 import {
   Dialog,
   DialogContent,
@@ -16,6 +23,8 @@ import {
 } from "@workspace/ui/components/dialog"
 
 import { ConfirmButton } from "@/components/confirm"
+import { DetailSheet } from "@/components/detail-sheet"
+import { EditorSheet } from "@/components/editor-sheet"
 import { MarkdownEditor } from "@/components/markdown-editor"
 import {
   Check,
@@ -668,24 +677,66 @@ function ModuleDialog({
     daysValue === null ||
     (Number.isInteger(daysValue) && daysValue >= 0 && daysValue <= 730)
 
-  return (
-    <Dialog open onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent
-        className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl"
-        data-testid="module-dialog"
-      >
-        <DialogHeader>
-          <DialogTitle>{module ? module.title : "New module"}</DialogTitle>
-          <DialogDescription>
-            {readOnly
-              ? releaseLabel({
-                  openAfterDays: module?.openAfterDays ?? null,
-                  afterPrevious: module?.afterPrevious ?? false,
-                })
-              : "Students see a module once it opens. Changes apply when you save the outline."}
-          </DialogDescription>
-        </DialogHeader>
-        {!readOnly && (
+  const problem = !title.trim()
+    ? "Name the module (Details)."
+    : !daysOk
+      ? "Opens after is a whole number of days, 0 to 730 (Details)."
+      : (checkpoints.map(checkpointProblem).find(Boolean) ?? null)
+  const reading = writing !== null && (
+    <ReadingDialog
+      reading={writing === "new" ? null : items[writing]!}
+      onCancel={() => setWriting(null)}
+      onSave={(r) => {
+        setItems(
+          writing === "new"
+            ? [
+                ...items,
+                {
+                  ...r,
+                  kind: "reading",
+                  id: "",
+                  detail: "reading",
+                  key: `new-reading-${nextKey++}`,
+                },
+              ]
+            : items.map((x, i) => (i === writing ? { ...x, ...r } : x))
+        )
+        setWriting(null)
+      }}
+    />
+  )
+  const tabs = (
+    <Tabs defaultValue={module ? "content" : "details"} className="gap-4">
+      <TabsList>
+        <TabsTrigger value="details">Details</TabsTrigger>
+        <TabsTrigger value="content">
+          Content{" "}
+          <span className="text-muted-foreground tabular-nums">
+            {items.length}
+          </span>
+        </TabsTrigger>
+        <TabsTrigger value="checkpoints">
+          Checkpoints{" "}
+          <span className="text-muted-foreground tabular-nums">
+            {checkpoints.length}
+          </span>
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="details" className="grid gap-4">
+        {readOnly ? (
+          <>
+            {module?.summary && (
+              <p className="text-body-sm text-body">{module.summary}</p>
+            )}
+            <p className="text-body-sm text-body">
+              {releaseLabel({
+                openAfterDays: module?.openAfterDays ?? null,
+                afterPrevious: module?.afterPrevious ?? false,
+              })}
+            </p>
+          </>
+        ) : (
           <>
             <Field label="Name">
               <TextInput
@@ -694,62 +745,70 @@ function ModuleDialog({
                 onChange={(e) => setTitle(e.target.value)}
               />
             </Field>
-            <Field label="Summary (optional)">
+            <Field
+              label="Summary (optional)"
+              help="One or two lines students see above the module."
+            >
               <TextArea
                 rows={2}
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
               />
             </Field>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <fieldset className="grid gap-3 rounded-lg p-3 ring-1 ring-foreground/10">
+              <legend className="px-1 text-caption font-medium text-ink">
+                When it opens
+              </legend>
               <Field
-                label="Opens after (days from the class's start)"
-                help="Empty: at the start."
+                label="Days after the class starts"
+                help="Empty: from the start."
               >
                 <TextInput
                   aria-label="Opens after days"
                   inputMode="numeric"
+                  className="w-32"
                   value={days}
                   onChange={(e) => setDays(e.target.value)}
                 />
               </Field>
-              <div className="self-end pb-2">
-                <Check
-                  checked={afterPrevious}
-                  onCheckedChange={setAfterPrevious}
-                  label="Only after finishing the module before"
-                />
-              </div>
-            </div>
+              <Check
+                checked={afterPrevious}
+                onCheckedChange={setAfterPrevious}
+                label="Only after finishing the module before"
+              />
+            </fieldset>
           </>
         )}
-        {module?.summary && readOnly && (
-          <p className="text-body-sm">{module.summary}</p>
-        )}
-        <div className="grid gap-1">
-          <div className="text-caption font-medium text-ink">
-            In this module, in order
+      </TabsContent>
+
+      <TabsContent value="content" className="grid gap-4">
+        <div className="grid gap-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-title-sm text-ink">Lessons, in order</h3>
+            <span className="text-caption text-muted-foreground">
+              Practice: not marked
+            </span>
           </div>
           <ol
-            className="grid gap-0.5 rounded-md border border-hairline p-1"
+            className="grid overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10"
             data-testid="module-items"
           >
             {items.map((item, index) => (
               <li
                 key={itemKey(item)}
-                className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 hover:bg-muted"
+                className="flex items-center gap-2 border-b border-hairline px-3 py-2 last:border-0"
               >
-                <span className="w-6 text-caption tabular-nums">
+                <span className="w-5 text-caption text-muted-foreground tabular-nums">
                   {index + 1}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-body-sm text-ink">
                   {item.title}
                 </span>
-                <span className="text-xs text-body capitalize">
+                <span className="text-caption text-body capitalize">
                   {itemDetail(item)}
                 </span>
                 {!readOnly && (
-                  <>
+                  <span className="flex items-center">
                     {item.kind === "reading" && (
                       <Button
                         variant="ghost"
@@ -767,7 +826,7 @@ function ModuleDialog({
                       disabled={index === 0}
                       onClick={() => move(index, -1)}
                     >
-                      ↑
+                      <ArrowUpIcon aria-hidden />
                     </Button>
                     <Button
                       variant="ghost"
@@ -776,7 +835,7 @@ function ModuleDialog({
                       disabled={index === items.length - 1}
                       onClick={() => move(index, 1)}
                     >
-                      ↓
+                      <ArrowDownIcon aria-hidden />
                     </Button>
                     <Button
                       variant="ghost"
@@ -786,14 +845,17 @@ function ModuleDialog({
                         setItems(items.filter((_, i) => i !== index))
                       }
                     >
-                      ✕
+                      <XIcon aria-hidden />
                     </Button>
-                  </>
+                  </span>
                 )}
               </li>
             ))}
             {items.length === 0 && (
-              <li className="px-1.5 py-1 text-caption">Nothing yet.</li>
+              <li className="px-3 py-4 text-caption text-body">
+                No lessons yet. Write a reading, or add practice problems and
+                questions from the library below.
+              </li>
             )}
           </ol>
           {!readOnly && (
@@ -808,34 +870,11 @@ function ModuleDialog({
             </div>
           )}
         </div>
-        {writing !== null && (
-          <ReadingDialog
-            reading={writing === "new" ? null : items[writing]!}
-            onCancel={() => setWriting(null)}
-            onSave={(r) => {
-              setItems(
-                writing === "new"
-                  ? [
-                      ...items,
-                      {
-                        ...r,
-                        kind: "reading",
-                        id: "",
-                        detail: "reading",
-                        key: `new-reading-${nextKey++}`,
-                      },
-                    ]
-                  : items.map((x, i) => (i === writing ? { ...x, ...r } : x))
-              )
-              setWriting(null)
-            }}
-          />
-        )}
         {!readOnly && (
-          <div className="grid gap-1">
-            <div className="text-caption font-medium text-ink">
-              Add from the library
-            </div>
+          <div className="grid gap-2">
+            <h3 className="text-title-sm text-ink">
+              Add practice from the library
+            </h3>
             <TextInput
               aria-label="Search problems and questions"
               placeholder="Search titles and tags"
@@ -843,21 +882,19 @@ function ModuleDialog({
               onChange={(e) => setSearch(e.target.value)}
             />
             <ul
-              className="grid max-h-56 gap-0.5 overflow-y-auto rounded-md border border-hairline p-1"
+              className="grid max-h-72 overflow-y-auto rounded-lg bg-card ring-1 ring-foreground/10"
               data-testid="module-candidates"
             >
-              {!library && (
-                <li className="px-1.5 py-1 text-caption">Loading…</li>
-              )}
+              {!library && <li className="px-3 py-2 text-caption">Loading…</li>}
               {candidates.map((item) => (
                 <li
                   key={`${item.kind}:${item.id}`}
-                  className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 hover:bg-muted"
+                  className="flex items-center gap-2 border-b border-hairline px-3 py-1.5 last:border-0"
                 >
                   <span className="min-w-0 flex-1 truncate text-body-sm text-ink">
                     {item.title}
                   </span>
-                  <span className="text-xs text-body capitalize">
+                  <span className="text-caption text-body capitalize">
                     {itemDetail(item)}
                   </span>
                   <Button
@@ -871,49 +908,77 @@ function ModuleDialog({
                 </li>
               ))}
               {library && candidates.length === 0 && (
-                <li className="px-1.5 py-1 text-caption">Nothing matches.</li>
+                <li className="px-3 py-2 text-caption">Nothing matches.</li>
               )}
             </ul>
-            <p className="text-caption">
-              Courses hold readings you write here, ready library problems and
-              questions that mark themselves (choice, and short answers with
-              accepted answers): practice nobody has to mark.
+            <p className="text-caption text-body">
+              Ready library problems, and questions that mark themselves. Marked
+              work (a quiz, a lab, a project) goes under Checkpoints.
             </p>
           </div>
         )}
-        <CheckpointsEditor
-          value={checkpoints}
-          onChange={setCheckpoints}
-          moduleTitle={title.trim()}
-          library={library}
-          readOnly={readOnly}
-        />
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancel}>
-            {readOnly ? "Close" : "Cancel"}
-          </Button>
-          {!readOnly && (
-            <Button
-              disabled={!title.trim() || !daysOk || !checkpointsOk}
-              onClick={() =>
-                onSave({
-                  id: module?.id,
-                  key: module?.key ?? `new-${nextKey++}`,
-                  title: title.trim(),
-                  summary,
-                  openAfterDays: daysValue || null,
-                  afterPrevious,
-                  items,
-                  checkpoints,
-                })
-              }
-            >
-              Done
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </TabsContent>
+
+      <TabsContent value="checkpoints" className="grid gap-3">
+        <p className="text-caption text-body">
+          Marked work for the course grade, each optional and one of a kind: a
+          quiz (questions that mark themselves), a lab (problems solved in one
+          attempt) and a project (a repository a teacher marks).
+        </p>
+        {readOnly && checkpoints.length === 0 ? (
+          <p className="text-body-sm text-body">
+            No checkpoints in this module.
+          </p>
+        ) : (
+          <CheckpointsEditor
+            value={checkpoints}
+            onChange={setCheckpoints}
+            moduleTitle={title.trim()}
+            library={library}
+            readOnly={readOnly}
+          />
+        )}
+      </TabsContent>
+    </Tabs>
+  )
+
+  if (readOnly)
+    return (
+      <DetailSheet
+        testId="module-dialog"
+        onClose={onCancel}
+        title={module?.title ?? "Module"}
+        width="46rem"
+      >
+        {tabs}
+      </DetailSheet>
+    )
+  return (
+    <EditorSheet
+      testId="module-dialog"
+      title={module ? `Edit ${module.title}` : "New module"}
+      description="Students see a module once it opens. Changes apply when you save the outline."
+      width="46rem"
+      submitLabel="Done"
+      submitDisabled={problem !== null}
+      error={problem}
+      onClose={onCancel}
+      onSubmit={() =>
+        onSave({
+          id: module?.id,
+          key: module?.key ?? `new-${nextKey++}`,
+          title: title.trim(),
+          summary,
+          openAfterDays: daysValue || null,
+          afterPrevious,
+          items,
+          checkpoints,
+        })
+      }
+    >
+      {tabs}
+      {reading}
+    </EditorSheet>
   )
 }
 
