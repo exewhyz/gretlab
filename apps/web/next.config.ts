@@ -6,6 +6,8 @@ import { contentSecurityPolicy, CSP_REPORT_PATH } from "./lib/csp"
 
 // Enforced since 26 November 2026, after report-only showed nothing blocked on real traffic
 // (lib/csp.ts). Violations are still reported to /api/csp-report and logged.
+// Where uploaded files live, if not R2 over https (lib/storage.ts).
+const storage = process.env.STORAGE_ENDPOINT
 const CSP_HEADER = "Content-Security-Policy"
 const dev = process.env.NODE_ENV === "development"
 
@@ -29,9 +31,21 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Every page but the LMS picker, whose form posts back to the LMS.
-        source: "/((?!lti/pick/).*)",
-        headers: [{ key: CSP_HEADER, value: contentSecurityPolicy({ dev }) }],
+        // Every page but the LMS picker, whose form posts back to the LMS, and the JavaScript
+        // runner's worker (below): two policies on one response would both have to pass.
+        source: "/((?!lti/pick/|js-worker\\.js$).*)",
+        headers: [
+          { key: CSP_HEADER, value: contentSecurityPolicy({ dev, storage }) },
+        ],
+      },
+      {
+        source: "/js-worker.js",
+        headers: [
+          {
+            key: CSP_HEADER,
+            value: contentSecurityPolicy({ dev, storage, evalInWorker: true }),
+          },
+        ],
       },
       {
         source: "/lti/pick/:id",
@@ -40,6 +54,7 @@ const nextConfig: NextConfig = {
             key: CSP_HEADER,
             value: contentSecurityPolicy({
               dev,
+              storage,
               formTargets: ["https:", ...(dev ? ["http:"] : [])],
             }),
           },

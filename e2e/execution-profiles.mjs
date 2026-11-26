@@ -280,7 +280,7 @@ try {
   await a.screenshot({ path: `${SHOTS}xp-account-profile.png`, fullPage: true })
   await a.getByRole("tab", { name: "Security" }).click()
   await a.waitForURL(/\/account\/security$/, { timeout: 15000 })
-  await a.getByRole("heading", { name: "Security" }).waitFor({ timeout: 15000 })
+  await a.getByRole("heading", { name: "How you sign in" }).waitFor({ timeout: 15000 })
   check("the Security tab has its own address", true)
 
   const o = await as("xp-o@example.com")
@@ -335,7 +335,8 @@ try {
   check("only Python and JavaScript are offered", (await e.getByLabel("Language").locator("option").allTextContents()).every((l) => /Python|JavaScript/.test(l)))
   await e.getByRole("button", { name: "Submit", exact: true }).click()
   await e.getByText(/Saved in the Submissions tab/).waitFor({ timeout: 45000 })
-  check("Submit graded in the browser: Accepted, provisional", (await e.getByTestId("verdict").textContent()).includes("Accepted") && (await e.getByText("Provisional", { exact: true }).count()) > 0)
+  check("Submit graded in the browser: Accepted, provisional", (await e.getByTestId("verdict").textContent()).includes("Accepted") && (await e.getByText("Provisional", { exact: true }).count()) > 0, `${await e.getByTestId("verdict").textContent()} / provisional tags: ${await e.getByText("Provisional", { exact: true }).count()}`)
+  await e.screenshot({ path: `${SHOTS}xp-browser-submit.png` })
   await e.screenshot({ path: `${SHOTS}xp-browser-submit.png` })
   check("no page errors", errors.length === 0, errors.join(" | "))
 } finally {

@@ -210,6 +210,34 @@ const settle = (tab) =>
     found.join(" | ")
   )
   await tab.screenshot({ path: `${SHOTS}problem-run.png` })
+  // JavaScript in the browser: its worker builds the program with new Function, which only the
+  // worker's own policy allows (lib/csp.ts evalInWorker).
+  await tab.getByLabel("Language").selectOption("javascript")
+  await tab
+    .locator(".monaco-editor textarea, .monaco-editor .native-edit-context")
+    .first()
+    .focus()
+  await tab.keyboard.press("ControlOrMeta+a")
+  await tab.keyboard.press("Delete")
+  await tab.keyboard.insertText('console.log("hello from js")\n')
+  await tab.waitForTimeout(300)
+  await tab.getByRole("button", { name: "Run", exact: true }).click()
+  await tab
+    .getByTestId("run-output")
+    .first()
+    .getByText("hello from js")
+    .waitFor({ timeout: 60_000 })
+    .catch(() => {})
+  check(
+    "JavaScript ran in the visitor's browser",
+    (await tab.getByTestId("run-output").first().textContent())?.includes("hello from js"),
+    await tab.getByTestId("run-output").first().textContent().catch(() => "")
+  )
+  const jsFound = await violations(tab)
+  check("…breaking no rule", jsFound.length === 0, jsFound.join(" | "))
+  const workerPolicy = (await fetch(`${BASE}/js-worker.js`)).headers.get("content-security-policy") ?? ""
+  const pagePolicy = (await fetch(`${BASE}/problems/p1`)).headers.get("content-security-policy") ?? ""
+  check("only the JavaScript worker may evaluate code", workerPolicy.includes("'unsafe-eval'") && workerPolicy.split("default-src").length === 2 && !pagePolicy.includes("'unsafe-eval'"), workerPolicy.slice(0, 120))
   await context.close()
 }
 

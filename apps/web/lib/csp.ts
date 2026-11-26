@@ -55,7 +55,23 @@ export const CSP_REPORT_PATH = "/api/csp-report"
 export function contentSecurityPolicy({
   dev = false,
   formTargets = [] as string[],
+  storage = undefined as string | undefined,
+  /**
+   * For public/js-worker.js alone: it runs the student's JavaScript, in their own browser and
+   * apart from the page, by building it with `new Function`, which needs 'unsafe-eval'.
+   */
+  evalInWorker = false,
 } = {}) {
+  // File storage at a plain http address (the tests' stand-in for R2, local development):
+  // images redirect there, so it's allowed by origin. R2 itself is https, covered below.
+  const storageOrigin = (() => {
+    try {
+      const url = storage ? new URL(storage) : null
+      return url?.protocol === "http:" ? [url.origin] : []
+    } catch {
+      return []
+    }
+  })()
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     "script-src": [
@@ -63,14 +79,14 @@ export function contentSecurityPolicy({
       "'unsafe-inline'",
       // Pyodide compiles WebAssembly; React's development build uses eval.
       "'wasm-unsafe-eval'",
-      ...(dev ? ["'unsafe-eval'"] : []),
+      ...(dev || evalInWorker ? ["'unsafe-eval'"] : []),
       ...RAZORPAY.script,
       ...PYODIDE,
       ...ADS.script,
     ],
     "style-src": ["'self'", "'unsafe-inline'"],
     // Images in statements are on Cloudflare R2 behind signed links; ads bring their own.
-    "img-src": ["'self'", "data:", "blob:", "https:"],
+    "img-src": ["'self'", "data:", "blob:", "https:", ...storageOrigin],
     "font-src": ["'self'", "data:"],
     "connect-src": [
       "'self'",
