@@ -87,6 +87,12 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               our payment provider; we never see or keep them, only the provider&apos;s
               reference for each payment.
             </Item>
+            <Item term="Referrals">
+              your referral code and link; which organizations were registered or paid with it,
+              and where each is (waiting, active, paying); what you earned from each payment and
+              when we paid it out, with our payout note. Organizations referred see nothing about
+              who referred them.
+            </Item>
             <Item term="Feedback on teachers">
               if your organization runs feedback rounds: your ratings and comments about the
               teachers of your subjects. They&apos;re kept with your account only so you answer once
@@ -243,6 +249,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
         <>
           <List>
             <Item term="Signed in">a cookie that keeps you signed in, which scripts on the page can&apos;t read.</Item>
+            <Item term="Referral link">if you follow someone&apos;s referral link, a cookie remembering its code for 30 days, so an organization you register from that browser counts as theirs.</Item>
             <Item term="Trusted browser">if you tick &quot;Don&apos;t ask again on this browser&quot;, a signed cookie that skips the second sign-in step for 30 days.</Item>
             <Item term="Preferences">small cookies and browser storage remembering your choices: Learn or Teach, which organizations&apos; content to show, light or dark theme, editor settings and folded menus.</Item>
             <Item term="Your code without an account">kept in your browser&apos;s storage, on that device only.</Item>

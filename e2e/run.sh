@@ -128,6 +128,7 @@ suite monitoring http://localhost:3100
 suite jobs http://localhost:3100
 suite storage http://localhost:3100
 suite billing http://localhost:3100
+suite referrals http://localhost:3100
 suite rate-limits http://localhost:3100
 suite csp http://localhost:3100
 suite links http://localhost:3100

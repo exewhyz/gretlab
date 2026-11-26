@@ -38,6 +38,7 @@ import {
   writeAudit,
 } from "@/features/orgs/server"
 import { kindPolicies } from "@/features/orgs/kinds"
+import { checkoutReferral, recordEarning } from "@/features/referrals/server"
 import { getSettings } from "@/features/settings/server"
 import { ApiError, notFound } from "@/lib/api/route"
 import { needWithinLimit } from "@/lib/api/rate-limit"
@@ -77,6 +78,8 @@ export const checkoutSchema = z.object({
   judges: z.number().int().min(0).max(100),
   storagePacks: z.number().int().min(0).max(1000),
   period: z.enum(BILLING_PERIODS as [BillingPeriod, ...BillingPeriod[]]),
+  /** A referral code or coupon (features/referrals). */
+  coupon: z.string().trim().max(30).optional(),
 })
 
 type Change = {
@@ -152,9 +155,10 @@ export async function checkout(
       "Paying online isn't set up yet. Contact GretLab to change your plan."
     )
   const list = await priceList()
+  const { coupon, ...plan } = input
   const choice: PlanChoice = {
-    ...input,
-    features: withNeeds(list, input.features),
+    ...plan,
+    features: withNeeds(list, plan.features),
   }
   // Only what this kind of organization can use (the kind, and the platform's policy for it).
   const policy = organizationPolicy(
@@ -274,6 +278,9 @@ export async function checkout(
       describe: describe(choice, start, end),
     }
   }
+  // A code's discount, worked out here (never by the browser); a typed code may attribute.
+  const referral = await checkoutReferral(ctx.org.id, coupon, amount, user.id)
+  amount -= referral.discount
   if (amount <= 0)
     throw new ApiError(
       409,
@@ -331,6 +338,8 @@ export async function checkout(
       sgst: tax.sgst,
       igst: tax.igst,
       total: tax.total,
+      coupon: referral.coupon,
+      discount: referral.discount,
       createdBy: user.id,
     })
     .returning({ id: payments.id })
@@ -420,6 +429,8 @@ export async function applyPayment(orderId: string, razorpayPaymentId: string) {
       igst: number
       total: number
       invoice_number: string | null
+      coupon: string | null
+      discount: number
     }[]
     if (!payment) return null
     // Paid for a change that was replaced by another: kept on record for a refund, never applied.
@@ -486,7 +497,18 @@ export async function applyPayment(orderId: string, razorpayPaymentId: string) {
         address: sub?.address ?? "",
         email: sub?.billingEmail ?? "",
       },
-      lines: [{ description: change.describe, amount: payment.amount }],
+      lines: payment.discount
+        ? [
+            {
+              description: change.describe,
+              amount: payment.amount + payment.discount,
+            },
+            {
+              description: `Discount (code ${payment.coupon})`,
+              amount: -payment.discount,
+            },
+          ]
+        : [{ description: change.describe, amount: payment.amount }],
       taxable: payment.amount,
       cgst: payment.cgst,
       sgst: payment.sgst,
@@ -535,6 +557,8 @@ export async function applyPayment(orderId: string, razorpayPaymentId: string) {
       .update(organizations)
       .set({ planFeatures: c.features })
       .where(eq(organizations.id, payment.org_id))
+    // Refer and earn: the first payment opens the window; one within it earns the referrer.
+    await recordEarning(tx, payment, now)
     await writeSystemEntry(
       "Razorpay",
       "billing.paid",
@@ -581,7 +605,8 @@ type Invoice = {
   razorpayPaymentId: string
 }
 
-const rupee = (n: number) => `Rs ${n.toLocaleString("en-IN")}`
+const rupee = (n: number) =>
+  `${n < 0 ? "- " : ""}Rs ${Math.abs(n).toLocaleString("en-IN")}`
 
 /** A paid invoice as a PDF, for whoever manages the organization's billing. */
 export async function invoicePdf(slug: string, user: User, paymentId: string) {

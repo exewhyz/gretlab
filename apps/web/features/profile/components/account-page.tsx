@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { Field, TextArea, TextInput } from "@/components/form"
 import { Row, Section } from "@/components/settings-sections"
 import { SecuritySettings } from "@/features/auth/components/security"
+import { ReferAndEarn } from "@/features/referrals/components/refer-and-earn"
 import { api, ApiRequestError } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import { toast } from "@/lib/toast"
@@ -21,7 +22,13 @@ import type { accountProfile } from "@/features/profile/server"
 import { accountProfileSchema } from "@/features/profile/schemas"
 
 type Profile = ApiResult<typeof accountProfile>
-export type AccountTab = "profile" | "security"
+export type AccountTab = "profile" | "security" | "referrals"
+
+const TAB_PATH: Record<AccountTab, string> = {
+  profile: "/account",
+  security: "/account/security",
+  referrals: "/account/referrals",
+}
 
 /** Account: the person's profile and their sign-in security, as tabs with their own address. */
 export function AccountPage({ tab }: { tab: AccountTab }) {
@@ -33,7 +40,7 @@ export function AccountPage({ tab }: { tab: AccountTab }) {
         <div>
           <h1 className="text-display-sm text-ink">Account</h1>
           <p className="text-body-sm text-body">
-            Your profile, and how you sign in.{" "}
+            Your profile, how you sign in, and your referrals.{" "}
             <Link
               href="/notifications"
               className="underline underline-offset-2 hover:text-ink"
@@ -46,16 +53,23 @@ export function AccountPage({ tab }: { tab: AccountTab }) {
       <Tabs
         value={tab}
         onValueChange={(next) => {
-          const target = next === "security" ? "/account/security" : "/account"
+          const target = TAB_PATH[next as AccountTab] ?? "/account"
           if (target !== pathname) router.replace(target, { scroll: false })
         }}
       >
         <TabsList aria-label="Account">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="referrals">Refer and earn</TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab === "profile" ? <ProfileForm /> : <SecuritySettings />}
+      {tab === "profile" ? (
+        <ProfileForm />
+      ) : tab === "security" ? (
+        <SecuritySettings />
+      ) : (
+        <ReferAndEarn />
+      )}
     </div>
   )
 }

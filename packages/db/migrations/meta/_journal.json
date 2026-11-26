@@ -743,6 +743,13 @@
       "when": 1795692291494,
       "tag": "0105_upload_uses",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1795713487195,
+      "tag": "0106_referrals",
+      "breakpoints": true
     }
   ]
 }

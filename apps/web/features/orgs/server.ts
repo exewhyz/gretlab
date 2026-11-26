@@ -403,7 +403,7 @@ export async function signUpOrganization(
       }
     )
   }
-  return { slug: org.slug, name: org.name, pending }
+  return { id: org.id, slug: org.slug, name: org.name, pending }
 }
 
 export async function setOrganizationActive(

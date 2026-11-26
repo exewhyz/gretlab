@@ -38,13 +38,14 @@ export function NewOrganizationSheet({
     slug: "",
     type: "college" as OrgType,
     ownerEmail: "",
+    referralCode: "",
   })
   const [slugTouched, setSlugTouched] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const create = useMutation({
     mutationFn: () =>
       api<{ name: string; slug: string }>("/admin/organizations", {
-        body: form,
+        body: { ...form, referralCode: form.referralCode.trim() || undefined },
       }),
     onSuccess: (org) => {
       void client.invalidateQueries({ queryKey: ["admin", "organizations"] })
@@ -136,6 +137,17 @@ export function NewOrganizationSheet({
               onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
             />
           </Field>
+          <Field
+            label="Referral code (optional)"
+            help="Whoever referred it earns from its first months of payments."
+          >
+            <TextInput
+              value={form.referralCode}
+              onChange={(e) =>
+                setForm({ ...form, referralCode: e.target.value.toUpperCase() })
+              }
+            />
+          </Field>
         </div>
       )}
       {last && (
@@ -145,6 +157,11 @@ export function NewOrganizationSheet({
             <ReviewRow label="Name">{form.name}</ReviewRow>
             <ReviewRow label="Address">/orgs/{form.slug}</ReviewRow>
             <ReviewRow label="First owner">{form.ownerEmail}</ReviewRow>
+            {form.referralCode.trim() && (
+              <ReviewRow label="Referred with">
+                {form.referralCode.trim()}
+              </ReviewRow>
+            )}
             <ReviewRow label="Groups">
               {KINDS[form.type].groupLevels.join(" › ")}
             </ReviewRow>

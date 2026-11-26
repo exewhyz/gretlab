@@ -295,6 +295,30 @@ export const SETTINGS = {
     schema: z.number().int().min(0).max(1_000_000),
     default: 500,
   },
+  "referral.enabled": {
+    label: "Refer and earn",
+    description:
+      "People's personal links, creator links and coupons. Off: no new attributions, discounts or earnings (what's owed stays owed).",
+    group: "Referrals",
+    schema: z.boolean(),
+    default: true,
+  },
+  "referral.percent": {
+    label: "Referrer's share",
+    description:
+      "Percent of each payment before GST a referrer earns, unless the code sets its own.",
+    group: "Referrals",
+    schema: z.number().int().min(0).max(50),
+    default: 5,
+  },
+  "referral.months": {
+    label: "For how many months",
+    description:
+      "Payments within this many months of the organization's first payment earn, unless the code sets its own.",
+    group: "Referrals",
+    schema: z.number().int().min(1).max(36),
+    default: 3,
+  },
   "billing.free_students": {
     label: "Free plan: students",
     description: "How many students the free plan allows.",

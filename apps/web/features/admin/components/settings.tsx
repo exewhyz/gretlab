@@ -21,7 +21,10 @@ import { Card, Loading, PageTitle } from "./shell"
 const GROUPS = [
   ...new Set(SETTING_KEYS.map((key) => SETTINGS[key].group)),
 ].filter(
-  (group) => group !== "Judges" && group !== "Billing" && group !== "Feedback"
+  (group) => group !== "Judges" &&
+    group !== "Billing" &&
+    group !== "Feedback" &&
+    group !== "Referrals"
 )
 
 /** Generated from the registry: a new setting appears here with no UI code. */

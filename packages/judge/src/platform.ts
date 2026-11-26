@@ -76,6 +76,12 @@ export const PLATFORM_PERMISSIONS = {
       "Feature prices and ready-made plans, every organization's plan and payments, and setting a plan by hand (custom deals, pilots).",
     module: "Platform",
   },
+  "platform.referrals.manage": {
+    label: "Manage referrals",
+    description:
+      "Creator links and campaign coupons, every referral and what each referrer is owed, marking payouts paid, and the referral settings.",
+    module: "Platform",
+  },
   "platform.costs.view": {
     label: "See costs",
     description:

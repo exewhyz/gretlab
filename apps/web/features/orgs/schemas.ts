@@ -21,6 +21,8 @@ export const orgCreateSchema = z.object({
   slug,
   type: z.enum(ORG_TYPES),
   ownerEmail: z.email("Enter the owner's email").toLowerCase(),
+  /** Who referred it (features/referrals); optional. */
+  referralCode: z.string().trim().max(30).optional(),
 })
 
 export const signupSchema = z.object({

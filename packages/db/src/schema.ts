@@ -2895,6 +2895,86 @@ export const uploadUses = pgTable(
   ]
 )
 
+/**
+ * Refer and earn (packages/judge/src/referrals.ts, features/referrals): codes, who each
+ * organization was referred by, and what each paid plan earned its referrer.
+ */
+export const referralCodes = pgTable(
+  "referral_codes",
+  {
+    code: text("code").primaryKey(),
+    /** personal: anyone's own link; creator: a sponsored creator's; campaign: a coupon. */
+    kind: text("kind").$type<"personal" | "creator" | "campaign">().notNull(),
+    /** Who earns from it; null for a campaign coupon, which earns nobody. */
+    ownerId: uuid("owner_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** The referrer's share, and the window in months; null: the settings'. */
+    percent: integer("percent"),
+    months: integer("months"),
+    /** Percent off for the organization, in the same window. */
+    discountPercent: integer("discount_percent").notNull().default(0),
+    validFrom: timestamp("valid_from", { withTimezone: true }),
+    validTo: timestamp("valid_to", { withTimezone: true }),
+    maxUses: integer("max_uses"),
+    /** Organizations attributed to it. */
+    uses: integer("uses").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    note: text("note").notNull().default(""),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("referral_codes_personal")
+      .on(table.ownerId)
+      .where(sql`kind = 'personal'`),
+  ]
+)
+
+export const orgReferrals = pgTable("org_referrals", {
+  orgId: uuid("org_id")
+    .primaryKey()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  code: text("code")
+    .notNull()
+    .references(() => referralCodes.code),
+  referrerId: uuid("referrer_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: createdAt(),
+  /** Its first paid payment: the window of earning and discount starts here. */
+  firstPaidAt: timestamp("first_paid_at", { withTimezone: true }),
+})
+
+export const referralEarnings = pgTable(
+  "referral_earnings",
+  {
+    id: id(),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .unique()
+      .references(() => payments.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    referrerId: uuid("referrer_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** Rupees, the share of the payment before GST. */
+    amount: integer("amount").notNull(),
+    percent: integer("percent").notNull(),
+    status: text("status").$type<"owed" | "paid" | "void">().notNull().default("owed"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    paidBy: uuid("paid_by").references(() => users.id, { onDelete: "set null" }),
+    payoutNote: text("payout_note").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (table) => [index("referral_earnings_by").on(table.referrerId, table.createdAt)]
+)
+
 export type Organization = typeof organizations.$inferSelect
 export type OrgGroup = typeof orgGroups.$inferSelect
 export type OrgRole = typeof orgRoles.$inferSelect
@@ -3913,6 +3993,9 @@ export const payments = pgTable(
     sgst: integer("sgst").notNull().default(0),
     igst: integer("igst").notNull().default(0),
     total: integer("total").notNull(),
+    /** A referral code applied to it (features/referrals), and the rupees it took off. */
+    coupon: text("coupon"),
+    discount: integer("discount").notNull().default(0),
     // abandoned: replaced by another change before it was paid; refund_due: paid anyway, to refund.
     status: text("status").$type<"created" | "paid" | "failed" | "abandoned" | "refund_due">().notNull().default("created"),
     razorpayOrderId: text("razorpay_order_id").unique(),

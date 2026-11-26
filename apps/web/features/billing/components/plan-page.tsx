@@ -202,11 +202,14 @@ function ChangePlan({ slug, data }: { slug: string; data: Billing }) {
             period: "year",
           }
   const [choice, setChoice] = useState<PlanChoice>(start)
+  const [coupon, setCoupon] = useState("")
   const footer =
     data.enabled && data.canPay ? (
       <PayButton
         slug={slug}
         choice={choice}
+        coupon={coupon}
+        onCoupon={setCoupon}
         mode={payMode(data, choice)}
         onDone={() => client.invalidateQueries({ queryKey: ["billing", slug] })}
       />
@@ -473,11 +476,16 @@ function payMode(data: Billing, choice: PlanChoice): "pay" | "renew" | "same" {
 function PayButton({
   slug,
   choice,
+  coupon,
+  onCoupon,
   mode,
   onDone,
 }: {
   slug: string
   choice: PlanChoice
+  /** A referral code or coupon, worked out on the server. */
+  coupon: string
+  onCoupon: (code: string) => void
   mode: "pay" | "renew" | "same"
   onDone: () => void
 }) {
@@ -488,7 +496,7 @@ function PayButton({
   const pay = useMutation({
     mutationFn: async () => {
       const order = await api<Checkout>(`/orgs/${slug}/billing/checkout`, {
-        body: choice,
+        body: { ...choice, coupon: coupon.trim() || undefined },
       })
       if (order.scheduled)
         return `Your new plan starts on ${formatDate(order.from)}. Nothing to pay now.`
@@ -553,6 +561,13 @@ function PayButton({
   })
   return (
     <div className="grid gap-2">
+      <TextInput
+        aria-label="Referral code or coupon"
+        placeholder="Have a code?"
+        value={coupon}
+        onChange={(e) => onCoupon(e.target.value.toUpperCase())}
+        className="font-mono"
+      />
       <Button
         onClick={() => pay.mutate()}
         disabled={pay.isPending || mode === "same"}

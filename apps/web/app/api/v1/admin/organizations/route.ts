@@ -1,4 +1,5 @@
 import { route } from "@/lib/api/route"
+import { attribute } from "@/features/referrals/server"
 import { readPage } from "@/lib/api/paging"
 import { writePlatformAudit } from "@/features/platform/staff"
 import {
@@ -18,6 +19,9 @@ export const POST = route(
   { access: "platform.orgs.create", body: orgCreateSchema },
   async ({ user, body }) => {
     const org = await createOrganization(user, body)
+    // Who referred it, when the platform knows: once, and never the owner's own code.
+    if (body.referralCode)
+      await attribute(org.id, body.referralCode, null).catch(() => false)
     await writePlatformAudit(
       user,
       "org.create",

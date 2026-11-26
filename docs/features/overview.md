@@ -89,5 +89,5 @@ The `coding` module: on for every kind from the start, and switchable off.
   [Platform staff and organizations](/features/platform/platform-staff/), [LTI 1.3](/features/platform/lti/)
   and [Site settings, search and legal](/features/platform/site-settings/).
 - [College single sign-on](/features/platform/single-sign-on/), [Your logo and colour](/features/platform/branding/)
-  and [Plans and billing](/features/platform/plans-and-billing/).
+  [Plans and billing](/features/platform/plans-and-billing/) and [Refer and earn](/features/platform/referrals/).
 - The [organization API](/api/) has its own guide.

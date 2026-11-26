@@ -19,6 +19,14 @@ aren't listed.
 
 ## 26 November 2026
 
+### Refer and earn
+
+- Everyone has a referral link under **Account › Refer and earn**. An organization registered
+  through it earns you 5% of each of its payments (before GST) for its first 3 months.
+- The platform makes creator links for sponsored creators and campaign coupons with a discount,
+  and pays out what's owed by hand from **Dashboard › Referrals**.
+- Organizations can type a code when they pay for a plan; its discount shows on the invoice.
+
 ### Reuse your images
 
 - The editor's image button now opens **Your images**: everything you've uploaded, newest first

@@ -181,6 +181,7 @@ export default defineConfig({
                 { label: "LTI 1.3", slug: "features/platform/lti" },
                 { label: "College single sign-on", slug: "features/platform/single-sign-on" },
                 { label: "Your logo and colour", slug: "features/platform/branding" },
+                { label: "Refer and earn", slug: "features/platform/referrals" },
                 { label: "Plans and billing", slug: "features/platform/plans-and-billing" },
                 { label: "Site settings, search and legal", slug: "features/platform/site-settings" },
               ],
