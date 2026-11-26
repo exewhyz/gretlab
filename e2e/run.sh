@@ -42,7 +42,8 @@ pnpm --dir $ROOT --filter runner test:queue || exit 1
 pnpm --dir $ROOT --filter @workspace/db test:lists || exit 1
 pnpm --dir $ROOT --filter @workspace/db test:pipelining || exit 1
 
-cd $ROOT/apps/web && pnpm exec next build >/dev/null || exit 1
+# LTI_ALLOW_HTTP reaches the build too: the LMS picker's form-action is set there (next.config.ts).
+cd $ROOT/apps/web && LTI_ALLOW_HTTP=true pnpm exec next build >/dev/null || exit 1
 NEXTAUTH_URL=http://localhost:3100 NEXTAUTH_SECRET=e2e-only-secret GOOGLE_CLIENT_ID=fake GOOGLE_CLIENT_SECRET=fake ADMIN_EMAILS=admin@example.com PROXY_SECRET=e2e-proxy-secret-0123456789 GITHUB_LOOKUP=off LTI_ALLOW_HTTP=true SSO_ALLOW_HTTP=true SSO_DNS_SERVER=127.0.0.1:3195 RESEND_API_KEY=e2e RESEND_API_URL=http://127.0.0.1:3198 MAIL_FROM='Gretlab <no-reply@example.com>' CRON_SECRET=e2e-cron-secret-0123456789 WEBHOOKS_ALLOW_LOCAL=true JUDGES_PROVIDER=fake JUDGES_LATEST_VERSION=e2e-latest RAZORPAY_KEY_ID=rzp_test_e2e RAZORPAY_KEY_SECRET=e2e-razorpay-secret RAZORPAY_WEBHOOK_SECRET=e2e-razorpay-webhook RAZORPAY_API_URL=http://127.0.0.1:3197 pnpm exec next start -p 3100 > $LOGS/web.log 2>&1 &
 for i in {1..20}; do curl -s -o /dev/null localhost:3100/privacy && break; sleep 1; done
 cd $ROOT/apps/runner

@@ -10,6 +10,8 @@ import { contentSecurityPolicy, CSP_REPORT_PATH } from "./lib/csp"
 const storage = process.env.STORAGE_ENDPOINT
 const CSP_HEADER = "Content-Security-Policy"
 const dev = process.env.NODE_ENV === "development"
+// The LMS picker may post to a plain http LMS only where LTI itself allows one (local tests).
+const ltiHttp = dev || process.env.LTI_ALLOW_HTTP === "true"
 
 const nextConfig: NextConfig = {
   // A self-contained server for the container image; see apps/web/Dockerfile.
@@ -55,7 +57,7 @@ const nextConfig: NextConfig = {
             value: contentSecurityPolicy({
               dev,
               storage,
-              formTargets: ["https:", ...(dev ? ["http:"] : [])],
+              formTargets: ["https:", ...(ltiHttp ? ["http:"] : [])],
             }),
           },
         ],
