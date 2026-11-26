@@ -3515,6 +3515,25 @@ export const orgSso = pgTable("org_sso", {
   updatedAt: updatedAt(),
 })
 
+/**
+ * A domain a college says it owns, proved with a DNS TXT record (features/sso): the record
+ * `_gretlab-challenge.<domain>` holding `gretlab-verify=<token>`. Verified, the domain joins its
+ * single sign-on's domains.
+ */
+export const ssoDomainClaims = pgTable(
+  "sso_domain_claims",
+  {
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    domain: text("domain").notNull(),
+    token: text("token").notNull(),
+    createdAt: createdAt(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  },
+  (table) => [primaryKey({ columns: [table.orgId, table.domain] })]
+)
+
 /** A college sign-in in flight: state, nonce and PKCE verifier, used once within minutes. */
 export const ssoStates = pgTable("sso_states", {
   state: text("state").primaryKey(),

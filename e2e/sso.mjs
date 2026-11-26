@@ -8,6 +8,7 @@
 import { execFileSync } from "node:child_process"
 import { createHash, createSign, generateKeyPairSync, randomUUID } from "node:crypto"
 import { mkdirSync } from "node:fs"
+import { createSocket } from "node:dgram"
 import { createServer } from "node:http"
 import { createRequire } from "node:module"
 
@@ -95,6 +96,40 @@ const idp = createServer(async (req, res) => {
 })
 await new Promise((r) => idp.listen(3196, "127.0.0.1", r))
 
+// ---------- a fake DNS server (:3195) answering TXT records the test puts there
+const txt = new Map() // name -> [values]
+const dns = createSocket("udp4")
+dns.on("message", (msg, from) => {
+  // The question: labels from byte 12, then type and class.
+  let at = 12
+  const labels = []
+  while (msg[at] !== 0) {
+    labels.push(msg.subarray(at + 1, at + 1 + msg[at]).toString())
+    at += msg[at] + 1
+  }
+  const name = labels.join(".").toLowerCase()
+  const questionEnd = at + 5
+  const values = txt.get(name) ?? []
+  const answers = values.map((v) => {
+    const data = Buffer.from(v)
+    const rdata = Buffer.concat([Buffer.from([data.length]), data])
+    const head = Buffer.alloc(12)
+    head.writeUInt16BE(0xc00c, 0) // the name, pointing at the question's
+    head.writeUInt16BE(16, 2) // TXT
+    head.writeUInt16BE(1, 4) // IN
+    head.writeUInt32BE(30, 6) // TTL
+    head.writeUInt16BE(rdata.length, 10)
+    return Buffer.concat([head, rdata])
+  })
+  const header = Buffer.alloc(12)
+  msg.copy(header, 0, 0, 2) // the id
+  header.writeUInt16BE(values.length ? 0x8180 : 0x8183, 2) // a reply; NXDOMAIN when empty
+  header.writeUInt16BE(1, 4)
+  header.writeUInt16BE(values.length, 6)
+  dns.send(Buffer.concat([header, msg.subarray(12, questionEnd), ...answers]), from.port, from.address)
+})
+await new Promise((r) => dns.bind(3195, "127.0.0.1", r))
+
 const client = async (email) => {
   const cookie = `next-auth.session-token=${await encode({ token: { email }, secret: SECRET })}`
   return async (path, { method, body } = {}) => {
@@ -136,6 +171,25 @@ check("the college connects its identity provider", connected.status === 200, JS
 const settings = (await owner("/orgs/sso-college/sso")).json
 check("the secret is never sent back, the redirect address is", settings?.hasSecret === true && !JSON.stringify(settings).includes("college-secret") && settings.redirectUri.endsWith("/api/v1/sso/callback"))
 check("the secret is sealed at rest", !psql(`select client_secret from org_sso where org_id='${orgId}'`).includes("college-secret"))
+
+// ---------- a college proves a domain with DNS
+const D = "/orgs/sso-college/sso/domains"
+check("public mail can't be claimed", (await owner(D, { body: { domain: "gmail.com" } })).json?.error?.code === "bad_domain")
+check("a domain another college verified can't be claimed", (await (await client("sso-o@example.com"))(`/orgs/sso-other/sso/domains`, { body: { domain: "sso-college.edu" } })).json?.error?.code === "domain_taken")
+const claimed = (await owner(D, { body: { domain: "DNS-College.edu" } })).json
+const pendingClaim = claimed?.pending?.find((p) => p.domain === "dns-college.edu")
+check("claiming a domain gives the TXT record to add", pendingClaim?.record === "_gretlab-challenge.dns-college.edu" && /^gretlab-verify=[\w-]{20,}$/.test(pendingClaim.value), JSON.stringify(claimed).slice(0, 300))
+check("asking again keeps the same record", (await owner(D, { body: { domain: "dns-college.edu" } })).json?.pending?.find((p) => p.domain === "dns-college.edu")?.value === pendingClaim?.value)
+check("before the record exists, Verify says so", (await owner(`${D}/verify`, { body: { domain: "dns-college.edu" } })).json?.error?.code === "not_found_yet")
+txt.set("_gretlab-challenge.dns-college.edu", ["gretlab-verify=someone-elses-token"])
+check("a record with another value doesn't verify it", (await owner(`${D}/verify`, { body: { domain: "dns-college.edu" } })).json?.error?.code === "not_found_yet")
+txt.set("_gretlab-challenge.dns-college.edu", ["v=spf1 -all", pendingClaim?.value])
+const verified = (await owner(`${D}/verify`, { body: { domain: "dns-college.edu" } })).json
+check("with the record, it's verified and joins the college's domains", verified?.verified?.includes("dns-college.edu") && psql(`select 'dns-college.edu' = any(domains) from org_sso where org_id='${orgId}'`) === "t", JSON.stringify(verified).slice(0, 200))
+check("verifying is logged", psql(`select count(*) from audit_log where org_id='${orgId}' and action='org.sso_domain_verify'`) === "1")
+const removed = (await owner(D, { method: "DELETE", body: { domain: "dns-college.edu" } })).json
+check("removing a domain takes it away", !removed?.verified?.includes("dns-college.edu") && psql(`select 'dns-college.edu' = any(domains) from org_sso where org_id='${orgId}'`) === "f")
+await owner(D, { body: { domain: "dns-college.edu" } })
 
 // ---------- signing in
 const first = await signIn("asha@sso-college.edu")
@@ -201,12 +255,15 @@ try {
   op.on("pageerror", (e) => errors.push(e.message.slice(0, 200)))
   await op.goto(`${BASE}/orgs/sso-college/manage/sso`)
   await op.getByTestId("sso-domains").waitFor({ timeout: 30000 })
-  check("the college's page shows its confirmed domains", (await op.getByTestId("sso-domains").textContent()).includes("sso-college.edu"))
+  check("the college's page shows its verified domains", (await op.getByTestId("sso-domains").first().textContent()).includes("sso-college.edu"))
+  await op.getByTestId("sso-domain-pending").waitFor({ timeout: 15000 })
+  check("a domain waiting for DNS shows the record to add", (await op.getByTestId("sso-domain-pending").textContent()).includes("_gretlab-challenge.dns-college.edu"))
   await op.screenshot({ path: `${SHOTS}sso-settings.png`, fullPage: true })
   check("no page errors", errors.length === 0, errors.join(" | "))
 } finally {
   await browser.close()
   idp.close()
+  dns.close()
   cleanup()
 }
 

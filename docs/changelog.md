@@ -8,6 +8,11 @@ aren't listed.
 
 ## 26 November 2026
 
+### Colleges prove their own email domains
+
+- For single sign-on, a college now verifies its email domains itself: add the domain, put the
+  DNS record GretLab shows at your DNS host, and press Verify. No need to write to us.
+
 ### Passkeys, and a clearer Account page
 
 - **Sign in with a passkey**: your fingerprint, face or screen lock (Face ID, Touch ID, Windows

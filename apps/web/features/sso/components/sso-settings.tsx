@@ -6,8 +6,10 @@ import { useState } from "react"
 import { Button } from "@workspace/ui/components/button"
 import { Switch } from "@workspace/ui/components/switch"
 
+import { ConfirmButton } from "@/components/confirm"
 import { Field, FormMessage, TextInput } from "@/components/form"
 import { Card, Loading, PageTitle } from "@/features/admin/components/shell"
+import type { domainClaims } from "@/features/sso/domains"
 import type { ssoSettings } from "@/features/sso/server"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
@@ -59,21 +61,7 @@ function SsoForm({ slug, initial }: { slug: string; initial: Settings }) {
         Signing in this way makes them members here. Two-factor sign-in still
         applies.
       </p>
-      <Card className="grid gap-2">
-        <h2 className="text-title-sm text-ink">Your email domains</h2>
-        {noDomains ? (
-          <p className="text-body-sm text-body" data-testid="sso-no-domains">
-            GretLab confirms which email domains your college owns before single
-            sign-on can be switched on, so no one can sign in someone
-            else&apos;s address. Write to us with your domains (for example
-            college.edu).
-          </p>
-        ) : (
-          <p className="text-body-sm text-ink" data-testid="sso-domains">
-            {initial.domains.join(", ")}
-          </p>
-        )}
-      </Card>
+      <DomainsCard slug={slug} />
       <Card className="grid gap-3">
         <h2 className="text-title-sm text-ink">Your identity provider</h2>
         <Field
@@ -155,6 +143,188 @@ function SsoForm({ slug, initial }: { slug: string; initial: Settings }) {
           </Button>
         </div>
       </Card>
+    </div>
+  )
+}
+
+type Claims = ApiResult<typeof domainClaims>
+
+/**
+ * The college's email domains: proved with a DNS TXT record (features/sso/domains.ts), as Google
+ * Workspace and Microsoft 365 do. Verified ones may sign in through its single sign-on.
+ */
+function DomainsCard({ slug }: { slug: string }) {
+  const client = useQueryClient()
+  const claims = useQuery({
+    queryKey: ["org", slug, "sso", "domains"],
+    queryFn: () => api<Claims>(`/orgs/${slug}/sso/domains`),
+  })
+  const [domain, setDomain] = useState("")
+  const [message, setMessage] = useState<{
+    text: string
+    kind: "ok" | "err"
+  } | null>(null)
+  const done = (data: Claims, text?: string) => {
+    client.setQueryData(["org", slug, "sso", "domains"], data)
+    // The switch below depends on there being a verified domain.
+    void client.invalidateQueries({
+      queryKey: ["org", slug, "sso"],
+      exact: true,
+    })
+    setMessage(text ? { text, kind: "ok" } : null)
+  }
+  const fail = (e: Error) => setMessage({ text: e.message, kind: "err" })
+  const add = useMutation({
+    mutationFn: () =>
+      api<Claims>(`/orgs/${slug}/sso/domains`, { body: { domain } }),
+    onSuccess: (data) => {
+      setDomain("")
+      done(
+        data,
+        "Now add the TXT record below at your DNS host, then press Verify."
+      )
+    },
+    onError: fail,
+    meta: { quiet: true },
+  })
+  const verify = useMutation({
+    mutationFn: (d: string) =>
+      api<Claims>(`/orgs/${slug}/sso/domains/verify`, { body: { domain: d } }),
+    onSuccess: (data, d) => done(data, `${d} is verified.`),
+    onError: fail,
+    meta: { quiet: true },
+  })
+  const remove = useMutation({
+    mutationFn: (d: string) =>
+      api<Claims>(`/orgs/${slug}/sso/domains`, {
+        method: "DELETE",
+        body: { domain: d },
+      }),
+    onSuccess: (data) => done(data),
+    onError: fail,
+    meta: { quiet: true },
+  })
+  return (
+    <Card className="grid gap-3" data-testid="sso-domains-card">
+      <div>
+        <h2 className="text-title-sm text-ink">Your email domains</h2>
+        <p className="text-body-sm text-body">
+          Single sign-on only signs in addresses on domains your college has
+          proved it owns, so no one can sign in someone else&apos;s address. Add
+          a domain, put the TXT record we show at your DNS host (where your
+          domain&apos;s records are managed), then press Verify.
+        </p>
+      </div>
+      {!claims.data ? (
+        <Loading error={claims.error} />
+      ) : claims.data.verified.length + claims.data.pending.length > 0 ? (
+        <ul className="grid divide-y divide-hairline rounded-md border border-hairline">
+          {claims.data.verified.map((d) => (
+            <li
+              key={d}
+              className="flex flex-wrap items-center gap-2 px-3 py-2 text-body-sm"
+              data-testid="sso-domains"
+            >
+              <span className="flex-1 text-ink">{d}</span>
+              <span className="rounded-full bg-success/10 px-2 py-0.5 text-caption text-success">
+                Verified
+              </span>
+              <ConfirmButton
+                size="sm"
+                variant="ghost"
+                title={`Remove ${d}?`}
+                description="People with these addresses won't sign in through your college any more. Without any domain, single sign-on switches off."
+                confirmLabel="Remove domain"
+                onConfirm={() => remove.mutate(d)}
+              >
+                Remove
+              </ConfirmButton>
+            </li>
+          ))}
+          {claims.data.pending.map((c) => (
+            <li
+              key={c.domain}
+              className="grid gap-2 px-3 py-3 text-body-sm"
+              data-testid="sso-domain-pending"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex-1 text-ink">{c.domain}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-caption text-body">
+                  Waiting for DNS
+                </span>
+                <Button
+                  size="sm"
+                  disabled={verify.isPending}
+                  onClick={() => verify.mutate(c.domain)}
+                >
+                  Verify
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => remove.mutate(c.domain)}
+                >
+                  Cancel
+                </Button>
+              </div>
+              <dl className="grid gap-1 rounded-md bg-muted p-2 text-caption">
+                <div className="grid gap-x-2 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:items-center">
+                  <dt className="text-body">Type</dt>
+                  <dd className="font-mono text-ink">TXT</dd>
+                </div>
+                <Copyable label="Name" value={c.record} />
+                <Copyable label="Value" value={c.value} />
+              </dl>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          add.mutate()
+        }}
+      >
+        <Field label="Add a domain">
+          <TextInput
+            value={domain}
+            placeholder="college.edu"
+            onChange={(e) => setDomain(e.target.value)}
+            className="w-64"
+          />
+        </Field>
+        <Button
+          type="submit"
+          variant="outline"
+          disabled={!domain.trim() || add.isPending}
+        >
+          Add
+        </Button>
+      </form>
+      {message && <FormMessage message={message} />}
+    </Card>
+  )
+}
+
+/** One line of the record to add, copied with one press. */
+function Copyable({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div className="grid gap-x-2 sm:grid-cols-[5rem_minmax(0,1fr)_auto] sm:items-center">
+      <dt className="text-body">{label}</dt>
+      <dd className="min-w-0 font-mono break-all text-ink">{value}</dd>
+      <Button
+        type="button"
+        size="xs"
+        variant="ghost"
+        onClick={() => {
+          void navigator.clipboard?.writeText(value)
+          setCopied(true)
+        }}
+      >
+        {copied ? "Copied" : "Copy"}
+      </Button>
     </div>
   )
 }

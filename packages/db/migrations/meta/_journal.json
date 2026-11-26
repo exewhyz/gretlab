@@ -722,6 +722,13 @@
       "when": 1795634994737,
       "tag": "0102_passkeys",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1795666149431,
+      "tag": "0103_sso_domain_claims",
+      "breakpoints": true
     }
   ]
 }

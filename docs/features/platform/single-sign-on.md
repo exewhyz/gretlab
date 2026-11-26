@@ -13,13 +13,22 @@ glance:
   permissions: [org.settings.manage, platform.orgs.manage]
 ---
 
-## Before you start: your domains
+## Before you start: prove your domains
 
-Write to GretLab with the email domains your college owns (for example `college.edu`). Platform
-staff add them under **Admin › Organizations › SSO domains** once they've checked. Until then
-single sign-on can't be switched on: your identity provider can sign in anyone whose address is on
-these domains, so a college can never claim someone else's. Public mail such as gmail.com is
-never accepted, and each domain belongs to one organization only.
+Single sign-on only signs in addresses on domains your college has proved it owns, so no one can
+sign in someone else's address. Under **School › Single sign-on › Your email domains**:
+
+1. Type a domain (for example `college.edu`) and press **Add**.
+2. GretLab shows a DNS record to add where your domain's records are managed (your DNS host:
+   GoDaddy, Cloudflare, your IT team): type **TXT**, name `_gretlab-challenge.college.edu`, and a
+   value starting `gretlab-verify=`. Each has a Copy button.
+3. Once it's added, press **Verify**. DNS changes can take a few minutes, sometimes longer; Verify
+   says when the record isn't there yet.
+
+Public mail such as gmail.com can't be claimed, and a domain another organization has verified
+can't be claimed again. Removing your last domain switches single sign-on off. Each step is in your
+activity log. Platform staff can also set domains for you under **Admin › Organizations › SSO
+domains**.
 
 ## Connecting your identity provider
 
