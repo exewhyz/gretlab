@@ -4,9 +4,9 @@ import type { NextConfig } from "next"
 
 import { contentSecurityPolicy, CSP_REPORT_PATH } from "./lib/csp"
 
-// Report-only until the reports from real traffic are clean (lib/csp.ts); then
-// "Content-Security-Policy".
-const CSP_HEADER = "Content-Security-Policy-Report-Only"
+// Enforced since 26 November 2026, after report-only showed nothing blocked on real traffic
+// (lib/csp.ts). Violations are still reported to /api/csp-report and logged.
+const CSP_HEADER = "Content-Security-Policy"
 const dev = process.env.NODE_ENV === "development"
 
 const nextConfig: NextConfig = {

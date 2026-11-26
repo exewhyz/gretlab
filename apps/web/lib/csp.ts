@@ -6,8 +6,8 @@
  * data need it without per-request nonces, and statements render markdown with raw HTML shown
  * as text, so there's no way to inject one through content.
  *
- * Sent report-only first (CSP_ENFORCE unset): browsers report what it would block to
- * /api/csp-report, which logs it, and nothing breaks. Enforced once the reports are clean.
+ * Enforced since 26 November 2026, after a report-only period showed nothing blocked on real
+ * traffic. Browsers still report what it blocks to /api/csp-report, which logs it.
  * Imported by next.config.ts, so it imports nothing.
  */
 

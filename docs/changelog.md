@@ -8,6 +8,13 @@ aren't listed.
 
 ## 26 November 2026
 
+### A stricter browser security policy
+
+- The site's Content-Security-Policy is now enforced: browsers only load scripts, frames and
+  connections from GretLab and the services it uses (Razorpay, Google ads, the in-browser Python
+  runner), which blocks a whole class of injected-script attacks. It ran in report-only mode first
+  and blocked nothing on real traffic.
+
 ### Secrets stay hidden until you ask
 
 - Backup codes, an authenticator app's setup key, new API keys and webhook secrets, your private

@@ -1,6 +1,5 @@
 /**
- * The Content-Security-Policy (lib/csp.ts): every page carries it (report-only until the reports
- * from real traffic are clean), the LMS picker may post its form to an LMS, browsers' reports are
+ * The Content-Security-Policy (lib/csp.ts): every page carries it, enforced, the LMS picker may post its form to an LMS, browsers' reports are
  * taken in both formats and anything malformed is refused, and the site's own pages break none
  * of it: a visitor's problem page with Monaco and Python run in the browser (Pyodide), the
  * landing page, the library, and signed-in homes and dashboards.
@@ -52,11 +51,12 @@ const directives = (header) =>
 // ---------- the header
 const home = await fetch(BASE + "/")
 const policy = directives(
-  home.headers.get("content-security-policy-report-only")
+  home.headers.get("content-security-policy")
 )
 check(
-  "pages carry the policy, report-only for now",
-  Boolean(policy["default-src"]) && !home.headers.get("content-security-policy")
+  "pages carry the policy, enforced (not report-only)",
+  Boolean(policy["default-src"]) &&
+    !home.headers.get("content-security-policy-report-only")
 )
 check(
   "scripts only from here and the services the site uses",
@@ -85,7 +85,7 @@ const picker = directives(
     await fetch(BASE + "/lti/pick/00000000-0000-0000-0000-000000000000", {
       redirect: "manual",
     })
-  ).headers.get("content-security-policy-report-only")
+  ).headers.get("content-security-policy")
 )
 check(
   "the LMS picker may post its answer back to the LMS",
