@@ -860,7 +860,7 @@ export function ExtensionControl({
         {extension && (
           <span
             data-testid="extension-chip"
-            className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary"
+            className="rounded-full bg-muted px-2 py-0.5 text-xs text-ink"
             title={extension.reason || undefined}
           >
             Until {formatDateTime(extension.dueAt)}

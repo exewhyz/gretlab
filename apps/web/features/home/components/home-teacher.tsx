@@ -1,5 +1,6 @@
 "use client"
 
+import { WARNING_RULES } from "@workspace/judge"
 import { ArrowRightIcon } from "@phosphor-icons/react"
 import Link from "next/link"
 
@@ -229,7 +230,10 @@ export function TeacherHome({
                         <span>Attendance</span>
                         <span className="tabular-nums">{c.attendance}%</span>
                       </div>
-                      <Meter value={c.attendance} bad={c.attendance < 85} />
+                      <Meter
+                        value={c.attendance}
+                        bad={c.attendance < WARNING_RULES.attendancePercent}
+                      />
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2">

@@ -1,13 +1,7 @@
 "use client"
 
-import {
-  BuildingsIcon,
-  CodeIcon,
-  TrophyIcon,
-  UsersIcon,
-  WarningIcon,
-  type Icon,
-} from "@phosphor-icons/react"
+import { Figure, Figures } from "@/components/figures"
+import { WarningIcon } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { VERDICTS, type Verdict } from "@workspace/judge"
 import Link from "next/link"
@@ -55,48 +49,6 @@ const trendConfig = {
   total: { label: "Submissions", color: "var(--chart-1)" },
 } satisfies ChartConfig
 
-function Tile({
-  label,
-  value,
-  hint,
-  href,
-  icon: I,
-}: {
-  label: string
-  value: string | number
-  hint?: string
-  href?: string | null
-  icon: Icon
-}) {
-  const body = (
-    <Card
-      size="sm"
-      className={cn("h-full", href && "transition-shadow hover:shadow-md")}
-      data-testid="admin-tile"
-    >
-      <CardHeader>
-        <CardDescription className="flex items-center gap-2">
-          <I className="size-4" aria-hidden="true" />
-          {label}
-        </CardDescription>
-        <div className="text-3xl leading-tight font-semibold text-ink tabular-nums">
-          {value}
-        </div>
-        {hint && (
-          <div className="text-caption text-muted-foreground">{hint}</div>
-        )}
-      </CardHeader>
-    </Card>
-  )
-  return href ? (
-    <Link href={href} className="block h-full">
-      {body}
-    </Link>
-  ) : (
-    body
-  )
-}
-
 /** /admin: the platform at a glance, what needs attention, and the judge's health. */
 export function AdminOverview() {
   const { data: viewer } = useViewer()
@@ -123,7 +75,7 @@ export function AdminOverview() {
   const week = data.submissionsByDay.slice(-7).reduce((s, d) => s + d.total, 0)
   const verdictTotal = data.verdictsLast24h.reduce((s, v) => s + v.total, 0)
   const accepted =
-    data.verdictsLast24h.find((v) => v.verdict === "accepted")?.total ?? 0
+    data.verdictsLast24h.find((v) => v.verdict === "AC")?.total ?? 0
   const manageOrgs = held.includes("platform.orgs.manage")
   // Each shortcut only for those whose role opens its page.
   const actions = [
@@ -250,38 +202,42 @@ export function AdminOverview() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
+      <Figures>
+        <Figure
+          testId="admin-tile"
           label="Students and staff"
           value={data.users}
           hint={`${data.newUsers7d} joined this week`}
-          href={isAdmin ? "/admin/users" : null}
-          icon={UsersIcon}
+          href={isAdmin ? "/admin/users" : undefined}
         />
-        <Tile
+        <Figure
+          testId="admin-tile"
           label="Organizations"
           value={data.organizations.total}
           hint={`${data.organizations.active} active${data.organizations.pending.length ? ` · ${data.organizations.pending.length} waiting` : ""}`}
-          href={manageOrgs ? "/admin/organizations" : null}
-          icon={BuildingsIcon}
+          href={manageOrgs ? "/admin/organizations" : undefined}
         />
-        <Tile
+        <Figure
+          testId="admin-tile"
           label="Problems"
           value={data.problems}
           href={
-            held.includes("platform.library.edit") ? "/admin/problems" : null
+            held.includes("platform.library.edit")
+              ? "/admin/problems"
+              : undefined
           }
-          icon={CodeIcon}
         />
-        <Tile
+        <Figure
+          testId="admin-tile"
           label="Contests"
           value={data.contests}
           href={
-            held.includes("platform.work.manage") ? "/admin/contests" : null
+            held.includes("platform.work.manage")
+              ? "/admin/contests"
+              : undefined
           }
-          icon={TrophyIcon}
         />
-      </div>
+      </Figures>
 
       {data.organizations.pending.length > 0 && manageOrgs && (
         <Card data-testid="pending-schools">
@@ -291,7 +247,9 @@ export function AdminOverview() {
               Registered on the site; nobody can use them until you approve.
             </CardDescription>
             <CardAction>
-              <Badge>{data.organizations.pending.length}</Badge>
+              <Badge variant="secondary">
+                {data.organizations.pending.length}
+              </Badge>
             </CardAction>
           </CardHeader>
           <CardContent className="grid gap-2">
@@ -312,6 +270,7 @@ export function AdminOverview() {
                 </div>
                 <Button
                   size="sm"
+                  variant="outline"
                   onClick={() => approve.mutate(o.id)}
                   disabled={approve.isPending}
                 >
@@ -366,6 +325,7 @@ export function AdminOverview() {
                   content={<ChartTooltipContent hideLabel />}
                 />
                 <Bar
+                  isAnimationActive={false}
                   dataKey="total"
                   fill="var(--color-total)"
                   radius={[6, 6, 2, 2]}
@@ -418,31 +378,26 @@ export function AdminOverview() {
             ) : queue.oldestQueuedSeconds > STUCK_AFTER_SECONDS ? (
               <Badge variant="destructive">Backed up</Badge>
             ) : (
-              <Badge>Healthy</Badge>
+              <Badge variant="secondary" className="bg-success/10 text-success">
+                Healthy
+              </Badge>
             )}
           </CardAction>
         </CardHeader>
         <CardContent className="grid gap-5">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {(
-              [
-                ["Waiting to run", queue.queued],
-                ["Running now", queue.running],
-                ["Done, last 5 min", queue.finishedLast5Min],
-                ["Typical wait", `${queue.waitP50Seconds.toFixed(1)} s`],
-                ["Slowest 5% wait", `${queue.waitP95Seconds.toFixed(1)} s`],
-              ] as const
-            ).map(([label, value]) => (
-              <div key={label} className="rounded-lg bg-muted/50 p-3">
-                <div className="text-caption text-muted-foreground">
-                  {label}
-                </div>
-                <div className="text-title-md text-ink tabular-nums">
-                  {value}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Figures>
+            <Figure label="Waiting to run" value={queue.queued} />
+            <Figure label="Running now" value={queue.running} />
+            <Figure label="Done, last 5 min" value={queue.finishedLast5Min} />
+            <Figure
+              label="Typical wait"
+              value={`${queue.waitP50Seconds.toFixed(1)} s`}
+            />
+            <Figure
+              label="Slowest 5% wait"
+              value={`${queue.waitP95Seconds.toFixed(1)} s`}
+            />
+          </Figures>
           <div className="grid gap-1.5">
             <div className="flex justify-between text-body-sm">
               <span className="text-ink">Runner slots in use</span>

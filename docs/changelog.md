@@ -6,6 +6,17 @@ description: What's new in GretLab, newest first.
 What changed for the people using GretLab, newest first. Fixes and changes that don't show to anyone
 aren't listed.
 
+## 27 November 2026
+
+### Clearer pages
+
+- The platform overview's share of accepted submissions was always shown as 0%; it's right now.
+- Attendance bars on the school and teacher homes turn red below the 75% minimum, not below 85%.
+- The school home's recent-days chart shows its bars at once.
+- The platform overview's figures sit in one row, and its status reads green when healthy.
+- Units, study plans and courses each say what they are and how they differ.
+- A handed-in project shows the same way in a course as in an assignment.
+
 ## 26 November 2026
 
 ### Creating an organization, step by step

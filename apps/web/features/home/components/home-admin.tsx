@@ -1,5 +1,6 @@
 "use client"
 
+import { WARNING_RULES } from "@workspace/judge"
 import {
   ArrowRightIcon,
   CalendarDotsIcon,
@@ -298,7 +299,11 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
                     <span className="truncate">{c.name}</span>
                     <Meter
                       value={c.taken ? (100 * c.present) / c.students : 0}
-                      bad={c.taken && c.present / c.students < 0.85}
+                      bad={
+                        c.taken &&
+                        (100 * c.present) / c.students <
+                          WARNING_RULES.attendancePercent
+                      }
                     />
                     <span
                       className={cn(
@@ -369,6 +374,7 @@ export function AdminHome({ slug, data }: { slug: string; data: AdminData }) {
                     fill="var(--color-percent)"
                     // Slim ink bars: ten full-width dark blocks outweighed the page.
                     maxBarSize={18}
+                    isAnimationActive={false}
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>

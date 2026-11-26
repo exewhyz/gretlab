@@ -200,7 +200,7 @@ export function MemberHome() {
               >
                 <span
                   aria-hidden="true"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary font-mono text-xs font-bold text-primary-foreground"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-md bg-ink font-mono text-xs font-bold text-canvas"
                 >
                   {o.name.slice(0, 2).toUpperCase()}
                 </span>
@@ -558,7 +558,7 @@ export function MemberHome() {
                           href={`/u/${data.handle}`}
                           className="text-body-sm font-medium hover:text-primary-active"
                         >
-                          Profile
+                          Your profile
                         </Link>
                       </CardAction>
                     )}

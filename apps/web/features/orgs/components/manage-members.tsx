@@ -188,7 +188,7 @@ export function ManageMembers({
         />
         <SelectInput
           aria-label="Status"
-          className="w-48"
+          className="w-56"
           value={status}
           onChange={(event) => {
             setStatus(event.target.value)
