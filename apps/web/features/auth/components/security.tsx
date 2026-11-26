@@ -28,12 +28,13 @@ import { ConfirmButton } from "@/components/confirm"
 import { Field, FormMessage, TextInput } from "@/components/form"
 import { PASSWORD, passwordProblem } from "@workspace/judge"
 
+import { masked, RevealButton, SecretValue } from "@/components/secret-value"
 import { Row, Section } from "@/components/settings-sections"
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { formatDate } from "@/lib/format"
 
-import { addPasskey } from "../passkey-client"
+import { addPasskey, passkeySecondStep } from "../passkey-client"
 import type { listPasskeys } from "../passkeys"
 import { sendSecondStep, STEP_MESSAGES } from "../session-step"
 import type { ApiResult } from "@/lib/api/types"
@@ -237,6 +238,7 @@ export function SecuritySettings() {
           method={dialog.kind === "remove" ? dialog.method : undefined}
           last={dialog.kind === "remove" && methodCount === 1}
           emailOn={s.methods.email}
+          passkeyOn={s.methods.passkey}
           onDone={(codes) => {
             setDialog(null)
             if (codes) setFresh(codes)
@@ -436,7 +438,9 @@ function deviceName() {
   return `${browser} on ${system}`
 }
 
+/** New backup codes: hidden until asked for (shared screens), then copied or downloaded. */
 function BackupCodes({ codes }: { codes: string[] }) {
+  const [shown, setShown] = useState(false)
   const text = `Backup codes for ${location.host}. Each works once.\n\n${codes.join("\n")}\n`
   return (
     <div
@@ -447,11 +451,21 @@ function BackupCodes({ codes }: { codes: string[] }) {
         Save these backup codes somewhere safe. If you can&apos;t get a code any
         other way, each one signs you in once. They won&apos;t be shown again.
       </p>
-      <ul className="grid grid-cols-2 gap-1 font-mono text-body-sm text-ink sm:grid-cols-5">
-        {codes.map((c) => (
-          <li key={c}>{c}</li>
-        ))}
-      </ul>
+      <div className="flex items-start gap-2">
+        <ul
+          className="grid flex-1 grid-cols-2 gap-1 font-mono text-body-sm text-ink sm:grid-cols-5"
+          data-shown={shown || undefined}
+        >
+          {codes.map((c) => (
+            <li key={c}>{shown ? c : masked(c).slice(0, c.length)}</li>
+          ))}
+        </ul>
+        <RevealButton
+          shown={shown}
+          onToggle={() => setShown(!shown)}
+          what="backup codes"
+        />
+      </div>
       <div className="flex gap-2">
         <Button
           size="sm"
@@ -569,15 +583,13 @@ function AppSetup({
         />
         <div className="grid content-start gap-1 text-body-sm">
           <p className="text-ink">Scan this with your authenticator app.</p>
-          <p className="text-body">
-            Can&apos;t scan? Add an account by key:{" "}
-            <code
-              className="font-mono break-all text-ink"
-              data-testid="app-secret"
-            >
-              {setup.secret.match(/.{1,4}/g)!.join(" ")}
-            </code>
-          </p>
+          <p className="text-body">Can&apos;t scan? Add an account by key:</p>
+          <SecretValue
+            value={setup.secret}
+            display={setup.secret.match(/.{1,4}/g)!.join(" ")}
+            what="setup key"
+            testId="app-secret"
+          />
           <a
             href={setup.url}
             className="text-caption text-body underline sm:hidden"
@@ -682,32 +694,43 @@ function CodeDialog({
   method,
   last,
   emailOn,
+  passkeyOn,
   onDone,
 }: {
   kind: "remove" | "codes"
   method?: Method
   last: boolean
   emailOn: boolean
+  /** A passkey can confirm it instead of a code (someone with only a passkey has no code). */
+  passkeyOn: boolean
   onDone: (codes?: string[]) => void
 }) {
   const [code, setCode] = useState("")
+  const [passkeyProblem, setPasskeyProblem] = useState<string | null>(null)
   const mail = useMutation({
     mutationFn: () =>
       api<ApiResult<typeof emailConfirmCode>>("/me/security/code", {
         method: "POST",
       }),
   })
+  // Without a code, the server takes the passkey just confirmed (a second step this minute).
   const act = useMutation({
-    mutationFn: () =>
+    mutationFn: (withCode: string | undefined) =>
       kind === "remove"
-        ? api("/me/security/remove", { body: { method, code } }).then(
+        ? api("/me/security/remove", { body: { method, code: withCode } }).then(
             () => undefined
           )
         : api<ApiResult<typeof renewBackupCodes>>("/me/security/backup-codes", {
-            body: { code },
+            body: { code: withCode },
           }).then((r) => r.backupCodes),
     onSuccess: (codes) => onDone(codes),
   })
+  const withPasskey = async () => {
+    setPasskeyProblem(null)
+    const problem = await passkeySecondStep("stepUp")
+    if (problem) return setPasskeyProblem(problem)
+    act.mutate(undefined)
+  }
   const name = method === "app" ? "the authenticator app" : "codes by email"
   return (
     <Dialog open onOpenChange={(open) => !open && onDone()}>
@@ -726,8 +749,9 @@ function CodeDialog({
               : last
                 ? `It's your only method, so signing in will need only Google again.`
                 : `You'll still sign in with your other method.`}{" "}
-            Type a current code from the app, an emailed code or a backup code
-            to confirm.
+            {passkeyOn
+              ? "Confirm with your passkey, or type a current code from the app, an emailed code or a backup code."
+              : "Type a current code from the app, an emailed code or a backup code to confirm."}
           </DialogDescription>
         </DialogHeader>
         <Field label="Code">
@@ -751,6 +775,20 @@ function CodeDialog({
               : "Email me a code"}
           </Button>
         )}
+        {passkeyOn && (
+          <Button
+            size="sm"
+            className="justify-self-start"
+            disabled={act.isPending}
+            onClick={() => void withPasskey()}
+          >
+            <FingerprintIcon aria-hidden />
+            Use a passkey instead
+          </Button>
+        )}
+        {passkeyProblem && (
+          <FormMessage message={{ text: passkeyProblem, kind: "err" }} />
+        )}
         {(act.error ?? mail.error) && (
           <FormMessage
             message={{ text: (act.error ?? mail.error)!.message, kind: "err" }}
@@ -763,7 +801,7 @@ function CodeDialog({
           <Button
             variant={kind === "remove" ? "destructive" : "default"}
             disabled={code.trim().length < 6 || act.isPending}
-            onClick={() => act.mutate()}
+            onClick={() => act.mutate(code)}
           >
             {kind === "codes" ? "Make new codes" : last ? "Turn off" : "Remove"}
           </Button>

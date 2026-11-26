@@ -86,13 +86,24 @@ try {
   await ctx.addCookies([await cookie({ mfaAt: Date.now() - 30 * 60_000 })])
   await page.goto(`${BASE}/account/security`)
   await page.getByTestId("passkey-row").waitFor({ timeout: 30000 })
+  // Forgotten backup codes, with only a passkey: new ones, confirmed with the passkey.
+  const before = psql(`select backup_codes::text from two_factor where user_id='${uid}'`)
+  await page.getByTestId("backup-left").getByRole("button", { name: "Regenerate" }).click()
+  await page.getByRole("button", { name: "Use a passkey instead" }).click()
+  await page.getByTestId("backup-left").getByTestId("backup-codes").waitFor({ timeout: 20000 })
+  check("with only a passkey, new backup codes confirmed with it", psql(`select backup_codes::text from two_factor where user_id='${uid}'`) !== before)
+  // A fresh second step was just recorded; make the next action ask again.
+  await ctx.clearCookies()
+  await ctx.addCookies([await cookie({ mfaAt: Date.now() - 30 * 60_000 })])
+  await page.goto(`${BASE}/account/security`)
+  await page.getByTestId("passkey-row").waitFor({ timeout: 30000 })
   await page.getByTestId("passkey-row").getByRole("button", { name: "Remove" }).click()
   await page.getByRole("alertdialog").getByRole("button", { name: "Remove passkey" }).click()
   await page.getByTestId("step-up").getByRole("button", { name: "Use a passkey" }).click()
   for (let i = 0; i < 50 && psql(`select count(*) from passkeys where user_id='${uid}'`) !== "0"; i++) await new Promise((r) => setTimeout(r, 200))
   check("a protected action confirmed with a passkey goes ahead", psql(`select count(*) from passkeys where user_id='${uid}'`) === "0")
   check("removing the last method turns two-factor off", psql(`select count(*) from two_factor where user_id='${uid}' and enabled_at is not null`) === "0")
-  check("the step-up was logged", psql(`select count(*) from audit_log where action='security.step_up' and summary like '%passkey%'`) === "1")
+  check("each confirmation with a passkey is logged", Number(psql(`select count(*) from audit_log where action='security.step_up' and summary like '%passkey%'`)) >= 2)
 
   // ---------- a phone width
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 } })

@@ -1,6 +1,7 @@
 "use client"
 
-import { CalendarBlankIcon, CopyIcon } from "@phosphor-icons/react"
+import { SecretValue } from "@/components/secret-value"
+import { CalendarBlankIcon } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useMemo, useState } from "react"
@@ -157,7 +158,6 @@ export function CalendarPage() {
 
 function Feed({ feed }: { feed: string | null }) {
   const client = useQueryClient()
-  const [copied, setCopied] = useState(false)
   const done = () => client.invalidateQueries({ queryKey: ["me", "calendar"] })
   const rotate = useMutation({
     mutationFn: () => api("/me/calendar/feed", { body: {} }),
@@ -194,22 +194,13 @@ function Feed({ feed }: { feed: string | null }) {
       </div>
       {url && (
         <div className="flex flex-wrap items-center gap-2">
-          <TextInput
-            aria-label="Calendar link"
-            readOnly
+          {/* The link is the key to your calendar: hidden until asked for. */}
+          <SecretValue
             value={url}
-            className="min-w-0 flex-1 font-mono text-xs"
+            what="calendar link"
+            testId="calendar-link"
+            className="min-w-0 flex-1"
           />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              void navigator.clipboard?.writeText(url)
-              setCopied(true)
-            }}
-          >
-            <CopyIcon /> {copied ? "Copied" : "Copy"}
-          </Button>
           <ConfirmButton
             size="sm"
             variant="ghost"
@@ -217,10 +208,7 @@ function Feed({ feed }: { feed: string | null }) {
             description="The old link stops working; calendars using it need the new one."
             confirmLabel="New link"
             tone="default"
-            onConfirm={() => {
-              setCopied(false)
-              rotate.mutate()
-            }}
+            onConfirm={() => rotate.mutate()}
           >
             New link
           </ConfirmButton>

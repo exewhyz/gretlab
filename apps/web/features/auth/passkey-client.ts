@@ -10,7 +10,7 @@ import { signIn } from "next-auth/react"
 
 import { api } from "@/lib/api/client"
 
-import { sendSecondStep, type StepProblem } from "./session-step"
+import { sendSecondStep, STEP_MESSAGES, type StepProblem } from "./session-step"
 
 /*
  * The browser's side of passkeys (features/auth/passkeys.ts): ask the server for options, let
@@ -34,10 +34,13 @@ const cancelled = (error: unknown) =>
   error instanceof Error &&
   (error.name === "NotAllowedError" || error.name === "AbortError")
 
-/** The second step (`step`) or confirming a protected action (`stepUp`) with a passkey. */
+/**
+ * The second step (`step`) or confirming a protected action (`stepUp`) with a passkey. Answers
+ * what to tell the person when it didn't work (the server's own words when it said why), or null.
+ */
 export async function passkeySecondStep(
   kind: "step" | "stepUp"
-): Promise<StepProblem | null> {
+): Promise<string | null> {
   let options: AuthOptions
   try {
     options = await api<AuthOptions>(
@@ -46,19 +49,26 @@ export async function passkeySecondStep(
         : "/me/security/passkeys/options",
       { method: "POST" }
     )
-  } catch {
-    return "failed"
+  } catch (error) {
+    return error instanceof Error && error.message
+      ? error.message
+      : STEP_MESSAGES.failed
   }
   let response
   try {
     response = await startAuthentication({ optionsJSON: options.options })
   } catch (error) {
-    return cancelled(error) ? "cancelled" : "bad_passkey"
+    if (cancelled(error)) return STEP_MESSAGES.cancelled
+    // The browser's own reason (no passkey for this site here, a security error), not a guess.
+    return error instanceof Error && error.message
+      ? `Your device couldn't use a passkey: ${error.message}`
+      : STEP_MESSAGES.bad_passkey
   }
   const answer = { challengeId: options.challengeId, response }
-  return sendSecondStep(
+  const problem = await sendSecondStep(
     kind === "step" ? { passkeyStep: answer } : { passkeyStepUp: answer }
   )
+  return problem ? STEP_MESSAGES[problem] : null
 }
 
 /** Signing in with a passkey alone. Answers the reason it didn't, or null when signed in. */

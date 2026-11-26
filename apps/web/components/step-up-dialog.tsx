@@ -72,7 +72,7 @@ export function StepUpDialog() {
     const refused = await passkeySecondStep("stepUp")
     setBusy(false)
     if (refused) {
-      setMessage({ text: STEP_MESSAGES[refused], kind: "err" })
+      setMessage({ text: refused, kind: "err" })
       return
     }
     finish(true)

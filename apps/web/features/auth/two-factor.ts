@@ -613,7 +613,8 @@ async function needCode(user: User, code: string) {
 export async function removeMethod(
   user: User,
   method: Exclude<Method, "passkey">,
-  code: string
+  /** Left out when the route already saw a recent second step (a passkey). */
+  code?: string
 ) {
   const row = await rowOf(user.id)
   const methods = methodsOf(row)
@@ -626,7 +627,7 @@ export async function removeMethod(
       "Two-factor sign-in is required for your account, so its last method can't be removed."
     )
   }
-  await needCode(user, code)
+  if (code !== undefined) await needCode(user, code)
   const db = getDb()
   if (last) {
     await db.delete(twoFactor).where(eq(twoFactor.userId, user.id))
@@ -656,9 +657,11 @@ export async function removeMethod(
   return { enabled: true }
 }
 
-/** New backup codes for old ones, with a current code. */
-export async function renewBackupCodes(user: User, code: string) {
-  await needCode(user, code)
+/** New backup codes for old ones, with a current code (or after a recent second step). */
+export async function renewBackupCodes(user: User, code?: string) {
+  if (!(await rowOf(user.id))?.enabledAt)
+    throw new ApiError(400, "not_set_up", "Two-factor sign-in isn't on.")
+  if (code !== undefined) await needCode(user, code)
   const codes = newBackupCodes()
   await getDb()
     .update(twoFactor)

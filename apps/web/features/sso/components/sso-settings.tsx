@@ -1,5 +1,6 @@
 "use client"
 
+import { RevealButton, SecretValue } from "@/components/secret-value"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
@@ -31,6 +32,7 @@ function SsoForm({ slug, initial }: { slug: string; initial: Settings }) {
   const [issuer, setIssuer] = useState(initial.issuer)
   const [clientId, setClientId] = useState(initial.clientId)
   const [secret, setSecret] = useState("")
+  const [showSecret, setShowSecret] = useState(false)
   const [enabled, setEnabled] = useState(initial.enabled)
   const [required, setRequired] = useState(initial.required)
   const save = useMutation({
@@ -98,12 +100,19 @@ function SsoForm({ slug, initial }: { slug: string; initial: Settings }) {
               : "From your identity provider. It's stored encrypted and never shown again."
           }
         >
-          <TextInput
-            type="password"
-            autoComplete="off"
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-          />
+          <div className="flex items-center gap-1.5">
+            <TextInput
+              type={showSecret ? "text" : "password"}
+              autoComplete="off"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+            />
+            <RevealButton
+              shown={showSecret}
+              onToggle={() => setShowSecret(!showSecret)}
+              what="client secret"
+            />
+          </div>
         </Field>
         <label className="flex items-start gap-2 text-body-sm text-ink">
           <Switch
@@ -273,7 +282,16 @@ function DomainsCard({ slug }: { slug: string }) {
                   <dd className="font-mono text-ink">TXT</dd>
                 </div>
                 <Copyable label="Name" value={c.record} />
-                <Copyable label="Value" value={c.value} />
+                <div className="grid gap-x-2 sm:grid-cols-[5rem_minmax(0,1fr)] sm:items-center">
+                  <dt className="text-body">Value</dt>
+                  <dd className="min-w-0">
+                    <SecretValue
+                      value={c.value}
+                      what="record value"
+                      testId="sso-record-value"
+                    />
+                  </dd>
+                </div>
               </dl>
             </li>
           ))}

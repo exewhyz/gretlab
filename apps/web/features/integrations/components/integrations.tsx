@@ -1,5 +1,6 @@
 "use client"
 
+import { SecretValue } from "@/components/secret-value"
 import { CopyIcon } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
@@ -44,31 +45,16 @@ import type {
 
 type Data = ApiResult<typeof listIntegrations>
 
-/** A value shown once, with a copy button. */
+/** A value shown once: hidden until asked for, with a copy button. */
 function Secret({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false)
   return (
     <div className="grid gap-1.5">
-      <span className="text-caption">{label}</span>
-      <div className="flex items-center gap-2">
-        <code
-          data-testid="shown-secret"
-          className="min-w-0 flex-1 rounded-md bg-muted px-2 py-1.5 font-mono text-xs break-all text-ink"
-        >
-          {value}
-        </code>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            void navigator.clipboard
-              .writeText(value)
-              .then(() => setCopied(true))
-          }
-        >
-          <CopyIcon /> {copied ? "Copied" : "Copy"}
-        </Button>
-      </div>
+      <SecretValue
+        label={label}
+        value={value}
+        what={label.toLowerCase()}
+        testId="shown-secret"
+      />
       <p className="text-caption">
         Keep it somewhere safe now: it won&apos;t be shown again.
       </p>
@@ -394,7 +380,9 @@ function NewKey({
       description="It may only do what you choose, from what you can do across the organization."
       error={make.error?.message}
       submitLabel="Make key"
-      submitDisabled={!name.trim() || permissions.length === 0 || make.isPending}
+      submitDisabled={
+        !name.trim() || permissions.length === 0 || make.isPending
+      }
       onSubmit={() => make.mutate()}
       onClose={onClose}
       testId="new-api-key"

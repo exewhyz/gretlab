@@ -8,6 +8,15 @@ aren't listed.
 
 ## 26 November 2026
 
+### Secrets stay hidden until you ask
+
+- Backup codes, an authenticator app's setup key, new API keys and webhook secrets, your private
+  calendar link and single sign-on's DNS proof are shown as dots until you press the eye button;
+  Copy still copies them without showing them.
+- With only a passkey, you can now make new backup codes (and remove a method) by confirming with
+  your passkey; before, it asked for a code you didn't have. A passkey that doesn't work now says
+  why instead of "Something went wrong".
+
 ### Colleges prove their own email domains
 
 - For single sign-on, a college now verifies its email domains itself: add the domain, put the

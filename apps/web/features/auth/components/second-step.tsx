@@ -85,7 +85,7 @@ export function SecondStep({
     setMessage(null)
     const problem = await passkeySecondStep("step")
     if (problem) {
-      setMessage({ text: STEP_MESSAGES[problem], kind: "err" })
+      setMessage({ text: problem, kind: "err" })
       setBusy(false)
       return
     }

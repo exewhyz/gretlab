@@ -16,7 +16,7 @@ import { platformCan } from "@/features/platform/access"
 
 import { clientIp } from "./client-ip"
 import { ApiError } from "./errors"
-import { withRequest, type RequestInfo } from "./request-context"
+import { requestInfo, withRequest, type RequestInfo } from "./request-context"
 import { reportError } from "../report-error"
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024
@@ -97,6 +97,22 @@ interface Handler<A extends Access, B> {
 const SECRET_FIELDS = new Set(["passwordHash", "password_hash"])
 const withoutSecrets = (key: string, value: unknown) => (SECRET_FIELDS.has(key) ? undefined : value)
 
+const STEP_UP_MESSAGE =
+  "Confirm it's you: use a passkey, or enter a code from your authenticator app, an emailed code, or a backup code."
+
+/**
+ * For a handler that takes a code or, without one, a second step from the last ten minutes
+ * (a passkey, through the step-up dialog): refuses with step_up_required otherwise.
+ */
+export function needRecentSecondStep() {
+  // The session route() read for this request (kept in the request context).
+  const session = requestInfo().session as
+    | { twoFactor: boolean; mfaAt: number | null }
+    | undefined
+  if (session && stepUpDue(session.twoFactor, session.mfaAt))
+    throw new ApiError(403, "step_up_required", STEP_UP_MESSAGE)
+}
+
 export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
   options: {
     access: A
@@ -150,7 +166,7 @@ export function route<A extends Access, S extends ZodType = ZodType<undefined>>(
         throw new ApiError(
           403,
           "step_up_required",
-          "Confirm it's you: enter a code from your authenticator app, an emailed code, or a backup code."
+          STEP_UP_MESSAGE
         )
       }
 
