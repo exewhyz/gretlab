@@ -1138,6 +1138,7 @@ Status is updated as items ship; anything not ticked has not been built.
 **On hold (the owner's decision, November 2026), don't start without asking:**
 - fees that students pay their school (the `finance` module is listed but not ready); organizations paying GretLab for their plans is built (Plans and billing);
 - using Google's sign-in strength (amr/auth_time) in two-factor;
+- SAML sign-on for colleges (the owner's decision, 26 November 2026): OpenID Connect covers Microsoft 365, Google Workspace, Okta and Keycloak; build SAML only when a college that can't use OpenID Connect asks;
 
 **Open follow-ups:**
 - Neon (Sydney) is kept frozen read-only as the way back until about 29 November 2026; then the owner deletes it, and the privacy policy's Neon line comes out (bump `LEGAL_UPDATED`). The wider plan (organizations of 200,000 students, judge pools per organization, Redis, a job queue, Cloudflare R2, monitoring, costs) is in the owner's "GretLab Scaling Plan" report.
@@ -1158,7 +1159,7 @@ Next, roughly in order of value for a college deployment:
 0. Organizations: the server-paged members list, syllabus topics on assignments, organizations' own study plans, feedback rounds and per-organization time and memory limits are built.
 0. From the LeetCode/HackerRank research, not built yet (contest code replay is built): company/position filters (n/a for a college); AI help (needs a policy decision first).
 
-2. College SSO with SAML, if a college only has SAML (OpenID Connect is built).
+2. (On hold: SAML sign-on, until a college needs it.)
 2. Two-factor: passkeys, the platform's and organizations' requirements and step-up are built. Google's "authentication strength" claims were considered and not used: they need a verified Google app, cover only Google sign-ins, and the app would still need its own check.
 3. Plagiarism: cross-language detection, if ever wanted (the owner chose same language only for now; the side-by-side view and organizations' checks are built).
 4. (Done: the Content-Security-Policy is enforced; limits by address are built.)
