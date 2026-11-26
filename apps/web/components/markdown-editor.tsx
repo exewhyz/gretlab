@@ -26,6 +26,8 @@ import { Button } from "@workspace/ui/components/button"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { ImagePicker, type PickedImage } from "@/components/image-picker"
+
 import { Markdown } from "./markdown"
 
 type View = "write" | "preview" | "split"
@@ -89,6 +91,7 @@ export function MarkdownEditor({
   const picker = useRef<HTMLInputElement>(null)
   const [view, setView] = useState<View>("split")
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [choosing, setChoosing] = useState(false)
   // The latest text, for uploads that finish after more typing.
   const latest = useRef(value)
   latest.current = value
@@ -97,6 +100,22 @@ export function MarkdownEditor({
    * Images go in at the cursor as a placeholder while they upload, then become
    * markdown pointing at the stored file.
    */
+  /** An image picked from the person's own images: in at the cursor, nothing uploaded. */
+  function insertPicked(image: PickedImage) {
+    const el = area.current
+    const at = el?.selectionStart ?? latest.current.length
+    const lead =
+      at > 0 && !latest.current.slice(0, at).endsWith("\n") ? "\n\n" : ""
+    const alt =
+      image.name.replace(/\.[^.]+$/, "").replace(/[[\]]/g, "") || "image"
+    latest.current =
+      latest.current.slice(0, at) +
+      lead +
+      `![${alt}](${image.url})\n` +
+      latest.current.slice(at)
+    onChange(latest.current)
+  }
+
   async function insertImages(files: File[]) {
     const images = files.filter((f) => f.type.startsWith("image/"))
     if (images.length === 0) return
@@ -271,10 +290,16 @@ export function MarkdownEditor({
           aria-label="Image"
           title="Image (or paste or drop one into the text)"
           disabled={!showWrite}
-          onClick={() => picker.current?.click()}
+          onClick={() => setChoosing(true)}
         >
           <ImageIcon />
         </Button>
+        <ImagePicker
+          open={choosing}
+          onOpenChange={setChoosing}
+          onPick={insertPicked}
+          onUpload={() => picker.current?.click()}
+        />
         <input
           ref={picker}
           type="file"

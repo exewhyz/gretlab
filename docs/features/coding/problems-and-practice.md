@@ -39,7 +39,9 @@ solve, with the daily challenge, personal lists and a leaderboard around it.
   library: tag a problem and its topic appears. A problem's tags link to their topic.
 - **Statements are Markdown**, with input format, output format and constraints kept as their own
   fields and samples taken from the tests. Raw HTML is shown as text, never run, so organizations can
-  write problems safely. Images are uploaded and served by GretLab itself.
+  write problems safely. Images are uploaded and served by GretLab itself. The image button opens
+  **Your images**: everything you've uploaded, newest first and searchable, so you pick an image
+  again instead of uploading it again (the same image is only ever stored once).
 - **Suggestions as you type**, in every language. In C, C++ and Java the editor reads your code
   as you write it: after a dot it lists what that variable has (`nums.` on a `vector` offers
   `push_back`, `size`…; `sc.` on a `Scanner` offers `nextInt`, `nextLine`…; `Math.` offers `max`,

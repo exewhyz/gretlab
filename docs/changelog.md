@@ -19,6 +19,12 @@ aren't listed.
 
 ## 26 November 2026
 
+### Reuse your images
+
+- The editor's image button now opens **Your images**: everything you've uploaded, newest first
+  and searchable. Pick one to use it again, or upload a new one. The organization logo uses the
+  same picker.
+
 ### Creating an organization, step by step
 
 - Making an organization (from the dashboard) or registering a school now goes in short steps:

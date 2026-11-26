@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto"
 
-import { getDb, sql, uploads, type User } from "@workspace/db"
+import { getDb, sql, uploadUses, uploads, type User } from "@workspace/db"
 
 import { isStaff, ApiError, notFound } from "@/lib/api/route"
+import { likeTerm, paged, type PageQuery } from "@/lib/api/paging"
 import {
   hasPublicAddress,
   imageKey,
@@ -13,7 +14,92 @@ import {
 } from "@/lib/storage"
 import { teachesAnywhere } from "@/features/teaching/server"
 
-const { and, eq, gte, count } = sql
+const { and, desc, eq, gte, count, ilike, inArray } = sql
+
+/** The image is in this person's library, at the top (uploaded or picked just now). */
+async function addToLibrary(userId: string, uploadId: string, name: string) {
+  const clean = name.slice(0, 200)
+  await getDb()
+    .insert(uploadUses)
+    .values({ uploadId, userId, name: clean })
+    .onConflictDoUpdate({
+      target: [uploadUses.uploadId, uploadUses.userId],
+      set: { lastUsedAt: sql.sql`now()`, ...(clean ? { name: clean } : {}) },
+    })
+}
+
+/**
+ * The person's own images, most recently used first, a page at a time (searched by file name):
+ * to pick one again instead of uploading it again. Only ever their own library.
+ */
+export async function myUploads(
+  user: User,
+  view: PageQuery,
+  /** Only images a logo can be (PNG or JPEG, which PDFs can hold). */
+  forLogo = false
+) {
+  const where = and(
+    eq(uploadUses.userId, user.id),
+    view.q ? ilike(uploadUses.name, likeTerm(view.q)) : undefined,
+    forLogo
+      ? inArray(uploads.contentType, ["image/png", "image/jpeg"])
+      : undefined
+  )
+  return paged({
+    page: view.page ?? 1,
+    perPage: view.perPage ?? 24,
+    count: async () =>
+      (
+        await getDb()
+          .select({ n: count() })
+          .from(uploadUses)
+          .innerJoin(uploads, eq(uploads.id, uploadUses.uploadId))
+          .where(where)
+      )[0]?.n ?? 0,
+    rows: (limit, offset) =>
+      getDb()
+        .select({
+          id: uploads.id,
+          name: uploadUses.name,
+          contentType: uploads.contentType,
+          size: uploads.size,
+          lastUsedAt: uploadUses.lastUsedAt,
+        })
+        .from(uploadUses)
+        .innerJoin(uploads, eq(uploads.id, uploadUses.uploadId))
+        .where(where)
+        .orderBy(desc(uploadUses.lastUsedAt))
+        .limit(limit)
+        .offset(offset)
+        .then((rows) =>
+          rows.map((r) => ({ ...r, url: `/api/v1/uploads/${r.id}` }))
+        ),
+  })
+}
+
+/** Picked from the library: it moves to the top. Only an image already in it. */
+export async function pickUpload(user: User, uploadId: string) {
+  if (!UUID.test(uploadId)) throw notFound("Image not found")
+  const [row] = await getDb()
+    .update(uploadUses)
+    .set({ lastUsedAt: sql.sql`now()` })
+    .where(
+      and(eq(uploadUses.userId, user.id), eq(uploadUses.uploadId, uploadId))
+    )
+    .returning({ id: uploadUses.uploadId })
+  if (!row) throw notFound("Image not found")
+  return { id: row.id, url: `/api/v1/uploads/${row.id}` }
+}
+
+/** Takes an image out of the person's library; the image itself stays (statements use it). */
+export async function removeFromLibrary(user: User, uploadId: string) {
+  if (!UUID.test(uploadId)) throw notFound("Image not found")
+  await getDb()
+    .delete(uploadUses)
+    .where(
+      and(eq(uploadUses.userId, user.id), eq(uploadUses.uploadId, uploadId))
+    )
+}
 
 export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 const IMMUTABLE = "public, max-age=31536000, immutable"
@@ -97,7 +183,10 @@ export async function storeImage(
     .select({ id: uploads.id })
     .from(uploads)
     .where(eq(uploads.hash, hash))
-  if (same) return { id: same.id, url: `/api/v1/uploads/${same.id}` }
+  if (same) {
+    await addToLibrary(user.id, same.id, file.name)
+    return { id: same.id, url: `/api/v1/uploads/${same.id}` }
+  }
   // To R2 when it's set up (lib/storage), so the database keeps only who and what.
   const key = storageReady() ? imageKey(hash, contentType) : null
   if (key) {
@@ -126,6 +215,7 @@ export async function storeImage(
         .from(uploads)
         .where(eq(uploads.hash, hash))
     )[0]!.id
+  await addToLibrary(user.id, id, file.name)
   return { id, url: `/api/v1/uploads/${id}` }
 }
 

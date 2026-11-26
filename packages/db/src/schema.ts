@@ -2867,6 +2867,34 @@ export const uploads = pgTable(
   (table) => [index("uploads_by").on(table.uploadedBy, table.createdAt)]
 )
 
+/**
+ * Who has an uploaded image in their library (features/uploads): one row per person per image,
+ * so the same image uploaded by two people is stored once (uploads.hash) and listed for both.
+ * Removing it from a library removes this row only; the image stays, since statements use it.
+ */
+export const uploadUses = pgTable(
+  "upload_uses",
+  {
+    uploadId: uuid("upload_id")
+      .notNull()
+      .references(() => uploads.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The file's name when it was uploaded, to find it again. */
+    name: text("name").notNull().default(""),
+    createdAt: createdAt(),
+    /** Last uploaded or picked: the library lists the most recent first. */
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.uploadId, table.userId] }),
+    index("upload_uses_by").on(table.userId, table.lastUsedAt),
+  ]
+)
+
 export type Organization = typeof organizations.$inferSelect
 export type OrgGroup = typeof orgGroups.$inferSelect
 export type OrgRole = typeof orgRoles.$inferSelect

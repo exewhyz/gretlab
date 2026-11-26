@@ -64,6 +64,26 @@ check("…where the bytes are the same, as an image", there.status === 200 && th
 const again = await (await api(admin, "/uploads", { method: "POST", body: form() })).json()
 check("the same image again is the same upload", again?.id === up.id)
 
+// ---------- your images: reuse instead of uploading again
+const library = async (cookie, extra = "") => (await api(cookie, `/me/uploads?page=1${extra}`)).json()
+const mine = await library(admin)
+check("an upload is in its uploader's images, with its file name", mine?.items?.[0]?.id === up.id && mine.items[0].name === "st.png" && mine.items[0].url === up.url, JSON.stringify(mine?.items?.[0]))
+const otherForm = () => { const f = new FormData(); f.append("file", new Blob([png], { type: "image/png" }), "same-picture.png"); return f }
+const sameByOther = await (await api(other, "/uploads", { method: "POST", body: otherForm() })).json()
+const theirs = await library(other)
+check("the same image uploaded by someone else is stored once, and in their images too", sameByOther?.id === up.id && theirs?.items?.some((i) => i.id === up.id && i.name === "same-picture.png") && psql(`select count(*) from uploads where hash = '${hash}'`) === "1")
+const gif = Buffer.concat([Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64"), Buffer.from(String(Date.now()))])
+const gifForm = () => { const f = new FormData(); f.append("file", new Blob([gif], { type: "image/gif" }), "st-anim.gif"); return f }
+const gifUp = await (await api(other, "/uploads", { method: "POST", body: gifForm() })).json()
+check("nobody sees another person's images", !(await library(admin)).items.some((i) => i.id === gifUp.id))
+check("searched by file name", (await library(other, "&q=anim")).items.map((i) => i.id).join() === gifUp.id)
+check("only PNG and JPEG for a logo", !(await library(other, "&for=logo")).items.some((i) => i.id === gifUp.id) && (await library(other, "&for=logo")).items.some((i) => i.id === up.id))
+const picked = await api(other, `/me/uploads/${up.id}`, { method: "POST" })
+check("picking one moves it to the top, at the same address", picked.status === 200 && (await library(other)).items[0].id === up.id)
+check("…but only one of your own", (await api(admin, `/me/uploads/${gifUp.id}`, { method: "POST" })).status === 404)
+const forgot = await api(other, `/me/uploads/${up.id}`, { method: "DELETE" })
+check("removing it from your images forgets it there only: it's still served, and still the other person's", forgot.status === 200 && !(await library(other)).items.some((i) => i.id === up.id) && (await library(admin)).items.some((i) => i.id === up.id) && (await fetch(BASE + up.url, { redirect: "manual" })).status === 302)
+
 // ---------- images kept in the database: served as before, then moved
 const old = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64")
 const oldId = psql(`insert into uploads (hash, content_type, size, data, stored_in) values ('st-old-${Date.now()}', 'image/png', ${old.length}, decode('${old.toString("hex")}', 'hex'), 'db') returning id`)
@@ -97,6 +117,42 @@ const file = await fetch(link)
 check("…which gives the same CSV as the instant download", file.status === 200 && (await file.text()) === direct)
 check("someone else gets no link", (await api(other, `/jobs/${job}/file`)).status === 404)
 check("nothing of it is in the public bucket", (await fetch(`${S3}/gretlab-public/jobs/${job}/st-export-grades.csv`)).status === 404)
+
+// ---------- the picker in the editor
+{
+  const { chromium } = createRequire(ROOT + "package.json")("playwright")
+  const browser = await chromium.launch()
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    await ctx.addCookies([{ name: "next-auth.session-token", value: (await cookieOf("admin@example.com")).split("=")[1], url: BASE }])
+    const page = await ctx.newPage()
+    await page.goto(`${BASE}/admin/problems/new`)
+    const editor = page.getByTestId("markdown-editor").first()
+    await editor.waitFor({ timeout: 30000 })
+    await editor.getByRole("button", { name: "Image", exact: true }).click()
+    const picker = page.getByTestId("image-picker")
+    await picker.getByTestId("my-images").waitFor({ timeout: 15000 })
+    await picker.getByRole("button", { name: "Use st.png" }).first().click()
+    await picker.waitFor({ state: "detached", timeout: 10000 })
+    const text = await editor.locator("textarea").first().inputValue()
+    check("the editor's image button picks one of your images, putting it in without uploading", text.includes(`![st](${up.url})`), text.slice(0, 200))
+    await editor.getByRole("button", { name: "Image", exact: true }).click()
+    await page.getByTestId("image-picker").getByTestId("my-images").waitFor({ timeout: 15000 })
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: "/tmp/gretlab-e2e/image-picker.png" })
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 } })
+    await phone.addCookies([{ name: "next-auth.session-token", value: (await cookieOf("admin@example.com")).split("=")[1], url: BASE }])
+    const pp = await phone.newPage()
+    await pp.goto(`${BASE}/admin/problems/new`)
+    await pp.getByTestId("markdown-editor").first().getByRole("button", { name: "Image", exact: true }).click()
+    await pp.getByTestId("image-picker").getByTestId("my-images").waitFor({ timeout: 15000 })
+    const box = await pp.getByTestId("image-picker").boundingBox()
+    check("the picker fits a phone's screen", box && box.x >= 0 && box.x + box.width <= 391, JSON.stringify(box))
+    await pp.screenshot({ path: "/tmp/gretlab-e2e/image-picker-phone.png" })
+  } finally {
+    await browser.close()
+  }
+}
 
 // ---------- Monitoring
 const health = await (await api(admin, "/admin/monitoring")).json()

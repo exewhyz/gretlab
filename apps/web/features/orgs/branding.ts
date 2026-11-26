@@ -4,7 +4,14 @@
  * the light and dark page; the logo is a PNG or JPEG (PDFs can hold those) of up to 2 MB, stored
  * like any uploaded image. Every change is in the activity log.
  */
-import { getDb, organizations, sql, type User } from "@workspace/db"
+import {
+  getDb,
+  organizations,
+  sql,
+  uploadUses,
+  uploads,
+  type User,
+} from "@workspace/db"
 import { accentProblem, type Branding } from "@workspace/judge"
 
 import { brandOf } from "@/features/orgs/brand"
@@ -12,7 +19,7 @@ import { context, need, writeAudit } from "@/features/orgs/server"
 import { storeImage } from "@/features/uploads/server"
 import { ApiError } from "@/lib/api/route"
 
-const { eq } = sql
+const { and, eq } = sql
 
 async function manager(slug: string, user: User) {
   const ctx = await context(slug, user)
@@ -72,6 +79,38 @@ export async function saveLogo(slug: string, user: User, file: File) {
         field: "Logo",
         from: ctx.org.branding.logo ? "A logo" : "None",
         to: "A new logo",
+      },
+    ],
+  })
+  return brandOf({ branding })
+}
+
+/** The logo from an image already in the person's library (a PNG or JPEG). */
+export async function setLogoFrom(slug: string, user: User, uploadId: string) {
+  const ctx = await manager(slug, user)
+  const [image] = await getDb()
+    .select({ id: uploads.id, contentType: uploads.contentType })
+    .from(uploadUses)
+    .innerJoin(uploads, eq(uploads.id, uploadUses.uploadId))
+    .where(
+      and(eq(uploadUses.userId, user.id), eq(uploadUses.uploadId, uploadId))
+    )
+  if (!image)
+    throw new ApiError(404, "not_found", "That image isn't in your images.")
+  if (image.contentType !== "image/png" && image.contentType !== "image/jpeg")
+    throw new ApiError(
+      415,
+      "unsupported_image",
+      "Use a PNG or JPEG for the logo."
+    )
+  const branding = { ...ctx.org.branding, logo: image.id }
+  await save(ctx.org.id, branding)
+  await writeAudit(ctx, "org.branding", "Changed the logo", {
+    changes: [
+      {
+        field: "Logo",
+        from: ctx.org.branding.logo ? "A logo" : "None",
+        to: "A logo from their images",
       },
     ],
   })

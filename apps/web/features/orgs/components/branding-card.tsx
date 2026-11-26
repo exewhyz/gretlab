@@ -2,12 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { accentProblem, CANVAS, onAccent } from "@workspace/judge"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 
 import { ConfirmButton } from "@/components/confirm"
+import { ImagePicker } from "@/components/image-picker"
 import { Field, FormMessage, TextInput } from "@/components/form"
 import { Card } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
@@ -72,6 +73,8 @@ function BrandingForm({
 }) {
   const [accent, setAccent] = useState(initial.accent ?? "")
   const [message, setMessage] = useState<Message>(null)
+  const [choosing, setChoosing] = useState(false)
+  const file = useRef<HTMLInputElement>(null)
   const fail = (e: Error) => setMessage({ text: e.message, kind: "err" })
   const colour = /^#[0-9a-f]{6}$/i.test(accent) ? accent.toLowerCase() : null
   const problem = accent ? accentProblem(accent) : null
@@ -87,6 +90,16 @@ function BrandingForm({
   })
   const upload = useMutation({
     mutationFn: (file: File) => uploadLogo(slug, file),
+    onSuccess: onSaved,
+    onError: fail,
+    meta: { success: "Logo saved.", quiet: true },
+  })
+  const reuse = useMutation({
+    mutationFn: (uploadId: string) =>
+      api<Brand>(`/orgs/${slug}/branding/logo`, {
+        method: "PUT",
+        body: { uploadId },
+      }),
     onSuccess: onSaved,
     onError: fail,
     meta: { success: "Logo saved.", quiet: true },
@@ -125,17 +138,34 @@ function BrandingForm({
             </span>
           )}
           <div className="grid gap-1.5">
-            <Input
+            <Button
+              type="button"
+              variant="outline"
+              disabled={upload.isPending || reuse.isPending}
+              onClick={() => setChoosing(true)}
+            >
+              {initial.logo ? "Change logo" : "Add a logo"}
+            </Button>
+            <input
+              ref={file}
               type="file"
+              hidden
               accept="image/png,image/jpeg"
               aria-label="Logo image"
-              disabled={upload.isPending}
               onChange={(event) => {
-                const file = event.target.files?.[0]
+                const chosen = event.target.files?.[0]
                 setMessage(null)
-                if (file) upload.mutate(file)
+                if (chosen) upload.mutate(chosen)
                 event.target.value = ""
               }}
+            />
+            <ImagePicker
+              open={choosing}
+              onOpenChange={setChoosing}
+              forLogo
+              title="Your logo"
+              onPick={(image) => reuse.mutate(image.id)}
+              onUpload={() => file.current?.click()}
             />
             <span className="text-caption text-body">
               PNG or JPEG, up to 2 MB. Square works best.
