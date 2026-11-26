@@ -1,1 +1,1 @@
-ALTER TABLE "organizations" ADD COLUMN "branding" jsonb DEFAULT '{}'::jsonb NOT NULL;
+ALTER TABLE "organizations" ADD COLUMN IF NOT EXISTS "branding" jsonb DEFAULT '{}'::jsonb NOT NULL;
