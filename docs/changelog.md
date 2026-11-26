@@ -8,6 +8,13 @@ aren't listed.
 
 ## 26 November 2026
 
+### Watch how contest code was written
+
+- Whoever runs a contest can open any cell of its leaderboard to play back how that contestant
+  wrote the code during the contest, with their submissions on the timeline.
+- Steps where a lot of code appeared at once are pointed out as probably pasted, in contests and
+  in an assignment's Playback in the gradebook. Each replay is recorded in the activity log.
+
 ### Adding a passkey asks first
 
 - With two-step verification already on, **Add a passkey** now asks you to confirm it's you

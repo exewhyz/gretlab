@@ -6,6 +6,7 @@ import {
   orgGroups,
   orgMembers,
   orgRoles,
+  problems,
   quizResponses,
   roleAssignments,
   rubricMarks,
@@ -17,10 +18,12 @@ import {
 } from "@workspace/db"
 import {
   ancestry,
+  bigJumps,
   duringSitting,
   extendedDue,
   grantsAnyUnder,
   inAudience,
+  joinStarter,
   markQuestion,
   rubricEarned,
   rubricTotal,
@@ -947,6 +950,20 @@ export async function releaseFeedback(id: string, orgId: string | null) {
   )
 }
 
+/** Each language's starter code for a problem: where playback measures new code from. */
+async function starterCode(problemId: string) {
+  const [row] = await getDb()
+    .select({ code: problems.code })
+    .from(problems)
+    .where(eq(problems.id, problemId))
+  return Object.fromEntries(
+    Object.entries(row?.code ?? {}).map(([language, parts]) => [
+      language,
+      joinStarter(parts),
+    ])
+  )
+}
+
 /**
  * One student's graded submissions on one problem of an assignment, with their code, for
  * whoever may see that student's grades. Anyone outside the gradebook isn't found.
@@ -995,8 +1012,8 @@ export async function studentAttempts(
   const extensionNow = (await extensionsOn([id], student.id))
     .get(id)
     ?.get(student.id)
-  const [draft, history, marks, comments, events, sittings] = await Promise.all(
-    [
+  const [draft, history, marks, comments, events, sittings, code] =
+    await Promise.all([
       latestDraft(student.id, problemId),
       withHistory ? draftHistory(student.id, problemId) : null,
       marksOn([id], student.id),
@@ -1006,8 +1023,8 @@ export async function studentAttempts(
       ),
       assignment.exam ? eventsOf(id, student.id) : [],
       assignment.exam ? sittingsOn([id], student.id) : null,
-    ]
-  )
+      withHistory ? starterCode(problemId) : {},
+    ])
   const sitting = sittings?.get(id)?.get(student.id)
   return {
     extension: extensionNow ?? null,
@@ -1028,7 +1045,7 @@ export async function studentAttempts(
       comments: comments.filter((c) => c.submissionId === r.id),
     })),
     draft,
-    ...(history ? { history } : {}),
+    ...(history ? { history, jumps: bigJumps(history, code) } : {}),
   }
 }
 

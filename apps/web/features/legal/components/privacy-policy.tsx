@@ -167,7 +167,8 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
           <Item term="Your organization's staff">
             teachers and administrators see what their role allows for the classes they
             run: your submissions and their results, your working copy and how it was
-            written (for assignments they can grade), grades, attendance and records. Every
+            written (for assignments they can grade, and for contests they run, only what you
+            wrote while it ran), grades, attendance and records. Every
             change they make to members, roles and settings is recorded. Your profile in an
             organization (your classes, roles, record, parents and contact details) is
             shown to you, your linked parents and its staff who may see members; your

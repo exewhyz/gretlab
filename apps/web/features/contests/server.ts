@@ -412,7 +412,7 @@ export async function boardInputs(contest: Contest) {
 }
 
 async function computeBoard(contest: Contest, staff: boolean) {
-  const [{ config, participants, entries }, changes] = await Promise.all([
+  const [{ config, participants, entries, labelOf }, changes] = await Promise.all([
     boardInputs(contest),
     contest.ratedAt
       ? getDb()
@@ -435,6 +435,8 @@ async function computeBoard(contest: Contest, staff: boolean) {
     problemLabels: config.problemLabels,
     frozen: frozen && cutoff !== null && new Date() >= cutoff,
     rated: contest.rated,
+    /** For whoever runs it: the problems whose cells open how the code was written (./replay.ts). */
+    replay: staff ? [...labelOf.values()] : [],
     /** Ended and rated, but its rating changes aren't applied yet (features/contests/ratings.ts). */
     awaitingRatings: contest.rated && !contest.ratedAt && phase === "ended",
     rows: computeLeaderboard(config, participants, entries, frozen).map((row) => {

@@ -28,6 +28,7 @@ import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 
 import { ContestQuestions, type ContestQuestion } from "./contest-questions"
+import { ContestReplay } from "./contest-replay"
 import { Countdown } from "./countdown"
 import { PhaseBadge } from "./contest-list"
 import type { ApiResult } from "@/lib/api/types"
@@ -229,7 +230,7 @@ export function ContestDetail({ slug }: { slug: string }) {
               )}
               {tab === "Leaderboard" &&
                 (board.data ? (
-                  <LeaderboardTab board={board.data} />
+                  <LeaderboardTab slug={slug} board={board.data} />
                 ) : (
                   <Loading error={board.error} />
                 ))}
@@ -333,8 +334,15 @@ function RulesTab({ contest }: { contest: ContestView }) {
   )
 }
 
-function LeaderboardTab({ board }: { board: Leaderboard }) {
+function LeaderboardTab({ slug, board }: { slug: string; board: Leaderboard }) {
   const icpc = board.scoring === "icpc"
+  // Whoever runs it opens a cell to see how that code was written (./contest-replay.tsx).
+  const replayable = new Set(board.you ? [] : (board.replay ?? []))
+  const [replay, setReplay] = useState<{
+    userId: string
+    name: string
+    label: string
+  } | null>(null)
   // Rated and applied: each contestant's rating change (features/contests/ratings.ts).
   const rated = board.rows.some((row) => "rating" in row && row.rating)
   if (board.rows.length === 0) {
@@ -389,40 +397,79 @@ function LeaderboardTab({ board }: { board: Leaderboard }) {
             ) : (
               <td className="tabular-nums">{row.score}</td>
             )}
-            {row.problems.map((problem) => (
-              <td
-                key={problem.label}
-                className="whitespace-nowrap tabular-nums"
-              >
-                {problem.pending > 0 && (
-                  <span title="Pending">?{problem.pending} </span>
-                )}
-                {icpc ? (
-                  problem.solved ? (
-                    <span
-                      className="text-success"
-                      title={`Solved at ${problem.solvedAtMinutes} min, ${problem.attempts} wrong attempt(s)`}
+            {row.problems.map((problem) => {
+              const cell = (
+                <>
+                  {problem.pending > 0 && (
+                    <span title="Pending">?{problem.pending} </span>
+                  )}
+                  {icpc ? (
+                    problem.solved ? (
+                      <span
+                        className="text-success"
+                        title={`Solved at ${problem.solvedAtMinutes} min, ${problem.attempts} wrong attempt(s)`}
+                      >
+                        ✓ {problem.solvedAtMinutes}m
+                        {problem.attempts > 0 && ` (+${problem.attempts})`}
+                      </span>
+                    ) : problem.attempts > 0 ? (
+                      <span
+                        className="text-destructive"
+                        title={`${problem.attempts} wrong attempt(s)`}
+                      >
+                        −{problem.attempts}
+                      </span>
+                    ) : null
+                  ) : (
+                    problem.score || null
+                  )}
+                </>
+              )
+              return (
+                <td
+                  key={problem.label}
+                  className="whitespace-nowrap tabular-nums"
+                >
+                  {replayable.has(problem.label) ? (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      className="min-w-10 tabular-nums"
+                      aria-label={`How ${row.user.name} wrote ${problem.label}`}
+                      onClick={() =>
+                        setReplay({
+                          userId: row.user.id,
+                          name: row.user.name,
+                          label: problem.label,
+                        })
+                      }
                     >
-                      ✓ {problem.solvedAtMinutes}m
-                      {problem.attempts > 0 && ` (+${problem.attempts})`}
-                    </span>
-                  ) : problem.attempts > 0 ? (
-                    <span
-                      className="text-destructive"
-                      title={`${problem.attempts} wrong attempt(s)`}
-                    >
-                      −{problem.attempts}
-                    </span>
-                  ) : null
-                ) : (
-                  problem.score || null
-                )}
-              </td>
-            ))}
-            {rated && <RatingCell rating={"rating" in row ? row.rating : null} />}
+                      {cell}
+                    </Button>
+                  ) : (
+                    cell
+                  )}
+                </td>
+              )
+            })}
+            {rated && (
+              <RatingCell rating={"rating" in row ? row.rating : null} />
+            )}
           </tr>
         ))}
       </Table>
+      {replayable.size > 0 && (
+        <p className="mt-2 text-caption">
+          You run this contest: open a cell to see how that code was written.
+        </p>
+      )}
+      {replay && (
+        <ContestReplay
+          slug={slug}
+          {...replay}
+          onClose={() => setReplay(null)}
+        />
+      )}
     </>
   )
 }

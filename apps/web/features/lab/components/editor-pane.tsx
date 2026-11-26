@@ -174,7 +174,7 @@ export function EditorPane({
           className="text-xs text-body"
           title={
             session.viewer?.user && !session.isPlayground
-              ? "Saved to your account a moment after you stop typing, so it's there on any computer. For assignment problems your teacher can see it, and how it changed."
+              ? "Saved to your account a moment after you stop typing, so it's there on any computer. For assignment problems your teacher can see it, and how it changed; in a contest, so can whoever runs it."
               : "Kept in this browser: saved a moment after you stop typing, and whenever you leave or run your code"
           }
         >

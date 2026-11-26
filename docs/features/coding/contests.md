@@ -66,6 +66,23 @@ After a contest ends, anyone who could have entered it can **take it virtually**
   person's own practice.
 - Right answers to the contest's questions stay hidden from them until their attempt ends.
 
+## Watching how code was written
+
+Whoever runs a contest can open any cell of its leaderboard to see how that contestant wrote that
+problem's code while the contest ran:
+
+- The code is played back as it grew, saved every few seconds as they typed in the editor, with
+  what changed at each step highlighted. Code from before or after the contest isn't shown.
+- Their graded submissions are listed with the minute of each; pressing one shows the code as it
+  was then.
+- Steps where a lot of new code appeared in one save (more than anyone types in a few seconds) are
+  pointed out as **probably pasted**. They're a reason to look, never proof: it may be the
+  contestant's own code from elsewhere. Undoing back to earlier code, reformatting and the
+  problem's starter code aren't counted.
+- Contestants and anyone else can't open it. Every replay is recorded in the activity log.
+
+The same paste markers appear in an assignment's **Playback** in the gradebook.
+
 ## Edge cases
 
 - Problems written for a contest are reachable only once the contest starts.
