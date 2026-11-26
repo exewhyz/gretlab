@@ -31,6 +31,24 @@ glance:
 - Five wrong codes of any kind lock the step for 15 minutes. Removing a method or making new backup
   codes needs a current code.
 
+## Passkeys
+
+A passkey is your fingerprint, face or screen lock on a phone or computer (Face ID, Touch ID,
+Windows Hello, Android) or a security key. Add one under **Account › Security › How you sign in ›
+Add a passkey**: your device asks you to confirm, and the passkey is named after it ("Chrome on
+macOS").
+
+- **Sign in with it alone:** **Sign in with a passkey** on the sign-in page. Because the device
+  checks it's you (fingerprint, face or PIN), it counts as both steps, as Google treats passkeys.
+- **As your second step** after a password, Google or your college: **Use a passkey**. It also
+  confirms protected actions.
+- Your first passkey turns two-step verification on and gives you backup codes, like the first
+  authenticator app. Removing one asks you to confirm it's you; removing your last way through the
+  second step turns it off (not allowed when it's required).
+- The passkey itself never leaves your device or your password manager: GretLab keeps only a public
+  key that can check it, and notices if one is copied.
+- Addresses whose college requires its own sign-in can't sign in with a passkey either.
+
 ## Requiring it
 
 The platform setting can require two-factor for staff, or for everyone. Someone required who hasn't

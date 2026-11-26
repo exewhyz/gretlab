@@ -8,6 +8,17 @@ aren't listed.
 
 ## 26 November 2026
 
+### Passkeys, and a clearer Account page
+
+- **Sign in with a passkey**: your fingerprint, face or screen lock (Face ID, Touch ID, Windows
+  Hello, Android) or a security key. Add one under **Account › Security**. It signs you in on its
+  own, works as your second step after a password, Google or your college, and confirms protected
+  actions.
+- **Account › Security and Profile are laid out like Google's and Clerk's account pages**: how you
+  sign in (passkeys, password), two-step verification with every method listed and whether it's
+  on, and where you're signed in. Profile is in sections (profile, contact, links, your
+  organizations) with one save bar that stays in view while you have changes.
+
 ### Organizations can require two-factor sign-in
 
 - Under **Manage › Settings › Two-factor sign-in**, require it of your staff or of everyone in

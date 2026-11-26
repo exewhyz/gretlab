@@ -80,6 +80,7 @@ suite ratings http://localhost:3100
 suite solution-posts http://localhost:3100
 suite sso http://localhost:3100
 suite org-two-factor http://localhost:3100
+suite passkeys http://localhost:3100
 suite orgs http://localhost:3100
 suite platform http://localhost:3100
 suite library http://localhost:3100

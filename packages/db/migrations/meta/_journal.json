@@ -715,6 +715,13 @@
       "when": 1795634373616,
       "tag": "0101_org_require_2fa",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1795634994737,
+      "tag": "0102_passkeys",
+      "breakpoints": true
     }
   ]
 }

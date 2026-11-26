@@ -26,6 +26,8 @@ const MESSAGES: Record<RateLimitAction, string> = {
     "Too many emails asked for from your network. Try again in an hour.",
   lti_login:
     "Too many launches from your network. Wait a minute and try again.",
+  passkey:
+    "Too many passkey sign-ins from your network. Wait a few minutes and try again.",
   checkout:
     "Too many payments started for this organization. Try again in an hour.",
 }

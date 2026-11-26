@@ -15,6 +15,7 @@ import { runJobs, tidyJobs } from "@/features/jobs/server"
 import { tidyRateLimits } from "@/lib/api/rate-limit"
 import { checkPlans } from "@/features/billing/server"
 import { applyDueRatings } from "@/features/contests/ratings"
+import { tidyPasskeyChallenges } from "@/features/auth/passkeys"
 
 export const dynamic = "force-dynamic"
 /** The drain stops itself after 25 s; this is the host's hard limit around it. */
@@ -90,6 +91,7 @@ async function handle(request: NextRequest) {
   })
   await tidyJobs().catch(() => {})
   await tidyRateLimits().catch(() => {})
+  await tidyPasskeyChallenges().catch(() => {})
   // Plans: grace, payment due and paused, and their notices (at most what changed since).
   const plans = await checkPlans().catch((error) => {
     console.error("[billing]", error)

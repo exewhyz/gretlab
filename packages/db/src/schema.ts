@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm"
 import {
+  bigint,
   boolean,
   customType,
   doublePrecision,
@@ -1377,6 +1378,45 @@ export const hostelResidents = pgTable(
 )
 
 /**
+ * A passkey (WebAuthn): Face ID, Touch ID, Windows Hello, Android or a security key. It signs its
+ * owner in on its own (with user verification) and passes the second step (features/auth/passkeys.ts).
+ */
+export const passkeys = pgTable(
+  "passkeys",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The credential's id, base64url, as the browser reports it. */
+    credentialId: text("credential_id").notNull().unique(),
+    /** Its COSE public key, base64url. */
+    publicKey: text("public_key").notNull(),
+    /** The signature counter, to notice a cloned authenticator. */
+    counter: bigint("counter", { mode: "number" }).notNull().default(0),
+    transports: jsonb("transports").$type<string[]>().notNull().default([]),
+    /** Synced across the owner's devices (iCloud Keychain, Google Password Manager). */
+    backedUp: boolean("backed_up").notNull().default(false),
+    /** The owner's name for it ("MacBook", "Security key"). */
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (table) => [index("passkeys_user").on(table.userId)]
+)
+
+/** A WebAuthn challenge in flight: used once, within five minutes. */
+export const webauthnChallenges = pgTable("webauthn_challenges", {
+  id: id(),
+  /** Null for signing in, before anyone is known. */
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  challenge: text("challenge").notNull(),
+  purpose: text("purpose").$type<"register" | "sign_in" | "step">().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+})
+
+/**
  * A person's second sign-in step (apps/web/features/auth/two-factor.ts): an authenticator
  * app (its secret encrypted with the auth secret), codes by email, or both, and one-time
  * backup codes, hashed. While the app is being set up, its new secret and codes wait in
@@ -1401,6 +1441,8 @@ export const twoFactor = pgTable("two_factor", {
   lockedUntil: timestamp("locked_until", { withTimezone: true }),
   /** Codes by email: on or off, and the one code waiting to be typed (hashed). */
   emailOn: boolean("email_on").notNull().default(false),
+  /** At least one passkey (passkeys) is a way through the second step. */
+  passkeyOn: boolean("passkey_on").notNull().default(false),
   emailCode: text("email_code"),
   emailCodeExpires: timestamp("email_code_expires", { withTimezone: true }),
   emailCodeTries: integer("email_code_tries").notNull().default(0),

@@ -26,6 +26,8 @@ export const RATE_LIMITS = {
   email_link: { max: 50, seconds: 60 * 60 },
   /** LMS launches (login initiation) from one address: a large lab launching together fits. */
   lti_login: { max: 600, seconds: 60 },
+  /** Passkey sign-ins started from one address (each keeps a challenge): a lab fits. */
+  passkey: { max: 600, seconds: 15 * 60 },
   /** Payment orders an organization starts (each makes a Razorpay order). */
   checkout: { max: 20, seconds: 60 * 60 },
 } as const satisfies Record<string, RateLimit>

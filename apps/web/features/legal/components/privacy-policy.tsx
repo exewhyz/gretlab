@@ -94,6 +94,11 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               averages and comments, never who gave them, and nothing until at least three students
               have answered.
             </Item>
+            <Item term="Passkeys">
+              if you add one: a public key that can check it, its name, when it was added and last
+              used, and a counter that shows if it was copied. The passkey itself stays on your device
+              or password manager; GretLab never receives it or your fingerprint or face.
+            </Item>
             <Item term="College sign-in">
               if your college signs you in to GretLab: the identifier its sign-in service gives you,
               linked to your account so you&apos;re recognised next time, and your name and email

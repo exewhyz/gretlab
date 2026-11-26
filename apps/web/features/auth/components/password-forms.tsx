@@ -1,6 +1,12 @@
 "use client"
 
-import { BuildingsIcon, EyeIcon, EyeSlashIcon, GoogleLogoIcon } from "@phosphor-icons/react"
+import {
+  BuildingsIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  FingerprintIcon,
+  GoogleLogoIcon,
+} from "@phosphor-icons/react"
 import { passwordProblem, PASSWORD } from "@workspace/judge"
 import Link from "next/link"
 import { signIn } from "next-auth/react"
@@ -11,6 +17,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 
 import { FormMessage } from "@/components/form"
+import { signInWithPasskey } from "@/features/auth/passkey-client"
 import { api } from "@/lib/api/client"
 
 /*
@@ -34,6 +41,47 @@ export function GoogleButton({ next, label = "Continue with Google" }: { next: s
       <GoogleLogoIcon weight="bold" aria-hidden />
       {label}
     </Button>
+  )
+}
+
+/** Signing in with a passkey alone (Face ID, Touch ID, Windows Hello, a security key). */
+export function PasskeyButton({ next }: { next: string }) {
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+  return (
+    <div className="grid gap-1">
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true)
+          setProblem(null)
+          const reason = await signInWithPasskey()
+          if (!reason) {
+            window.location.href = continueTo(next)
+            return
+          }
+          setBusy(false)
+          setProblem(
+            reason === "cancelled"
+              ? null
+              : reason === "use_sso"
+                ? REASONS.use_sso!
+                : "That passkey didn't sign you in. Try again, or another way."
+          )
+        }}
+      >
+        <FingerprintIcon weight="bold" aria-hidden />
+        Sign in with a passkey
+      </Button>
+      {problem && (
+        <p role="alert" className="text-caption text-destructive">
+          {problem}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -183,6 +231,7 @@ export function SignInForm({ callbackUrl: next, devLogin }: { callbackUrl: strin
   return (
     <div className="grid gap-4">
       <GoogleButton next={next} />
+      <PasskeyButton next={next} />
       <CollegeButton next={next} />
       <Divider />
       <form className="grid gap-3" onSubmit={submit} data-testid="password-sign-in">

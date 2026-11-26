@@ -72,7 +72,7 @@ export const TRUST_COOKIE = "gl-2fa-trust"
 export const ISSUER = "GretLab"
 
 type Row = typeof twoFactor.$inferSelect
-type Method = "app" | "email"
+type Method = "app" | "email" | "passkey"
 
 /* ---------- keys, sealing, signing ---------- */
 
@@ -116,7 +116,7 @@ const sign = (text: string) =>
 
 const nowSeconds = () => Math.floor(Date.now() / 1000)
 
-async function rowOf(userId: string) {
+export async function rowOf(userId: string) {
   const [row] = await getDb()
     .select()
     .from(twoFactor)
@@ -135,11 +135,16 @@ async function userByEmail(email: string) {
 const methodsOf = (row: Row | null) => ({
   app: Boolean(row?.enabledAt && row.secret),
   email: Boolean(row?.enabledAt && row.emailOn),
+  passkey: Boolean(row?.enabledAt && row.passkeyOn),
 })
+
+/** Whether another way through the second step stays after taking `method` away. */
+const othersThan = (methods: ReturnType<typeof methodsOf>, method: Method) =>
+  (Object.keys(methods) as Method[]).some((m) => m !== method && methods[m])
 
 /* ---------- telling the person, and the log ---------- */
 
-const log = (actor: User, action: string, summary: string) =>
+export const log = (actor: User, action: string, summary: string) =>
   writeEntry(getDb(), { orgId: null, actor, action, summary })
 
 /**
@@ -158,7 +163,7 @@ async function notice(to: string, email: { subject: string; text: string; html: 
 }
 
 /** A notice for the account's owner whenever its sign-in changes. */
-async function securityNotice(user: User, what: string) {
+export async function securityNotice(user: User, what: string) {
   const site = process.env.NEXTAUTH_URL ?? ""
   return notice(
     user.email,
@@ -220,7 +225,7 @@ export async function twoFactorStatus(user: User) {
   const row = await rowOf(user.id)
   const methods = methodsOf(row)
   return {
-    enabled: methods.app || methods.email,
+    enabled: methods.app || methods.email || methods.passkey,
     enabledAt: row?.enabledAt ?? null,
     methods,
     emailAvailable: mailEnabled(),
@@ -387,7 +392,7 @@ export async function emailStepUpCode(user: User) {
 /* ---------- turning methods on ---------- */
 
 /** Backup codes come with the first method; later methods keep the ones they have. */
-async function pendingBackupCodes(user: User, row: Row | null) {
+export async function pendingBackupCodes(user: User, row: Row | null) {
   if (row?.enabledAt) return null
   const codes = newBackupCodes()
   await getDb()
@@ -431,7 +436,7 @@ export async function startEmailSetup(user: User) {
 }
 
 /** Puts a method on; the first one turns two-factor on and brings its backup codes. */
-async function turnOn(
+export async function turnOn(
   user: User,
   row: Row,
   method: Method,
@@ -449,7 +454,12 @@ async function turnOn(
       lockedUntil: null,
     })
     .where(eq(twoFactor.userId, user.id))
-  const name = method === "app" ? "an authenticator app" : "codes by email"
+  const name =
+    method === "app"
+      ? "an authenticator app"
+      : method === "email"
+        ? "codes by email"
+        : "a passkey"
   await log(
     user,
     first ? "security.2fa_on" : "security.method_add",
@@ -600,11 +610,15 @@ async function needCode(user: User, code: string) {
  * Takes one method away, with a current code (any method, or a backup code). Taking the
  * last one away turns two-factor off, which isn't allowed while it's required.
  */
-export async function removeMethod(user: User, method: Method, code: string) {
+export async function removeMethod(
+  user: User,
+  method: Exclude<Method, "passkey">,
+  code: string
+) {
   const row = await rowOf(user.id)
   const methods = methodsOf(row)
   if (!methods[method]) throw new ApiError(400, "not_on", "That isn't on.")
-  const last = !(method === "app" ? methods.email : methods.app)
+  const last = !othersThan(methods, method)
   if (last && (await mustUseTwoFactor(user))) {
     throw new ApiError(
       403,

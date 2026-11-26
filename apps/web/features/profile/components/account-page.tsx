@@ -5,11 +5,14 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useState } from "react"
 
-import { Button } from "@workspace/ui/components/button"
+import { BuildingsIcon } from "@phosphor-icons/react"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
+import { cn } from "@workspace/ui/lib/utils"
 import { Progress } from "@workspace/ui/components/progress"
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 
 import { Field, TextArea, TextInput } from "@/components/form"
+import { Row, Section } from "@/components/settings-sections"
 import { SecuritySettings } from "@/features/auth/components/security"
 import { api, ApiRequestError } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
@@ -89,9 +92,7 @@ function ProfileEditor({ profile }: { profile: Profile }) {
   const queryClient = useQueryClient()
   const { email, completeness, organizations, ...initial } = profile
   const [form, setForm] = useState<Draft>(initial)
-  const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>(
-    {}
-  )
+  const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({})
   const set = (key: keyof Draft, value: string) => {
     setForm((f) => ({ ...f, [key]: value }))
     setErrors((e) => ({ ...e, [key]: undefined }))
@@ -146,20 +147,42 @@ function ProfileEditor({ profile }: { profile: Profile }) {
   )
 
   return (
-    <div className="grid gap-4 min-[1024px]:grid-cols-[1fr_18rem]">
-      <section className="grid content-start gap-4 rounded-lg border border-hairline bg-card p-4">
+    <div className="grid max-w-4xl gap-8">
+      <Section
+        title="Profile"
+        description="How you appear on GretLab: on your public page, leaderboards and to your classmates."
+        padded
+        status={
+          <div className="mt-2 grid gap-2" data-testid="profile-completeness">
+            <div className="flex items-baseline justify-between text-caption">
+              <span className="text-ink">Profile complete</span>
+              <span className="text-body tabular-nums">
+                {completeness.done} of {completeness.total}
+              </span>
+            </div>
+            <Progress value={percent} aria-label="Profile complete" />
+            {completeness.missing.length ? (
+              <ul className="grid gap-0.5 text-caption text-body">
+                {completeness.missing.map((m) => (
+                  <li key={m.key}>Add {m.label.toLowerCase()}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-caption text-body">Complete. Nice.</p>
+            )}
+          </div>
+        }
+      >
         <div className="grid gap-3 min-[720px]:grid-cols-2">
           {text("name", "Name")}
           {text("handle", "Profile address", {
             help: "Your public page is /u/ followed by this.",
           })}
         </div>
-        <Field label="Email" help="Where sign-in links and notices go. It can't be changed here.">
-          <TextInput value={email} readOnly className="bg-muted" />
-        </Field>
         {text("headline", "Headline", {
           placeholder: "Second-year CSE student, or Maths teacher",
         })}
+        {text("city", "City")}
         <div className="grid gap-1">
           <Field label="About you">
             <TextArea
@@ -173,73 +196,82 @@ function ProfileEditor({ profile }: { profile: Profile }) {
             <p className="text-caption text-destructive">{errors.bio}</p>
           )}
         </div>
+      </Section>
+      <Section
+        title="Contact"
+        description="How GretLab and your organizations reach you."
+        padded
+      >
+        <Field
+          label="Email"
+          help="Where sign-in links and notices go. It can't be changed here."
+        >
+          <TextInput value={email} readOnly className="bg-muted" />
+        </Field>
+        {text("phone", "Phone", {
+          type: "tel",
+          help: "Kept sealed. Only you, your linked parents and staff of your organizations who may see members' details see it.",
+        })}
+      </Section>
+      <Section
+        title="Links"
+        description="Where people can see more of your work."
+        padded
+      >
+        {text("website", "Website", { placeholder: "https://…" })}
         <div className="grid gap-3 min-[720px]:grid-cols-2">
-          {text("city", "City")}
-          {text("phone", "Phone", {
-            type: "tel",
-            help: "Kept sealed. Only you, your linked parents and staff of your organizations who may see members' details see it.",
-          })}
-          {text("website", "Website", { placeholder: "https://…" })}
           {text("github", "GitHub username")}
           {text("linkedin", "LinkedIn", {
             placeholder: "https://www.linkedin.com/in/…",
           })}
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-hairline pt-3">
-          {changed && (
-            <Button variant="ghost" onClick={() => setForm(initial)}>
-              Undo changes
-            </Button>
-          )}
-          <Button disabled={save.isPending || !changed} onClick={submit}>
-            {save.isPending ? "Saving…" : "Save profile"}
-          </Button>
-        </div>
-      </section>
-      <aside className="grid content-start gap-4">
-        <section
-          className="grid gap-2 rounded-lg border border-hairline bg-card p-4"
-          data-testid="profile-completeness"
+      </Section>
+      {organizations.length > 0 && (
+        <Section
+          title="In your organizations"
+          description="Each one keeps its own details about you: your class, role, designation, and who's linked to you."
         >
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-title-sm text-ink">Your profile</h2>
-            <span className="text-caption tabular-nums text-body">
-              {completeness.done} of {completeness.total}
-            </span>
-          </div>
-          <Progress value={percent} aria-label="Profile complete" />
-          {completeness.missing.length ? (
-            <ul className="grid gap-1 text-body-sm text-body">
-              {completeness.missing.map((m) => (
-                <li key={m.key}>· {m.label}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-body-sm text-body">Complete. Nice.</p>
-          )}
-        </section>
-        {organizations.length > 0 && (
-          <section className="grid gap-2 rounded-lg border border-hairline bg-card p-4">
-            <h2 className="text-title-sm text-ink">In your organizations</h2>
-            <p className="text-caption text-body">
-              Each one keeps its own details about you: your class, role,
-              designation, and who&apos;s linked to you.
-            </p>
-            <ul className="grid gap-1">
-              {organizations.map((o) => (
-                <li key={o.slug}>
-                  <Link
-                    href={o.profile}
-                    className="text-body-sm text-ink underline-offset-2 hover:underline"
-                  >
-                    {o.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {organizations.map((o) => (
+            <Row
+              key={o.slug}
+              icon={<BuildingsIcon aria-hidden />}
+              title={o.name}
+              detail="Your profile there"
+              action={
+                <Link
+                  href={o.profile}
+                  className={cn(
+                    buttonVariants({ size: "sm", variant: "outline" })
+                  )}
+                >
+                  Open
+                </Link>
+              }
+            />
+          ))}
+        </Section>
+      )}
+      {/* One save for the whole form, kept in view while there's something to save. */}
+      <div
+        className={cn(
+          "flex flex-wrap items-center justify-end gap-3 border-t border-hairline bg-canvas/95 py-3 backdrop-blur",
+          changed && "sticky bottom-0 z-10"
         )}
-      </aside>
+      >
+        {changed && (
+          <span className="mr-auto text-caption text-body">
+            Unsaved changes
+          </span>
+        )}
+        {changed && (
+          <Button variant="ghost" onClick={() => setForm(initial)}>
+            Undo changes
+          </Button>
+        )}
+        <Button disabled={save.isPending || !changed} onClick={submit}>
+          {save.isPending ? "Saving…" : "Save profile"}
+        </Button>
+      </div>
     </div>
   )
 }

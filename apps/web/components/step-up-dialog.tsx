@@ -13,6 +13,7 @@ import {
 } from "@workspace/ui/components/dialog"
 
 import { Field, FormMessage, TextInput } from "@/components/form"
+import { passkeySecondStep } from "@/features/auth/passkey-client"
 import { sendSecondStep, STEP_MESSAGES } from "@/features/auth/session-step"
 import { api, ApiRequestError } from "@/lib/api/client"
 import { setStepUpAsker } from "@/lib/api/step-up"
@@ -64,6 +65,19 @@ export function StepUpDialog() {
     finish(true)
   }
 
+  // A passkey confirms it too; the device's own prompt, then the server checks it.
+  const withPasskey = async () => {
+    setBusy(true)
+    setMessage(null)
+    const refused = await passkeySecondStep("stepUp")
+    setBusy(false)
+    if (refused) {
+      setMessage({ text: STEP_MESSAGES[refused], kind: "err" })
+      return
+    }
+    finish(true)
+  }
+
   const emailMe = async () => {
     setMessage(null)
     try {
@@ -92,7 +106,8 @@ export function StepUpDialog() {
             <DialogTitle>Confirm it&apos;s you</DialogTitle>
             <DialogDescription>
               This change needs a fresh code: from your authenticator app, an
-              emailed code, or one of your backup codes. Then it goes ahead.
+              emailed code, one of your backup codes, or a passkey. Then it goes
+              ahead.
             </DialogDescription>
           </DialogHeader>
           <Field label="Code">
@@ -107,9 +122,19 @@ export function StepUpDialog() {
           </Field>
           <FormMessage message={message} />
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button type="button" variant="ghost" onClick={emailMe}>
-              Email me a code
-            </Button>
+            <div className="flex flex-wrap gap-1">
+              <Button type="button" variant="ghost" onClick={emailMe}>
+                Email me a code
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => void withPasskey()}
+              >
+                Use a passkey
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Button
                 type="button"

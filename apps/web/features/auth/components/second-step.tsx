@@ -8,6 +8,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Field, FormMessage, TextInput } from "@/components/form"
 import { api } from "@/lib/api/client"
 
+import { passkeySecondStep } from "../passkey-client"
 import { sendSecondStep, STEP_MESSAGES } from "../session-step"
 import type { ApiResult } from "@/lib/api/types"
 import type { emailSignInCode } from "@/features/auth/two-factor"
@@ -25,7 +26,7 @@ export function SecondStep({
 }: {
   email: string
   next: string
-  options: { app: boolean; email: boolean; address: string }
+  options: { app: boolean; email: boolean; passkey?: boolean; address: string }
 }) {
   const [mode, setMode] = useState<Mode>(
     options.app ? "app" : options.email ? "email" : "backup"
@@ -78,6 +79,21 @@ export function SecondStep({
     window.location.assign(next)
   }
 
+  // A passkey: the device's own prompt, then the server checks it.
+  const withPasskey = async () => {
+    setBusy(true)
+    setMessage(null)
+    const problem = await passkeySecondStep("step")
+    if (problem) {
+      setMessage({ text: STEP_MESSAGES[problem], kind: "err" })
+      setBusy(false)
+      return
+    }
+    if (trust)
+      await api("/me/security/trust", { method: "POST" }).catch(() => {})
+    window.location.assign(next)
+  }
+
   const choose = (m: Mode) => {
     setMode(m)
     setCode("")
@@ -92,6 +108,16 @@ export function SecondStep({
         void submit()
       }}
     >
+      {options.passkey && (
+        <Button
+          type="button"
+          className="justify-self-start"
+          disabled={busy}
+          onClick={() => void withPasskey()}
+        >
+          Use a passkey
+        </Button>
+      )}
       <p>
         Signed in as <span className="text-ink">{email}</span>.{" "}
         {mode === "app" &&

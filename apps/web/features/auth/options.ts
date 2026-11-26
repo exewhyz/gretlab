@@ -12,6 +12,12 @@ import { addressFrom } from "@/lib/api/client-ip"
 import { pastLimit, withinLimit } from "@/lib/api/rate-limit"
 
 import { checkPassword } from "./password"
+import {
+  assertionSchema,
+  passkeyRegisterStep,
+  passkeyStep,
+  verifyAssertion,
+} from "./passkeys"
 import { confirmApp, confirmEmail, confirmStepUp, verifySecondStep } from "./two-factor"
 
 /** Sign in as anyone without a password, so never available in a production build. */
@@ -121,6 +127,35 @@ export const authOptions: NextAuthOptions = {
         }
       },
     }),
+    // A passkey on its own (features/auth/passkeys.ts): made with user verification, so it's
+    // both steps at once; the jwt callback records the second step as passed.
+    CredentialsProvider({
+      id: "passkey",
+      name: "Passkey",
+      credentials: { challengeId: { type: "text" }, response: { type: "text" } },
+      async authorize(credentials) {
+        let response: unknown
+        try {
+          response = JSON.parse(credentials?.response ?? "")
+        } catch {
+          throw new Error("bad_passkey")
+        }
+        const parsed = assertionSchema.safeParse({
+          challengeId: credentials?.challengeId,
+          response,
+        })
+        if (!parsed.success) throw new Error("bad_passkey")
+        let user
+        try {
+          user = await verifyAssertion(parsed.data, null)
+        } catch {
+          throw new Error("bad_passkey")
+        }
+        // A college that requires its own sign-in: not a passkey here either.
+        if (await ssoRequiredFor(user.email, "password")) throw new Error("use_sso")
+        return { id: user.id, email: user.email, name: user.name }
+      },
+    }),
     ...(DEV_LOGIN_ENABLED
       ? [
           CredentialsProvider({
@@ -149,6 +184,8 @@ export const authOptions: NextAuthOptions = {
         return user.email ? admit(user.email, user.name, true) : false
       }
       // The password was checked in authorize, against a confirmed account.
+      if (account?.provider === "passkey")
+        return user.email ? admit(user.email, user.name) : false
       if (account?.provider === "password")
         return user.email ? admit(user.email, user.name) : false
       if (!(DEV_LOGIN_ENABLED && account?.provider === "dev")) return false
@@ -159,12 +196,14 @@ export const authOptions: NextAuthOptions = {
      * update() with a code, and only a right code records `mfaAt` in the signed cookie.
      * A fresh sign-in starts without it (features/auth/two-factor.ts).
      */
-    async jwt({ token, trigger, session }) {
+    async jwt({ token, trigger, session, account }) {
       if (trigger === "signIn") {
         delete token.mfaAt
         delete token.mfaError
         // A password reset or "sign out everywhere" ends sessions from before it.
         token.signedInAt = Date.now()
+        // A passkey with user verification is both steps at once.
+        if (account?.provider === "passkey") token.mfaAt = Date.now()
       }
       if (
         trigger === "update" &&
@@ -177,9 +216,19 @@ export const authOptions: NextAuthOptions = {
           stepUp?: unknown
           confirmApp?: unknown
           confirmEmail?: unknown
+          passkeyStep?: unknown
+          passkeyStepUp?: unknown
+          registerPasskey?: unknown
         }
+        const mfaAt = typeof token.mfaAt === "number" ? token.mfaAt : null
         const result =
-          typeof data.confirmApp === "string"
+          data.registerPasskey !== undefined
+            ? await passkeyRegisterStep(token.email, data.registerPasskey, mfaAt)
+            : data.passkeyStep !== undefined
+              ? await passkeyStep(token.email, data.passkeyStep, false)
+              : data.passkeyStepUp !== undefined
+                ? await passkeyStep(token.email, data.passkeyStepUp, true)
+                : typeof data.confirmApp === "string"
             ? await confirmApp(token.email, data.confirmApp)
             : typeof data.confirmEmail === "string"
               ? await confirmEmail(token.email, data.confirmEmail)

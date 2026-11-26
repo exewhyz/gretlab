@@ -1,9 +1,20 @@
 "use client"
 
+import {
+  BrowsersIcon,
+  DeviceMobileIcon,
+  EnvelopeSimpleIcon,
+  FingerprintIcon,
+  DevicesIcon,
+  KeyIcon,
+  LockKeyIcon,
+  PlusIcon,
+} from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState, type ReactNode } from "react"
 
 import { Button } from "@workspace/ui/components/button"
+import { cn } from "@workspace/ui/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -13,13 +24,17 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 
+import { ConfirmButton } from "@/components/confirm"
 import { Field, FormMessage, TextInput } from "@/components/form"
 import { PASSWORD, passwordProblem } from "@workspace/judge"
 
-import { Card, Loading } from "@/features/admin/components/shell"
+import { Row, Section } from "@/components/settings-sections"
+import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { formatDate } from "@/lib/format"
 
+import { addPasskey } from "../passkey-client"
+import type { listPasskeys } from "../passkeys"
 import { sendSecondStep, STEP_MESSAGES } from "../session-step"
 import type { ApiResult } from "@/lib/api/types"
 import type { startAppSetup, twoFactorStatus } from "@/features/auth/two-factor"
@@ -58,129 +73,164 @@ export function SecuritySettings() {
   })
   if (!status.data) return <Loading error={status.error} />
   const s = status.data
-  const methodCount = Number(s.methods.app) + Number(s.methods.email)
+  const methodCount =
+    Number(s.methods.app) + Number(s.methods.email) + Number(s.methods.passkey)
+  const twoStepRows = (
+    <>
+      <MethodRow
+        icon={<DeviceMobileIcon aria-hidden />}
+        title="Authenticator app"
+        detail="Google Authenticator, Microsoft Authenticator, 1Password and others. Works offline."
+        on={s.methods.app}
+        onAdd={() => setSetting("app")}
+        onRemove={() => setDialog({ kind: "remove", method: "app" })}
+        testId="method-app"
+      />
+      <MethodRow
+        icon={<EnvelopeSimpleIcon aria-hidden />}
+        title="Codes by email"
+        detail={
+          s.emailAvailable || s.methods.email
+            ? `A code is sent to ${s.email} each time you sign in.`
+            : "This site can't send email yet, so codes by email aren't available."
+        }
+        on={s.methods.email}
+        disabled={!s.emailAvailable && !s.methods.email}
+        onAdd={() => setSetting("email")}
+        onRemove={() => setDialog({ kind: "remove", method: "email" })}
+        testId="method-email"
+      />
+      <Row
+        icon={<FingerprintIcon aria-hidden />}
+        title="Passkeys"
+        status={s.methods.passkey ? "On" : "Off"}
+        on={s.methods.passkey}
+        detail="A passkey passes this step too. Add or remove them under How you sign in."
+        testId="method-passkey"
+      />
+      {s.enabled && (
+        <Row
+          icon={<KeyIcon aria-hidden />}
+          title="Backup codes"
+          status={`${s.backupCodesLeft} left`}
+          on={s.backupCodesLeft > 3}
+          warn={s.backupCodesLeft <= 3}
+          detail="One-time codes for when you can't use any other way. Keep them somewhere safe."
+          testId="backup-left"
+          action={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDialog({ kind: "codes" })}
+            >
+              Regenerate
+            </Button>
+          }
+        >
+          {fresh && <BackupCodes codes={fresh} />}
+        </Row>
+      )}
+      {s.enabled && (
+        <Row
+          icon={<BrowsersIcon aria-hidden />}
+          title="Trusted browsers"
+          detail={
+            note ?? "Browsers you trusted skip the second step for 30 days."
+          }
+          action={
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={forget.isPending}
+              onClick={() => forget.mutate()}
+            >
+              Forget them
+            </Button>
+          }
+        />
+      )}
+    </>
+  )
   return (
-    <div className="grid max-w-2xl gap-4">
-      <h2 className="text-title-md text-ink">Security</h2>
+    <div className="grid max-w-4xl gap-8">
       {s.required && !s.enabled && (
         <p
           role="alert"
           className="rounded-md border border-hairline bg-destructive/10 p-3 text-body-sm text-ink"
         >
-          Your account needs two-factor sign-in. Turn on a method below to carry
-          on using the site.
+          Your account needs two-step verification. Turn on a method below to
+          carry on using the site.
         </p>
       )}
-      <Card data-testid="two-factor">
-        <h2 className="mb-1 text-title-sm text-ink">Two-factor sign-in</h2>
-        <p className="mb-3 text-body-sm text-body">
-          After your password or Google, you also prove it&apos;s you with a
-          code: from an authenticator app on your phone, or sent to your email.
-          Turn on both, so losing one doesn&apos;t lock you out.
-        </p>
-        <p
-          className="mb-3 text-body-sm text-ink"
-          data-testid="two-factor-state"
-        >
-          {s.enabled ? `On since ${formatDate(s.enabledAt!)}.` : "Off."}
-        </p>
-        {/* Setting a method up is one focused step: a dialog over the page. */}
-        <Dialog
-          open={setting !== null}
-          onOpenChange={(open) => !open && setSetting(null)}
-        >
-          <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>
-                {setting === "email"
-                  ? "Turn on codes by email"
-                  : "Set up an authenticator app"}
-              </DialogTitle>
-              <DialogDescription>
-                {setting === "email"
-                  ? `We'll send a code to ${s.email}; enter it to confirm.`
-                  : "Scan the code with your app, keep the backup codes somewhere safe, then enter the code the app shows."}
-              </DialogDescription>
-            </DialogHeader>
-            {setting === "app" && (
-              <AppSetup
-                onDone={() => (setSetting(null), refresh())}
-                onCancel={() => setSetting(null)}
-              />
-            )}
-            {setting === "email" && (
-              <EmailSetup
-                address={s.email}
-                onDone={() => (setSetting(null), refresh())}
-                onCancel={() => setSetting(null)}
-              />
-            )}
-          </DialogContent>
-        </Dialog>
-        <div className="grid divide-y divide-hairline rounded-md border border-hairline">
-          <MethodRow
-            title="Authenticator app"
-            detail="Google Authenticator, Microsoft Authenticator, 1Password and others. Works offline."
-            on={s.methods.app}
-            onAdd={() => setSetting("app")}
-            onRemove={() => setDialog({ kind: "remove", method: "app" })}
-            testId="method-app"
-          />
-          {(s.emailAvailable || s.methods.email) && (
-            <MethodRow
-              title="Codes by email"
-              detail={`A code is sent to ${s.email} each time you sign in.`}
-              on={s.methods.email}
-              onAdd={() => setSetting("email")}
-              onRemove={() => setDialog({ kind: "remove", method: "email" })}
-              testId="method-email"
+      <Section
+        title="How you sign in"
+        description="The ways you can get into your account."
+      >
+        <PasskeysRow onChange={refresh} />
+        <PasswordCard />
+      </Section>
+      <Section
+        title="Two-step verification"
+        description="After your password, Google or your college, a second step proves it's you. Turn on more than one, so losing one doesn't lock you out."
+        testId="two-factor"
+        status={
+          <span
+            data-testid="two-factor-state"
+            className={s.enabled ? "text-success" : "text-body"}
+          >
+            {s.enabled ? `On since ${formatDate(s.enabledAt!)}.` : "Off."}
+          </span>
+        }
+        footer={
+          s.enabled && s.required ? (
+            <p className="text-caption">
+              Required for your account, so its last method can&apos;t be
+              removed.
+            </p>
+          ) : null
+        }
+      >
+        {twoStepRows}
+      </Section>
+      <Section
+        title="Where you're signed in"
+        description="Left yourself signed in somewhere, or lost a device?"
+      >
+        <SessionsCard />
+      </Section>
+      {/* Setting a method up is one focused step: a dialog over the page. */}
+      <Dialog
+        open={setting !== null}
+        onOpenChange={(open) => !open && setSetting(null)}
+      >
+        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {setting === "email"
+                ? "Turn on codes by email"
+                : "Set up an authenticator app"}
+            </DialogTitle>
+            <DialogDescription>
+              {setting === "email"
+                ? `We'll send a code to ${s.email}; enter it to confirm.`
+                : "Scan the code with your app, keep the backup codes somewhere safe, then enter the code the app shows."}
+            </DialogDescription>
+          </DialogHeader>
+          {setting === "app" && (
+            <AppSetup
+              onDone={() => (setSetting(null), refresh())}
+              onCancel={() => setSetting(null)}
             />
           )}
-        </div>
-        {s.enabled && (
-          <div className="mt-4 grid gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-body-sm">
-              <span className="text-ink" data-testid="backup-left">
-                {s.backupCodesLeft} backup code
-                {s.backupCodesLeft === 1 ? "" : "s"} left
-                {s.backupCodesLeft <= 3 && (
-                  <span className="text-destructive">: make new ones soon</span>
-                )}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setDialog({ kind: "codes" })}
-              >
-                New backup codes
-              </Button>
-            </div>
-            {fresh && <BackupCodes codes={fresh} />}
-            <div className="flex flex-wrap items-center justify-between gap-2 text-body-sm">
-              <span className="text-body">
-                Browsers you trusted skip the code for 30 days.
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={forget.isPending}
-                onClick={() => forget.mutate()}
-              >
-                Forget trusted browsers
-              </Button>
-            </div>
-            {note && <p className="text-caption text-success">{note}</p>}
-            {s.required && (
-              <p className="text-caption">
-                Required for your account, so its last method can&apos;t be
-                removed.
-              </p>
-            )}
-          </div>
-        )}
-      </Card>
-      <PasswordCard />
-      <SessionsCard />
+          {setting === "email" && (
+            <EmailSetup
+              address={s.email}
+              onDone={() => (setSetting(null), refresh())}
+              onCancel={() => setSetting(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
       {dialog && (
         <CodeDialog
           kind={dialog.kind}
@@ -199,49 +249,191 @@ export function SecuritySettings() {
 }
 
 function MethodRow({
+  icon,
   title,
   detail,
   on,
+  disabled,
   onAdd,
   onRemove,
   testId,
-  children,
 }: {
+  icon: ReactNode
   title: string
   detail: string
   on: boolean
+  disabled?: boolean
   onAdd: () => void
   onRemove: () => void
   testId: string
-  children?: ReactNode
 }) {
   return (
-    <div className="grid gap-3 p-3" data-testid={testId}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-body-sm font-medium text-ink">
-            {title}{" "}
-            <span className={on ? "text-success" : "text-body"}>
-              · {on ? "On" : "Off"}
-            </span>
-          </div>
-          <div className="text-xs text-body">{detail}</div>
-        </div>
-        {on ? (
+    <Row
+      icon={icon}
+      title={title}
+      status={on ? "On" : "Off"}
+      on={on}
+      detail={detail}
+      testId={testId}
+      action={
+        on ? (
           <Button size="sm" variant="ghost" onClick={onRemove}>
             Remove
           </Button>
         ) : (
-          !children && (
-            <Button size="sm" variant="outline" onClick={onAdd}>
-              Turn on
-            </Button>
-          )
-        )}
-      </div>
-      {children}
-    </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={disabled}
+            onClick={onAdd}
+          >
+            Turn on
+          </Button>
+        )
+      }
+    />
   )
+}
+
+/**
+ * Passkeys (features/auth/passkeys.ts): sign in with Face ID, Touch ID, Windows Hello or a
+ * security key, and pass the second step with one. The first one turns two-factor on and brings
+ * backup codes; removing one asks for a recent second step.
+ */
+function PasskeysRow({ onChange }: { onChange: () => void }) {
+  const client = useQueryClient()
+  const list = useQuery({
+    queryKey: ["me", "security", "passkeys"],
+    queryFn: () => api<ApiResult<typeof listPasskeys>>("/me/security/passkeys"),
+  })
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<{
+    text: string
+    kind: "ok" | "err"
+  } | null>(null)
+  const [codes, setCodes] = useState<string[] | null>(null)
+  const supported =
+    typeof window !== "undefined" && "PublicKeyCredential" in window
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: ["me", "security", "passkeys"] })
+    onChange()
+  }
+  // Straight to the device's own prompt, as Google and Clerk do; named after where it was made.
+  const add = async () => {
+    setBusy(true)
+    setMessage(null)
+    const { problem, backupCodes } = await addPasskey(deviceName())
+    setBusy(false)
+    if (problem) {
+      if (problem !== "cancelled")
+        setMessage({ text: STEP_MESSAGES[problem], kind: "err" })
+      return
+    }
+    if (backupCodes) setCodes(backupCodes)
+    setMessage({ text: "Passkey added.", kind: "ok" })
+    refresh()
+  }
+  const remove = useMutation({
+    mutationFn: (id: string) =>
+      api(`/me/security/passkeys/${id}`, { method: "DELETE" }),
+    onSuccess: refresh,
+  })
+  const count = list.data?.length ?? 0
+  return (
+    <Row
+      icon={<FingerprintIcon aria-hidden />}
+      title="Passkeys"
+      status={list.data ? (count ? `${count} added` : "None yet") : undefined}
+      on={count > 0}
+      detail="Sign in with your fingerprint, face or screen lock instead of a password; it counts as your second step too. It stays on your device or your password manager."
+      testId="passkeys"
+      action={
+        supported ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void add()}
+          >
+            <PlusIcon aria-hidden />
+            Add a passkey
+          </Button>
+        ) : undefined
+      }
+    >
+      {!list.data ? (
+        <Loading error={list.error} />
+      ) : (
+        <>
+          {list.data.length > 0 && (
+            <ul className="grid divide-y divide-hairline rounded-md border border-hairline">
+              {list.data.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex flex-wrap items-center gap-2 px-3 py-2 text-body-sm"
+                  data-testid="passkey-row"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="text-ink">{p.name}</span>
+                    <span className="block text-caption text-body">
+                      Added {formatDate(p.createdAt)} ·{" "}
+                      {p.lastUsedAt
+                        ? `last used ${formatDate(p.lastUsedAt)}`
+                        : "not used yet"}
+                      {p.backedUp ? " · synced" : ""}
+                    </span>
+                  </span>
+                  <ConfirmButton
+                    size="sm"
+                    variant="ghost"
+                    title={`Remove ${p.name}?`}
+                    description="It won't sign you in any more. If it's your only way through the second step, two-step verification goes off."
+                    confirmLabel="Remove passkey"
+                    onConfirm={() => remove.mutate(p.id)}
+                  >
+                    Remove
+                  </ConfirmButton>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!supported && (
+            <p className="text-caption">
+              This browser can&apos;t make passkeys.
+            </p>
+          )}
+          {message && <FormMessage message={message} />}
+          {codes && <BackupCodes codes={codes} />}
+        </>
+      )}
+    </Row>
+  )
+}
+
+/** A name for a new passkey: the browser and system it was made on ("Chrome on macOS"). */
+function deviceName() {
+  const ua = navigator.userAgent
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /Firefox\//.test(ua)
+      ? "Firefox"
+      : /Chrome\//.test(ua)
+        ? "Chrome"
+        : /Safari\//.test(ua)
+          ? "Safari"
+          : "Browser"
+  const system = /iPhone|iPad/.test(ua)
+    ? "iOS"
+    : /Android/.test(ua)
+      ? "Android"
+      : /Mac OS X/.test(ua)
+        ? "macOS"
+        : /Windows/.test(ua)
+          ? "Windows"
+          : /Linux/.test(ua)
+            ? "Linux"
+            : "this device"
+  return `${browser} on ${system}`
 }
 
 function BackupCodes({ codes }: { codes: string[] }) {
@@ -614,15 +806,27 @@ function PasswordCard() {
   const has = status.data.hasPassword
   const problem = password ? passwordProblem(password) : null
   return (
-    <Card data-testid="password-card">
-      <h2 className="mb-1 text-title-sm text-ink">Password</h2>
-      <p className="mb-3 text-body-sm text-body">
-        {has
-          ? "You can sign in with your email and password, as well as Google."
-          : "You sign in with Google. Add a password to sign in with your email too."}
-      </p>
+    <Row
+      icon={<LockKeyIcon aria-hidden />}
+      title="Password"
+      status={has ? "Set" : "Not set"}
+      on={has}
+      detail={
+        has
+          ? "Sign in with your email and password."
+          : "You sign in another way. Add a password to sign in with your email too."
+      }
+      testId="password-card"
+      action={
+        open ? undefined : (
+          <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+            {has ? "Change" : "Add a password"}
+          </Button>
+        )
+      }
+    >
       {done && <FormMessage message={{ text: done, kind: "ok" }} />}
-      {open ? (
+      {open && (
         <form
           className="grid max-w-sm gap-3"
           onSubmit={(e) => {
@@ -675,12 +879,8 @@ function PasswordCard() {
             </Button>
           </div>
         </form>
-      ) : (
-        <Button variant="outline" onClick={() => setOpen(true)}>
-          {has ? "Change password" : "Add a password"}
-        </Button>
       )}
-    </Card>
+    </Row>
   )
 }
 
@@ -693,19 +893,21 @@ function SessionsCard() {
     },
   })
   return (
-    <Card data-testid="sessions-card">
-      <h2 className="mb-1 text-title-sm text-ink">Signed-in devices</h2>
-      <p className="mb-3 text-body-sm text-body">
-        Left yourself signed in somewhere, or lost a device? Sign out
-        everywhere, this browser included.
-      </p>
-      <Button
-        variant="outline"
-        disabled={out.isPending}
-        onClick={() => out.mutate()}
-      >
-        Sign out everywhere
-      </Button>
-    </Card>
+    <Row
+      icon={<DevicesIcon aria-hidden />}
+      title="Every device"
+      detail="Sign out on every device and browser you've used, this one included."
+      testId="sessions-card"
+      action={
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={out.isPending}
+          onClick={() => out.mutate()}
+        >
+          Sign out everywhere
+        </Button>
+      }
+    />
   )
 }

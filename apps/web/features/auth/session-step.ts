@@ -13,9 +13,10 @@ export async function sendSecondStep(
     | { stepUp: string }
     | { confirmApp: string }
     | { confirmEmail: string }
-): Promise<
-  "wrong_code" | "locked" | "not_set_up" | "expired" | "failed" | null
-> {
+    | { passkeyStep: unknown }
+    | { passkeyStepUp: unknown }
+    | { registerPasskey: unknown }
+): Promise<StepProblem | null> {
   const csrfToken = await getCsrfToken()
   const res = await fetch("/api/auth/session", {
     method: "POST",
@@ -27,13 +28,11 @@ export async function sendSecondStep(
     mfaError?: string | null
   } | null
   const error = session?.mfaError
-  return error === "wrong_code" ||
-    error === "locked" ||
-    error === "not_set_up" ||
-    error === "expired"
-    ? error
-    : null
+  if (!error) return null
+  return error in STEP_MESSAGES ? (error as StepProblem) : "failed"
 }
+
+export type StepProblem = keyof typeof STEP_MESSAGES
 
 export const STEP_MESSAGES = {
   wrong_code: "That code isn't right. Check the app and try again.",
@@ -41,4 +40,11 @@ export const STEP_MESSAGES = {
   not_set_up: "Two-factor sign-in isn't set up. Start again.",
   expired: "That code has expired. Ask for a new one.",
   failed: "Something went wrong. Please try again.",
+  bad_passkey: "That passkey didn't work. Try again, or use another way.",
+  bad_challenge: "That took too long. Try again.",
+  cloned_passkey: "That passkey looks copied. Remove it and add it again.",
+  already_added: "That passkey is already added.",
+  too_many: "You have the most passkeys allowed. Remove one first.",
+  step_up_required: "Confirm it's you first (with a code or another passkey), then add it.",
+  cancelled: "The passkey was cancelled.",
 } as const
