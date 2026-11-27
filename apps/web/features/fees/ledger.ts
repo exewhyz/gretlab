@@ -1,4 +1,5 @@
 import {
+  guardians,
   feeConcessions,
   feeHeads,
   feePayments,
@@ -32,7 +33,9 @@ import {
   writeAudit,
   type OrgContext,
 } from "@/features/orgs/server"
+import { notify } from "@/features/notifications/server"
 import { ApiError, notFound } from "@/lib/api/route"
+import { orgPages } from "@/lib/paths"
 import { likeTerm, paged, readPage } from "@/lib/api/paging"
 import { seal, unseal } from "@/lib/sealed"
 
@@ -123,7 +126,7 @@ export async function groupsOf(ctx: FeeScope, studentId: string) {
 }
 
 /** Those groups and every group above them. */
-function withAncestors(ctx: FeeScope, groupIds: string[]) {
+export function withAncestors(ctx: FeeScope, groupIds: string[]) {
   const parent = new Map(ctx.groups.map((g) => [g.id, g.parentId]))
   const all = new Set<string>()
   for (const g of groupIds) {
@@ -134,6 +137,31 @@ function withAncestors(ctx: FeeScope, groupIds: string[]) {
     }
   }
   return all
+}
+
+/**
+ * Whether this person is the student, an active member, or a parent linked to them here
+ * (with Parent accounts on).
+ */
+export async function isStudentOrParent(
+  ctx: OrgContext,
+  user: User,
+  studentId: string
+) {
+  if (user.id === studentId) return ctx.membership?.status === "active" // A parent's access comes with the Parent accounts module, as everywhere else.
+  if (!ctx.modules.has("parents")) return false
+
+  const [link] = await getDb()
+    .select({ id: guardians.id })
+    .from(guardians)
+    .where(
+      and(
+        eq(guardians.orgId, ctx.org.id),
+        eq(guardians.parentId, user.id),
+        eq(guardians.studentId, studentId)
+      )
+    )
+  return Boolean(link)
 }
 
 /** Whether the person may do `permission` for a student in these groups. */
@@ -539,6 +567,12 @@ export async function collectFee(
       .returning({ id: feePayments.id, receiptNo: feePayments.receiptNo })
     return row!
   })
+  await notify([studentId], {
+    kind: "fee_paid",
+    title: `Fee received: ₹${input.amount.toLocaleString("en-IN")} (${payment.receiptNo})`,
+    href: orgPages(ctx.org.slug).fees("me"),
+    orgId: ctx.org.id,
+  })
   await writeAudit(
     ctx,
     "fees.collect",
@@ -598,7 +632,9 @@ export async function feeReceipt(slug: string, user: User, paymentId: string) {
   if (
     !mayFor(ctx, "fees.view", groups) &&
     !mayFor(ctx, "fees.collect", groups) &&
-    !mayFor(ctx, "fees.concede", groups)
+    !mayFor(ctx, "fees.concede", groups) &&
+    // The student and their parents may download their own receipts.
+    !(await isStudentOrParent(ctx, user, row.studentId))
   )
     throw notFound("No such receipt.")
   return {

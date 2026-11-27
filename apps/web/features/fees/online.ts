@@ -2,7 +2,6 @@ import {
   feePayments,
   feePlans,
   getDb,
-  guardians,
   orgGroups,
   organizations,
   sql,
@@ -12,6 +11,8 @@ import { allocatePayment, type FeeAllocation } from "@workspace/judge"
 import { z } from "zod"
 
 import { writeSystemEntry } from "@/features/audit/server"
+import { notify } from "@/features/notifications/server"
+import { orgPages } from "@/lib/paths"
 import { createOrder, paymentSignatureOk } from "@/features/billing/razorpay"
 import { orgContext, type OrgContext } from "@/features/orgs/server"
 import { needWithinLimit } from "@/lib/api/rate-limit"
@@ -19,6 +20,7 @@ import { ApiError, notFound } from "@/lib/api/route"
 import { seal, unseal } from "@/lib/sealed"
 
 import {
+  isStudentOrParent,
   ledgersFor,
   nextReceipt,
   receiptLines,
@@ -61,22 +63,6 @@ function keysOf(settings: (typeof organizations.$inferSelect)["feeSettings"]) {
   return { keyId: r.keyId, keySecret, webhookSecret }
 }
 
-/** Whether this person may pay this student's fees: the student, or a linked parent. */
-async function mayPay(ctx: OrgContext, user: User, studentId: string) {
-  if (user.id === studentId) return ctx.membership?.status === "active"
-  const [link] = await getDb()
-    .select({ id: guardians.id })
-    .from(guardians)
-    .where(
-      and(
-        eq(guardians.orgId, ctx.org.id),
-        eq(guardians.parentId, user.id),
-        eq(guardians.studentId, studentId)
-      )
-    )
-  return Boolean(link)
-}
-
 /** Starts an online payment: a Razorpay order in the institution's account. */
 export async function startOnlinePayment(
   slug: string,
@@ -85,7 +71,7 @@ export async function startOnlinePayment(
 ) {
   const ctx = await orgContext(slug, user)
   needFees(ctx)
-  if (!(await mayPay(ctx, user, input.studentId)))
+  if (!(await isStudentOrParent(ctx, user, input.studentId)))
     throw notFound("No such student's fees.")
   const keys = keysOf(ctx.org.feeSettings)
   if (!keys)
@@ -206,7 +192,7 @@ export async function applyOnlinePayment(
       .for("update")
     if (!row) throw notFound("No such payment.")
     // The same shape on every path; only a fresh payment is logged.
-    const done = { studentName: "", amount: 0 }
+    const done = { studentName: "", amount: 0, studentId: "", slug: "" }
     if (row.status === "paid")
       return { paid: true, receiptNo: row.receiptNo, fresh: false, ...done }
     if (row.status !== "created")
@@ -287,9 +273,17 @@ export async function applyOnlinePayment(
       fresh: true,
       studentName: who.name ?? who.email,
       amount: row.amount,
+      studentId: row.studentId,
+      slug: org!.slug,
     }
   })
-  if (result.fresh)
+  if (result.fresh) {
+    await notify([result.studentId], {
+      kind: "fee_paid",
+      title: `Fee received: ₹${result.amount.toLocaleString("en-IN")} (${result.receiptNo})`,
+      href: orgPages(result.slug).fees("me"),
+      orgId,
+    })
     await writeSystemEntry(
       "Razorpay",
       "fees.paid",
@@ -297,5 +291,37 @@ export async function applyOnlinePayment(
       { receipt: result.receiptNo },
       { orgId }
     )
+  }
   return { paid: result.paid, receiptNo: result.receiptNo }
+}
+
+/** A student's fees for themselves or a linked parent ("me" for your own). */
+export async function myFees(slug: string, user: User, studentId: string) {
+  const ctx = await orgContext(slug, user)
+  needFees(ctx)
+  const id = studentId === "me" ? user.id : studentId
+  if (!(await isStudentOrParent(ctx, user, id)))
+    throw notFound("No such student's fees.")
+  const who = await student(ctx, id)
+  const data = await ledgersFor(ctx, id)
+  return {
+    student: who,
+    today: data.day,
+    heads: data.heads,
+    online: Boolean(keysOf(ctx.org.feeSettings)),
+    plans: data.plans.map((p) => ({
+      id: p.id,
+      name: p.name,
+      ledger: p.ledger,
+      // Not who collected it, nor staff's notes on a concession.
+      payments: p.payments.map(({ collectedBy: _by, ...rest }) => rest),
+      concessions: p.concessions.map((c) => ({
+        id: c.id,
+        headId: c.headId,
+        percent: c.percent,
+        amount: c.amount,
+        reason: c.reason,
+      })),
+    })),
+  }
 }

@@ -627,6 +627,7 @@ export async function childOverview(
       absences: [],
       work: [],
       results: false,
+      fees: false,
     }
   }
   const modules = ctx.modules
@@ -706,5 +707,6 @@ export async function childOverview(
     work,
     campus: await campusOf(ctx.org, studentId),
     results: modules.has("exams"),
+    fees: modules.has("finance"),
   }
 }

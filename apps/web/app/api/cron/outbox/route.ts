@@ -14,6 +14,7 @@ import { checkAlerts } from "@/features/monitoring/alerts"
 import { runJobs, tidyJobs } from "@/features/jobs/server"
 import { tidyRateLimits } from "@/lib/api/rate-limit"
 import { checkPlans } from "@/features/billing/server"
+import { sendFeeReminders } from "@/features/fees/reminders"
 import { applyDueRatings } from "@/features/contests/ratings"
 import { tidyPasskeyChallenges } from "@/features/auth/passkeys"
 
@@ -97,6 +98,11 @@ async function handle(request: NextRequest) {
     console.error("[billing]", error)
     return null
   })
+  // Fee reminders: due soon, due today, then weekly while owed; each step once.
+  const fees = await sendFeeReminders().catch((error) => {
+    console.error("[fees]", error)
+    return null
+  })
   // Rated contests that have ended: their rating changes, once each, oldest first.
   const ratings = await applyDueRatings().catch((error) => {
     console.error("[ratings]", error)
@@ -109,6 +115,7 @@ async function handle(request: NextRequest) {
     alerts,
     jobs,
     plans,
+    fees,
     ...(await outboxHealth()),
     digests,
     webhooks: {

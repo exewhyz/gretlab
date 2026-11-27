@@ -87,6 +87,14 @@ export function ChildPage({
             Report card ›
           </Link>
         )}
+        {data.fees && (
+          <Link
+            href={orgPages(slug).fees(studentId)}
+            className="mt-2 ml-4 inline-block text-body-sm font-medium text-primary hover:underline"
+          >
+            Fees ›
+          </Link>
+        )}
       </header>
       {!data.active && (
         <p className="text-body-sm text-body">

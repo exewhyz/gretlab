@@ -214,6 +214,9 @@ function navFor(shell: Shell): { group: string; items: Item[] }[] {
         ...(shell.modules.includes("exams")
           ? [{ key: "results", label: "Results", href: `${base}/results/me` }]
           : []),
+        ...(shell.modules.includes("finance")
+          ? [{ key: "fees", label: "Fees", href: `${base}/fees/me` }]
+          : []),
         ...(shell.modules.includes("subjects")
           ? [{ key: "feedback", label: "Feedback", href: `${base}/feedback` }]
           : []),

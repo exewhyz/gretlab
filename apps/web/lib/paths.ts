@@ -32,6 +32,8 @@ export function orgPages(slug: string) {
     /** Someone's profile here; "me" for your own. */
     profile: (userId: string) => `${base}/profile/${userId}`,
     results: (studentId: string | "me") => `${base}/results/${studentId}`,
+    /** A student's fees, for them or their parent ("me" for your own). */
+    fees: (studentId: string | "me") => `${base}/fees/${studentId}`,
     /** A class (group) page, optionally on one tab. */
     cls: (groupId: string, tab?: ClassTab, extra?: Record<string, string>) => {
       const q = new URLSearchParams({

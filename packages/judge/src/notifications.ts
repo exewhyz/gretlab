@@ -146,6 +146,14 @@ export const NOTIFICATION_EVENTS = {
     kinds: ["admission_update"],
     emailByDefault: true,
   },
+  "fees.update": {
+    label: "Fees",
+    description:
+      "A fee instalment is due soon, due today or overdue, or a fee payment is received.",
+    audience: "everyone",
+    kinds: ["fee_due", "fee_paid"],
+    emailByDefault: true,
+  },
   "leave.request": {
     label: "Leave to decide",
     description: "Someone you approve leave for asks for it.",

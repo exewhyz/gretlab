@@ -189,6 +189,8 @@ const s1Owes = (await fees(owner, "fee-s1")).json.plans[0].ledger.balance
 const pay = (who, body) => who(`${O}/fees/pay`, { body: { studentId: uid("fee-s1"), planId: plan.id, ...body } })
 check("someone who isn't the student or their parent can't pay", (await pay(parent, { amount: 1000 })).status === 404)
 psql(`insert into guardians(org_id,parent_id,student_id,relation) values ('${orgId}','${uid("fee-out")}','${uid("fee-s1")}','father')`)
+check("a linked parent can't pay while Parent accounts is off", (await pay(parent, { amount: 1000 })).status === 404)
+await owner(O, { method: "PATCH", body: { modules: { finance: true, parents: true } } })
 check("more than is owed can't be paid online either", (await pay(s1Api, { amount: s1Owes + 1 })).json?.error?.code === "bad_amount")
 const order = (await pay(s1Api, { amount: 2000 })).json
 check("a student starts paying: an order in the college's own account, at most what's owed", order?.orderId?.startsWith("order_") && order.keyId === FEE_KEY && orders.at(-1)?.amount === 200000, JSON.stringify(order))
@@ -208,6 +210,31 @@ check("…and applies a payment on its own", (await hook(event, hmac(FEE_HOOK, e
 await hook(event, hmac(FEE_HOOK, event))
 check("…once, however often it's sent", psql(`select count(distinct receipt_no) from fee_payments where razorpay_order_id='${byParent.orderId}'`) === "1" && (await fees(owner, "fee-s1")).json.plans[0].ledger.balance === s1Owes - 3500)
 check("online payments are logged as Razorpay's, in the college's log", psql(`select count(*) from audit_log where org_id='${orgId}' and action='fees.paid' and actor_label='Razorpay'`) === "2")
+
+// ---------- students and parents
+const mine = await s1Api(`${O}/fees/mine/me`)
+check("a student sees their own fees", mine.status === 200 && mine.json?.plans?.length === 1 && mine.json.online === true, JSON.stringify(mine.json).slice(0, 160))
+check("…without who collected them", !JSON.stringify(mine.json).includes("collectedBy"))
+const s2Api = await client("fee-s2@example.com")
+check("…and not another student's", (await s2Api(`${O}/fees/mine/${uid("fee-s1")}`)).status === 404)
+check("a linked parent sees their child's", (await parent(`${O}/fees/mine/${uid("fee-s1")}`)).status === 200)
+check("…but no other child's", (await parent(`${O}/fees/mine/${uid("fee-s2")}`)).status === 404)
+const s2Mine = (await s2Api(`${O}/fees/mine/me`)).json
+check("staff's note on a concession isn't shown to the student", s2Mine?.plans?.[0]?.concessions?.length === 1 && !("note" in s2Mine.plans[0].concessions[0]))
+const receiptFor = async (who) => (await fetch(`${BASE}/api/v1${O}/fees/payments/${cash.json.id}/receipt`, { headers: { cookie: `next-auth.session-token=${await session(who)}` } })).status
+check("the student and their parent download the receipt; another student can't", (await receiptFor("fee-s1@example.com")) === 200 && (await receiptFor("fee-out@example.com")) === 200 && (await receiptFor("fee-s2@example.com")) === 404)
+// The counter's receipts came before the parent was linked; the two online ones after.
+const paidNotes = Number(psql(`select count(*) from notifications where user_id='${uid("fee-s1")}' and kind='fee_paid'`))
+const parentNotes = Number(psql(`select count(*) from notifications where user_id='${uid("fee-out")}' and kind='child_update'`))
+check("a received payment is announced to the student, a copy to their parent", paidNotes === 4 && parentNotes === 2, `student ${paidNotes}, parent ${parentNotes}`)
+const cronRun = async () => (await (await fetch(`${BASE}/api/cron/outbox`, { method: "POST", headers: { authorization: "Bearer e2e-cron-secret-0123456789" } })).json().catch(() => null))?.fees
+const firstRun = await cronRun()
+const dueNotes = () => Number(psql(`select count(*) from notifications where user_id='${uid("fee-s1")}' and kind='fee_due'`))
+check("the daily run reminds students of what's owed", firstRun?.sent > 0 && dueNotes() >= 1, JSON.stringify(firstRun))
+check("…naming the term and how late it is", /Term 1 is overdue/.test(psql(`select title from notifications where user_id='${uid("fee-s1")}' and kind='fee_due' order by created_at desc limit 1`)))
+const before = dueNotes()
+await cronRun()
+check("…once: running again sends nothing new", dueNotes() === before)
 
 // ---------- the Setup screen
 const browser = await chromium.launch()
@@ -256,6 +283,17 @@ try {
   await phone.goto(`${BASE}${O}/manage/fees`)
   await phone.getByRole("tab", { name: "Setup" }).click()
   await phone.getByTestId("fee-head").first().waitFor({ timeout: 30000 })
+  const sp = await open("fee-s1@example.com", 390)
+  await sp.goto(`${BASE}${O}/fees/me`)
+  await sp.getByTestId("my-instalment").first().waitFor({ timeout: 30000 })
+  check("the student's Fees page: instalments, receipts, and Pay online", (await sp.getByTestId("my-receipt").count()) >= 3 && (await sp.getByTestId("pay-fees").count()) === 1)
+  check("…on a phone, without sideways scrolling", await sp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+  await sp.screenshot({ path: SHOTS + "fees-mine-phone.png", fullPage: true })
+  const sl = await open("fee-s1@example.com", 1440)
+  await sl.goto(`${BASE}${O}/fees/me`)
+  await sl.getByTestId("my-instalment").first().waitFor({ timeout: 30000 })
+  check("…and Fees is in the student's sidebar", (await sl.getByRole("link", { name: "Fees" }).count()) > 0)
+  await sl.screenshot({ path: SHOTS + "fees-mine.png", fullPage: true })
   check("the Setup screen on a phone, without sideways scrolling", await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
   await phone.screenshot({ path: SHOTS + "fees-setup-phone.png", fullPage: true })
   check("no page errors", errors.length === 0, errors.join(" | "))

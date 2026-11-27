@@ -17,6 +17,7 @@ import {
 } from "@/features/admin/components/shell"
 import { Meter } from "@/features/home/components/home-parts"
 import { api } from "@/lib/api/client"
+import { loadRazorpay, type RazorpayAnswer } from "@/lib/razorpay-checkout"
 import type { ApiResult } from "@/lib/api/types"
 import { formatDate, formatDateTime } from "@/lib/format"
 import type { orgBilling } from "@/features/billing/server"
@@ -418,37 +419,6 @@ type Checkout =
       prefill: { name: string; email: string }
       total: number
     }
-
-interface RazorpayAnswer {
-  razorpay_order_id: string
-  razorpay_payment_id: string
-  razorpay_signature: string
-}
-type RazorpayCheckout = new (options: Record<string, unknown>) => {
-  open(): void
-  on(event: string, f: (e: { error?: { description?: string } }) => void): void
-}
-
-/** Razorpay's checkout script, loaded once, when someone pays. */
-function loadRazorpay(): Promise<RazorpayCheckout> {
-  const w = window as unknown as { Razorpay?: RazorpayCheckout }
-  if (w.Razorpay) return Promise.resolve(w.Razorpay)
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script")
-    script.src = "https://checkout.razorpay.com/v1/checkout.js"
-    script.onload = () =>
-      w.Razorpay
-        ? resolve(w.Razorpay)
-        : reject(new Error("Razorpay didn't load."))
-    script.onerror = () =>
-      reject(
-        new Error(
-          "Razorpay's checkout couldn't load. Check the connection and try again."
-        )
-      )
-    document.body.appendChild(script)
-  })
-}
 
 /**
  * Pays for the plan built above: the server prices it and makes an order, Razorpay's checkout

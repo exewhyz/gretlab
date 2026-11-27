@@ -246,6 +246,7 @@ const COPIED_TO_PARENTS = new Set<string>([
   "class.notice",
   "class.teacher_note",
   "campus.update",
+  "fees.update",
 ])
 
 /**
