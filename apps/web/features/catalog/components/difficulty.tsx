@@ -37,13 +37,14 @@ export function TagChip({
   active?: boolean
 }) {
   const classes = cn(
-    "inline-flex items-center rounded-full border border-hairline bg-canvas-soft px-2 py-0.5 text-xs text-body",
-    (onClick || href) && "cursor-pointer hover:border-hairline-strong hover:text-ink",
+    "inline-block max-w-full shrink-0 truncate rounded-full border border-hairline bg-canvas-soft px-2 py-0.5 align-middle text-xs text-body",
+    (onClick || href) &&
+      "cursor-pointer hover:border-hairline-strong hover:text-ink",
     active && "border-ink bg-ink text-canvas hover:text-canvas"
   )
   if (href) {
     return (
-      <Link href={href} className={classes}>
+      <Link href={href} className={classes} title={name}>
         {name}
       </Link>
     )
@@ -60,6 +61,8 @@ export function TagChip({
       {name}
     </Button>
   ) : (
-    <span className={classes}>{name}</span>
+    <span className={classes} title={name}>
+      {name}
+    </span>
   )
 }

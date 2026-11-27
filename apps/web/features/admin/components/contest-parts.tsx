@@ -130,7 +130,7 @@ export function ProblemPicker({
             />
             <SelectInput
               aria-label="Filter by level"
-              className="w-28 py-1"
+              className="w-32 shrink-0 py-1"
               value={level}
               onChange={(event) => setLevel(event.target.value)}
             >

@@ -278,7 +278,11 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
         </div>
 
         {catalog.tags.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-1.5" aria-label="Topics">
+          // On a phone, one row that scrolls sideways, so the topics don't push the list off the screen.
+          <div
+            className="mb-3 flex gap-1.5 pb-1 max-sm:overflow-x-auto sm:flex-wrap"
+            aria-label="Topics"
+          >
             {catalog.tags.map((tag) => (
               <TagChip
                 key={tag.slug}
@@ -289,7 +293,7 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
             ))}
             <Link
               href="/problems/topics"
-              className="ml-1 self-center text-caption text-body underline underline-offset-2 hover:text-ink"
+              className="ml-1 shrink-0 self-center text-caption whitespace-nowrap text-body underline underline-offset-2 hover:text-ink"
             >
               Browse by topic
             </Link>
@@ -335,7 +339,7 @@ export function ProblemLibrary({ initial }: { initial: Catalog }) {
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="w-full max-w-0 px-3 py-2">
                       <Link
                         href={`/problems/${problem.id}`}
                         className="hover:underline"

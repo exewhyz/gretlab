@@ -84,7 +84,7 @@ export function ManageGroups({ slug }: { slug: string }) {
 
   return (
     <>
-      <PageTitle>Groups</PageTitle>
+      <PageTitle>{data.title ?? "Groups"}</PageTitle>
       <p className="mb-3 text-caption text-body">
         Levels here: {data.levels.join(" › ")}. Change them in Settings.
       </p>
@@ -118,7 +118,7 @@ export function ManageGroups({ slug }: { slug: string }) {
       <FormMessage message={message} />
       {/* Above the tree, so folding never hides it. */}
       {groups.some((g) => g.notPlaced > 0) && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 p-2.5 text-caption text-ink">
+        <div className="mb-3 flex flex-wrap items-center gap-1.5 rounded-md bg-chart-4/15 p-2.5 text-caption text-ink ring-1 ring-chart-4/40">
           Some people sit in a group with groups inside and need a place:
           {groups
             .filter((g) => g.notPlaced > 0)
@@ -256,7 +256,7 @@ function GroupRow({
           {g.members} {g.members === 1 ? "member" : "members"}
         </span>
         {g.notPlaced > 0 && (
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+          <span className="rounded-full bg-chart-4/15 px-2 py-0.5 text-xs text-ink">
             {g.notPlaced} not placed yet
           </span>
         )}

@@ -24,7 +24,7 @@ export function ProgressBar({ progress }: { progress: Progress }) {
           <div
             className={cn(
               "h-full",
-              progress.behind.length ? "bg-primary" : "bg-success"
+              progress.behind.length ? "bg-destructive" : "bg-ink/70"
             )}
             style={{ width: `${progress.percent}%` }}
           />
@@ -32,7 +32,7 @@ export function ProgressBar({ progress }: { progress: Progress }) {
         {progress.covered} / {progress.total} topics
       </div>
       {progress.behind.length > 0 && (
-        <span className="text-xs text-primary" data-testid="behind">
+        <span className="text-xs text-destructive" data-testid="behind">
           Behind: {progress.behind.slice(0, 2).join(", ")}
           {progress.behind.length > 2 &&
             ` and ${progress.behind.length - 2} more`}

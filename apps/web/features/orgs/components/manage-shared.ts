@@ -147,6 +147,7 @@ export const useGroups = (slug: string) =>
     queryFn: () =>
       api<{
         levels: string[]
+        title?: string
         run?: RunInfo
         canManageAll: boolean
         groups: Group[]

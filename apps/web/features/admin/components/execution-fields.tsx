@@ -57,7 +57,10 @@ export function ExecutionFields({
         <RadioGroup
           value={value.execution}
           onValueChange={(v) =>
-            onChange({ ...value, execution: v === "browser" ? "browser" : "server" })
+            onChange({
+              ...value,
+              execution: v === "browser" ? "browser" : "server",
+            })
           }
           className="gap-2"
         >
@@ -78,18 +81,21 @@ export function ExecutionFields({
             <RadioGroupItem
               value="browser"
               aria-label="In the browser"
-              disabled={browserBlocked !== null && value.execution !== "browser"}
+              disabled={
+                browserBlocked !== null && value.execution !== "browser"
+              }
             />
             <span>
               In the students&apos; browsers: Python and JavaScript only.
               <span className="block text-caption text-body">
                 Every test&apos;s input is sent to the student&apos;s browser
                 and the server checks the output. Results are provisional and
-                the server judges them again once it can. Use it when the
-                server is failing.
+                the server judges them again once it can. Use it when the server
+                is failing.
               </span>
+              {/* Why it can't be chosen: an explanation, not an error. */}
               {browserBlocked && (
-                <span className="block text-caption text-destructive">
+                <span className="block text-caption text-body">
                   {browserBlocked}
                 </span>
               )}
@@ -120,8 +126,11 @@ export function ExecutionFields({
           max={data?.platformPerMinute}
           value={value.perMinute}
           placeholder={data ? String(data.platformPerMinute) : ""}
+          className="max-w-40"
           aria-invalid={Boolean(error)}
-          onChange={(event) => onChange({ ...value, perMinute: event.target.value })}
+          onChange={(event) =>
+            onChange({ ...value, perMinute: event.target.value })
+          }
         />
       </Field>
       {error && (
@@ -140,7 +149,9 @@ export const executionDraft = (stored?: {
 }): ExecutionDraft => ({
   execution: stored?.execution ?? "server",
   perMinute:
-    stored?.submissionsPerMinute == null ? "" : String(stored.submissionsPerMinute),
+    stored?.submissionsPerMinute == null
+      ? ""
+      : String(stored.submissionsPerMinute),
 })
 
 /** What the API takes. */

@@ -88,7 +88,7 @@ export function TeacherHome() {
                 className="flex items-baseline justify-between gap-3 text-body-sm hover:underline"
               >
                 <span className="truncate text-ink">{g.path}</span>
-                <span className="shrink-0 text-caption text-primary">
+                <span className="shrink-0 text-caption text-destructive">
                   {g.progress.behind.length} behind
                 </span>
               </Link>

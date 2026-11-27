@@ -16,6 +16,12 @@ aren't listed.
 - The platform overview's figures sit in one row, and its status reads green when healthy.
 - Units, study plans and courses each say what they are and how they differ.
 - A handed-in project shows the same way in a course as in an assignment.
+- Reports: classes behind the syllabus and students with no recent work show in red, and an
+  assignment nobody is set shows no average instead of 0%.
+- The groups page is titled in your organization's own word (Batches, Classes, Teams).
+- Assignment and contest forms: the level filter is no longer cut off, and a reason why browser
+  grading can't be chosen no longer looks like an error.
+- The problem library on a phone shows the problems on the first screen; topics scroll sideways.
 
 ## 26 November 2026
 

@@ -410,7 +410,9 @@ export function AssignmentEditor({
     for (const issue of parsed.error.issues) {
       const field = issue.path[0]
       const key = (
-        field === "execution" || field === "submissionsPerMinute" ? "run" : field
+        field === "execution" || field === "submissionsPerMinute"
+          ? "run"
+          : field
       ) as keyof FieldErrors
       found[key] ??= issue.message
     }
@@ -822,13 +824,18 @@ export function AssignmentEditor({
             />
             Accept late submissions
           </label>
-          <label className="inline-flex items-center gap-2 self-start text-ink">
+          <label className="inline-flex items-start gap-2 self-start text-ink">
             <Checkbox
+              className="mt-0.5"
               checked={form.holdFeedback}
               onCheckedChange={(checked) => set("holdFeedback", checked)}
             />
-            Hold results until I release them (quiz marks and answers, rubric
-            marks, comments)
+            <span>
+              Hold results until I release them
+              <span className="block text-caption text-body">
+                Quiz marks and answers, rubric marks and comments.
+              </span>
+            </span>
           </label>
           {form.allowLate && (
             <div className="grid content-start gap-1.5">

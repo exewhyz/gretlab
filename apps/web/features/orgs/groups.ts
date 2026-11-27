@@ -79,6 +79,8 @@ export async function listGroups(slug: string, user: User) {
   const kind = KINDS[ctx.org.type]
   return {
     levels: ctx.org.groupLevels,
+    // What this kind calls its groups (Batches, Classes, Teams), as the sidebar does.
+    title: kind.terms.groups,
     run: {
       dates: kind.groupDates,
       lead: kind.leadPerGroup,

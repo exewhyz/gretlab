@@ -206,7 +206,12 @@ export function OrgReports({
                     {a.started} / {a.students}
                   </td>
                   <td>
-                    <PercentBar value={a.averagePercent} />
+                    {/* Nobody to average: no bar, so it doesn't read as 0%. */}
+                    {a.students === 0 ? (
+                      <span className="text-body">—</span>
+                    ) : (
+                      <PercentBar value={a.averagePercent} />
+                    )}
                   </td>
                 </tr>
               ))}
@@ -258,7 +263,7 @@ export function OrgReports({
           <div role="group" aria-label="Show" className="flex gap-1.5">
             <Button
               size="sm"
-              variant={onlyInactive ? "outline" : "default"}
+              variant={onlyInactive ? "outline" : "secondary"}
               aria-pressed={!onlyInactive}
               onClick={() => show(false)}
             >
@@ -269,7 +274,7 @@ export function OrgReports({
             </Button>
             <Button
               size="sm"
-              variant={onlyInactive ? "default" : "outline"}
+              variant={onlyInactive ? "secondary" : "outline"}
               aria-pressed={onlyInactive}
               onClick={() => show(true)}
             >
@@ -314,7 +319,7 @@ export function OrgReports({
                 <div className="text-xs">{s.email}</div>
               </td>
               <td className="text-xs">{s.groups.join(", ") || "—"}</td>
-              <td className={cn(!s.activeThisWeek && "text-primary")}>
+              <td className={cn(!s.activeThisWeek && "text-destructive")}>
                 {s.lastActive ? formatDate(s.lastActive) : "Not in 30 days"}
               </td>
               <td>
