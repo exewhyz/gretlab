@@ -50,7 +50,7 @@ const roles = async (slug = "rl-school") => (await owner(`/orgs/${slug}/roles`))
 
 // ---------- a new organization
 const r0 = await roles()
-check("a new school starts with the built-in roles and its suggested ones", r0.filter((r) => r.systemKey).length === 4 && r0.filter((r) => r.templateKey).length === 11, JSON.stringify(r0.map((r) => r.name)))
+check("a new school starts with the built-in roles and its suggested ones", r0.filter((r) => r.systemKey).length === 4 && r0.filter((r) => r.templateKey).length === 12, JSON.stringify(r0.map((r) => r.name)))
 check("...a principal, class and subject teachers, a librarian…", ["Principal", "Class teacher", "Subject teacher", "Librarian", "Exam coordinator"].every((n) => r0.some((r) => r.name === n)))
 const co = await roles("rl-co")
 check("a company gets its own: HR partner, Trainer, Compliance officer, Team lead", ["HR partner", "Trainer", "Compliance officer", "Team lead"].every((n) => co.some((r) => r.name === n)) && !co.some((r) => r.name === "Principal"))
@@ -78,7 +78,7 @@ check("...and can run that class's register", (await teacher(`${O}/classes/${cls
 const helper = await client("rl-s@example.com")
 const kinds = (await admin("/admin/kinds")).json
 const school = kinds?.kinds.find((k) => k.key === "school")
-check("the kinds page lists each kind's suggested roles", school?.roles.length === 11 && school.rolesChanged === false)
+check("the kinds page lists each kind's suggested roles", school?.roles.length === 12 && school.rolesChanged === false)
 const put = (kind, roles, who = admin) => who(`/admin/kinds/${kind}/roles`, { method: "PUT", body: { roles } })
 const nurse = { key: "nurse", name: "School nurse", description: "Health records and sick leave.", permissions: ["students.view", "leave.students"], scope: "organization" }
 check("staff without the permission can't change them", (await put("school", [nurse], helper)).status === 403)
