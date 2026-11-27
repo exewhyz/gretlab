@@ -236,6 +236,29 @@ const before = dueNotes()
 await cronRun()
 check("…once: running again sends nothing new", dueNotes() === before)
 
+// ---------- reports
+const report = async (who, q) => (await who(`${O}/fees/reports?${q}`))
+const coll = (await report(owner, "kind=collection")).json
+const paidTotal = Number(psql(`select coalesce(sum(amount),0) from fee_payments where org_id='${orgId}' and status='paid'`))
+check("collection this month adds up the paid receipts, not the cancelled one", coll?.total === paidTotal && coll.rows.every((r) => r.receiptNo !== "FC/2026-27/000002"), `${coll?.total} vs ${paidTotal}`)
+check("…split by mode and by fee head", coll?.byMode?.some((m) => m.label === "Cash") && coll.byMode.some((m) => m.label === "Online (Razorpay)") && coll.byHead.some((h) => h.label === "Tuition"), JSON.stringify(coll?.byMode))
+check("a range with nothing in it is empty", (await report(owner, "kind=collection&from=2020-01-01&to=2020-01-31")).json?.count === 0)
+check("a range the wrong way round is refused", (await report(owner, "kind=collection&from=2026-12-01&to=2026-11-01")).json?.error?.code === "bad_range")
+const dues = (await report(owner, "kind=dues")).json
+check("dues list who owes, the most overdue first", dues?.rows?.length === 2 && dues.rows[0].overdue >= dues.rows[1].overdue && dues.overdue > 0, JSON.stringify(dues).slice(0, 200))
+check("…a class narrows it", (await report(owner, `kind=dues&groupId=${batchB.id}`)).json?.rows?.map((r) => r.email).join() === "fee-s2@example.com")
+check("…and overdue only leaves out who isn't late yet", (await report(owner, "kind=dues&overdueOnly=true")).json?.rows?.every((r) => r.overdue > 0))
+const conc = (await report(owner, "kind=concessions")).json
+check("concessions are listed with their reason", conc?.count === 1 && conc.rows[0].reason === "Staff ward", JSON.stringify(conc))
+check("a collector for one batch sees only that batch", (await report(teacher, "kind=dues")).json?.rows?.every((r) => r.email === "fee-s2@example.com"))
+check("a teacher with no fee role sees no report", (await report(s2Api, "kind=dues")).status === 403)
+check("an unknown report is refused", (await report(owner, "kind=everything")).status === 400)
+psql(`update users set name='=HYPERLINK("x")' where email='fee-s2@example.com'`)
+const csv = await fetch(`${BASE}/api/v1${O}/fees/reports?kind=dues&format=csv`, { headers: { cookie: `next-auth.session-token=${await session("fee-o@example.com")}` } })
+const csvText = await csv.text()
+check("reports download as CSV, with formulas made safe", csv.headers.get("content-type")?.startsWith("text/csv") && csvText.startsWith('"Student"') && csvText.includes(`"'=HYPERLINK(""x"")"`), csvText.slice(0, 200))
+psql(`update users set name='fee-s2 Name' where email='fee-s2@example.com'`)
+
 // ---------- the Setup screen
 const browser = await chromium.launch()
 const errors = []
@@ -278,6 +301,13 @@ try {
   await p.getByTestId("fee-receipt").nth(4).waitFor({ timeout: 15000 })
   check("…with what concessions it has, and Give a concession", (await p.getByTestId("concessions").count()) === 1 && (await p.getByRole("button", { name: "Give a concession" }).count()) === 1)
   check("collecting from the page adds the receipt", psql(`select count(*) from fee_payments where student_id='${uid("fee-s1")}' and status='paid'`) === "4")
+  await p.keyboard.press("Escape")
+  await p.getByRole("tab", { name: "Reports" }).click()
+  await p.getByTestId("report-row").first().waitFor({ timeout: 15000 })
+  await p.getByRole("button", { name: "Dues and defaulters" }).click()
+  await p.getByTestId("fee-report").getByText("Days late").waitFor({ timeout: 15000 })
+  check("the Reports tab shows collection, then dues", (await p.getByTestId("fee-report").innerText()).includes("Overdue"))
+  await p.screenshot({ path: SHOTS + "fees-reports.png", fullPage: true })
   await p.screenshot({ path: SHOTS + "fees-student.png" })
   const phone = await open("fee-o@example.com", 390)
   await phone.goto(`${BASE}${O}/manage/fees`)
