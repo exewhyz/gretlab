@@ -26,7 +26,11 @@
         "SITE_URL",
         "R2_*",
         "STORAGE_ENDPOINT",
-        "RAZORPAY_*"
+        "RAZORPAY_*",
+        "JUDGES_*",
+        "SSO_*",
+        "WEBHOOKS_ALLOW_LOCAL",
+        "VERCEL_GIT_COMMIT_SHA"
       ]
     },
     "lint": {

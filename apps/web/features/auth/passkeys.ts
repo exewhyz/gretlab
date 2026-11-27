@@ -66,7 +66,7 @@ async function saveChallenge(
 }
 
 /** The challenge, used once: refused if unknown, for something else, someone else's, or old. */
-async function useChallenge(
+async function consumeChallenge(
   id: string,
   purpose: "register" | "sign_in" | "step",
   userId: string | null
@@ -155,7 +155,7 @@ export async function register(
   user: User,
   input: z.infer<typeof registerSchema>
 ) {
-  const challenge = await useChallenge(input.challengeId, "register", user.id)
+  const challenge = await consumeChallenge(input.challengeId, "register", user.id)
   const rp = relyingParty()
   let verified
   try {
@@ -325,7 +325,7 @@ export async function verifyAssertion(
     : [null]
   if (email && !me)
     throw new ApiError(400, "bad_passkey", "That passkey isn't right.")
-  const challenge = await useChallenge(
+  const challenge = await consumeChallenge(
     input.challengeId,
     me ? "step" : "sign_in",
     me?.id ?? null

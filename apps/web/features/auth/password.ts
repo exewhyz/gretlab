@@ -125,7 +125,7 @@ async function mailedRecently(to: string, minutes: number) {
 }
 
 /** Uses up a link: its person, or null when it's unknown, used or expired. */
-async function useLink(token: string, kind: "verify" | "reset") {
+async function consumeLink(token: string, kind: "verify" | "reset") {
   const [row] = await getDb()
     .update(authTokens)
     .set({ usedAt: new Date() })
@@ -196,14 +196,14 @@ async function mayRegister(email: string) {
  * has an account, the email says so instead: the answer here is the same either way.
  */
 /** A college requires its single sign-on for this address (features/sso). */
-const useSso = () =>
+const ssoRequiredError = () =>
   new ApiError(409, "use_sso", "Your college signs you in to GretLab: use Sign in with your college.")
 
 export async function signUp(input: z.infer<typeof signUpSchema>) {
   await needWithinLimit("sign_up", requestInfo().ip)
   const problem = passwordProblem(input.password, input.email)
   if (problem) throw new ApiError(400, "weak_password", problem)
-  if (await ssoRequiredFor(input.email, "password")) throw useSso()
+  if (await ssoRequiredFor(input.email, "password")) throw ssoRequiredError()
   if (!(await mayRegister(input.email)))
     throw new ApiError(403, "registration_closed", "New accounts can't be made with this address here.")
   const db = getDb()
@@ -254,7 +254,7 @@ export async function signUp(input: z.infer<typeof signUpSchema>) {
 export const tokenSchema = z.object({ token: z.string().min(10).max(200) })
 
 export async function verifyEmail(token: string) {
-  const user = await useLink(token, "verify")
+  const user = await consumeLink(token, "verify")
   if (!user) return null
   await getDb()
     .update(users)
@@ -283,7 +283,7 @@ export async function resendConfirmation(email: string) {
 /** Emails a link to choose a new password (to any account, Google ones included). */
 export async function forgotPassword(email: string) {
   await needWithinLimit("email_link", requestInfo().ip)
-  if (await ssoRequiredFor(email, "password")) throw useSso()
+  if (await ssoRequiredFor(email, "password")) throw ssoRequiredError()
   const [user] = await getDb().select().from(users).where(eq(users.email, email))
   if (user && !user.disabled && !(await sentRecently(user.id, "reset"))) {
     const link = await newLink(user.id, "reset")
@@ -308,7 +308,7 @@ export async function resetPassword(input: z.infer<typeof resetSchema>) {
     .where(eq(authTokens.tokenHash, digest(input.token)))
   const problem = passwordProblem(input.password, row?.email ?? "")
   if (problem) throw new ApiError(400, "weak_password", problem)
-  const user = await useLink(input.token, "reset")
+  const user = await consumeLink(input.token, "reset")
   if (!user) throw new ApiError(400, "bad_link", "This link has expired or was already used. Ask for a new one.")
   await getDb()
     .update(users)
