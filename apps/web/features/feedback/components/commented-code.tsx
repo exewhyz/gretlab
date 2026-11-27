@@ -79,7 +79,7 @@ export function CommentedCode({
               <div
                 key={c.id}
                 data-testid="line-comment"
-                className="my-1 ml-8 grid gap-1 rounded-md border border-primary/40 bg-card px-3 py-2 font-sans text-body-sm whitespace-pre-wrap text-ink"
+                className="my-1 ml-8 grid gap-1 rounded-md border border-hairline-strong bg-card px-3 py-2 font-sans text-body-sm whitespace-pre-wrap text-ink"
               >
                 <div className="flex flex-wrap items-center gap-x-2 text-caption text-body">
                   <span>{c.author ?? "Teacher"}</span>

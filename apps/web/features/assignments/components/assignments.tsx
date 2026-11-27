@@ -226,7 +226,7 @@ export function AssignmentView({ slug }: { slug: string }) {
       {data.extension && (
         <p
           data-testid="my-extension"
-          className="mb-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-body-sm text-ink"
+          className="mb-2 rounded-md border border-hairline bg-muted px-3 py-2 text-body-sm text-ink"
         >
           Your teacher gave you until {formatDateTime(data.extension.dueAt)}
           {data.extension.whole

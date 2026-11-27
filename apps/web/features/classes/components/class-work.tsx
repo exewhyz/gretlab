@@ -9,7 +9,7 @@ import { Loading } from "@/features/admin/components/shell"
 import type { classwork } from "@/features/classes/server"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
-import { formatDateTime } from "@/lib/format"
+import { formatDateTime, formatDay } from "@/lib/format"
 
 /*
  * A class: one group someone teaches, with everything about it in tabs. Teachers see
@@ -186,14 +186,18 @@ export function Classwork({
                 a.topicIds.includes(`${groupId}:${t.id}`)
               )
               return (
-                <li key={t.id} className="grid gap-0.5" data-testid="syllabus-topic">
+                <li
+                  key={t.id}
+                  className="grid gap-0.5"
+                  data-testid="syllabus-topic"
+                >
                   <div className="flex justify-between gap-3">
                     <span className="text-ink">
                       {i + 1}. {t.title}
                     </span>
                     {t.plannedFor && (
                       <span className="text-caption text-body">
-                        {t.plannedFor}
+                        {formatDay(t.plannedFor)}
                       </span>
                     )}
                   </div>

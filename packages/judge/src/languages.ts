@@ -103,5 +103,11 @@ export type LanguageId = keyof typeof LANGUAGES
 export const LANGUAGE_IDS = Object.keys(LANGUAGES) as LanguageId[]
 
 export function isLanguageId(value: string): value is LanguageId {
-  return value in LANGUAGES
+  // Own keys only: `in` would also accept "toString" and "constructor".
+  return Object.hasOwn(LANGUAGES, value)
+}
+
+/** What people read for a language: "Python 3.13" for "python"; an unknown id as stored. */
+export function languageLabel(id: string): string {
+  return isLanguageId(id) ? LANGUAGES[id].label : id
 }

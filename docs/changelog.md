@@ -28,6 +28,9 @@ aren't listed.
   table.
 - The editor's settings button has a proper icon, and "Reset to the starter code" reads as a menu
   item.
+- The gradebook's student panel and Dashboard › Submissions name languages ("Python 3.13"); a
+  class's syllabus shows its dates as dates ("1 Jan 2026"); line comments and a student's
+  extension note are no longer outlined in orange.
 - Attendance registers (students and staff) colour each mark by what it means: present green,
   absent red, late or half day ochre, excused or on leave grey, so a register reads at a glance.
 

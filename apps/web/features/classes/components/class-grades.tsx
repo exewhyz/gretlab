@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDay } from "@/lib/format"
 import { CalendarCheckIcon } from "@phosphor-icons/react"
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
@@ -251,7 +252,9 @@ export function MySyllabus({
                 {i + 1}. {t.title}
               </span>
               {t.plannedFor && (
-                <span className="text-caption text-body">{t.plannedFor}</span>
+                <span className="text-caption text-body">
+                  {formatDay(t.plannedFor)}
+                </span>
               )}
             </li>
           ))}

@@ -11,6 +11,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
+import { languageLabel } from "@workspace/judge"
 
 interface File {
   path: string
@@ -89,7 +90,7 @@ export function LiveCode({ path }: { path: string }) {
           <span aria-hidden className="size-2 rounded-full bg-success" />
           Live
         </span>
-        <span>{data.draft.language}</span>
+        <span>{languageLabel(data.draft.language)}</span>
         <span>Saved {ago(data.draft.updatedAt, now)}</span>
       </div>
       <Code files={data.draft.files} />
@@ -276,7 +277,7 @@ export function PlaybackView({
               ? "at the start"
               : `${minutes} min after starting`}
         </span>
-        <span>{snapshot.language}</span>
+        <span>{languageLabel(snapshot.language)}</span>
         <span className="text-primary">Highlighted: changed in this step</span>
       </div>
       {jumpHere && (

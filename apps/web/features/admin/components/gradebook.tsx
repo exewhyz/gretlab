@@ -19,7 +19,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
-import { rubricTotal, type RubricCriterion } from "@workspace/judge"
+import {
+  languageLabel,
+  rubricTotal,
+  type RubricCriterion,
+} from "@workspace/judge"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   Tabs,
@@ -587,7 +591,7 @@ export function StudentCode({
                     {a.passedTests} / {a.totalTests} tests
                   </span>
                 )}
-                <span>{a.language}</span>
+                <span>{languageLabel(a.language)}</span>
                 <span>{formatDateTime(a.createdAt)}</span>
                 {a.late && <span className="text-primary">Late</span>}
                 {a.outside && (
