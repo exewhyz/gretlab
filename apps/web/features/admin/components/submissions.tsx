@@ -1,7 +1,7 @@
 "use client"
 
 import { useInfiniteQuery } from "@tanstack/react-query"
-import { VERDICTS } from "@workspace/judge"
+import { LANGUAGES, isLanguageId, VERDICTS } from "@workspace/judge"
 import Link from "next/link"
 import { useState } from "react"
 
@@ -134,7 +134,11 @@ export function AdminSubmissions() {
                     ? "—"
                     : `${row.passedTests ?? 0}/${row.totalTests}`}
                 </td>
-                <td>{row.language}</td>
+                <td>
+                  {isLanguageId(row.language)
+                    ? LANGUAGES[row.language].label
+                    : row.language}
+                </td>
                 <td className="whitespace-nowrap tabular-nums">
                   {formatRuntime(row.runtimeMs)}
                 </td>

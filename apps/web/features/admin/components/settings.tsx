@@ -11,8 +11,9 @@ import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"
 import { Switch } from "@workspace/ui/components/switch"
+import { cn } from "@workspace/ui/lib/utils"
 
-import { SelectInput, TextInput } from "@/components/form"
+import { SelectInput, TextArea, TextInput } from "@/components/form"
 import { api } from "@/lib/api/client"
 
 import { Card, Loading, PageTitle } from "./shell"
@@ -21,7 +22,8 @@ import { Card, Loading, PageTitle } from "./shell"
 const GROUPS = [
   ...new Set(SETTING_KEYS.map((key) => SETTINGS[key].group)),
 ].filter(
-  (group) => group !== "Judges" &&
+  (group) =>
+    group !== "Judges" &&
     group !== "Billing" &&
     group !== "Feedback" &&
     group !== "Referrals"
@@ -136,6 +138,8 @@ function SettingRow({
     )
   }
 
+  const long = typeof value === "string" && value.length > 60
+
   function commit() {
     if (typeof value === "number") onSave(Number(draft))
     else if (Array.isArray(value)) {
@@ -151,14 +155,29 @@ function SettingRow({
   return (
     <div className="flex flex-wrap items-start gap-3">
       {text}
-      <div className="flex w-full items-center gap-2 min-[901px]:w-80">
-        <TextInput
-          aria-label={label}
-          type={typeof value === "number" ? "number" : "text"}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && commit()}
-        />
+      <div
+        className={cn(
+          "flex w-full gap-2 min-[901px]:w-80",
+          long ? "items-end" : "items-center"
+        )}
+      >
+        {/* Sentences (a description) get room to be read whole; single values stay one line. */}
+        {long ? (
+          <TextArea
+            aria-label={label}
+            rows={3}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        ) : (
+          <TextInput
+            aria-label={label}
+            type={typeof value === "number" ? "number" : "text"}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && commit()}
+          />
+        )}
         <Button variant="outline" size="sm" onClick={commit}>
           Save
         </Button>

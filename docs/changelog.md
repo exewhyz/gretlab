@@ -22,6 +22,12 @@ aren't listed.
 - Assignment and contest forms: the level filter is no longer cut off, and a reason why browser
   grading can't be chosen no longer looks like an error.
 - The problem library on a phone shows the problems on the first screen; topics scroll sideways.
+- Dashboard › Submissions names each language ("Python 3.13"), and Dashboard › Settings gives
+  long text such as the site description a box you can read whole.
+- Dashboard › Organizations says when there are none (or none match) instead of showing an empty
+  table.
+- The editor's settings button has a proper icon, and "Reset to the starter code" reads as a menu
+  item.
 
 ## 26 November 2026
 

@@ -1,5 +1,6 @@
 "use client"
 
+import { GearSixIcon } from "@phosphor-icons/react"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
@@ -30,7 +31,7 @@ export function EditorSettings({ onReset }: { onReset: () => void }) {
           />
         }
       >
-        ⚙
+        <GearSixIcon aria-hidden />
       </PopoverTrigger>
       <PopoverContent
         align="end"
@@ -69,17 +70,20 @@ export function EditorSettings({ onReset }: { onReset: () => void }) {
             onCheckedChange={(checked) => saveEditorPrefs({ minimap: checked })}
           />
         </label>
-        <ConfirmButton
-          variant="ghost"
-          size="xs"
-          className="justify-start border-t border-hairline pt-2 text-destructive"
-          title="Reset to the starter code?"
-          description="Your files for this problem and language go back to the starter code. Your submissions keep their copies. This can't be undone."
-          confirmLabel="Reset code"
-          onConfirm={onReset}
-        >
-          Reset to the starter code
-        </ConfirmButton>
+        {/* A rule above it, not a box around it: the button's own border would draw one. */}
+        <div className="border-t border-hairline pt-2">
+          <ConfirmButton
+            variant="ghost"
+            size="xs"
+            className="w-full justify-start text-destructive hover:text-destructive"
+            title="Reset to the starter code?"
+            description="Your files for this problem and language go back to the starter code. Your submissions keep their copies. This can't be undone."
+            confirmLabel="Reset code"
+            onConfirm={onReset}
+          >
+            Reset to the starter code
+          </ConfirmButton>
+        </div>
       </PopoverContent>
     </Popover>
   )

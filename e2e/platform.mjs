@@ -112,6 +112,18 @@ await ownerPage.getByRole("tab", { name: /Roles/ }).click()
 await ownerPage.getByTestId("role-row").first().waitFor({ timeout: 15000 })
 check("and the roles, built in and custom", (await ownerPage.getByTestId("role-row").filter({ hasText: "Built in" }).count()) === 8 && (await ownerPage.getByTestId("role-row").filter({ hasText: "plat Library helper" }).count()) === 1)
 await ownerPage.screenshot({ path: SHOTS + "roles.png", fullPage: true })
+// The dashboard's people and organizations lists, on a laptop and a phone.
+for (const [path, name] of [["/admin/users", "admin-users"], ["/admin/organizations", "admin-orgs"]]) {
+  for (const [width, suffix] of [[1440, ""], [390, "-phone"]]) {
+    await ownerPage.setViewportSize({ width, height: width > 500 ? 900 : 844 })
+    await ownerPage.goto(`${BASE}${path}`)
+    await ownerPage.locator("main h1").first().waitFor({ timeout: 30000 })
+    await ownerPage.waitForLoadState("networkidle")
+    const overflow = await ownerPage.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+    check(`${path} at ${width}px without sideways scrolling`, overflow <= 0, `${overflow}px`)
+    await ownerPage.screenshot({ path: SHOTS + `${name}${suffix}.png`, fullPage: true })
+  }
+}
 await browser.close()
 
 cleanup()

@@ -123,90 +123,99 @@ export function AdminOrganizations() {
           }}
         />
       </div>
-      <div className={isPlaceholderData ? "opacity-60" : undefined}>
-        <Table
-          headers={[
-            "Organization",
-            "Kind",
-            "Members",
-            "Joining",
-            "Created",
-            "",
-          ]}
-        >
-          {data.map((org) => (
-            <tr key={org.id} className={org.active ? "" : "opacity-60"}>
-              <td>
-                <Link
-                  href={orgPages(org.slug).home}
-                  className="font-medium text-ink underline-offset-2 hover:underline"
-                >
-                  {org.name}
-                </Link>
-                {org.signupStatus === "pending" ? (
-                  <span
-                    className="ml-2 text-xs font-semibold text-primary-active"
-                    data-testid="awaiting-approval"
+      {/* No header over nothing: an empty list says so in its place. */}
+      {data.length > 0 && (
+        <div className={isPlaceholderData ? "opacity-60" : undefined}>
+          <Table
+            headers={[
+              "Organization",
+              "Kind",
+              "Members",
+              "Joining",
+              "Created",
+              "",
+            ]}
+          >
+            {data.map((org) => (
+              <tr key={org.id} className={org.active ? "" : "opacity-60"}>
+                <td>
+                  <Link
+                    href={orgPages(org.slug).home}
+                    className="font-medium text-ink underline-offset-2 hover:underline"
                   >
-                    Waiting for approval
-                  </span>
-                ) : (
-                  !org.active && <span className="ml-2 text-xs">Suspended</span>
-                )}
-                {!org.listed && <span className="ml-2 text-xs">Unlisted</span>}
-              </td>
-              <td>{ORG_TYPE[org.type]}</td>
-              <td className="tabular-nums">{org.members}</td>
-              <td className="capitalize">{org.joinPolicy}</td>
-              <td>{formatDate(org.createdAt)}</td>
-              <td className="text-right whitespace-nowrap">
-                {decidesModules && (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => setFeaturesFor(org.id)}
-                  >
-                    Modules
-                  </Button>
-                )}
-                {grantsPlatformPermission(held, "platform.orgs.manage") && (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => setSsoFor(org.id)}
-                  >
-                    SSO domains
-                  </Button>
-                )}
-                {org.active ? (
-                  <ConfirmButton
-                    size="xs"
-                    variant="ghost"
-                    disabled={toggle.isPending}
-                    title={`Suspend ${org.name}?`}
-                    description="Nobody can join, and its members can't use its assignments, contests or management pages until you reactivate it. Nothing is deleted."
-                    confirmLabel="Suspend"
-                    onConfirm={() => toggle.mutate(org)}
-                  >
-                    Suspend
-                  </ConfirmButton>
-                ) : (
-                  <Button
-                    size="xs"
-                    variant={
-                      org.signupStatus === "pending" ? "default" : "ghost"
-                    }
-                    disabled={toggle.isPending}
-                    onClick={() => toggle.mutate(org)}
-                  >
-                    {org.signupStatus === "pending" ? "Approve" : "Reactivate"}
-                  </Button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </Table>
-      </div>
+                    {org.name}
+                  </Link>
+                  {org.signupStatus === "pending" ? (
+                    <span
+                      className="ml-2 text-xs font-semibold text-primary-active"
+                      data-testid="awaiting-approval"
+                    >
+                      Waiting for approval
+                    </span>
+                  ) : (
+                    !org.active && (
+                      <span className="ml-2 text-xs">Suspended</span>
+                    )
+                  )}
+                  {!org.listed && (
+                    <span className="ml-2 text-xs">Unlisted</span>
+                  )}
+                </td>
+                <td>{ORG_TYPE[org.type]}</td>
+                <td className="tabular-nums">{org.members}</td>
+                <td className="capitalize">{org.joinPolicy}</td>
+                <td>{formatDate(org.createdAt)}</td>
+                <td className="text-right whitespace-nowrap">
+                  {decidesModules && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => setFeaturesFor(org.id)}
+                    >
+                      Modules
+                    </Button>
+                  )}
+                  {grantsPlatformPermission(held, "platform.orgs.manage") && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => setSsoFor(org.id)}
+                    >
+                      SSO domains
+                    </Button>
+                  )}
+                  {org.active ? (
+                    <ConfirmButton
+                      size="xs"
+                      variant="ghost"
+                      disabled={toggle.isPending}
+                      title={`Suspend ${org.name}?`}
+                      description="Nobody can join, and its members can't use its assignments, contests or management pages until you reactivate it. Nothing is deleted."
+                      confirmLabel="Suspend"
+                      onConfirm={() => toggle.mutate(org)}
+                    >
+                      Suspend
+                    </ConfirmButton>
+                  ) : (
+                    <Button
+                      size="xs"
+                      variant={
+                        org.signupStatus === "pending" ? "default" : "ghost"
+                      }
+                      disabled={toggle.isPending}
+                      onClick={() => toggle.mutate(org)}
+                    >
+                      {org.signupStatus === "pending"
+                        ? "Approve"
+                        : "Reactivate"}
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </Table>
+        </div>
+      )}
       {found && (
         <Pager
           page={found.page}
@@ -217,7 +226,7 @@ export function AdminOrganizations() {
         />
       )}
       {data.length === 0 && (
-        <p className="mt-3 text-body-sm text-body">
+        <p className="rounded-lg border border-hairline bg-card px-4 py-8 text-center text-body-sm text-body">
           {search ? "No organization matches." : "No organizations yet."}
         </p>
       )}
