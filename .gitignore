@@ -90,3 +90,6 @@ apps/web/.impeccable/mocks/
 apps/web/.impeccable/review/
 apps/web/.impeccable/build/
 apps/web/.impeccable/config.local.json
+
+# Screenshots belong in /tmp/gretlab-e2e, never the project root (a mistyped folder once put them here).
+/*.png

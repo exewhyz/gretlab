@@ -13,7 +13,9 @@ const require = createRequire(ROOT + "apps/web/")
 const { encode } = require("next-auth/jwt")
 const BASE = "http://localhost:3100"
 const SECRET = "e2e-only-secret"
-const SHOTS = process.env.E2E_SCREENSHOTS ?? "/tmp/gretlab-e2e/"
+// E2E_SCREENSHOTS is an on/off switch for the other suites (E2E_SCREENSHOTS=1): only a path names a
+// folder here, or "1" would write 1admin-overview.png into the working directory.
+const SHOTS = (process.env.E2E_SCREENSHOTS ?? "").includes("/") ? process.env.E2E_SCREENSHOTS.replace(/\/?$/, "/") : "/tmp/gretlab-e2e/"
 mkdirSync(SHOTS, { recursive: true })
 const seed = JSON.parse(readFileSync(ROOT + "packages/db/seed-data/content.json", "utf8"))
 const seedQs = seed.units.flatMap((u) => u.questions)
