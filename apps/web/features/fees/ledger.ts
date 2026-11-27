@@ -107,7 +107,13 @@ const forbidden = (what: string) =>
   new ApiError(403, "forbidden", `${what} isn't part of your role.`)
 
 /** The groups a student sits in, in this organization. */
-async function groupsOf(ctx: OrgContext, studentId: string) {
+/** What the ledger needs of an organization; an OrgContext is one, and so is a webhook's. */
+export interface FeeScope {
+  org: { id: string }
+  groups: { id: string; parentId: string | null }[]
+}
+
+export async function groupsOf(ctx: FeeScope, studentId: string) {
   const ids = new Set(ctx.groups.map((g) => g.id))
   const rows = await getDb()
     .select({ groupId: groupMembers.groupId })
@@ -117,7 +123,7 @@ async function groupsOf(ctx: OrgContext, studentId: string) {
 }
 
 /** Those groups and every group above them. */
-function withAncestors(ctx: OrgContext, groupIds: string[]) {
+function withAncestors(ctx: FeeScope, groupIds: string[]) {
   const parent = new Map(ctx.groups.map((g) => [g.id, g.parentId]))
   const all = new Set<string>()
   for (const g of groupIds) {
@@ -138,7 +144,7 @@ function mayFor(ctx: OrgContext, permission: Permission, groupIds: string[]) {
   )
 }
 
-async function student(ctx: OrgContext, studentId: string) {
+export async function student(ctx: FeeScope, studentId: string) {
   const [row] = await getDb()
     .select({
       id: users.id,
@@ -163,7 +169,7 @@ async function student(ctx: OrgContext, studentId: string) {
 }
 
 /** Everything a ledger is worked out from, for one student. */
-async function ledgersFor(ctx: OrgContext, studentId: string) {
+export async function ledgersFor(ctx: FeeScope, studentId: string) {
   const db = getDb()
   const groups = await groupsOf(ctx, studentId)
   const reach = withAncestors(ctx, groups)
@@ -399,7 +405,7 @@ export interface ReceiptSnapshot {
 }
 
 /** The next receipt number for this financial year, taken under the counter's row lock. */
-async function nextReceipt(
+export async function nextReceipt(
   tx: Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0],
   orgId: string,
   prefix: string,

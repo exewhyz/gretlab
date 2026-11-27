@@ -8,6 +8,8 @@
  *   node e2e/fees.mjs http://localhost:3100 /tmp/gretlab-e2e/
  */
 import { execFileSync } from "node:child_process"
+import { createHmac, randomBytes } from "node:crypto"
+import { createServer } from "node:http"
 import { mkdirSync } from "node:fs"
 import { createRequire } from "node:module"
 
@@ -26,6 +28,25 @@ const check = (name, ok, detail = "") => {
   if (!ok) failures++
 }
 const psql = (q) => execFileSync("docker", ["compose", "-f", ROOT + "docker-compose.yml", "exec", "-T", "postgres", "psql", "-U", "gretlab", "-d", DB, "-Atqc", q]).toString().trim()
+// ---------- a fake Razorpay that knows only the college's own keys
+const FEE_KEY = "rzp_test_feecollege", FEE_SECRET = "fee-secret-123", FEE_HOOK = "fee-hook-456"
+const orders = []
+const fake = createServer((req, res) => {
+  let body = ""
+  req.on("data", (c) => (body += c))
+  req.on("end", () => {
+    if (req.method !== "POST" || req.url !== "/v1/orders" || req.headers.authorization !== `Basic ${Buffer.from(`${FEE_KEY}:${FEE_SECRET}`).toString("base64")}`) {
+      res.writeHead(401, { "content-type": "application/json" }).end(JSON.stringify({ error: { description: "Authentication failed" } }))
+      return
+    }
+    const order = { id: `order_${randomBytes(7).toString("hex")}`, ...JSON.parse(body), status: "created" }
+    orders.push(order)
+    res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(order))
+  })
+})
+await new Promise((r) => fake.listen(3197, "127.0.0.1", r))
+const hmac = (secret, text) => createHmac("sha256", secret).update(text).digest("hex")
+
 const cleanup = () => {
   psql(`delete from organizations where slug in ('fee-college','fee-co','fee-other')`)
   psql(`delete from users where email like 'fee-%'`)
@@ -161,6 +182,33 @@ check("removing them puts the fees back", (await fees(owner, "fee-s2")).json.pla
 check("concessions are in the activity log", psql(`select count(*) from audit_log where org_id='${orgId}' and action='fees.concession'`) === "4")
 await concede(owner, "fee-s2", { headId: tuition.id, percent: 25, reason: "staff_ward" })
 
+// ---------- paying online, into the college's own Razorpay
+const s1Api = await client("fee-s1@example.com")
+const parent = await client("fee-out@example.com")
+const s1Owes = (await fees(owner, "fee-s1")).json.plans[0].ledger.balance
+const pay = (who, body) => who(`${O}/fees/pay`, { body: { studentId: uid("fee-s1"), planId: plan.id, ...body } })
+check("someone who isn't the student or their parent can't pay", (await pay(parent, { amount: 1000 })).status === 404)
+psql(`insert into guardians(org_id,parent_id,student_id,relation) values ('${orgId}','${uid("fee-out")}','${uid("fee-s1")}','father')`)
+check("more than is owed can't be paid online either", (await pay(s1Api, { amount: s1Owes + 1 })).json?.error?.code === "bad_amount")
+const order = (await pay(s1Api, { amount: 2000 })).json
+check("a student starts paying: an order in the college's own account, at most what's owed", order?.orderId?.startsWith("order_") && order.keyId === FEE_KEY && orders.at(-1)?.amount === 200000, JSON.stringify(order))
+const confirm = (who, body) => who(`${O}/fees/pay/confirm`, { body })
+check("a forged checkout signature is refused", (await confirm(s1Api, { orderId: order.orderId, paymentId: "pay_x1", signature: hmac("wrong", `${order.orderId}|pay_x1`) })).json?.error?.code === "bad_signature")
+const paid = (await confirm(s1Api, { orderId: order.orderId, paymentId: "pay_x1", signature: hmac(FEE_SECRET, `${order.orderId}|pay_x1`) })).json
+check("…the right one applies it, with the next receipt number", paid?.paid === true && /^FC\/2026-27\/\d{6}$/.test(paid.receiptNo), JSON.stringify(paid))
+const again = (await confirm(s1Api, { orderId: order.orderId, paymentId: "pay_x1", signature: hmac(FEE_SECRET, `${order.orderId}|pay_x1`) })).json
+check("…once: confirming again changes nothing", again?.receiptNo === paid.receiptNo && psql(`select count(*) from fee_payments where razorpay_order_id='${order.orderId}' and status='paid'`) === "1")
+check("…and the student owes that much less", (await fees(owner, "fee-s1")).json.plans[0].ledger.balance === s1Owes - 2000)
+const byParent = (await pay(parent, { amount: 1500 })).json
+check("a linked parent pays for their child", byParent?.orderId?.startsWith("order_"), JSON.stringify(byParent))
+const event = JSON.stringify({ event: "payment.captured", payload: { payment: { entity: { id: "pay_x2", order_id: byParent.orderId } } } })
+const hook = (body, signature) => fetch(`${BASE}/api/razorpay/fees/fee-college`, { method: "POST", headers: { "content-type": "application/json", "x-razorpay-signature": signature }, body })
+check("the college's webhook refuses a forged signature", (await hook(event, hmac("wrong", event))).status === 400)
+check("…and applies a payment on its own", (await hook(event, hmac(FEE_HOOK, event))).status === 200 && psql(`select status from fee_payments where razorpay_order_id='${byParent.orderId}'`) === "paid")
+await hook(event, hmac(FEE_HOOK, event))
+check("…once, however often it's sent", psql(`select count(distinct receipt_no) from fee_payments where razorpay_order_id='${byParent.orderId}'`) === "1" && (await fees(owner, "fee-s1")).json.plans[0].ledger.balance === s1Owes - 3500)
+check("online payments are logged as Razorpay's, in the college's log", psql(`select count(*) from audit_log where org_id='${orgId}' and action='fees.paid' and actor_label='Razorpay'`) === "2")
+
 // ---------- the Setup screen
 const browser = await chromium.launch()
 const errors = []
@@ -195,14 +243,14 @@ try {
   await p.getByLabel("Search students").fill("fee-s1")
   await p.getByRole("button", { name: "Fees of fee-s1 Name" }).click()
   await p.getByTestId("student-fees").getByTestId("ledger-row").first().waitFor({ timeout: 15000 })
-  check("a student's fees open in a sheet, with their receipts", (await p.getByTestId("fee-receipt").count()) === 2)
+  check("a student's fees open in a sheet, with their receipts", (await p.getByTestId("fee-receipt").count()) === 4)
   p.context().on("page", (popup) => popup.close().catch(() => {}))
   await p.getByRole("button", { name: "Collect" }).click()
   await p.getByLabel("Amount (₹)").fill("500")
   await p.getByRole("button", { name: "Collect and print receipt" }).click()
-  await p.getByTestId("fee-receipt").nth(2).waitFor({ timeout: 15000 })
+  await p.getByTestId("fee-receipt").nth(4).waitFor({ timeout: 15000 })
   check("…with what concessions it has, and Give a concession", (await p.getByTestId("concessions").count()) === 1 && (await p.getByRole("button", { name: "Give a concession" }).count()) === 1)
-  check("collecting from the page adds the receipt", psql(`select count(*) from fee_payments where student_id='${uid("fee-s1")}' and status='paid'`) === "2")
+  check("collecting from the page adds the receipt", psql(`select count(*) from fee_payments where student_id='${uid("fee-s1")}' and status='paid'`) === "4")
   await p.screenshot({ path: SHOTS + "fees-student.png" })
   const phone = await open("fee-o@example.com", 390)
   await phone.goto(`${BASE}${O}/manage/fees`)
@@ -213,6 +261,7 @@ try {
   check("no page errors", errors.length === 0, errors.join(" | "))
 } finally {
   await browser.close()
+  fake.close()
   cleanup()
 }
 

@@ -25,13 +25,20 @@ export const razorpayReady = () => Boolean(env().keyId && env().keySecret)
 /** The public key, for the browser's checkout. */
 export const razorpayKeyId = () => env().keyId
 
-/** An order for `paise`, tied to our payment row by its receipt. */
-export async function createOrder(input: {
-  paise: number
-  receipt: string
-  notes: Record<string, string>
-}): Promise<{ id: string }> {
-  const { keyId, keySecret, api } = env()
+/**
+ * An order for `paise`, tied to our payment row by its receipt. With `keys`, in an
+ * institution's own Razorpay account (its fees); without, in GretLab's (its plans).
+ */
+export async function createOrder(
+  input: {
+    paise: number
+    receipt: string
+    notes: Record<string, string>
+  },
+  keys?: { keyId: string; keySecret: string }
+): Promise<{ id: string }> {
+  const { api } = env()
+  const { keyId, keySecret } = keys ?? env()
   const res = await fetch(`${api}/v1/orders`, {
     method: "POST",
     headers: {
@@ -69,9 +76,13 @@ function hmacMatches(secret: string, payload: string, signature: string) {
 export const paymentSignatureOk = (
   orderId: string,
   paymentId: string,
-  signature: string
-) => hmacMatches(env().keySecret, `${orderId}|${paymentId}`, signature)
+  signature: string,
+  keySecret = env().keySecret
+) => hmacMatches(keySecret, `${orderId}|${paymentId}`, signature)
 
 /** A webhook's signature (X-Razorpay-Signature): HMAC-SHA256 of the raw body with the webhook secret. */
-export const webhookSignatureOk = (rawBody: string, signature: string) =>
-  hmacMatches(env().webhookSecret, rawBody, signature)
+export const webhookSignatureOk = (
+  rawBody: string,
+  signature: string,
+  webhookSecret = env().webhookSecret
+) => hmacMatches(webhookSecret, rawBody, signature)
