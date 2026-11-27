@@ -6,7 +6,6 @@ import {
   VideoCameraIcon,
 } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import type { KindTerms } from "@workspace/judge"
 import Link from "next/link"
 import { useState } from "react"
 

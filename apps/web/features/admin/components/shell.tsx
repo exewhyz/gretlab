@@ -24,7 +24,6 @@ import {
   NotebookIcon,
   PulseIcon,
   QuestionIcon,
-  ShieldCheckIcon,
   ShapesIcon,
   CpuIcon,
   CurrencyDollarIcon,

@@ -56,8 +56,6 @@ const {
 } = sql
 const raw = sql.sql
 
-const NOBODY = "00000000-0000-0000-0000-000000000000"
-
 export const syllabusSchema = z.object({
   topics: z
     .array(

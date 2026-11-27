@@ -4,24 +4,21 @@ import {
   DotsThreeIcon,
   PencilSimpleIcon,
   PlusIcon,
-  PrinterIcon,
 } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useState } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import {
   Card,
   CardAction,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card"
-import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -66,24 +63,17 @@ import {
   Field,
   FormMessage,
   SelectInput,
-  TextArea,
   TextInput,
 } from "@/components/form"
-import { Loading, PageTitle, Stats } from "@/features/admin/components/shell"
+import { Loading, PageTitle } from "@/features/admin/components/shell"
 import { api, ApiRequestError } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
 import type { ApiResult } from "@/lib/api/types"
 import type { getExam } from "@/features/results/server"
-import type { examResults, reportCard } from "@/features/results/server"
-import type { listExams } from "@/features/results/server"
-import type {
-  addPapers,
-  addTerm,
-  examSettings,
-  setPublished,
-} from "@/features/results/server"
+import type { examResults } from "@/features/results/server"
+import type { addPapers, setPublished } from "@/features/results/server"
 
-import { ExamDialog, Exams } from "./exams-list"
+import { ExamDialog } from "./exams-list"
 import { Paper, RESULT, fmt } from "./results-parts"
 
 export type ExamDetail = ApiResult<typeof getExam>

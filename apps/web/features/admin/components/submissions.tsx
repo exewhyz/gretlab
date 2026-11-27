@@ -13,7 +13,6 @@ import {
   formatRuntime,
   VerdictText,
 } from "@/features/submissions/components/verdict-badge"
-import type { SubmissionRow } from "@/features/submissions/types"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 

@@ -1,10 +1,7 @@
 import {
   getDb,
   organizations,
-  orgMembers,
-  orgRoles,
   payments,
-  roleAssignments,
   sql,
   subscriptions,
   type User,
@@ -27,7 +24,6 @@ import {
 import { z } from "zod"
 
 import { usageOf } from "./limits"
-import { razorpayReady } from "./razorpay"
 import { kindPolicies } from "@/features/orgs/kinds"
 import { needFor, orgContext, writeAudit } from "@/features/orgs/server"
 import { platformCan } from "@/features/platform/access"
@@ -43,7 +39,7 @@ import { likeTerm, paged, type PageQuery } from "@/lib/api/paging"
  * Billing settings over the launch price list. Paying (Razorpay) comes in features/billing/pay.ts.
  */
 
-const { and, eq, exists, ilike, inArray, or, desc, count } = sql
+const { eq, ilike, or, desc, count } = sql
 
 /** The price list in force: the Billing settings over the launch prices. */
 export async function priceList(): Promise<PriceList> {

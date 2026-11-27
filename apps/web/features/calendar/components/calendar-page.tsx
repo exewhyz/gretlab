@@ -10,7 +10,7 @@ import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { ConfirmButton } from "@/components/confirm"
-import { Check, FormMessage, TextInput } from "@/components/form"
+import { Check, FormMessage } from "@/components/form"
 import { Loading } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"

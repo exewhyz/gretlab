@@ -251,7 +251,6 @@ export function TimeChart({
         data={data}
         series={series}
         format={format}
-        long={long}
       />
     </section>
   )
@@ -268,14 +267,12 @@ function TableView({
   data,
   series,
   format,
-  long,
 }: {
   title: string
   hint: string
   data: Point[]
   series: Series[]
   format: (value: unknown) => string
-  long: boolean
 }) {
   const [open, setOpen] = useState(false)
   const rows = data

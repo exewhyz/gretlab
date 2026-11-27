@@ -19,7 +19,7 @@ import { cn } from "@workspace/ui/lib/utils"
 
 import { writeMode, useMode, type Mode } from "./mode"
 import { useContentScope } from "./scope"
-import { useViewer, type Viewer } from "./use-viewer"
+import { useViewer } from "./use-viewer"
 
 interface NavItem {
   href: string

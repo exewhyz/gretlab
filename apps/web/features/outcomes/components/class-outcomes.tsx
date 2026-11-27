@@ -11,7 +11,7 @@ import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 import { EditorSheet } from "@/components/editor-sheet"
-import { FormMessage, SelectInput, TextInput } from "@/components/form"
+import { SelectInput, TextInput } from "@/components/form"
 import { Loading, Table } from "@/features/admin/components/shell"
 import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"

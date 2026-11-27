@@ -1,6 +1,5 @@
 "use client"
 
-import type { ComponentProps } from "react"
 
 import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
@@ -17,8 +16,8 @@ import { StudentProjects } from "@/features/projects/components/projects"
 import { ClassChips } from "@/features/classes/components/class-chips"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
-import { ExamPanel, type SittingView } from "@/features/exams/components/exam"
-import { QuizSection, type QuizQuestionView } from "./quiz"
+import { ExamPanel } from "@/features/exams/components/exam"
+import { QuizSection } from "./quiz"
 import type { ApiResult } from "@/lib/api/types"
 import type {
   getAssignment,

@@ -17,7 +17,6 @@ import {
   type QuizQuestionView,
 } from "@/features/assignments/components/quiz"
 import { api } from "@/lib/api/client"
-import { formatDate } from "@/lib/format"
 import { orgPages } from "@/lib/paths"
 import type { ApiResult } from "@/lib/api/types"
 import type { checkpointView } from "@/features/courses/checkpoints"

@@ -8,7 +8,7 @@ import {
   users,
   type User,
 } from "@workspace/db"
-import { enabledModules, seatsLeft, stopsProblem } from "@workspace/judge"
+import { seatsLeft, stopsProblem } from "@workspace/judge"
 import { z } from "zod"
 
 import {

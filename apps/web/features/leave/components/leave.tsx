@@ -21,12 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@workspace/ui/components/empty"
+import { Empty, EmptyHeader, EmptyTitle } from "@workspace/ui/components/empty"
 import {
   Tabs,
   TabsContent,
@@ -50,8 +45,6 @@ import type { leaveHome } from "@/features/leave/server"
 import type { leaveTypes, listRequests } from "@/features/leave/server"
 
 type Request = ApiResult<typeof listRequests>["requests"][number]
-
-type LeaveType = ApiResult<typeof leaveTypes>["types"][number]
 
 type Home = ApiResult<typeof leaveHome>
 

@@ -13,7 +13,7 @@ import { marksItself, type QuestionInput } from "./schemas"
  * matches it, so another owner's ids aren't found.
  */
 
-const { and, asc, eq, inArray, isNull, or } = sql
+const { and, asc, eq, inArray, isNull } = sql
 
 const ownedBy = (orgId: string | null) =>
   orgId === null ? isNull(questions.orgId) : eq(questions.orgId, orgId)

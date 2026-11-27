@@ -12,7 +12,6 @@ import {
 } from "@workspace/db"
 import {
   deliveryFor,
-  enabledModules,
   eventOfKind,
   readPreferences,
   type EventPolicy,

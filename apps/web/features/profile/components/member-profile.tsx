@@ -385,7 +385,8 @@ function EditDetails({
   const [error, setError] = useState<string | null>(null)
   const save = useMutation({
     mutationFn: () => {
-      const { employeeId, ...rest } = form
+      // Without the staff number, which only some may change.
+      const { employeeId: _employeeId, ...rest } = form
       return api<Profile>(`/orgs/${slug}/profile/${id}`, {
         method: "PATCH",
         body: profile.can.editStaffNumber ? form : rest,

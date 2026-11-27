@@ -1,7 +1,6 @@
 "use client"
 
 import { SecretValue } from "@/components/secret-value"
-import { CopyIcon } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 

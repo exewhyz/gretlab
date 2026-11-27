@@ -8,7 +8,7 @@ import {
   TrophyIcon,
 } from "@phosphor-icons/react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
-import { ORG_TYPE_CONFIG, type OrgType } from "@workspace/judge"
+import { ORG_TYPE_CONFIG } from "@workspace/judge"
 import Link from "next/link"
 
 import { Badge } from "@workspace/ui/components/badge"

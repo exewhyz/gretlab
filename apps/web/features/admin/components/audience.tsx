@@ -13,13 +13,6 @@ import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import type { listGroups, previewAudience } from "@/features/orgs/server"
 
-interface Group {
-  id: string
-  name: string
-  parentId: string | null
-  depth: number
-}
-
 /**
  * Who something is for. Each box is a condition met by being in any ticked group (or one
  * inside it); a person must meet every box. One box with "3rd Year", another with "CAC":

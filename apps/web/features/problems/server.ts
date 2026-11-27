@@ -36,7 +36,13 @@ import type { ProblemInput } from "./schemas"
 import { readProblemFile, slugFor, toProblemInput } from "./import"
 import { usableBy } from "@/features/library/sharing"
 import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
-import { claimSlug, currentSlug, formerSlugsLike, recordSlugChange, slugIs } from "./slugs"
+import {
+  claimSlug,
+  currentSlug,
+  formerSlugsLike,
+  recordSlugChange,
+  slugIs,
+} from "./slugs"
 
 const { and, asc, count, desc, eq, gt, inArray, isNull, lte, or } = sql
 
@@ -290,7 +296,7 @@ export async function getProblemBySlug(slug: string) {
 
 /* ---------- staff ---------- */
 
-function refreshPublicPages(slug?: string) {
+function refreshPublicPages(_slug?: string) {
   // Public pages are cached; refresh them now rather than at the next timed revalidate.
   revalidatePath("/problems", "layout")
 }

@@ -12,7 +12,6 @@ import {
   applicationProblem,
   APPLICATION_STATUSES,
   canMoveTo,
-  enabledModules,
   nextApplicationNo,
   OPEN_STATUSES,
   readAdmissionSettings,

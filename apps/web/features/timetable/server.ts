@@ -10,7 +10,6 @@ import {
   type User,
 } from "@workspace/db"
 import {
-  enabledModules,
   readTimetableSettings,
   teacherClash,
   validPeriod,

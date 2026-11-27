@@ -79,16 +79,6 @@ const TONE: Record<Status, string> = {
   on_leave: "text-muted-foreground",
 }
 
-interface Counts {
-  present: number
-  late: number
-  half: number
-  absent: number
-  leave: number
-  marked: number
-  percent: number | null
-}
-
 type Register = ApiResult<typeof staffRegister>
 
 /** Manage › Staff attendance: a day's register and the month. */

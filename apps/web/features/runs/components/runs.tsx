@@ -1,7 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import type { KindTerms, RunState } from "@workspace/judge"
+import type { RunState } from "@workspace/judge"
 import Link from "next/link"
 import { useState } from "react"
 

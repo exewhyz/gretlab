@@ -48,13 +48,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react"
 import { useQuery } from "@tanstack/react-query"
-import {
-  accentVars,
-  KINDS,
-  ORG_NAV,
-  visibleOrgNav,
-  type OrgType,
-} from "@workspace/judge"
+import { accentVars, KINDS, ORG_NAV, visibleOrgNav } from "@workspace/judge"
 import { usePathname } from "next/navigation"
 import { useEffect, type ReactNode } from "react"
 

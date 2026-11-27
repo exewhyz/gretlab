@@ -16,7 +16,6 @@ import {
   countsAsPresent,
   eligibility,
   readAttendanceSettings,
-  enabledModules,
   summarizeAttendance,
   type AttendanceStatus,
 } from "@workspace/judge"

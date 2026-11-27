@@ -19,7 +19,6 @@ import {
 import {
   summarizeAttendance,
   coAttainment,
-  enabledModules,
   poAttainment,
   type Audience,
   type OutcomeMarks,

@@ -27,7 +27,7 @@ import { ClassChips } from "@/features/classes/components/class-chips"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
 
-import { ContestQuestions, type ContestQuestion } from "./contest-questions"
+import { ContestQuestions } from "./contest-questions"
 import { ContestReplay } from "./contest-replay"
 import { Countdown } from "./countdown"
 import { PhaseBadge } from "./contest-list"

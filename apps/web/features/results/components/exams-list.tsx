@@ -1,15 +1,9 @@
 "use client"
 
-import {
-  DotsThreeIcon,
-  PencilSimpleIcon,
-  PlusIcon,
-  PrinterIcon,
-} from "@phosphor-icons/react"
+import { PencilSimpleIcon, PlusIcon } from "@phosphor-icons/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { useState } from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
@@ -21,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card"
-import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -31,57 +24,25 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu"
-import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@workspace/ui/components/empty"
-import { Progress } from "@workspace/ui/components/progress"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@workspace/ui/components/tabs"
-import { cn } from "@workspace/ui/lib/utils"
 
-import { ConfirmDialog } from "@/components/confirm"
 import {
-  Check,
   Field,
   FormMessage,
   SelectInput,
   TextArea,
   TextInput,
 } from "@/components/form"
-import { Loading, PageTitle, Stats } from "@/features/admin/components/shell"
-import { api, ApiRequestError } from "@/lib/api/client"
+import { Loading, PageTitle } from "@/features/admin/components/shell"
+import { api } from "@/lib/api/client"
 import { orgPages } from "@/lib/paths"
 import type { ApiResult } from "@/lib/api/types"
-import type { getExam } from "@/features/results/server"
-import type { examResults, reportCard } from "@/features/results/server"
 import type { listExams } from "@/features/results/server"
-import type {
-  addPapers,
-  addTerm,
-  examSettings,
-  setPublished,
-} from "@/features/results/server"
+import type { addTerm, examSettings } from "@/features/results/server"
 
 import { Band, ExamItem, Term, shortDate } from "./results-parts"
 

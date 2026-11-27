@@ -2,18 +2,54 @@ import { createRequire } from "node:module"
 import babelParser from "@babel/eslint-parser"
 import js from "@eslint/js"
 import eslintConfigPrettier from "eslint-config-prettier"
-import onlyWarn from "eslint-plugin-only-warn"
 import turboPlugin from "eslint-plugin-turbo"
 import tseslint from "typescript-eslint"
 
 const require = createRequire(import.meta.url)
 
 /**
+ * Rules that fail lint (and so CI). Everything else only warns: these are the ones whose
+ * findings crash a page or break behaviour, never style.
+ */
+export const FAILING_RULES = ["react-hooks/rules-of-hooks"]
+
+const asWarning = (setting) => {
+  const level = Array.isArray(setting) ? setting[0] : setting
+  const next = level === 2 || level === "error" ? "warn" : level
+  return Array.isArray(setting) ? [next, ...setting.slice(1)] : next
+}
+
+/**
+ * The configs with every rule downgraded to a warning except FAILING_RULES, which are errors.
+ * (It replaced eslint-plugin-only-warn, which downgraded every rule with no exceptions.)
+ *
+ * @param {import("eslint").Linter.Config[]} configs
+ * @returns {import("eslint").Linter.Config[]}
+ */
+export function warnExceptFailing(configs) {
+  return [
+    ...configs.map((c) =>
+      c.rules
+        ? {
+            ...c,
+            rules: Object.fromEntries(
+              Object.entries(c.rules).map(([rule, setting]) => [
+                rule,
+                FAILING_RULES.includes(rule) ? setting : asWarning(setting),
+              ])
+            ),
+          }
+        : c
+    ),
+  ]
+}
+
+/**
  * A shared ESLint configuration for the repository.
  *
  * @type {import("eslint").Linter.Config[]}
  */
-export const config = [
+export const config = warnExceptFailing([
   // TypeScript too: without this, ESLint checks only .js files and skipped the whole app.
   { files: ["**/*.{js,mjs,cjs,jsx,ts,tsx}"] },
   js.configs.recommended,
@@ -58,11 +94,6 @@ export const config = [
     },
   },
   {
-    plugins: {
-      onlyWarn,
-    },
-  },
-  {
     ignores: ["dist/**"],
   },
-]
+])

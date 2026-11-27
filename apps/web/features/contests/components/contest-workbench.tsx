@@ -9,11 +9,6 @@ import { useViewer } from "@/features/account/use-viewer"
 import { Loading } from "@/features/admin/components/shell"
 import { ProblemView } from "@/features/lab/components/problem-view"
 import { Workbench } from "@/features/lab/components/workbench"
-import type {
-  ProblemDetail,
-  ProblemSummary,
-  QuestionStatus,
-} from "@/features/lab/types"
 import { api } from "@/lib/api/client"
 
 import { Countdown } from "./countdown"

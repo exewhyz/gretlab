@@ -4,10 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 
 import { Card, Loading } from "@/features/admin/components/shell"
-import {
-  CampusSummary,
-  type CampusData,
-} from "@/features/campus/components/campus"
+import { CampusSummary } from "@/features/campus/components/campus"
 import { WeekGrid } from "@/features/timetable/components/timetable"
 import { api } from "@/lib/api/client"
 import { formatDateTime } from "@/lib/format"
@@ -50,14 +47,6 @@ export function MyChildren() {
       )}
     </>
   )
-}
-
-interface Period {
-  id: string
-  name: string
-  starts: string
-  ends: string
-  isBreak: boolean
 }
 
 type Overview = ApiResult<typeof childOverview>

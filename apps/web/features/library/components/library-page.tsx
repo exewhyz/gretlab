@@ -69,11 +69,6 @@ interface LibraryQuestion extends Base {
 }
 type Library = ApiResult<typeof orgLibrary>
 
-const SOURCE_LABEL: Record<Source, string> = {
-  ours: "Ours",
-  platform: "Platform",
-  shared: "Shared with us",
-}
 const SHARING_LABEL: Record<Sharing, string> = {
   everyone: "Every college",
   selected: "Chosen",

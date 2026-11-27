@@ -298,9 +298,6 @@ importers:
       eslint-config-prettier:
         specifier: ^10.1.8
         version: 10.1.8(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))
-      eslint-plugin-only-warn:
-        specifier: ^1.2.1
-        version: 1.2.1
       eslint-plugin-react-hooks:
         specifier: ^7.1.1
         version: 7.1.1(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)
@@ -3787,9 +3784,6 @@ packages:
     hasBin: true
     peerDependencies:
       eslint: '>=7.0.0'
-
-  eslint-plugin-only-warn@1.2.1:
-    resolution: {integrity: sha512-j37hwfaQDEOfkZ1Dpvu/HnWLavlzQxQxfbrU/9Jb4R9qzrE1eTYuRJyrxq7LzLRI8miG5FOV6veoUVhx7AI84w==}
 
   eslint-plugin-react-hooks@7.1.1:
     resolution: {integrity: sha512-f2I7Gw6JbvCexzIInuSbZpfdQ44D7iqdWX01FKLvrPgqxoE7oMj8clOfto8U6vYiz4yd5oKu39rRSVOe1zRu0g==}
@@ -9375,8 +9369,6 @@ snapshots:
   eslint-config-prettier@10.1.8(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0)):
     dependencies:
       eslint: 10.13.0(jiti@2.7.0)(supports-color@7.2.0)
-
-  eslint-plugin-only-warn@1.2.1: {}
 
   eslint-plugin-react-hooks@7.1.1(eslint@10.13.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0):
     dependencies:

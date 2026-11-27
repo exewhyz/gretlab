@@ -14,7 +14,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState, type ReactNode } from "react"
 
 import { Button } from "@workspace/ui/components/button"
-import { cn } from "@workspace/ui/lib/utils"
 import {
   Dialog,
   DialogContent,

@@ -5,14 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 import { Loading } from "@/features/admin/components/shell"
-import type { SittingView } from "@/features/exams/components/exam"
 import { ProblemView } from "@/features/lab/components/problem-view"
 import { Workbench } from "@/features/lab/components/workbench"
-import type {
-  ProblemDetail,
-  ProblemSummary,
-  QuestionStatus,
-} from "@/features/lab/types"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import type { getAssignmentProblem } from "@/features/assignments/server"

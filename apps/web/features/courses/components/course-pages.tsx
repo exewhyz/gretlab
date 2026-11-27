@@ -625,7 +625,6 @@ function ModuleDialog({
   const [checkpoints, setCheckpoints] = useState<CheckpointDraft[]>(
     module?.checkpoints ?? []
   )
-  const checkpointsOk = checkpoints.every((c) => checkpointProblem(c) === null)
   const [search, setSearch] = useState("")
   const { data: library } = useQuery({
     queryKey: owner.key("library"),

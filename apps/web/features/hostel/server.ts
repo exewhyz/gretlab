@@ -9,12 +9,7 @@ import {
   users,
   type User,
 } from "@workspace/db"
-import {
-  bedLabels,
-  bedsToRemove,
-  enabledModules,
-  roomRun,
-} from "@workspace/judge"
+import { bedLabels, bedsToRemove, roomRun } from "@workspace/judge"
 import { z } from "zod"
 
 import {

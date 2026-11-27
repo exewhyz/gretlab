@@ -34,14 +34,6 @@ import type { ApiResult } from "@/lib/api/types"
 import type { importLinks, searchStudents } from "@/features/parents/server"
 import type { listLinks } from "@/features/parents/server"
 
-interface Link {
-  id: string
-  relation: string
-  parent: { name: string | null; email: string }
-  student: { id: string; name: string; email: string; classes: string[] }
-  canRemove: boolean
-}
-
 type Student = ApiResult<typeof searchStudents>[number]
 
 const RELATIONS = ["Mother", "Father", "Guardian", "Grandparent", "Other"]

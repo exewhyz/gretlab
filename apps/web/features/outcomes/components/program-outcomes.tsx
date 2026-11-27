@@ -1,7 +1,7 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { NBA_PROGRAM_OUTCOMES, type AttainmentRules } from "@workspace/judge"
+import { NBA_PROGRAM_OUTCOMES } from "@workspace/judge"
 import { useState } from "react"
 
 import { Button } from "@workspace/ui/components/button"

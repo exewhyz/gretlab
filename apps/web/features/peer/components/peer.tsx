@@ -25,17 +25,6 @@ import type { myPeerReview } from "@/features/peer/server"
 import type { getReviewTask } from "@/features/peer/server"
 import type { orgPeerOverview, orgStartPeerReview } from "@/features/peer/org"
 
-/*
- * Peer review: the teacher's panel in the gradebook (hand out reviews, read them, hide
- * one), and the student's on the assignment page (reviews to write, reviews received).
- */
-
-interface Settings {
-  reviews: number
-  anonymous: boolean
-  dueAt: string | null
-}
-
 interface Criterion {
   id: string
   label: string

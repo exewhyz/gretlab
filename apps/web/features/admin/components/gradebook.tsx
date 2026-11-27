@@ -55,7 +55,7 @@ import { PeerReviewPanel } from "@/features/peer/components/peer"
 import { ProjectMarking } from "@/features/projects/components/projects"
 
 import { toLocalInput } from "./contests"
-import { Card, Loading, PageTitle, Pager, Stats, Table } from "./shell"
+import { Loading, PageTitle, Pager, Stats, Table } from "./shell"
 import { useDebounced } from "@/lib/use-debounced"
 import type { ApiResult } from "@/lib/api/types"
 import type { orgGradebook } from "@/features/orgs/content"

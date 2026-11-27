@@ -12,7 +12,6 @@ import {
 } from "@workspace/db"
 import {
   checkInStatus,
-  enabledModules,
   readStaffAttendanceSettings,
   readTimetableSettings,
   STAFF_STATUSES,
