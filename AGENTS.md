@@ -1139,8 +1139,12 @@ Status is updated as items ship; anything not ticked has not been built.
 - [x] Test-case groups (subtasks): all-or-nothing groups, later tests skipped once one fails, in the editor, import and results
 - [x] Where code runs in three levels (platform, organization, assignment or contest), Python and JavaScript in the browser, provisional browser grading re-judged by the runners, per-work submission limits; one organization's modules set by the platform; Account › Profile and members' profiles in each organization; toasts, a progress bar, the sidebar footer and logo
 
+**Building now (the owner's decisions, 27 November 2026):** GretLab is sold as an ERP to colleges, universities and coaching institutes, with the coding lab built in.
+- [ ] Fees students pay their institution (taken off hold): heads, yearly plans of instalments, concessions, late fines, collecting at the counter, receipts, online payment into the institution's own Razorpay, reminders, reports. Slices: the rules (`packages/judge/src/fees.ts`, unit-tested: `feeLedger`, `allocatePayment`, `receiptNumber`, `splitWithGst`, `reminderStep`), then setup (heads, plans, settings; migration 0108), the ledger and the counter with receipts, concessions, online payment, the students' and parents' page with reminders, reports, and making the `finance` module ready and sellable.
+- [ ] Universities as a kind of organization, with affiliated colleges under a university (organizations inside organizations), in a plan of their own after fees.
+- [ ] Later: SMS and WhatsApp to students and parents.
+
 **On hold (the owner's decision, November 2026), don't start without asking:**
-- fees that students pay their school (the `finance` module is listed but not ready); organizations paying GretLab for their plans is built (Plans and billing);
 - using Google's sign-in strength (amr/auth_time) in two-factor;
 - SAML sign-on for colleges (the owner's decision, 26 November 2026): OpenID Connect covers Microsoft 365, Google Workspace, Okta and Keycloak; build SAML only when a college that can't use OpenID Connect asks;
 - the AWS scale test (the owner's decision, 27 November 2026): measuring judging across several real EC2 machines (`docs/scaling.md` › What this does not prove) waits until the owner starts it;
