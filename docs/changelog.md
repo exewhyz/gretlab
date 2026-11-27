@@ -28,6 +28,8 @@ aren't listed.
   table.
 - The editor's settings button has a proper icon, and "Reset to the starter code" reads as a menu
   item.
+- Attendance registers (students and staff) colour each mark by what it means: present green,
+  absent red, late or half day ochre, excused or on leave grey, so a register reads at a glance.
 
 ## 26 November 2026
 

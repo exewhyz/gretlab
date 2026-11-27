@@ -38,6 +38,16 @@ type Groups = ApiResult<typeof attendanceGroups>
 
 type Register = ApiResult<typeof getRegister>
 
+// A chosen mark wears its status colour (a tint, the colour around it), never orange,
+// which is for the one action (Save register).
+const MARK_TONE: Record<AttendanceStatus, string> = {
+  present: "border-success/50 bg-success/10 text-success hover:bg-success/15",
+  absent:
+    "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/15",
+  late: "border-chart-4/70 bg-chart-4/15 text-ink hover:bg-chart-4/20",
+  excused: "border-hairline-strong bg-muted text-ink hover:bg-muted",
+}
+
 const STATUSES: { value: AttendanceStatus; label: string; short: string }[] = [
   { value: "present", label: "Present", short: "P" },
   { value: "absent", label: "Absent", short: "A" },
@@ -290,12 +300,17 @@ function RegisterSheet({
                   <Button
                     key={st.value}
                     size="xs"
-                    variant={on ? "default" : "outline"}
+                    variant="outline"
                     aria-pressed={on}
                     aria-label={`${s.name}: ${st.label}`}
                     title={st.label}
                     disabled={!data.canMark}
-                    className={cn("w-9", !on && "text-body")}
+                    className={cn(
+                      "w-9",
+                      on
+                        ? cn("font-semibold", MARK_TONE[st.value])
+                        : "text-body"
+                    )}
                     onClick={() => {
                       setMarks({ ...marks, [s.id]: st.value })
                       setMessage(null)
@@ -445,7 +460,7 @@ export function AttendanceReport({ slug }: { slug: string }) {
             size="sm"
             role="tab"
             aria-selected={view === v}
-            variant={view === v ? "default" : "outline"}
+            variant={view === v ? "secondary" : "outline"}
             onClick={() => setView(v)}
           >
             {v === "month" ? "Month" : "By course"}
@@ -546,7 +561,8 @@ type CourseData = ApiResult<typeof courseAttendance>
 
 const STATUS_TONE = {
   eligible: "",
-  at_risk: "text-primary-active",
+  // Caution: an ochre tint behind ink, since ochre text is too light to read.
+  at_risk: "rounded-sm bg-chart-4/15 text-ink",
   short: "font-semibold text-destructive",
   none: "text-muted-foreground",
 } as const

@@ -60,10 +60,21 @@ const SHORT = Object.fromEntries(
 const LABEL = Object.fromEntries(
   STATUSES.map((s) => [s.value, s.label])
 ) as Record<Status, string>
+// A chosen mark wears its status colour, never orange (that's the Save button's).
+const MARK_TONE: Record<Status, string> = {
+  present: "border-success/50 bg-success/10 text-success hover:bg-success/15",
+  late: "border-chart-4/70 bg-chart-4/15 text-ink hover:bg-chart-4/20",
+  half_day: "border-chart-4/70 bg-chart-4/15 text-ink hover:bg-chart-4/20",
+  absent:
+    "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/15",
+  on_leave: "border-hairline-strong bg-muted text-ink hover:bg-muted",
+}
+
 const TONE: Record<Status, string> = {
   present: "text-success",
-  late: "text-primary-active",
-  half_day: "text-primary-active",
+  // Caution states: an ochre tint behind ink (ochre text is too light to read); never orange.
+  late: "rounded-sm bg-chart-4/15 text-ink",
+  half_day: "rounded-sm bg-chart-4/15 text-ink",
   absent: "text-destructive",
   on_leave: "text-muted-foreground",
 }
@@ -211,7 +222,7 @@ function DayRegister({ slug }: { slug: string }) {
               <div
                 key={s.id}
                 data-testid="staff-row"
-                className="grid gap-2 border-b border-hairline px-4 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_auto_7rem_minmax(0,12rem)] md:items-center"
+                className="grid gap-2 border-b border-hairline px-4 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_auto_8.5rem_minmax(0,12rem)] md:items-center"
               >
                 <div className="min-w-0">
                   <div className="truncate font-medium text-ink">{s.name}</div>
@@ -238,12 +249,17 @@ function DayRegister({ slug }: { slug: string }) {
                       <Button
                         key={st.value}
                         size="xs"
-                        variant={on ? "default" : "outline"}
+                        variant="outline"
                         aria-pressed={on}
                         aria-label={`${s.name}: ${st.label}`}
                         title={st.label}
                         disabled={!data.canMark}
-                        className={cn("min-w-9", !on && "text-body")}
+                        className={cn(
+                          "min-w-9",
+                          on
+                            ? cn("font-semibold", MARK_TONE[st.value])
+                            : "text-body"
+                        )}
                         onClick={() => set(s.id, { status: st.value })}
                       >
                         {st.short}

@@ -167,7 +167,7 @@ export function ReviewRow({
   return (
     <div className="grid gap-1 border-b border-hairline py-2.5 last:border-0 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-3">
       <dt className="text-caption text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 text-body-sm break-words text-ink">{children}</dd>
+      <dd className="min-w-0 text-body-sm wrap-break-word text-ink">{children}</dd>
     </div>
   )
 }
