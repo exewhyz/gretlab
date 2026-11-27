@@ -62,7 +62,7 @@ const cleanup = () => {
 }
 cleanup()
 psql(`insert into users(email,name,role) values ('admin@example.com','Admin','admin') on conflict (email) do nothing`)
-for (const h of ["rf-ref", "rf-owner", "rf-two", "rf-three", "rf-creator", "rf-c-org"]) psql(`insert into users(email,name,role,handle) values ('${h}@example.com','Rf ${h.slice(3)}','student','${h}')`)
+for (const h of ["rf-ref", "rf-owner", "rf-two", "rf-three", "rf-creator", "rf-c-org", "rf-pal", "rf-four"]) psql(`insert into users(email,name,role,handle) values ('${h}@example.com','Rf ${h.slice(3)}','student','${h}')`)
 const admin = await client("admin@example.com")
 const before = (await admin("/admin/settings")).json
 await admin("/admin/settings", { method: "PATCH", body: { "orgs.self_signup": "open", "billing.enabled": true, "billing.gst_registered": false } })
@@ -118,7 +118,7 @@ const full = (await two("/orgs/rf-two/billing/checkout", { body: want })).json
 const coupon = await pay(two, "rf-two", { ...want, coupon: "rf-diwali" }, "pay_rf4")
 const twoId = psql(`select id from organizations where slug = 'rf-two'`)
 check("a coupon takes its discount off, worked out on the server", coupon.order?.total === full.total - Math.round(full.total * 0.1) && psql(`select coupon || ':' || discount from payments where org_id = '${twoId}' and status = 'paid'`) === `RF-DIWALI:${Math.round(full.total * 0.1)}`, `${coupon.order?.total} vs ${full.total}`)
-check("…shown on the invoice", psql(`select invoice->'lines'->1->>'description' from payments where org_id = '${twoId}' and status = 'paid'`) === "Discount (code RF-DIWALI)")
+check("…shown on the invoice", psql(`select invoice->'lines'->1->>'description' from payments where org_id = '${twoId}' and status = 'paid'`) === "Promo code: RF-DIWALI")
 check("…and earns nobody", psql(`select count(*) from referral_earnings where org_id = '${twoId}'`) === "0" && psql(`select referrer_id is null from org_referrals where org_id = '${twoId}'`) === "t")
 await admin("/admin/organizations", { body: { name: "Rf Three", slug: "rf-three", type: "college", ownerEmail: "rf-three@example.com" } })
 const three = await client("rf-three@example.com")
@@ -131,6 +131,42 @@ await admin("/admin/organizations", { body: { name: "Rf Creator Org", slug: "rf-
 const cOrg = await client("rf-c-org@example.com")
 const cPaid = await pay(cOrg, "rf-c-org", want, "pay_rf5")
 check("…the organization made with it, paying, earns them 10%", psql(`select r.amount || ':' || r.percent from referral_earnings r join organizations o on o.id = r.org_id where o.slug = 'rf-c-org'`) === `${Math.floor(cPaid.order.total * 0.1)}:10`)
+
+// ---------- Apply, who a code is for, and codes that combine
+const quote = (api, slug, code, body = want) => api(`/orgs/${slug}/billing/coupon`, { body: { ...body, coupon: code } })
+await mk({ code: "rf-new", kind: "campaign", discountPercent: 15, forOrgs: ["new"] })
+await mk({ code: "rf-back", kind: "campaign", discountPercent: 20, forOrgs: ["inactive"] })
+const threeId = psql(`select id from organizations where slug = 'rf-three'`)
+const threeFull = (await three("/orgs/rf-three/billing/checkout", { body: want })).json
+const q1 = await quote(three, "rf-three", "rf-new")
+check("Apply shows a code's discount and what's left to pay", q1.status === 200 && q1.json?.lines?.length === 1 && q1.json.lines[0].code === "RF-NEW" && q1.json.discount === Math.round(threeFull.total * 0.15) && q1.json.total === threeFull.total - q1.json.discount, JSON.stringify(q1.json))
+check("…without making an order or attributing the organization", psql(`select count(*) from payments where org_id = '${threeId}' and coupon = 'RF-NEW'`) === "0" && psql(`select count(*) from org_referrals where org_id = '${threeId}'`) === "0")
+const notInactive = await quote(three, "rf-three", "rf-back")
+check("a code for inactive organizations is refused for a new one, saying who it's for", notInactive.status === 400 && notInactive.json?.error?.message === "This code is for inactive organizations.", JSON.stringify(notInactive.json))
+check("an unknown code is refused", (await quote(three, "rf-three", "rf-nothing")).json?.error?.message === "There's no such code.")
+check("Apply needs a code", (await quote(three, "rf-three", " ")).status === 400)
+const bigger = { ...want, students: 150 }
+const notNew = await quote(two, "rf-two", "rf-new", bigger)
+check("a code for new organizations is refused for one that has paid", notNew.status === 400 && notNew.json?.error?.message === "This code is for new organizations.", JSON.stringify(notNew.json))
+psql(`update subscriptions set status = 'past_due' where org_id = '${twoId}'`)
+check("…and a code for inactive ones works once its plan is past due", (await quote(two, "rf-two", "rf-back", bigger)).json?.lines?.[0]?.code === "RF-BACK")
+psql(`update subscriptions set status = 'active' where org_id = '${twoId}'`)
+await mk({ code: "rf-pal", kind: "creator", ownerEmail: "rf-pal@example.com", percent: 5, discountPercent: 10 })
+await mk({ code: "rf-plus", kind: "campaign", discountPercent: 5, combines: true })
+await mk({ code: "rf-solo", kind: "campaign", discountPercent: 5, combines: false })
+await admin("/admin/organizations", { body: { name: "Rf Four", slug: "rf-four", type: "college", ownerEmail: "rf-four@example.com", referralCode: "rf-pal" } })
+const four = await client("rf-four@example.com")
+const fourFull = (await four("/orgs/rf-four/billing/checkout", { body: want })).json
+psql(`update payments set status = 'abandoned' where org_id = (select id from organizations where slug = 'rf-four')`)
+const plus = (await quote(four, "rf-four", "rf-plus")).json
+const ref10 = Math.round((fourFull.total / 0.9) * 0.1)
+check("a code that combines adds to the referral discount", plus?.lines?.map((l) => l.code).join() === "RF-PAL,RF-PLUS" && plus.replaced === false && plus.discount === plus.lines[0].amount + plus.lines[1].amount, JSON.stringify(plus))
+const solo = (await quote(four, "rf-four", "rf-solo")).json
+check("…one that doesn't replaces it, and says so", solo?.lines?.map((l) => l.code).join() === "RF-SOLO" && solo.replaced === true, JSON.stringify(solo))
+check("…and its own referral discount alone is what it had", Math.abs(plus.lines[0].amount - ref10) <= 1, `${plus.lines[0].amount} vs ${ref10}`)
+const paidPlus = await pay(four, "rf-four", { ...want, coupon: "rf-plus" }, "pay_rf6")
+check("paying charges what Apply showed", paidPlus.order?.total === plus.total, `${paidPlus.order?.total} vs ${plus.total}`)
+check("…and the invoice lists each discount", psql(`select string_agg(l->>'description', '|') from payments p, jsonb_array_elements(p.invoice->'lines') l where p.org_id = (select id from organizations where slug = 'rf-four') and p.status = 'paid'`).includes("Referral discount: RF-PAL|Promo code: RF-PLUS"))
 
 // ---------- payouts
 const board = (await admin("/admin/referrals")).json
@@ -175,7 +211,25 @@ try {
   const plan = await open("rf-three@example.com", 1440)
   await plan.goto(`${BASE}/orgs/rf-three/manage/billing`)
   await plan.getByLabel("Referral code or coupon").waitFor({ timeout: 30000 })
-  check("the plan page takes a code", true)
+  await plan.getByLabel("Referral code or coupon").fill("rf-back")
+  await plan.getByRole("button", { name: "Apply" }).click()
+  await plan.getByTestId("coupon-error").waitFor({ timeout: 15000 })
+  check("Apply says why a code can't be used", (await plan.getByTestId("coupon-error").innerText()).includes("inactive organizations"))
+  await plan.getByLabel("Referral code or coupon").fill("rf-new")
+  await plan.getByRole("button", { name: "Apply" }).click()
+  await plan.getByTestId("applied-code").waitFor({ timeout: 15000 })
+  check("an applied code shows with its discount and the total", (await plan.getByTestId("applied-code").innerText()).includes("RF-NEW") && (await plan.getByTestId("coupon-total").innerText()).includes("To pay"))
+  check("…and there's no box for a second code", (await plan.getByLabel("Referral code or coupon").count()) === 0)
+  await plan.getByTestId("applied-code").scrollIntoViewIfNeeded()
+  await plan.screenshot({ path: SHOTS + "coupon-applied.png", fullPage: true })
+  await plan.getByRole("button", { name: "Remove code RF-NEW" }).click()
+  check("Remove brings the box back", (await plan.getByLabel("Referral code or coupon").count()) === 1)
+  await a.goto(`${BASE}/admin/referrals`)
+  await a.getByRole("tab", { name: "Links and coupons" }).click()
+  await a.getByRole("button", { name: "Edit RF-NEW" }).click()
+  await a.getByTestId("code-sheet").waitFor({ timeout: 10000 })
+  check("a code's sheet shows who can use it and whether it combines", await a.getByRole("checkbox", { name: /New/ }).isChecked() && !(await a.getByRole("switch", { name: "Combine with a referral discount" }).isChecked()))
+  await a.screenshot({ path: SHOTS + "referrals-code-rules.png" })
   check("no page errors", errors.length === 0, errors.join(" | "))
 } finally {
   await browser.close()

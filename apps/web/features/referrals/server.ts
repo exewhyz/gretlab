@@ -13,14 +13,18 @@ import {
   organizations,
   payments,
   referralCodes,
+  subscriptions,
   referralEarnings,
   sql,
   users,
   type User,
 } from "@workspace/db"
 import {
+  audienceProblem,
   codeProblem,
-  discountOf,
+  codesDiscount,
+  ORG_STANDINGS,
+  orgStanding,
   earningOf,
   inReferralWindow,
   newReferralCode,
@@ -128,21 +132,47 @@ export async function attribute(
   return true
 }
 
+/** Where an organization stands for a code's "who it's for": new, existing or inactive. */
+async function standingOf(orgId: string) {
+  const db = getDb()
+  const [[paid], [sub]] = await Promise.all([
+    db
+      .select({ id: payments.id })
+      .from(payments)
+      .where(and(eq(payments.orgId, orgId), eq(payments.status, "paid")))
+      .limit(1),
+    db
+      .select({ status: subscriptions.status })
+      .from(subscriptions)
+      .where(eq(subscriptions.orgId, orgId)),
+  ])
+  return orgStanding(Boolean(paid), sub?.status ?? "free")
+}
+
 /**
- * At checkout: the code that applies (one typed now, else the one the organization came
- * with), and the discount it gives on `amount` in its window. A typed code that can't be used is
- * refused; a valid one attributes the organization if nothing has yet.
+ * The discount on one payment of `amount` (before GST), worked out on the server for both
+ * Apply (a preview, `attribute: false`) and Pay. The organization's referral code gives its
+ * discount in its window; one typed code may add to it (`combines`) or replace it, and is
+ * refused when it can't be used now, is the payer's own, or isn't for this organization
+ * (`forOrgs`). A typed code attributes an organization that has no referral yet, at Pay only.
  */
-export async function checkoutReferral(
+export async function priceCodes(
   orgId: string,
   typed: string | null | undefined,
   amount: number,
-  payerId: string
+  payerId: string,
+  { attribute: attributing }: { attribute: boolean }
 ) {
   const settings = await referralSettings()
-  const none = { coupon: null as string | null, discount: 0 }
+  const none = {
+    coupon: null as string | null,
+    discount: 0,
+    lines: [] as { code: string; label: string; amount: number }[],
+    replaced: false,
+  }
+  const text = typed?.trim() ? typed : null
   if (!settings.enabled) {
-    if (typed)
+    if (text)
       throw new ApiError(400, "bad_code", "Codes can't be used right now.")
     return none
   }
@@ -151,26 +181,44 @@ export async function checkoutReferral(
     .select()
     .from(orgReferrals)
     .where(eq(orgReferrals.orgId, orgId))
-  let code = null
-  if (typed) {
-    code = await findCode(typed)
-    if (!code) throw new ApiError(400, "bad_code", "There's no such code.")
-    const problem = codeProblem(code, new Date())
+  const now = new Date()
+  const inWindow = (code: { months: number | null }) =>
+    inReferralWindow(
+      came?.firstPaidAt ?? null,
+      now,
+      code.months ?? settings.months
+    )
+  let promo = null
+  if (text) {
+    promo = await findCode(text)
+    if (!promo) throw new ApiError(400, "bad_code", "There's no such code.")
+    const problem =
+      codeProblem(promo, now) ??
+      (promo.ownerId === payerId ? "You can't use your own code." : null) ??
+      audienceProblem(promo.forOrgs, await standingOf(orgId))
     if (problem) throw new ApiError(400, "bad_code", problem)
-    if (code.ownerId === payerId)
-      throw new ApiError(400, "bad_code", "You can't use your own code.")
-    if (!came) await attribute(orgId, code.code, payerId)
-  } else if (came) {
-    code = await findCode(came.code)
+    if (!came && attributing) await attribute(orgId, promo.code, payerId)
   }
-  if (!code || code.discountPercent <= 0)
-    return { ...none, coupon: code?.code ?? null }
-  const months = code.months ?? settings.months
-  if (!inReferralWindow(came?.firstPaidAt ?? null, new Date(), months))
-    return { ...none, coupon: code.code }
+  // The code the organization came through, unless the typed one is now its referral.
+  const referral =
+    came && came.code !== promo?.code ? await findCode(came.code) : null
+  const result = codesDiscount(
+    amount,
+    // Its own code keeps giving its discount in the window, even once the code is used up.
+    referral && inWindow(referral)
+      ? { code: referral.code, percent: referral.discountPercent }
+      : null,
+    promo && inWindow(promo)
+      ? {
+          code: promo.code,
+          percent: promo.discountPercent,
+          combines: promo.combines,
+        }
+      : null
+  )
   return {
-    coupon: code.code,
-    discount: discountOf(amount, code.discountPercent),
+    coupon: promo?.code ?? referral?.code ?? null,
+    ...result,
   }
 }
 
@@ -313,6 +361,10 @@ export const codeInputSchema = z.object({
   maxUses: z.number().int().min(1).max(1_000_000).nullable(),
   active: z.boolean(),
   note: z.string().trim().max(500),
+  /** Who may type it at checkout (none: everyone). */
+  forOrgs: z.array(z.enum(ORG_STANDINGS)).max(3).default([]),
+  /** Typed at checkout, whether it adds to the organization's referral discount. */
+  combines: z.boolean().default(false),
 })
 
 export async function adminReferrals() {
@@ -334,6 +386,8 @@ export async function adminReferrals() {
         uses: referralCodes.uses,
         active: referralCodes.active,
         note: referralCodes.note,
+        forOrgs: referralCodes.forOrgs,
+        combines: referralCodes.combines,
         createdAt: referralCodes.createdAt,
       })
       .from(referralCodes)
@@ -442,6 +496,8 @@ export async function saveCode(
     maxUses: input.maxUses,
     active: input.active,
     note: input.note,
+    forOrgs: [...new Set(input.forOrgs)],
+    combines: input.combines,
   }
   await db
     .insert(referralCodes)
@@ -451,7 +507,12 @@ export async function saveCode(
     user,
     "referral.code",
     `${existing ? "Changed" : "Made"} the ${input.kind} code ${input.code}`,
-    { code: input.code, discountPercent: input.discountPercent }
+    {
+      code: input.code,
+      discountPercent: input.discountPercent,
+      forOrgs: input.forOrgs,
+      combines: input.combines,
+    }
   )
   return { code: input.code }
 }

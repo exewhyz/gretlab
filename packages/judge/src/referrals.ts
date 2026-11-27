@@ -83,3 +83,70 @@ export function newReferralCode(random: () => number = Math.random) {
     code += ALPHABET[Math.floor(random() * ALPHABET.length)]
   return code
 }
+
+/**
+ * Who a code is for (the owner's decisions, 27 November 2026). An organization is new until its
+ * first payment, existing while a paid plan is active, and inactive once it has paid but its plan
+ * is past due, paused or back to free. A code lists any of them; none listed means everyone.
+ */
+export const ORG_STANDINGS = ["new", "existing", "inactive"] as const
+export type OrgStanding = (typeof ORG_STANDINGS)[number]
+
+export function orgStanding(everPaid: boolean, status: string): OrgStanding {
+  if (!everPaid) return "new"
+  return status === "active" ? "existing" : "inactive"
+}
+
+/** Why a code isn't for this organization, or null when it is. */
+export function audienceProblem(
+  forOrgs: readonly OrgStanding[],
+  standing: OrgStanding
+): string | null {
+  if (forOrgs.length === 0 || forOrgs.includes(standing)) return null
+  const names = ORG_STANDINGS.filter((s) => forOrgs.includes(s))
+  return `This code is for ${names.join(" or ")} organizations.`
+}
+
+export interface DiscountLine {
+  code: string
+  label: string
+  amount: number
+}
+
+/**
+ * The discount on one payment. `referral` is the code the organization came through (when it
+ * still gives a discount), `promo` the one code typed at checkout. A promo code that combines
+ * adds to the referral discount (never past the amount); one that doesn't replaces it. The same
+ * code typed again counts once.
+ */
+export function codesDiscount(
+  amount: number,
+  referral: { code: string; percent: number } | null,
+  promo: { code: string; percent: number; combines: boolean } | null
+): { discount: number; lines: DiscountLine[]; replaced: boolean } {
+  const lines: DiscountLine[] = []
+  const ref =
+    referral && referral.percent > 0 ? discountOf(amount, referral.percent) : 0
+  // A typed code that gives nothing (a creator's link) leaves the referral discount as it is.
+  const typed =
+    promo && promo.code !== referral?.code && promo.percent > 0 ? promo : null
+  let replaced = false
+  if (ref > 0 && (!typed || typed.combines))
+    lines.push({
+      code: referral!.code,
+      label: "Referral discount",
+      amount: ref,
+    })
+  else if (ref > 0 && typed) replaced = true
+  if (typed) {
+    const left = amount - lines.reduce((n, l) => n + l.amount, 0)
+    const off = Math.min(left, discountOf(amount, typed.percent))
+    if (off > 0)
+      lines.push({ code: typed.code, label: "Promo code", amount: off })
+  }
+  return {
+    discount: lines.reduce((n, l) => n + l.amount, 0),
+    lines,
+    replaced,
+  }
+}

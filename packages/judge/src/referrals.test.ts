@@ -8,6 +8,9 @@ import {
   inReferralWindow,
   newReferralCode,
   normalizeCode,
+  audienceProblem,
+  codesDiscount,
+  orgStanding,
 } from "./referrals.ts"
 
 const NOW = new Date("2026-11-26T10:00:00Z")
@@ -87,4 +90,100 @@ test("new codes: eight characters, no look-alikes (0, O, 1, I, L)", () => {
     seen.add(c)
   }
   assert.ok(seen.size > 190)
+})
+
+test("where an organization stands: new until it pays, then existing while active, else inactive", () => {
+  assert.equal(orgStanding(false, "free"), "new")
+  assert.equal(orgStanding(false, "custom"), "new")
+  assert.equal(orgStanding(true, "active"), "existing")
+  assert.equal(orgStanding(true, "past_due"), "inactive")
+  assert.equal(orgStanding(true, "paused"), "inactive")
+  assert.equal(orgStanding(true, "free"), "inactive")
+})
+
+test("a code for some organizations refuses the others, saying who it's for", () => {
+  assert.equal(audienceProblem([], "inactive"), null)
+  assert.equal(audienceProblem(["new"], "new"), null)
+  assert.equal(
+    audienceProblem(["new"], "existing"),
+    "This code is for new organizations."
+  )
+  assert.equal(
+    audienceProblem(["new", "inactive"], "existing"),
+    "This code is for new or inactive organizations."
+  )
+  assert.equal(audienceProblem(["existing", "inactive"], "inactive"), null)
+})
+
+test("with no promo code, the referral discount alone", () => {
+  assert.deepEqual(codesDiscount(1000, { code: "REF", percent: 10 }, null), {
+    discount: 100,
+    lines: [{ code: "REF", label: "Referral discount", amount: 100 }],
+    replaced: false,
+  })
+  assert.deepEqual(codesDiscount(1000, null, null), {
+    discount: 0,
+    lines: [],
+    replaced: false,
+  })
+})
+
+test("a promo code that combines adds to the referral discount, never past the price", () => {
+  const both = codesDiscount(
+    1000,
+    { code: "REF", percent: 10 },
+    { code: "SALE", percent: 20, combines: true }
+  )
+  assert.equal(both.discount, 300)
+  assert.deepEqual(
+    both.lines.map((l) => l.code),
+    ["REF", "SALE"]
+  )
+  assert.equal(
+    codesDiscount(
+      1000,
+      { code: "REF", percent: 60 },
+      { code: "SALE", percent: 70, combines: true }
+    ).discount,
+    1000
+  )
+})
+
+test("a promo code that doesn't combine replaces the referral discount", () => {
+  const one = codesDiscount(
+    1000,
+    { code: "REF", percent: 10 },
+    { code: "SALE", percent: 5, combines: false }
+  )
+  assert.equal(one.discount, 50)
+  assert.deepEqual(one.lines, [
+    { code: "SALE", label: "Promo code", amount: 50 },
+  ])
+  assert.equal(one.replaced, true)
+  // Without a referral discount there's nothing to replace.
+  assert.equal(
+    codesDiscount(1000, null, { code: "SALE", percent: 5, combines: false })
+      .replaced,
+    false
+  )
+})
+
+test("the referral code typed again counts once", () => {
+  const same = codesDiscount(
+    1000,
+    { code: "REF", percent: 10 },
+    { code: "REF", percent: 10, combines: true }
+  )
+  assert.equal(same.discount, 100)
+  assert.equal(same.lines.length, 1)
+})
+
+test("a typed code with no discount of its own leaves the referral discount alone", () => {
+  const r = codesDiscount(
+    1000,
+    { code: "REF", percent: 10 },
+    { code: "CREATOR", percent: 0, combines: false }
+  )
+  assert.equal(r.discount, 100)
+  assert.equal(r.replaced, false)
 })

@@ -20,6 +20,7 @@ import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import { formatDate, formatDateTime } from "@/lib/format"
 import type { orgBilling } from "@/features/billing/server"
+import type { previewCoupon } from "@/features/billing/pay"
 
 import { PERIOD_LABEL, PlanBuilder, rupees } from "./plan-builder"
 
@@ -401,6 +402,9 @@ function LimitNote({ limits }: { limits: NonNullable<Billing["limits"]> }) {
   )
 }
 
+/** What Apply answers: the discount lines and the total, worked out on the server. */
+type CouponQuote = ApiResult<typeof previewCoupon>
+
 type Checkout =
   | { scheduled: true; from: string }
   | {
@@ -483,7 +487,7 @@ function PayButton({
 }: {
   slug: string
   choice: PlanChoice
-  /** A referral code or coupon, worked out on the server. */
+  /** The one code applied (after Apply), or "". Its discount is worked out on the server. */
   coupon: string
   onCoupon: (code: string) => void
   mode: "pay" | "renew" | "same"
@@ -493,10 +497,35 @@ function PayButton({
     text: string
     kind: "ok" | "err"
   } | null>(null)
+  const client = useQueryClient()
+  const [draft, setDraft] = useState("")
+  const quoteKey = ["billing", slug, "coupon", coupon, choice]
+  const ask = (code: string) =>
+    api<CouponQuote>(`/orgs/${slug}/billing/coupon`, {
+      body: { ...choice, coupon: code },
+    })
+  // Apply checks one code; once it's applied, the box gives way to the code and its discount.
+  const apply = useMutation({
+    mutationFn: (code: string) => ask(code),
+    onSuccess: (quote, code) => {
+      client.setQueryData(["billing", slug, "coupon", code, choice], quote)
+      onCoupon(code)
+      setDraft("")
+    },
+    meta: { quiet: true },
+  })
+  // The applied code priced again whenever the plan changes, so the total stays true.
+  const quote = useQuery({
+    queryKey: quoteKey,
+    queryFn: () => ask(coupon),
+    enabled: Boolean(coupon) && mode !== "same",
+    retry: false,
+    throwOnError: false,
+  })
   const pay = useMutation({
     mutationFn: async () => {
       const order = await api<Checkout>(`/orgs/${slug}/billing/checkout`, {
-        body: { ...choice, coupon: coupon.trim() || undefined },
+        body: { ...choice, coupon: coupon || undefined },
       })
       if (order.scheduled)
         return `Your new plan starts on ${formatDate(order.from)}. Nothing to pay now.`
@@ -561,16 +590,100 @@ function PayButton({
   })
   return (
     <div className="grid gap-2">
-      <TextInput
-        aria-label="Referral code or coupon"
-        placeholder="Have a code?"
-        value={coupon}
-        onChange={(e) => onCoupon(e.target.value.toUpperCase())}
-        className="font-mono"
-      />
+      {coupon ? (
+        <div
+          data-testid="applied-code"
+          className="grid gap-1 rounded-md border border-hairline bg-canvas-soft px-3 py-2 text-body-sm"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-ink">{coupon}</span>
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label={`Remove code ${coupon}`}
+              onClick={() => {
+                onCoupon("")
+                apply.reset()
+              }}
+            >
+              Remove
+            </Button>
+          </div>
+          {quote.data?.lines.map((line) => (
+            <div
+              key={line.code}
+              className="flex justify-between gap-2 text-caption text-body tabular-nums"
+            >
+              <span>
+                {line.label} ({line.code})
+              </span>
+              <span>−{rupees(line.amount)}</span>
+            </div>
+          ))}
+          {quote.data && quote.data.lines.length === 0 && (
+            <span className="text-caption text-body">
+              This code gives no discount on this plan now.
+            </span>
+          )}
+          {quote.data?.replaced && (
+            <span className="text-caption text-body">
+              It replaces your referral discount.
+            </span>
+          )}
+          {quote.data && (
+            <span
+              data-testid="coupon-total"
+              className="text-caption text-ink tabular-nums"
+            >
+              To pay {rupees(quote.data.total)}, GST included
+            </span>
+          )}
+          {quote.error && (
+            <span className="text-caption text-destructive">
+              {quote.error.message}
+            </span>
+          )}
+        </div>
+      ) : (
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (draft.trim()) apply.mutate(draft.trim())
+          }}
+        >
+          <TextInput
+            aria-label="Referral code or coupon"
+            placeholder="Have a code?"
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value.toUpperCase())
+              apply.reset()
+            }}
+            className="font-mono"
+          />
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={!draft.trim() || apply.isPending || mode === "same"}
+          >
+            {apply.isPending ? "Checking…" : "Apply"}
+          </Button>
+        </form>
+      )}
+      {apply.error && (
+        <span
+          data-testid="coupon-error"
+          className="text-caption text-destructive"
+        >
+          {apply.error.message}
+        </span>
+      )}
       <Button
         onClick={() => pay.mutate()}
-        disabled={pay.isPending || mode === "same"}
+        disabled={
+          pay.isPending || mode === "same" || (Boolean(coupon) && quote.isError)
+        }
         data-testid="pay"
         className="w-full"
       >

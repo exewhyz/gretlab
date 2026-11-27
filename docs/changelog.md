@@ -8,6 +8,15 @@ aren't listed.
 
 ## 27 November 2026
 
+### Codes at checkout
+
+- Plan and billing has an **Apply** button for a referral code or coupon: it shows the discount
+  and the total before you pay, or why the code can't be used. One code at a time; **Remove** it to
+  try another.
+- Each coupon can be limited to new, existing or inactive organizations, and can combine with the
+  discount an organization gets from its referral link, or replace it (Dashboard › Referrals).
+- Invoices list each discount on its own line.
+
 ### Clearer pages
 
 - Creating an organization (from the dashboard or by registering a school) says whether its web

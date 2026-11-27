@@ -38,7 +38,7 @@ import {
   writeAudit,
 } from "@/features/orgs/server"
 import { kindPolicies } from "@/features/orgs/kinds"
-import { checkoutReferral, recordEarning } from "@/features/referrals/server"
+import { priceCodes, recordEarning } from "@/features/referrals/server"
 import { getSettings } from "@/features/settings/server"
 import { ApiError, notFound } from "@/lib/api/route"
 import { needWithinLimit } from "@/lib/api/rate-limit"
@@ -91,6 +91,8 @@ type Change = {
   /** Rupees one period of the plan costs (what the subscription records). */
   periodPrice: number
   describe: string
+  /** The discounts taken off, one line each (a referral and a promo code may combine). */
+  discounts?: { code: string; label: string; amount: number }[]
 }
 
 /** Two changes alike (stored ones come back with their keys reordered, so not by text). */
@@ -136,26 +138,18 @@ async function seller() {
   }
 }
 
-/** Starts paying for a plan: the order for the browser's Razorpay checkout, or a plan kept for next period. */
-export async function checkout(
-  slug: string,
-  user: User,
+/**
+ * What a plan choice costs this organization now, before any code: a new or renewed period at
+ * its price, or what's added mid-period for the days left (what's removed waits for renewal).
+ * Writes nothing, so Apply can show it; checkout schedules a smaller plan itself.
+ */
+async function planCharge(
+  ctx: Awaited<ReturnType<typeof billingContext>>,
   input: z.infer<typeof checkoutSchema>
 ) {
-  const ctx = await billingContext(slug, user)
-  // Each attempt makes a Razorpay order: an organization can't flood them.
-  await needWithinLimit("checkout", ctx.org.id)
-  const settings = await getSettings()
-  if (!settings["billing.enabled"])
-    throw new ApiError(409, "billing_off", "Billing isn't switched on.")
-  if (!razorpayReady())
-    throw new ApiError(
-      409,
-      "payments_off",
-      "Paying online isn't set up yet. Contact GretLab to change your plan."
-    )
   const list = await priceList()
-  const { coupon, ...plan } = input
+  const { coupon: _code, ...plan } = input
+  void _code
   const choice: PlanChoice = {
     ...plan,
     features: withNeeds(list, plan.features),
@@ -231,23 +225,9 @@ export async function checkout(
       sub!.periodEnd!,
       now
     )
-    if (due <= 0) {
-      // Smaller: nothing to pay; it starts at the next period.
-      await getDb()
-        .update(subscriptions)
-        .set({
-          next: choice as unknown as Record<string, unknown>,
-          updatedAt: now,
-          updatedBy: user.id,
-        })
-        .where(eq(subscriptions.orgId, ctx.org.id))
-      await writeAudit(
-        ctx,
-        "billing.scheduled",
-        "Chose a smaller plan from the next period"
-      )
-      return { scheduled: true as const, from: sub!.periodEnd!.toISOString() }
-    }
+    // Smaller: nothing to pay; it starts at the next period (checkout schedules it).
+    if (due <= 0)
+      return { smaller: true as const, choice, from: sub!.periodEnd! }
     kind = "upgrade"
     amount = due
     change = {
@@ -278,9 +258,54 @@ export async function checkout(
       describe: describe(choice, start, end),
     }
   }
+  return { smaller: false as const, list, sub, kind, amount, change }
+}
+
+/** Starts paying for a plan: the order for the browser's Razorpay checkout, or a plan kept for next period. */
+export async function checkout(
+  slug: string,
+  user: User,
+  input: z.infer<typeof checkoutSchema>
+) {
+  const ctx = await billingContext(slug, user)
+  // Each attempt makes a Razorpay order: an organization can't flood them.
+  await needWithinLimit("checkout", ctx.org.id)
+  const settings = await getSettings()
+  if (!settings["billing.enabled"])
+    throw new ApiError(409, "billing_off", "Billing isn't switched on.")
+  if (!razorpayReady())
+    throw new ApiError(
+      409,
+      "payments_off",
+      "Paying online isn't set up yet. Contact GretLab to change your plan."
+    )
+  const charge = await planCharge(ctx, input)
+  const now = new Date()
+  if (charge.smaller) {
+    await getDb()
+      .update(subscriptions)
+      .set({
+        next: charge.choice as unknown as Record<string, unknown>,
+        updatedAt: now,
+        updatedBy: user.id,
+      })
+      .where(eq(subscriptions.orgId, ctx.org.id))
+    await writeAudit(
+      ctx,
+      "billing.scheduled",
+      "Chose a smaller plan from the next period"
+    )
+    return { scheduled: true as const, from: charge.from.toISOString() }
+  }
+  const { list, sub, kind, change } = charge
+  let amount = charge.amount
   // A code's discount, worked out here (never by the browser); a typed code may attribute.
-  const referral = await checkoutReferral(ctx.org.id, coupon, amount, user.id)
+  const referral = await priceCodes(ctx.org.id, input.coupon, amount, user.id, {
+    attribute: true,
+  })
   amount -= referral.discount
+  // The invoice lists each discount (a referral and a promo code may combine).
+  if (referral.lines.length) change.discounts = referral.lines
   if (amount <= 0)
     throw new ApiError(
       409,
@@ -363,6 +388,60 @@ export async function checkout(
     name: (await seller()).name,
     description: change.describe.slice(0, 250),
     prefill: { name: user.name ?? "", email: sub?.billingEmail || user.email },
+    total: tax.total,
+  }
+}
+
+/** Apply at checkout: the plan as chosen, and the one code typed. */
+export const couponSchema = checkoutSchema.extend({
+  coupon: z.string().trim().min(1, "Type a code").max(30),
+})
+
+/**
+ * What a code takes off the plan as chosen, before paying: the same price and discount Pay
+ * works out, without making an order or attributing the organization. One code at a time; a
+ * code that can't be used is refused (400 bad_code) with the reason.
+ */
+export async function previewCoupon(
+  slug: string,
+  user: User,
+  input: z.infer<typeof couponSchema>
+) {
+  const ctx = await billingContext(slug, user)
+  // Each Apply counts, so codes can't be guessed in bulk.
+  await needWithinLimit("coupon", ctx.org.id)
+  const settings = await getSettings()
+  if (!settings["billing.enabled"])
+    throw new ApiError(409, "billing_off", "Billing isn't switched on.")
+  const charge = await planCharge(ctx, input)
+  if (charge.smaller)
+    throw new ApiError(
+      409,
+      "nothing_to_pay",
+      "That plan costs nothing now (it starts at renewal), so there's nothing to take a code off."
+    )
+  const codes = await priceCodes(
+    ctx.org.id,
+    input.coupon,
+    charge.amount,
+    user.id,
+    {
+      attribute: false,
+    }
+  )
+  const tax = gstSplit(
+    Math.max(0, charge.amount - codes.discount),
+    await seller(),
+    charge.sub?.gstin || null
+  )
+  return {
+    coupon: codes.coupon,
+    before: charge.amount,
+    discount: codes.discount,
+    lines: codes.lines,
+    replaced: codes.replaced,
+    taxable: tax.taxable,
+    gst: tax.cgst + tax.sgst + tax.igst,
     total: tax.total,
   }
 }
@@ -503,10 +582,17 @@ export async function applyPayment(orderId: string, razorpayPaymentId: string) {
               description: change.describe,
               amount: payment.amount + payment.discount,
             },
-            {
-              description: `Discount (code ${payment.coupon})`,
-              amount: -payment.discount,
-            },
+            ...(change.discounts?.length
+              ? change.discounts.map((d) => ({
+                  description: `${d.label}: ${d.code}`,
+                  amount: -d.amount,
+                }))
+              : [
+                  {
+                    description: `Discount (code ${payment.coupon})`,
+                    amount: -payment.discount,
+                  },
+                ]),
           ]
         : [{ description: change.describe, amount: payment.amount }],
       taxable: payment.amount,

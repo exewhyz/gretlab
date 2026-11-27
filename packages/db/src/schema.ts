@@ -2914,6 +2914,14 @@ export const referralCodes = pgTable(
     months: integer("months"),
     /** Percent off for the organization, in the same window. */
     discountPercent: integer("discount_percent").notNull().default(0),
+    /** Who may type it at checkout: new, existing, inactive (none: everyone). */
+    forOrgs: text("for_orgs")
+      .array()
+      .$type<("new" | "existing" | "inactive")[]>()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    /** Typed at checkout, whether it adds to a referral discount (or replaces it). */
+    combines: boolean("combines").notNull().default(false),
     validFrom: timestamp("valid_from", { withTimezone: true }),
     validTo: timestamp("valid_to", { withTimezone: true }),
     maxUses: integer("max_uses"),

@@ -30,6 +30,7 @@ const MESSAGES: Record<RateLimitAction, string> = {
     "Too many passkey sign-ins from your network. Wait a few minutes and try again.",
   checkout:
     "Too many payments started for this organization. Try again in an hour.",
+  coupon: "Too many codes tried for this organization. Try again in an hour.",
 }
 
 /** Counts one attempt; false when it's past the limit. */

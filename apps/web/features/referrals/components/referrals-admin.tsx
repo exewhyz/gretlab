@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { useState } from "react"
 
+import { ORG_STANDINGS } from "@workspace/judge"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -35,6 +36,20 @@ import { STAGE_LABEL } from "./refer-and-earn"
 
 type Data = ApiResult<typeof adminReferrals>
 type Code = Data["codes"][number]
+
+type Standing = (typeof ORG_STANDINGS)[number]
+
+/** Where an organization stands, for "who can use it" (packages/judge/src/referrals.ts). */
+const STANDING: Record<Standing, string> = {
+  new: "New",
+  existing: "Existing",
+  inactive: "Inactive",
+}
+const STANDING_HELP: Record<Standing, string> = {
+  new: "Has never paid.",
+  existing: "Has paid, and its plan is active.",
+  inactive: "Has paid before; its plan is now past due or paused.",
+}
 
 const KIND_LABEL: Record<string, string> = {
   personal: "Personal link",
@@ -256,6 +271,12 @@ function Codes({ data }: { data: Data }) {
             </td>
             <td className="text-body tabular-nums">
               {c.discountPercent ? `${c.discountPercent}%` : "—"}
+              <span className="block text-caption text-muted-foreground">
+                {c.forOrgs.length
+                  ? `For ${c.forOrgs.map((s) => STANDING[s].toLowerCase()).join(", ")}`
+                  : "For everyone"}
+                {c.combines && " · combines"}
+              </span>
             </td>
             <td className="text-caption text-body">
               {c.validFrom || c.validTo
@@ -323,6 +344,8 @@ function CodeSheet({
     maxUses: code?.maxUses != null ? String(code.maxUses) : "",
     active: code?.active ?? true,
     note: code?.note ?? "",
+    forOrgs: code?.forOrgs ?? ([] as Standing[]),
+    combines: code?.combines ?? false,
   })
   const set = (patch: Partial<typeof form>) => setForm({ ...form, ...patch })
   const save = useMutation({
@@ -340,6 +363,8 @@ function CodeSheet({
           maxUses: intOr(form.maxUses),
           active: form.active,
           note: form.note,
+          forOrgs: form.forOrgs,
+          combines: form.combines,
         },
       }),
     onSuccess: () => {
@@ -445,6 +470,54 @@ function CodeSheet({
           />
         </Field>
       </div>
+      <fieldset className="grid gap-2">
+        <legend className="mb-1 text-body-sm font-medium text-ink">
+          Who can use it at checkout
+        </legend>
+        {ORG_STANDINGS.map((s) => (
+          <label
+            key={s}
+            className="flex items-start gap-2 text-body-sm text-ink"
+          >
+            <Checkbox
+              className="mt-0.5"
+              checked={form.forOrgs.includes(s)}
+              onCheckedChange={(on) =>
+                set({
+                  forOrgs: on
+                    ? [...form.forOrgs, s]
+                    : form.forOrgs.filter((x) => x !== s),
+                })
+              }
+            />
+            <span>
+              {STANDING[s]}
+              <span className="block text-caption text-body">
+                {STANDING_HELP[s]}
+              </span>
+            </span>
+          </label>
+        ))}
+        <span className="text-caption text-body">
+          None ticked: every organization.
+        </span>
+      </fieldset>
+      <label className="flex items-start gap-2 text-body-sm text-ink">
+        <Switch
+          className="mt-0.5"
+          checked={form.combines}
+          onCheckedChange={(on) => set({ combines: on })}
+          aria-label="Combine with a referral discount"
+        />
+        <span>
+          Combine with a referral discount
+          <span className="block text-caption text-body">
+            On: an organization that came through a referral link keeps that
+            discount and gets this one too. Off: this code replaces it for that
+            payment.
+          </span>
+        </span>
+      </label>
       <Field label="Note (for staff)">
         <TextInput
           value={form.note}

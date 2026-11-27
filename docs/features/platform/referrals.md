@@ -40,6 +40,27 @@ Under **Dashboard › Referrals › Links and coupons** (the platform owner):
 A code's discount applies to payments in the same window, comes off before GST, and shows as its
 own line on the invoice. Prices are always worked out on the server.
 
+### Who a code is for, and codes that combine
+
+Each code can also say:
+
+- **Who can use it at checkout:** new organizations (never paid), existing ones (paid, plan
+  active) and inactive ones (paid before, plan now past due or paused), in any mix. None ticked
+  means everyone. A code typed by an organization it isn't for is refused, saying who it's for
+  ("This code is for new organizations.").
+- **Combine with a referral discount:** an organization that came through a referral link gets
+  that link's discount automatically. With this on, a promo code adds its discount on top (never
+  past the price). With it off, the promo code replaces the referral discount for that payment.
+  A typed code that gives no discount of its own never takes the referral discount away.
+
+### Applying a code
+
+On **Manage › Plan and billing**, type the code and press **Apply**. The page shows each discount,
+and what's left to pay with GST, before anything is charged, or why the code can't be used. One
+code at a time: an applied code shows with **Remove**, and the box comes back only once it's
+removed. The total follows any change to the plan. Applying makes no order and doesn't tie the
+organization to the code; paying does. An organization can try 60 codes an hour.
+
 ## Paying out
 
 Earnings are tracked, not paid automatically. **Dashboard › Referrals › Earnings** lists what's

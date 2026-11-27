@@ -30,6 +30,8 @@ export const RATE_LIMITS = {
   passkey: { max: 600, seconds: 15 * 60 },
   /** Payment orders an organization starts (each makes a Razorpay order). */
   checkout: { max: 20, seconds: 60 * 60 },
+  /** Codes an organization tries with Apply at checkout, so codes can't be guessed in bulk. */
+  coupon: { max: 60, seconds: 60 * 60 },
 } as const satisfies Record<string, RateLimit>
 
 export type RateLimitAction = keyof typeof RATE_LIMITS
