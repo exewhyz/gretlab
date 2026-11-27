@@ -1143,12 +1143,13 @@ Status is updated as items ship; anything not ticked has not been built.
 - fees that students pay their school (the `finance` module is listed but not ready); organizations paying GretLab for their plans is built (Plans and billing);
 - using Google's sign-in strength (amr/auth_time) in two-factor;
 - SAML sign-on for colleges (the owner's decision, 26 November 2026): OpenID Connect covers Microsoft 365, Google Workspace, Okta and Keycloak; build SAML only when a college that can't use OpenID Connect asks;
-- converting the screens that still describe their data by hand (about 36 files ask with an inline shape) to `ApiResult<typeof …>` (the owner's decision, 27 November 2026): not even as screens are touched; new screens still take their types from the server;
+- the AWS scale test (the owner's decision, 27 November 2026): measuring judging across several real EC2 machines (`docs/scaling.md` › What this does not prove) waits until the owner starts it;
 
 **Open follow-ups:**
 - Neon (Sydney) is kept frozen read-only as the way back until about 29 November 2026; then the owner deletes it, and the privacy policy's Neon line comes out (bump `LEGAL_UPDATED`). The wider plan (organizations of 200,000 students, judge pools per organization, Redis, a job queue, Cloudflare R2, monitoring, costs) is in the owner's "GretLab Scaling Plan" report.
 - (Fixed, 26 November 2026: the three checks that failed now and then. Drafts were stamped by the web server's clock while exam sittings start by the database's, so a draft saved just before an exam could look newer when the Docker VM's clock fell behind; drafts and their snapshots now take `now()`. A problem's assignments came back in no particular order; now soonest due first. And the problem library crashed for signed-in people on a day without a daily challenge, because `route()` turns a `null` into `{ ok: true }`: `/daily` now answers a real `null`. A handler whose value may be null must answer it itself, as `/daily` does.)
 - Design: `/impeccable doctor` reports the skill's setup gaps.
+- About 36 screens still describe their data by hand where they could take it from the server (`ApiResult<typeof …>`); convert each as it's touched (some reshape data on purpose and keep theirs).
 - The problem library isn't paged on the server; it sends compact rows and pages in the browser. Revisit if a library grows past a few thousand items.
 - Production demo data: the owner resets it with `cd packages/db && DATABASE_URL='<session pooler URL>?sslmode=require' pnpm exec tsx src/demo.ts`, a dry run first, then `DEMO_PASSWORD='<new password>'` and `--wipe=<database name>`. Choose a new password each reset and keep it out of docs and commits.
 
