@@ -4,6 +4,7 @@ import { test } from "node:test"
 import {
   allocatePayment,
   feeLedger,
+  planProblem,
   receiptNumber,
   reminderStep,
   splitWithGst,
@@ -217,4 +218,60 @@ test("reminders: 3 days before, on the day, then weekly while it's owed", () => 
   assert.equal(reminderStep(due, "2026-12-17", 100), "late-1")
   assert.equal(reminderStep(due, "2026-12-24", 100), "late-2")
   assert.equal(reminderStep(due, "2026-12-24", 0), null)
+})
+
+test("a plan needs instalments with real days, known heads and sensible amounts", () => {
+  const ok = {
+    id: "a",
+    label: "Term 1",
+    dueOn: "2026-07-10",
+    lines: [{ headId: "tuition", amount: 100 }],
+    fine: null,
+  }
+  const known = ["tuition"]
+  assert.equal(planProblem([ok], known), null)
+  assert.equal(planProblem([], known), "Add at least one instalment.")
+  assert.equal(
+    planProblem([{ ...ok, label: " " }], known),
+    "Give every instalment a name."
+  )
+  assert.equal(
+    planProblem([{ ...ok, dueOn: "2026-02-30" }], known),
+    "Term 1: the due day isn't a real date."
+  )
+  assert.equal(
+    planProblem([{ ...ok, lines: [] }], known),
+    "Term 1: add at least one fee head."
+  )
+  assert.equal(
+    planProblem([{ ...ok, lines: [{ headId: "x", amount: 1 }] }], known),
+    "Term 1: that fee head isn't one of yours."
+  )
+  assert.equal(
+    planProblem(
+      [
+        {
+          ...ok,
+          lines: [
+            { headId: "tuition", amount: 1 },
+            { headId: "tuition", amount: 2 },
+          ],
+        },
+      ],
+      known
+    ),
+    "Term 1: each fee head once."
+  )
+  assert.equal(
+    planProblem([{ ...ok, lines: [{ headId: "tuition", amount: -1 }] }], known),
+    "Term 1: amounts are whole rupees, 0 or more."
+  )
+  assert.equal(
+    planProblem([ok, { ...ok, id: "a" }], known),
+    "Each instalment once."
+  )
+  assert.equal(
+    planProblem([{ ...ok, fine: { amount: -5, graceDays: 0 } }], known),
+    "Term 1: the fine and its grace are whole numbers, 0 or more."
+  )
 })

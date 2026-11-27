@@ -115,6 +115,12 @@ export const PERMISSIONS = {
       "Link parents to the students of the groups this applies to, and see who they are (Parent accounts module). Grant this, or the finer actions under it.",
     module: "Members",
   },
+  "fees.manage": {
+    label: "Manage fees",
+    description:
+      "Fee heads and plans, collecting fees, concessions and fee reports (Fees module). Grant this, or the finer actions under it.",
+    module: "Fees",
+  },
   "library.manage": {
     label: "Run the library",
     description:
@@ -501,6 +507,34 @@ export const PERMISSIONS = {
       "Approve or refuse staff leave, see everyone's balances, and set the kinds of leave and how many days a year each allows.",
     module: "Members",
     parent: "leave.manage",
+  },
+  "fees.setup": {
+    label: "Set up fees",
+    description:
+      "Fee heads, each year's fee plans, receipt numbering and online payments. Organization-wide.",
+    module: "Fees",
+    parent: "fees.manage",
+  },
+  "fees.collect": {
+    label: "Collect fees",
+    description:
+      "Record payments at the counter for students of the groups this applies to, print receipts, and cancel one with a reason.",
+    module: "Fees",
+    parent: "fees.manage",
+  },
+  "fees.concede": {
+    label: "Give concessions",
+    description:
+      "Give and remove scholarships and concessions for students of the groups this applies to.",
+    module: "Fees",
+    parent: "fees.manage",
+  },
+  "fees.view": {
+    label: "See fees",
+    description:
+      "See the fees, payments and dues of students of the groups this applies to, and the fee reports.",
+    module: "Fees",
+    parent: "fees.manage",
   },
   "org.members.assign_roles": {
     label: "Assign roles",

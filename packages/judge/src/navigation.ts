@@ -25,6 +25,7 @@ export const NAV_GROUPS = [
   "Academics",
   "Every day",
   "Campus",
+  "Fees",
   "Coding lab",
   "School",
 ] as const
@@ -177,6 +178,14 @@ export const ORG_NAV: NavItem[] = [
     group: "Academics",
     anyOf: ["timetable.periods", "timetable.edit"],
     module: "timetable",
+  },
+  {
+    key: "fees",
+    label: "Fees",
+    path: "/fees",
+    group: "Fees",
+    anyOf: ["fees.setup", "fees.collect", "fees.concede", "fees.view"],
+    module: "finance",
   },
   {
     key: "books",

@@ -757,6 +757,13 @@
       "when": 1795756542892,
       "tag": "0107_coupon_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1795760579342,
+      "tag": "0108_fees",
+      "breakpoints": true
     }
   ]
 }

@@ -132,8 +132,9 @@ export const MODULES = {
   },
   finance: {
     label: "Fees and payments",
-    description: "Fee plans, invoices and online payments.",
-    ready: false,
+    description:
+      "Fee heads and yearly plans of instalments, concessions, collecting at the counter with receipts, online payment into your own Razorpay account, reminders and dues reports.",
+    ready: true,
   },
 } as const satisfies Record<
   string,

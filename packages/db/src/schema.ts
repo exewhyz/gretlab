@@ -998,6 +998,18 @@ export const organizations = pgTable("organizations", {
     .notNull()
     .default({}),
   /** Each module's own settings, by module key (e.g. timetable: { days }). */
+  /**
+   * Fees: the receipt prefix, the GSTIN on receipts, and the institution's own Razorpay keys
+   * (secrets sealed, purpose "fees"). Money paid online goes to the institution.
+   */
+  feeSettings: jsonb("fee_settings")
+    .$type<{
+      prefix?: string
+      gstin?: string
+      razorpay?: { keyId: string; keySecret: string; webhookSecret: string }
+    }>()
+    .notNull()
+    .default({}),
   moduleSettings: jsonb("module_settings")
     .$type<Record<string, unknown>>()
     .notNull()
@@ -1227,6 +1239,179 @@ export const libraryBooks = pgTable(
     createdAt: createdAt(),
   },
   (table) => [index("library_books_org").on(table.orgId, table.title)]
+)
+
+/* ---------- Fees (the finance module; rules in packages/judge/src/fees.ts) ---------- */
+
+/** What fees are for: tuition, exam, hostel… An optional GST rate is included in its amounts. */
+export const feeHeads = pgTable(
+  "fee_heads",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    gstRate: integer("gst_rate").notNull().default(0),
+    /** everyone, hostel (residents only) or transport (riders only). */
+    appliesTo: text("applies_to")
+      .$type<"everyone" | "hostel" | "transport">()
+      .notNull()
+      .default("everyone"),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (table) => [uniqueIndex("fee_heads_name").on(table.orgId, sql`lower(name)`)]
+)
+
+/** A year's fees for chosen classes: instalments, each a due day and an amount per head. */
+export const feePlans = pgTable(
+  "fee_plans",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    yearId: uuid("year_id")
+      .notNull()
+      .references(() => academicYears.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** The classes it's for (group ids; a group covers the groups inside it). */
+    audience: uuid("audience").array().notNull().default(sql`'{}'::uuid[]`),
+    instalments: jsonb("instalments")
+      .$type<
+        {
+          id: string
+          label: string
+          dueOn: string
+          lines: { headId: string; amount: number }[]
+          fine: { amount: number; graceDays: number } | null
+        }[]
+      >()
+      .notNull()
+      .default([]),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("fee_plans_org_year").on(table.orgId, table.yearId)]
+)
+
+/** A scholarship or concession for one student on one plan: off a head, or the whole plan. */
+export const feeConcessions = pgTable(
+  "fee_concessions",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => feePlans.id, { onDelete: "cascade" }),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    headId: uuid("head_id").references(() => feeHeads.id, {
+      onDelete: "cascade",
+    }),
+    percent: integer("percent"),
+    amount: integer("amount"),
+    /** merit, scholarship, sibling, staff_ward or other. */
+    reason: text("reason").notNull(),
+    note: text("note").notNull().default(""),
+    givenBy: uuid("given_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("fee_concessions_student").on(table.planId, table.studentId),
+  ]
+)
+
+/**
+ * A payment towards a student's fees: at the counter (cash, cheque, DD, UPI, transfer) or
+ * online through the institution's own Razorpay. Paid ones carry a receipt number, numbered
+ * per financial year, and what the receipt said (sealed), so reprints match.
+ */
+export const feePayments = pgTable(
+  "fee_payments",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      // "no action" (checked at the end of the statement): a plan or student with payments
+      // can't be deleted on its own, but deleting the organization takes them all together.
+      .references(() => feePlans.id, { onDelete: "no action" }),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "no action" }),
+    amount: integer("amount").notNull(),
+    /** cash, cheque, dd, upi, transfer or online. */
+    mode: text("mode").notNull(),
+    /** A cheque or DD number and bank, a UPI or transfer reference. */
+    reference: text("reference").notNull().default(""),
+    allocation: jsonb("allocation")
+      .$type<{ instalmentId: string; headId: string; amount: number }[]>()
+      .notNull()
+      .default([]),
+    /** created (an online order not yet paid), paid, cancelled or abandoned. */
+    status: text("status").notNull().default("created"),
+    cancelReason: text("cancel_reason"),
+    receiptNo: text("receipt_no"),
+    receipt: text("receipt"),
+    razorpayOrderId: text("razorpay_order_id"),
+    razorpayPaymentId: text("razorpay_payment_id"),
+    collectedBy: uuid("collected_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("fee_payments_student").on(table.orgId, table.studentId),
+    index("fee_payments_paid").on(table.orgId, table.paidAt),
+    uniqueIndex("fee_payments_receipt").on(table.orgId, table.receiptNo),
+    uniqueIndex("fee_payments_order").on(table.razorpayOrderId),
+  ]
+)
+
+/** The last receipt number per organization and financial year, taken under a row lock. */
+export const feeReceiptCounters = pgTable(
+  "fee_receipt_counters",
+  {
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    financialYear: text("financial_year").notNull(),
+    last: integer("last").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.orgId, table.financialYear] })]
+)
+
+/** Reminders sent, once per student, instalment and step (soon, due, late-1…). */
+export const feeRemindersSent = pgTable(
+  "fee_reminders_sent",
+  {
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => feePlans.id, { onDelete: "cascade" }),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    instalmentId: text("instalment_id").notNull(),
+    step: text("step").notNull(),
+    sentAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.planId, table.studentId, table.instalmentId, table.step],
+    }),
+  ]
 )
 
 /** A book lent to a member. Days are "YYYY-MM-DD" in the site's time zone. */

@@ -281,3 +281,42 @@ export function reminderStep(dueOn: string, today: string, balance: number) {
   if (days < 7) return "due"
   return `late-${Math.floor(days / 7)}`
 }
+
+const isDay = (day: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(day) &&
+  new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day
+
+const wholeAtLeastZero = (n: number) => Number.isInteger(n) && n >= 0
+
+/** Why a plan's instalments can't be saved, or null. `headIds` are the institution's heads. */
+export function planProblem(
+  instalments: FeeInstalment[],
+  headIds: string[]
+): string | null {
+  if (instalments.length === 0) return "Add at least one instalment."
+  if (new Set(instalments.map((i) => i.id)).size !== instalments.length)
+    return "Each instalment once."
+  for (const inst of instalments) {
+    const name = inst.label.trim()
+    if (!name) return "Give every instalment a name."
+    if (!isDay(inst.dueOn)) return `${name}: the due day isn't a real date.`
+    if (inst.lines.length === 0) return `${name}: add at least one fee head.`
+    if (new Set(inst.lines.map((l) => l.headId)).size !== inst.lines.length)
+      return `${name}: each fee head once.`
+    for (const line of inst.lines) {
+      if (!headIds.includes(line.headId))
+        return `${name}: that fee head isn't one of yours.`
+      if (!wholeAtLeastZero(line.amount))
+        return `${name}: amounts are whole rupees, 0 or more.`
+    }
+    if (
+      inst.fine &&
+      !(
+        wholeAtLeastZero(inst.fine.amount) &&
+        wholeAtLeastZero(inst.fine.graceDays)
+      )
+    )
+      return `${name}: the fine and its grace are whole numbers, 0 or more.`
+  }
+  return null
+}
