@@ -64,6 +64,10 @@ banking. GretLab never sees your card or bank details.
 - **The same plan again** is refused while it's in force. If you open payment in two tabs, the
   same change shares one payment; a different change replaces the first, and a replaced payment
   that goes through anyway isn't applied and is refunded.
+- **A referral code or coupon:** type it and press **Apply** to see each discount and what's left
+  to pay, with GST, before anything is charged, or why the code can't be used. One code at a time:
+  **Remove** it to try another. Which organizations a code is for, and whether it adds to the
+  discount from the link you came through, are in [Refer and earn](/features/platform/referrals/).
 - **Only what your kind of organization can use** is offered: a college isn't sold assigned
   training, a company isn't sold hostels. Those show as "Not for a …".
 - **Monthly, semester or yearly** can be changed in the week before your period renews.

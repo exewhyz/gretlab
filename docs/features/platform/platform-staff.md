@@ -27,8 +27,9 @@ Reviewer, Support, Organizations manager, Communications, Auditor) and custom on
 
 - **Created** by platform staff (Dashboard › Organizations › **New organization**), or registered by
   a school at `/schools/new` when the platform allows it: off, with review, or open. Both are short
-  guided steps: the kind (what it decides is shown), then the name and address (and the first
-  owner, or the year and grades to start with), then a review where you confirm the kind, which
+  guided steps: the kind (what it decides is shown), then the name and address (the page says
+  whether the address is free as you type it, and waits for a free one), with the first owner, or
+  the year and grades to start with, then a review where you confirm the kind, which
   can't be changed later.
 - **Kinds' modules:** Dashboard › Organization kinds sets, per kind, whether each module it can use is
   off, optional or on from the start, for every organization of that kind at once, and each kind's

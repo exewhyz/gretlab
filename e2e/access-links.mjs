@@ -99,6 +99,17 @@ const support = await client("al-support@example.com")
 check("Support (submissions) opens the plagiarism check's lists", (await support("/admin/problems")).status === 200 && (await support("/admin/contests")).status === 200)
 check("...but still can't write problems", (await support("/admin/problems", { body: {} })).status === 403)
 
+// ---------- search engines: private pages say noindex, whatever the page itself sets
+const robotsOf = async (path) => {
+  const html = await (await fetch(BASE + path, { redirect: "manual" })).text()
+  return /<meta name="robots" content="([^"]*)"/.exec(html)?.[1] ?? "(none)"
+}
+for (const path of ["/admin/costs", "/admin/referrals", `${O}/about`]) {
+  const robots = await robotsOf(path)
+  check(`${path} tells search engines not to index it`, robots.includes("noindex"), robots)
+}
+check("…while a public problem list stays indexable", !(await robotsOf("/problems")).includes("noindex"))
+
 // ---------- the pages
 const browser = await chromium.launch()
 const view = async (email) => {
