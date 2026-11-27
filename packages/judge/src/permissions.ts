@@ -538,6 +538,12 @@ export const PERMISSIONS = {
     module: "University",
     parent: "university.manage",
   },
+  "university.share": {
+    label: "Share content with colleges",
+    description: "Share the university's own problems, questions, courses and templates with every affiliated college.",
+    module: "University",
+    parent: "university.manage",
+  },
   "university.view": {
     label: "See colleges",
     description: "Each affiliated college's students, registrations, attendance figures, marks and results. Never their fees, parents or staff.",

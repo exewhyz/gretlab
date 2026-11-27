@@ -1,7 +1,7 @@
 import type { User } from "@workspace/db"
 import type { Permission } from "@workspace/judge"
 
-import { canAnywhere, orgContext, writeAudit } from "@/features/orgs/server"
+import { canAnywhere, canFor, orgContext, writeAudit } from "@/features/orgs/server"
 import { ApiError } from "@/lib/api/route"
 
 import {
@@ -26,7 +26,15 @@ async function libraryContext(slug: string, user: User, write = false) {
 
 export async function orgLibrary(slug: string, user: User) {
   const ctx = await libraryContext(slug, user)
-  return getLibrary(ctx.org.id, user.id)
+  const library = await getLibrary(ctx.org.id, user.id)
+  return {
+    ...library,
+    /** A university's people who may share its own items with its affiliated colleges. */
+    shareWithColleges:
+      ctx.org.type === "university" &&
+      ctx.modules.has("affiliation") &&
+      canFor(ctx, "university.share", []),
+  }
 }
 
 export async function orgCopyToLibrary(

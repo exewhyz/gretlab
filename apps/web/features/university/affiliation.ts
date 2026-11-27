@@ -65,6 +65,7 @@ export function needUniversity(
   ctx: OrgContext,
   permission:
     | "university.colleges"
+    | "university.share"
     | "university.view"
     | "university.syllabus"
     | "university.registrations"

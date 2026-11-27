@@ -123,7 +123,7 @@ export const ROLE_TEMPLATES: Record<OrgType, RoleTemplate[]> = {
       ...TEACHING, "org.groups.edit", "subjects.manage", "timetable.manage", "exams.manage", "leave.manage", "reports.view", "events.manage", "org.outcomes.manage", "students.view",
     ]),
     t("affiliation_office", "Affiliation office", "organization", "Affiliated colleges, the common syllabus, and the overview of each college.", [
-      "university.colleges", "university.syllabus", "university.view", "notices.manage",
+      "university.colleges", "university.syllabus", "university.share", "university.view", "notices.manage",
     ]),
     t("hod", "Head of department", "group", "Leads a department: its courses, timetable, faculty's teaching, results and leave.", [
       ...TEACHING, "org.groups.edit", "subjects.manage", "timetable.manage", "exams.manage", "leave.manage", "reports.view", "events.manage", "org.outcomes.manage", "students.view",

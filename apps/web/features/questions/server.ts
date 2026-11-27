@@ -4,7 +4,7 @@ import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
 import { ApiError, notFound } from "@/lib/api/route"
 
 import { readQuestionFile } from "./import"
-import { usableBy, usableIds } from "@/features/library/sharing"
+import { keepAffiliates, usableBy, usableIds } from "@/features/library/sharing"
 import { marksItself, type QuestionInput } from "./schemas"
 
 /*
@@ -66,7 +66,7 @@ export async function saveQuestion(
   }
   const [row] = await getDb()
     .update(questions)
-    .set(values)
+    .set(orgId ? { ...values, sharing: keepAffiliates(questions) } : values)
     .where(
       and(
         eq(questions.id, id),

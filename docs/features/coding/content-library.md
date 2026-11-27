@@ -10,7 +10,7 @@ glance:
   where:
     path: /orgs/<slug>/manage/library
     menu: "Coding lab › Library"
-  permissions: [problems.manage, platform.library.manage, platform.library.share]
+  permissions: [problems.manage, platform.library.manage, platform.library.share, university.share]
   module: coding
 ---
 
@@ -20,7 +20,9 @@ a **Library** page: its own items and what's shared with it, with search, filter
 ## How it works
 
 - **Sharing:** the platform's items reach every organization, chosen organizations and teachers, or
-  platform staff only. An organization's own items are always its own.
+  platform staff only. An organization's own items are always its own, except a university's: it
+  can share its problems, questions, courses and templates with the colleges affiliated to it.
+  They reach a college only while it's affiliated, and stopping takes them back.
 - **What an owner may use:** its own items, or published items shared with it. Every picker and save
   uses that one rule.
 - **Collections** are folders that only group items.
@@ -32,6 +34,9 @@ a **Library** page: its own items and what's shared with it, with search, filter
 1. **Coding lab › Library:** filter by source, difficulty or type, and status.
 2. Group items into collections, or **Copy** a shared one to adapt it.
 3. Platform staff use **Share** to decide who sees an item.
+4. A university selects its own items and presses **Share with colleges** (or **Stop sharing**);
+   courses and templates have the same button in their lists. Public library problems already
+   reach everyone, so they aren't shared this way.
 
 ## Related
 

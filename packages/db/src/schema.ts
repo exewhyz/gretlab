@@ -2712,7 +2712,8 @@ export const questions = pgTable(
   (table) => [index("questions_by_org").on(table.orgId)]
 )
 
-export type Sharing = "everyone" | "selected" | "owner"
+/** `affiliates`: a university's own item, for the colleges affiliated to it (features/library/sharing.ts). */
+export type Sharing = "everyone" | "selected" | "owner" | "affiliates"
 
 /** The colleges and teachers an item shared with "selected" reaches. */
 export const contentShares = pgTable(

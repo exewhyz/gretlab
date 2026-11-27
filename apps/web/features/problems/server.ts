@@ -34,7 +34,7 @@ import {
 
 import type { ProblemInput } from "./schemas"
 import { readProblemFile, slugFor, toProblemInput } from "./import"
-import { usableBy } from "@/features/library/sharing"
+import { keepAffiliates, usableBy } from "@/features/library/sharing"
 import { editedElsewhere, unchangedSince } from "@/lib/api/conflict"
 import {
   claimSlug,
@@ -408,7 +408,11 @@ export async function saveProblem(
     const [row] = id
       ? await tx
           .update(problems)
-          .set(values)
+          .set(
+            orgId && values.sharing === "owner"
+              ? { ...values, sharing: keepAffiliates(problems) }
+              : values
+          )
           .where(
             and(
               eq(problems.id, id),

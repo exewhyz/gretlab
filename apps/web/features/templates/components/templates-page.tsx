@@ -27,6 +27,7 @@ import {
   Table,
 } from "@/features/admin/components/shell"
 import { useOwner } from "@/features/admin/owner"
+import { CollegesShareToggle } from "@/features/university/components/share-toggle"
 import { ShareDialog } from "@/features/library/components/library-page"
 import { GroupPicker } from "@/features/orgs/components/group-picker"
 import { useGroups } from "@/features/orgs/components/manage-shared"
@@ -44,7 +45,7 @@ import type {
  * its own dates. The editor is the assignment form in template mode.
  */
 
-type Sharing = "everyone" | "selected" | "owner"
+type Sharing = "everyone" | "selected" | "owner" | "affiliates"
 
 type TemplateRow = ApiResult<typeof orgTemplates>[number]
 
@@ -54,6 +55,7 @@ const SHARING_LABEL: Record<Sharing, string> = {
   everyone: "Every college",
   selected: "Chosen colleges",
   owner: "Staff only",
+  affiliates: "Affiliated colleges",
 }
 
 export function TemplatesPage() {
@@ -118,11 +120,21 @@ export function TemplatesPage() {
               <td className="tabular-nums">{t.questions}</td>
               <td className="tabular-nums">{t.points}</td>
               <td className="text-caption">
-                {platform
-                  ? SHARING_LABEL[t.sharing]
-                  : t.source === "ours"
-                    ? "Ours"
-                    : t.owner}
+                {platform ? (
+                  SHARING_LABEL[t.sharing]
+                ) : t.source === "ours" ? (
+                  owner.sharesWithColleges ? (
+                    <CollegesShareToggle
+                      kind="template"
+                      item={t}
+                      listKey={owner.key("templates")}
+                    />
+                  ) : (
+                    "Ours"
+                  )
+                ) : (
+                  t.owner
+                )}
               </td>
               <td className="tabular-nums">{t.uses}</td>
               <td className="text-right">

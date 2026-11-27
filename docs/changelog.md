@@ -16,6 +16,9 @@ aren't listed.
 - A college asks to affiliate under **Manage › University** by the university's address; the
   university approves it with a college code, or refuses, under **Manage › Affiliated colleges**,
   and either side can end it. Both are told, and every step is in both activity logs.
+- A university shares its own problems, questions, courses and templates with its affiliated
+  colleges (**Share with colleges** in its Library, Courses and Templates). Colleges find them in
+  their library and pickers and can set them as work, only while they're affiliated.
 
 ### The college ERP with a coding lab
 

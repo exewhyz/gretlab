@@ -40,7 +40,7 @@ import type { orgCopyToLibrary } from "@/features/library/org"
 
 type Kind = "problem" | "question"
 type Source = "ours" | "platform" | "shared"
-type Sharing = "everyone" | "selected" | "owner"
+type Sharing = "everyone" | "selected" | "owner" | "affiliates"
 
 interface Base {
   id: string
@@ -73,6 +73,7 @@ const SHARING_LABEL: Record<Sharing, string> = {
   everyone: "Every college",
   selected: "Chosen",
   owner: "Staff only",
+  affiliates: "Affiliated colleges",
 }
 const PAGE = 100
 
@@ -168,7 +169,34 @@ export function LibraryPage() {
     onError: (e) => setMessage({ text: e.message, kind: "err" }),
   })
 
+  // A university shares its own items (not public library problems) with its colleges.
+  const forColleges = selected.filter(
+    (r) => r.source === "ours" && r.sharing !== "everyone"
+  )
+  const shareColleges = useMutation({
+    mutationFn: (sharing: "owner" | "affiliates") =>
+      api<{ changed: number }>(owner.api("/library/affiliates"), {
+        body: {
+          sharing,
+          items: forColleges.map((r) => ({ kind: kindOf(), id: r.id })),
+        },
+      }),
+    onSuccess: (r, sharing) => {
+      setPicked(new Set())
+      setMessage({
+        text:
+          sharing === "affiliates"
+            ? `Shared ${r.changed} with your affiliated colleges. They can use what's ready.`
+            : `Stopped sharing ${r.changed} with your affiliated colleges.`,
+        kind: "ok",
+      })
+      void refresh()
+    },
+    onError: (e) => setMessage({ text: e.message, kind: "err" }),
+  })
+
   if (!data) return <Loading error={error} />
+  const universityShares = !platform && data.shareWithColleges === true
   const count = (kind: Kind) =>
     kind === "problem" ? data.problems.length : data.questions.length
   const current = data.collections.find((c) => c.id === collection)
@@ -208,7 +236,9 @@ export function LibraryPage() {
       <p className="mb-3 max-w-3xl text-body-sm text-body">
         {platform
           ? "Everything the platform has: share it with every college, chosen colleges or teachers, or keep it to staff. Group it into collections."
-          : "Your college's content and what the platform shares with you, in one place. Copy shared items to adapt them; group anything into collections."}
+          : universityShares
+            ? "The university's content and what the platform shares with you, in one place. Share your own with your affiliated colleges; group anything into collections."
+            : "Your college's content and what the platform shares with you, in one place. Copy shared items to adapt them; group anything into collections."}
       </p>
       <div className="grid gap-4 min-[1101px]:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="grid content-start gap-1" data-testid="collections">
@@ -369,6 +399,28 @@ export function LibraryPage() {
                   Share…
                 </Button>
               )}
+              {universityShares && forColleges.length > 0 && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={shareColleges.isPending}
+                    onClick={() => shareColleges.mutate("affiliates")}
+                  >
+                    Share with colleges
+                  </Button>
+                  {forColleges.some((r) => r.sharing === "affiliates") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={shareColleges.isPending}
+                      onClick={() => shareColleges.mutate("owner")}
+                    >
+                      Stop sharing
+                    </Button>
+                  )}
+                </>
+              )}
               {!platform && notOurs > 0 && (
                 <Button
                   size="sm"
@@ -396,7 +448,7 @@ export function LibraryPage() {
               tab === "problem" ? "Difficulty" : "Type",
               "Tags",
               "Source",
-              ...(platform ? ["Shared with"] : []),
+              ...(platform || universityShares ? ["Shared with"] : []),
               "Status",
             ]}
           >
@@ -444,12 +496,14 @@ export function LibraryPage() {
                   <td className="text-caption">
                     {r.source === "ours" ? "Ours" : r.owner}
                   </td>
-                  {platform && (
+                  {(platform || universityShares) && (
                     <td className="text-caption" data-testid="sharing-cell">
                       {r.source === "ours"
                         ? r.sharing === "selected"
                           ? `${r.sharedWith} chosen`
-                          : SHARING_LABEL[r.sharing]
+                          : universityShares && r.sharing === "owner"
+                            ? "Only us"
+                            : SHARING_LABEL[r.sharing]
                         : "—"}
                     </td>
                   )}

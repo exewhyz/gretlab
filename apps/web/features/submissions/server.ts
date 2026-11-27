@@ -188,12 +188,12 @@ export async function canReachProblem(
       (await usedInOpenWork(user, vp, problem.id))
     )
   }
+  if (!problem.published) return false
   // Published for members: any active member of its organization.
-  return (
-    problem.published &&
-    problem.orgId !== null &&
-    accessTo(vp, content, "problems.manage") === "take"
-  )
+  if (problem.orgId !== null && accessTo(vp, content, "problems.manage") === "take")
+    return true
+  // A university's problem shared with its colleges: through a college's work that uses it.
+  return user !== null && (await usedInOpenWork(user, vp, problem.id))
 }
 
 /**

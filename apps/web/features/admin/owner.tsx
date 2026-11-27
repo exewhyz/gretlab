@@ -56,6 +56,11 @@ export function useOwner() {
      * anywhere in it) on its pages, the platform's on the platform's. For showing a
      * button only when its action would be allowed; the server checks again.
      */
+    /** A university's people who may share its own content with its affiliated colleges. */
+    sharesWithColleges:
+      shell?.org.type === "university" &&
+      shell.modules.includes("affiliation") &&
+      shell.wholeOrg.includes("university.share"),
     can: (org: Permission, platform: PlatformPermission) =>
       orgSlug
         ? (shell?.permissions.includes(org) ?? false)

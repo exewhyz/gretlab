@@ -1,10 +1,21 @@
-import { contentShares, courses, getDb, problems, questions, sql, templates } from "@workspace/db"
+import {
+  contentShares,
+  courses,
+  getDb,
+  orgAffiliations,
+  problems,
+  questions,
+  sql,
+  templates,
+} from "@workspace/db"
 
 /*
  * Who may use library content in their own work (assignments, exams, contests, the daily
  * challenge). An owner (the platform, or one college) always uses its own. Anyone else uses
  * a published item when it's shared with everyone, or shared with their college or with
- * them ("selected"). Practice is separate: public library problems stay public.
+ * them ("selected"). A university's item marked "affiliates" reaches the colleges
+ * affiliated to it, only while the affiliation is active. Practice is separate: public
+ * library problems stay public.
  */
 
 const { and, eq, isNull, or } = sql
@@ -25,6 +36,17 @@ function sharedTo(table: Item, kind: ShareKind, orgId: string | null, userId?: s
   return sql.sql`exists (select 1 from ${contentShares} where ${contentShares.itemType} = ${kind} and ${contentShares.itemId} = ${table.id} and (${sql.sql.join(targets as ReturnType<typeof sql.sql>[], sql.sql` or `)}))`
 }
 
+/** Owned by the university this college is affiliated to now. */
+const fromItsUniversity = (table: Item, orgId: string) =>
+  sql.sql`${table.orgId} = (select ${orgAffiliations.universityId} from ${orgAffiliations} where ${orgAffiliations.collegeId} = ${orgId} and ${orgAffiliations.status} = 'active')`
+
+/**
+ * What a college's save writes to `sharing` when it would make the item its own: an item
+ * the university shared with its colleges stays shared, so editing it doesn't take it back.
+ */
+export const keepAffiliates = (table: Item) =>
+  sql.sql<"owner" | "affiliates">`case when ${table.sharing} = 'affiliates' then 'affiliates' else 'owner' end`
+
 /** A where-condition: items this owner (and person) may use. */
 export function usableBy(
   table: Item,
@@ -38,7 +60,10 @@ export function usableBy(
       eq(table.published, true),
       or(
         eq(table.sharing, "everyone"),
-        and(eq(table.sharing, "selected"), sharedTo(table, kind, orgId, userId))
+        and(eq(table.sharing, "selected"), sharedTo(table, kind, orgId, userId)),
+        orgId
+          ? and(eq(table.sharing, "affiliates"), fromItsUniversity(table, orgId))
+          : undefined
       )
     )
   )!

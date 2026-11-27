@@ -36,6 +36,7 @@ import {
 import { useViewer } from "@/features/account/use-viewer"
 import { Loading, PageTitle, Table } from "@/features/admin/components/shell"
 import { useOwner } from "@/features/admin/owner"
+import { CollegesShareToggle } from "@/features/university/components/share-toggle"
 import { ShareDialog } from "@/features/library/components/library-page"
 import { KIND_LABEL } from "@/features/questions/components/question-editor"
 import { api } from "@/lib/api/client"
@@ -56,7 +57,7 @@ import { KIND_NAME } from "./checkpoint-page"
  * module is edited in a dialog; the outline is saved as a whole.
  */
 
-type Sharing = "everyone" | "selected" | "owner"
+type Sharing = "everyone" | "selected" | "owner" | "affiliates"
 
 type CourseRow = ApiResult<typeof orgCourses>[number]
 
@@ -102,6 +103,7 @@ const SHARING_LABEL: Record<Sharing, string> = {
   everyone: "Every college",
   selected: "Chosen colleges",
   owner: "Staff only",
+  affiliates: "Affiliated colleges",
 }
 
 const itemDetail = (item: Item) =>
@@ -168,11 +170,21 @@ export function CoursesPage() {
             <td className="tabular-nums">{c.modules}</td>
             <td className="tabular-nums">{c.items}</td>
             <td className="text-caption">
-              {platform
-                ? SHARING_LABEL[c.sharing]
-                : c.source === "ours"
-                  ? "Ours"
-                  : c.owner}
+              {platform ? (
+                SHARING_LABEL[c.sharing]
+              ) : c.source === "ours" ? (
+                owner.sharesWithColleges ? (
+                  <CollegesShareToggle
+                    kind="course"
+                    item={c}
+                    listKey={owner.key("courses")}
+                  />
+                ) : (
+                  "Ours"
+                )
+              ) : (
+                c.owner
+              )}
             </td>
             <td className="tabular-nums">{c.classes}</td>
             <td className="text-caption">{c.published ? "Ready" : "Draft"}</td>
