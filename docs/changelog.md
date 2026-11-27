@@ -8,6 +8,14 @@ aren't listed.
 
 ## 27 November 2026
 
+### The college ERP with a coding lab
+
+- GretLab now introduces itself as the college ERP with a coding lab built in, for colleges,
+  universities and coaching institutes: the landing page, its questions, the docs and the
+  description search engines show.
+- The landing page's week switches between a college and a coaching institute, and the contact
+  form asks whether you're a college, university or coaching institute.
+
 ### Fees
 
 - Colleges, universities and coaching institutes can collect their fees in GretLab (switch on

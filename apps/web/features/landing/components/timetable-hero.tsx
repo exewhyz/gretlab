@@ -9,7 +9,7 @@ import { cn } from "@workspace/ui/lib/utils"
 import { DAYS, SLOTS, WEEKS, type Audience, type Period } from "../content"
 
 /*
- * The first viewport: a week, for a college or a cohort. A title bar holds the switch and
+ * The first viewport: a week, for a college or a coaching institute. A title bar holds the switch and
  * names the class and the week; the headline sits in merged cells of Mon–Thu, periods 1–2;
  * every other period is a toggle that shows what GretLab does there. On load (and on each
  * switch) the "now" marker steps through a few periods and rests on the lab; touching the

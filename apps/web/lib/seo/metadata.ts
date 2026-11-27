@@ -13,7 +13,8 @@ export async function siteMetadata(): Promise<Metadata> {
   const site = await siteSettings()
   return {
     metadataBase: new URL(site.url),
-    title: { default: `${site.name}: ${site.tagline.toLowerCase()}`, template: `%s · ${site.name}` },
+    // Only the first letter goes small, so "ERP" and other capitals in the tagline stay as typed.
+    title: { default: `${site.name}: ${site.tagline.charAt(0).toLowerCase()}${site.tagline.slice(1)}`, template: `%s · ${site.name}` },
     description: site.description,
     applicationName: site.name,
     openGraph: {

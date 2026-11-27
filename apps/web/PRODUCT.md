@@ -27,7 +27,7 @@ GretLab is one place where any kind of learning organization runs its day and it
 
 ## Positioning
 
-One platform for every kind of organization: school, college, coaching institute, cohort program, company, community and other.
+Sold as **the college ERP with a coding lab built in**, to colleges, universities and coaching institutes (the owner's decision, 27 November 2026). The coding lab is what no other ERP has; admissions, attendance, timetables, exams and grade cards, fees, parents and the campus are why an institution needs no second system. The platform still serves every kind of organization: school, college, coaching institute, cohort program, company, community and other.
 
 - Each kind gets its own words (students, learners, employees), group levels, roles and modules from a single kinds registry.
 - Each organization switches modules on and off.
@@ -51,7 +51,7 @@ One platform for every kind of organization: school, college, coaching institute
 - **Permissions:** access is per permission and per group (a class teacher sees their class). The sidebar (`ORG_NAV`), home cards and APIs follow one rule, and a link appears only where its page opens.
 - **Modules:** switched per organization within the kind's policy. A switched-off module leaves no trace in the UI.
 - **Wording:** follows the kind's terms everywhere.
-- **Undecided or on hold:** fees and payments, and Google's sign-in strength in two-factor.
+- **Undecided or on hold:** Google's sign-in strength in two-factor. Fees are built (the Fees module); universities with affiliated colleges and SMS/WhatsApp come next.
 
 ## Brand Commitments
 

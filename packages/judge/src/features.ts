@@ -52,7 +52,7 @@ export const SETTINGS = {
     group: "Search engines",
     schema: z.string().trim().min(20).max(300),
     default:
-      "GretLab runs a school, college or training program's day (attendance, timetables, leave, records, exams and report cards) with a coding lab built in: practice problems, graded assignments, lab exams and contests judged in a secure sandbox." as string,
+      "The college ERP with a coding lab built in, for colleges, universities and coaching institutes: admissions, attendance, exams and grade cards, fees and receipts, and code judged in a sandbox and graded the same minute." as string,
   },
   "seo.tagline": {
     label: "Tagline",
@@ -60,7 +60,7 @@ export const SETTINGS = {
       "One line: the home page's title and the share card's headline.",
     group: "Search engines",
     schema: z.string().trim().min(3).max(80),
-    default: "The coding lab and the school day, in one place" as string,
+    default: "The college ERP with a coding lab built in" as string,
   },
   "seo.indexing": {
     label: "Let search engines index the site",

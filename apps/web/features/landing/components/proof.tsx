@@ -10,7 +10,14 @@ import type { landingProof } from "../enquiries"
 
 type Proof = Awaited<ReturnType<typeof landingProof>>
 
-const KIND: Record<string, string> = { college: "College", cohort: "Cohort program", school: "School", other: "" }
+const KIND: Record<string, string> = {
+  college: "College",
+  university: "University",
+  coaching: "Coaching institute",
+  cohort: "Cohort program",
+  school: "School",
+  other: "",
+}
 
 export function Partners({ partners }: { partners: Proof["partners"] }) {
   if (partners.length === 0) return null

@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic"
 /** The site's front page: the name and tagline, and the site's own share card. */
 export async function generateMetadata(): Promise<Metadata> {
   const site = await siteSettings()
-  const title = `${site.name}: ${site.tagline.toLowerCase()}`
+  // Only the first letter goes small, so "ERP" and other capitals in the tagline stay as typed.
+  const title = `${site.name}: ${site.tagline.charAt(0).toLowerCase()}${site.tagline.slice(1)}`
   return {
     title: { absolute: title },
     description: site.description,

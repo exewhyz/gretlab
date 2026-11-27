@@ -56,6 +56,8 @@ await admin("/admin/settings", { method: "PATCH", body: { "landing.contact_email
 let html = await page()
 check("the page has the form and the questions", html.includes('id="contact"') && html.includes('id="faq"') && html.includes("What is GretLab?"))
 check("with no partners or quotes, those sections are hidden", !html.includes("Colleges and programs on GretLab") && !html.includes("In their"))
+check("it says what GretLab is: the college ERP with a coding lab", html.includes("The college ERP with a coding lab that") && html.includes("For colleges, universities and coaching institutes."))
+check("…and fees are in the answers", html.includes("How do fees work?"))
 
 // ---------- the contact form
 const good = { name: "Lnd Asha", email: "lnd-asha@example.com", organization: "Lnd College", kind: "college", learners: "500–2,000", message: "Labs for 600 students", website: "" }
@@ -96,6 +98,11 @@ check("adding and removing are in the activity log", Number(psql(`select count(*
 const browser = await chromium.launch()
 const tab = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage()
 await tab.goto(BASE + "/")
+await tab.getByRole("button", { name: "Coaching" }).click()
+await tab.getByText("DSA in Java › Batch A").waitFor({ timeout: 10000 })
+check("the switch shows a coaching batch's week, with fees and dues in it", (await tab.getByText("Fee counter").count()) > 0 && (await tab.getByText("Dues").count()) > 0)
+await tab.screenshot({ path: SHOTS + "landing-coaching.png" })
+await tab.getByRole("button", { name: "College" }).click()
 await tab.getByRole("link", { name: "Talk to us" }).first().click()
 await tab.waitForTimeout(400)
 check("Talk to us leads to the form", new URL(tab.url()).hash === "#contact")

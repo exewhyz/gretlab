@@ -3,7 +3,9 @@ title: Features overview
 description: Everything GretLab does, grouped the way the app groups it, with where each part lives.
 ---
 
-GretLab's features come in two halves: **the day**, switched on as modules to suit each kind of
+GretLab is the college ERP with a coding lab built in, for colleges, universities and coaching
+institutes. Its features come in two halves: **the day** (admissions, attendance, timetables,
+exams and grade cards, fees, parents, the campus), switched on as modules to suit each kind of
 organization, and **the lab**, the coding judge. This page maps them; each has its own page.
 
 ## Coding lab

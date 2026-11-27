@@ -18,8 +18,8 @@ import { Partners, Testimonials } from "./proof"
 import { TimetableHero } from "./timetable-hero"
 
 /*
- * The landing page (/), shown to visitors and signed-in people alike, for colleges and cohort programs: a week with the headline
- * set into it (switchable between a college and a cohort), the coding lab as one
+ * The landing page (/), shown to visitors and signed-in people alike, for colleges, universities and coaching institutes: a
+ * week with the headline set into it (switchable between a college and a coaching institute), the coding lab as one
  * submission followed to the gradebook, what sits around the lab for each audience, a line
  * of what's under the hood, and a close. Short on purpose: the screens do the explaining.
  */
@@ -70,7 +70,7 @@ export function Landing({
             <div className="px-5 pt-8 pb-14 lg:p-0">
               <TimetableHero headline={<Headline facts={facts} />} />
               <p className="mt-4 text-caption text-muted-foreground lg:px-10 lg:pb-6">
-                An example week. The college, cohort, people and numbers are made up.
+                An example week. The college, coaching institute, people and numbers are made up.
               </p>
             </div>
             <Partners partners={proof.partners} />
@@ -91,7 +91,7 @@ export function Landing({
 function Header({ facts, signedIn }: { facts: LandingFacts; signedIn: boolean }) {
   const links: [string, string][] = [
     ["The coding lab", "#lab"],
-    ["Colleges and cohorts", "#around"],
+    ["Colleges and coaching", "#around"],
     ["Questions", "#faq"],
   ]
   return (
@@ -131,7 +131,7 @@ function Headline({ facts }: { facts: LandingFacts }) {
     <div>
       <h1 id="landing-title" className="text-display-lg text-balance text-ink sm:text-display-xl">
         <span className="font-semibold">
-          The coding lab that{" "}
+          The college ERP with a coding lab that{" "}
           <span className="relative inline-block whitespace-nowrap">
             <span className="relative z-10">grades itself.</span>
             {/* The framed words, tagged with the verdict they produce. */}
@@ -145,10 +145,13 @@ function Headline({ facts }: { facts: LandingFacts }) {
             </span>
           </span>
         </span>
-        <span className="mt-4 block text-body">For colleges and cohorts.</span>
+        <span className="mt-4 block text-body">
+          For colleges, universities and coaching institutes.
+        </span>
       </h1>
       <p className="mt-5 max-w-[64ch] text-body-md text-body">
-        Lab exams, assignments and contests, judged in a sandbox and graded the same minute.
+        Admissions, attendance, exams and grade cards, fees and receipts, and a
+        coding lab graded in a sandbox the same minute.
       </p>
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <Primary facts={facts} />

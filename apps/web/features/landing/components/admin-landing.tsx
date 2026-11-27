@@ -231,6 +231,8 @@ function PartnerList() {
             <Field label="Kind">
               <SelectInput value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
                 <option value="college">College</option>
+                <option value="university">University</option>
+                <option value="coaching">Coaching institute</option>
                 <option value="cohort">Cohort program</option>
                 <option value="school">School</option>
                 <option value="other">Other</option>

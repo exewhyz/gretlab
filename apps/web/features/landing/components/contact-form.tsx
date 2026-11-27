@@ -11,7 +11,7 @@ import { api, ApiRequestError } from "@/lib/api/client"
 import { ENQUIRY_KINDS, enquirySchema, LEARNER_SIZES, type EnquiryInput } from "../schemas"
 
 /*
- * "Talk to us": a short form for a college, cohort program or school. Checked here with the
+ * "Talk to us": a short form for a college, university, coaching institute, cohort program or school. Checked here with the
  * same rules as the server, sent to POST /enquiries, and answered with what happens next.
  * A hidden field catches bots.
  */
@@ -102,7 +102,7 @@ export function ContactForm() {
         </Labelled>
         <div className="sm:col-span-2">
           <Labelled label="Anything we should know (optional)" error={errors.message}>
-            <TextArea rows={3} value={form.message} onChange={(e) => set("message", e.target.value)} placeholder="Your labs, courses or the cohort you're planning" />
+            <TextArea rows={3} value={form.message} onChange={(e) => set("message", e.target.value)} placeholder="Your college or institute, how many students, and what you'd like to run on GretLab" />
           </Labelled>
         </div>
         {/* People never see this; bots fill it in. */}

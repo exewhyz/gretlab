@@ -1,11 +1,11 @@
 /*
  * What the landing page shows, for its two audiences: a college (a CSE batch's week in a
- * semester) and a cohort program (a pod's week in a 12-week run). The organizations, people
+ * semester) and a coaching institute (a batch's week in a course). The organizations, people
  * and figures are an example and the page says so. What GretLab does is stated plainly and
  * must stay true of the code: when a feature changes, change its line here.
  */
 
-export type Audience = "college" | "cohort"
+export type Audience = "college" | "coaching"
 
 export interface Period {
   id: string
@@ -66,36 +66,36 @@ export const WEEKS: Record<Audience, Week> = {
       p("fri-4", "From Moodle", "Opened through LTI", "Students open GretLab from your LMS with LTI 1.3, and grades go back to it."),
       p("mon-5", "Outcomes", "CO3 at level 3", "Problems are tagged with course outcomes; CO and PO attainment is worked out from marks."),
       p("tue-5", "Grade card", "SGPA 8.82", "Credits, grades and points per course, with SGPA and CGPA on a printable grade card."),
-      p("wed-5", "Discussion", "3 new threads", "Each class has its own discussion, with anonymous posts and answers marked by faculty."),
+      p("wed-5", "Fees", "Term 2 · 41 of 62 paid", "Fee plans in instalments, receipts at the counter, and online payment straight into your own Razorpay account, with reminders before and after the due day."),
       p("thu-5", "Early warnings", "4 students to watch", "Students with missed work, low marks, silence or low attendance are listed with the reason.", "bad"),
       p("fri-5", "Certificates", "12 issued", "Certificates for finishing a course, each with a public page anyone can check."),
     ],
     tour: ["fri-1", "tue-3", "tue-5", "thu-5", "mon-3"],
   },
-  cohort: {
-    label: "Cohort",
-    group: "Full-stack › Cohort 7 › Pod B",
-    when: "Week 6 of 12",
+  coaching: {
+    label: "Coaching",
+    group: "DSA in Java › Batch A",
+    when: "Course week 7",
     periods: [
-      p("fri-1", "Stand-up", "8 of 9 here", "Attendance for each session, and a learner's record across the whole run."),
-      p("fri-2", "Mentor", "Sam · 2 to check in", "Each pod has a mentor who sees their learners' work, attendance and warnings in one place."),
-      p("mon-3", "Lab test", "7 of 9 accepted", "Timed tests and assignments judged against hidden tests, graded the same minute.", "ok"),
-      p("tue-3", "Project", "Pinned to a1f9c2e", "Learners hand in a GitHub repository; it's pinned to the commit, so later pushes don't change what was marked."),
-      p("wed-3", "Module 6 opens", "After module 5", "Course modules open by day, or only once the module before is finished."),
-      p("thu-3", "Practice", "12-day streak", "Problems by topic in five languages, with a daily challenge and streaks."),
-      p("fri-3", "Peer review", "Anonymous · 2 each", "Learners review each other's code against the rubric, with comments on lines."),
-      p("mon-4", "Assignment", "REST API · due Sunday", "Assignments with due dates, late rules and rubrics, marked from submissions."),
-      p("tue-4", "Contest", "Pod against pod", "Contests with a live scoreboard, for a pod or the whole cohort."),
-      p("wed-4", "Discussion", "5 threads in Pod B", "Each pod has its own discussion, with answers marked by mentors."),
-      p("thu-4", "Early warnings", "1 learner gone quiet", "Learners who've stopped submitting, or are falling behind, are listed with the reason.", "bad"),
-      p("fri-4", "Demo day", "34 going", "Events with places and a waitlist, on everyone's calendar."),
-      p("mon-5", "Progress", "Week 6 of 12", "Program managers see each run's week and every learner's work, attendance and warnings by pod."),
-      p("tue-5", "Similarity check", "No matches", "Submissions are compared across the cohort to find copied code."),
-      p("wed-5", "Leave", "Ritu · 2 days", "Learners and mentors ask for leave in GretLab."),
-      p("thu-5", "Course", "Module 5 · 8 of 9 done", "Each learner's progress through the course, module by module."),
-      p("fri-5", "Graduation", "Week 12", "Graduates get a certificate with a public page anyone can check."),
+      p("fri-1", "Register", "38 of 42 present", "Attendance for every batch class, and parents are told the same day when their child is absent."),
+      p("fri-2", "Fees", "Instalment 2 · due Monday", "Fee plans in instalments with GST on the receipt, reminders before the due day, and online payment into your own Razorpay account."),
+      p("mon-3", "Weekly test", "31 of 42 accepted", "Timed tests judged against hidden tests and graded the same minute.", "ok"),
+      p("tue-3", "Fee counter", "Receipt issued", "Cash, cheque or UPI at the counter, with a numbered receipt to print; concessions and scholarships come off on their own."),
+      p("wed-3", "Assignment", "Due Friday · 29 of 42 in", "Coding assignments with due dates, late rules and rubrics; marks are worked out from submissions."),
+      p("thu-3", "Practice", "Topic: graphs", "Problems by topic in Python, JavaScript, C, C++ and Java, with a daily challenge and streaks."),
+      p("fri-3", "Parents", "Marks and dues", "Parents follow attendance, marks, the timetable and fees on their phone, and can pay online."),
+      p("mon-4", "Contest", "Batch against batch", "Contests with ICPC or IOI scoring and a live scoreboard."),
+      p("tue-4", "Similarity check", "1 pair to review", "Submissions are compared across the batch to find copied code, even with names changed."),
+      p("wed-4", "Doubts", "6 threads", "Each batch has its own discussion, with answers marked by faculty."),
+      p("thu-4", "Early warnings", "3 students to watch", "Students with missed work, low marks, silence or low attendance are listed with the reason.", "bad"),
+      p("fri-4", "Timetable", "Batch B at 6 pm", "Timetables per batch; a teacher can't be booked in two batches at once."),
+      p("mon-5", "Results", "Rank 4 of 42", "Marks by test, with ranks and a printable report card."),
+      p("tue-5", "Admissions", "5 new enquiries", "Applications online, reviewed and admitted into a batch, with the parent linked."),
+      p("wed-5", "Dues", "8 students overdue", "Who owes and who's late, by batch, with a CSV for the accounts.", "bad"),
+      p("thu-5", "Leave", "Riya · 2 days", "Students and faculty ask for leave; approved leave is excused on the register."),
+      p("fri-5", "Certificates", "Course completed", "Certificates for finishing a course, each with a public page anyone can check."),
     ],
-    tour: ["fri-1", "tue-3", "fri-4", "thu-4", "mon-3"],
+    tour: ["fri-1", "fri-2", "tue-3", "wed-5", "mon-3"],
   },
 }
 
@@ -132,19 +132,19 @@ export const AROUND: Record<Audience, { title: string; items: [string, string][]
       ["Semesters and credits", "SGPA, CGPA and grade cards"],
       ["Outcomes", "CO and PO attainment from marks"],
       ["Lab exams", "one sitting, the lab's network if you like"],
-      ["Similarity checks", "copied code found across a class"],
+      ["Fees and receipts", "online into your own Razorpay account"],
       ["Your LMS", "LTI 1.3, with grades sent back"],
     ],
   },
-  cohort: {
-    title: "For a cohort",
+  coaching: {
+    title: "For a coaching institute",
     items: [
-      ["Runs and weeks", "week 6 of 12, for every pod"],
-      ["Pods and mentors", "each learner's progress in one place"],
-      ["GitHub projects", "pinned to the commit handed in"],
-      ["Peer review", "anonymous, against the rubric"],
-      ["Courses", "modules that open as they go"],
-      ["Graduation", "certificates anyone can check"],
+      ["Batches and timetables", "nobody booked twice at once"],
+      ["Fees with GST", "instalments, receipts, online payment"],
+      ["Tests and ranks", "graded the same minute"],
+      ["Parents", "attendance, marks and dues on their phone"],
+      ["Admissions", "applications to a batch, parent linked"],
+      ["Dues", "who owes and who's late, by batch"],
     ],
   },
 }
