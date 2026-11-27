@@ -103,6 +103,48 @@ check("…and the setup screen never sees them", !JSON.stringify(await setup()).
 check("an accountant can't change the settings", (await acct(`${O}/fees/settings`, { method: "PUT", body: { prefix: "X", gstin: "", razorpay: null } })).status === 403)
 check("changes are in the activity log", Number(psql(`select count(*) from audit_log where org_id='${orgId}' and action like 'fees.%'`)) >= 6)
 
+// ---------- a student's fees and the counter
+const batchB = (await owner(`${O}/groups`, { body: { name: "2026-B", parentId: dept.id } })).json
+await owner(`${O}/groups/${batch.id}/members`, { body: { userIds: [uid("fee-s1")] } })
+await owner(`${O}/groups/${batchB.id}/members`, { body: { userIds: [uid("fee-s2")] } })
+const fees = async (who, h) => (await who(`${O}/fees/students/${uid(h)}`))
+const s1 = (await fees(owner, "fee-s1")).json
+const l1 = s1?.plans?.[0]?.ledger
+check("a student's plan reaches them through their batch's department", s1?.plans?.length === 1 && s1.plans[0].id === plan.id, JSON.stringify(s1).slice(0, 200))
+check("…a day scholar isn't charged the hostel head", l1?.instalments?.[0]?.gross === 30000, JSON.stringify(l1?.instalments?.[0]))
+check("…a term past its grace carries the late fine and is overdue", l1?.instalments?.[0]?.fine === 500 && l1.instalments[0].overdue && l1.instalments[0].balance === 30500)
+check("…and a later term isn't overdue yet", l1?.instalments?.[1]?.overdue === false && l1.instalments[1].balance === 30000)
+const collect = (who, h, body) => who(`${O}/fees/students/${uid(h)}/payments`, { body: { planId: plan.id, mode: "cash", reference: "", ...body } })
+const cash = await collect(acct, "fee-s1", { amount: 10000 })
+check("the counter collects cash and numbers the receipt", cash.status === 200 && cash.json?.receiptNo === "FC/2026-27/000001", JSON.stringify(cash.json))
+check("a cheque needs its number", (await collect(acct, "fee-s1", { amount: 1000, mode: "cheque" })).json?.error?.code === "reference_needed")
+const cheque = await collect(acct, "fee-s1", { amount: 20500, mode: "cheque", reference: "123456 SBI" })
+check("…and the next receipt follows on", cheque.json?.receiptNo === "FC/2026-27/000002", JSON.stringify(cheque.json))
+const after = (await fees(owner, "fee-s1")).json.plans[0].ledger
+check("the oldest dues are paid first, the fine last", after.instalments[0].balance === 0 && after.instalments[1].balance === 30000)
+const over = await collect(acct, "fee-s1", { amount: 30001 })
+check("more than is owed is refused, saying how much is", over.json?.error?.message === "That's more than is owed: ₹30,000 at most.", JSON.stringify(over.json))
+check("a teacher can't collect", (await collect(teacher, "fee-s1", { amount: 100 })).status === 403)
+const batchRole = (await owner(`${O}/roles`, { body: { name: "Batch B fees", permissions: ["fees.collect"] } })).json
+await owner(`${O}/members/${uid("fee-t")}/roles`, { body: { roleId: batchRole.id, groupId: batchB.id } })
+check("a collector for one batch can't collect for another", (await collect(teacher, "fee-s1", { amount: 100 })).status === 403)
+check("…but can for their own", (await collect(teacher, "fee-s2", { amount: 100 })).status === 200)
+const twice = await Promise.all([collect(acct, "fee-s2", { amount: 30400 }), collect(acct, "fee-s2", { amount: 30400 })])
+check("two counters can't take the same dues together", twice.filter((r) => r.status === 200).length === 1 && twice.some((r) => r.json?.error?.code === "bad_amount"), JSON.stringify(twice.map((r) => r.json)))
+const chequeId = psql(`select id from fee_payments where receipt_no='FC/2026-27/000002'`)
+check("cancelling needs a reason", (await owner(`${O}/fees/payments/${chequeId}/cancel`, { body: { reason: "" } })).status === 400)
+check("a bounced cheque is cancelled", (await owner(`${O}/fees/payments/${chequeId}/cancel`, { body: { reason: "Cheque bounced" } })).status === 200)
+const back = (await fees(owner, "fee-s1")).json.plans[0]
+check("…its number kept, the dues owed again", back.ledger.instalments[0].balance === 20500 && back.payments.find((p) => p.id === chequeId)?.status === "cancelled" && psql(`select receipt_no from fee_payments where id='${chequeId}'`) === "FC/2026-27/000002")
+const pdf = await fetch(`${BASE}/api/v1${O}/fees/payments/${cash.json.id}/receipt`, { headers: { cookie: `next-auth.session-token=${await session("fee-o@example.com")}` } })
+const bytes = Buffer.from(await pdf.arrayBuffer())
+check("the receipt is a PDF", pdf.status === 200 && pdf.headers.get("content-type") === "application/pdf" && bytes.subarray(0, 4).toString() === "%PDF", `${pdf.status} ${pdf.headers.get("content-type")}`)
+const peek = async (who) => (await fetch(`${BASE}/api/v1${O}/fees/payments/${cash.json.id}/receipt`, { headers: { cookie: `next-auth.session-token=${await session(who)}` } })).status
+check("…that a collector for another batch, or an outsider, can't read", (await peek("fee-t@example.com")) === 404 && [403, 404].includes(await peek("fee-out@example.com")))
+check("…and is kept sealed as issued", !psql(`select receipt from fee_payments where id='${cash.json.id}'`).includes("fee-s1"))
+check("a plan with payments can't be deleted", (await owner(`${O}/fees/plans/${plan.id}`, { method: "DELETE" })).json?.error?.code === "plan_has_payments")
+check("collecting and cancelling are in the activity log", psql(`select count(*) from audit_log where org_id='${orgId}' and action in ('fees.collect','fees.cancel')`) === "5")
+
 // ---------- the Setup screen
 const browser = await chromium.launch()
 const errors = []
@@ -116,6 +158,7 @@ try {
   }
   const p = await open("fee-o@example.com", 1440)
   await p.goto(`${BASE}${O}/manage/fees`)
+  await p.getByRole("tab", { name: "Setup" }).click()
   await p.getByTestId("fee-head").first().waitFor({ timeout: 30000 })
   check("the Setup screen lists the heads and plans", (await p.getByTestId("fee-head").count()) === 2 && (await p.getByTestId("fee-plan").count()) === 1)
   check("…and Fees is in the sidebar", (await p.getByRole("navigation", { name: "Organization" }).innerText()).includes("Fees"))
@@ -132,8 +175,21 @@ try {
   check("…and can take another", (await p.getByTestId("fee-instalment").count()) === 3)
   await p.keyboard.press("Escape")
   await p.screenshot({ path: SHOTS + "fees-setup.png", fullPage: true })
+  await p.getByRole("tab", { name: "Students" }).click()
+  await p.getByLabel("Search students").fill("fee-s1")
+  await p.getByRole("button", { name: "Fees of fee-s1 Name" }).click()
+  await p.getByTestId("student-fees").getByTestId("ledger-row").first().waitFor({ timeout: 15000 })
+  check("a student's fees open in a sheet, with their receipts", (await p.getByTestId("fee-receipt").count()) === 2)
+  p.context().on("page", (popup) => popup.close().catch(() => {}))
+  await p.getByRole("button", { name: "Collect" }).click()
+  await p.getByLabel("Amount (₹)").fill("500")
+  await p.getByRole("button", { name: "Collect and print receipt" }).click()
+  await p.getByTestId("fee-receipt").nth(2).waitFor({ timeout: 15000 })
+  check("collecting from the page adds the receipt", psql(`select count(*) from fee_payments where student_id='${uid("fee-s1")}' and status='paid'`) === "2")
+  await p.screenshot({ path: SHOTS + "fees-student.png" })
   const phone = await open("fee-o@example.com", 390)
   await phone.goto(`${BASE}${O}/manage/fees`)
+  await phone.getByRole("tab", { name: "Setup" }).click()
   await phone.getByTestId("fee-head").first().waitFor({ timeout: 30000 })
   check("the Setup screen on a phone, without sideways scrolling", await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
   await phone.screenshot({ path: SHOTS + "fees-setup-phone.png", fullPage: true })

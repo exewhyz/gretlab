@@ -72,7 +72,8 @@ export function headApplies(head: FeeHead, facts: StudentFacts) {
   )
 }
 
-interface Line {
+/** One head's charge in an instalment, after concessions, and what's been paid on it. */
+export interface FeeLedgerLine {
   headId: string
   gross: number
   concession: number
@@ -82,7 +83,7 @@ interface Line {
 }
 
 /** Takes `amount` off the lines (oldest first), never taking a line below zero. */
-function takeAmount(lines: Line[], amount: number) {
+function takeAmount(lines: FeeLedgerLine[], amount: number) {
   let left = Math.max(0, Math.round(amount))
   for (const line of lines) {
     if (left <= 0) break
@@ -93,7 +94,7 @@ function takeAmount(lines: Line[], amount: number) {
   }
 }
 
-function takePercent(lines: Line[], percent: number) {
+function takePercent(lines: FeeLedgerLine[], percent: number) {
   for (const line of lines) {
     const off = Math.min(line.net, Math.round((line.net * percent) / 100))
     line.concession += off
@@ -125,7 +126,7 @@ export function feeLedger(input: {
         const head = heads.get(l.headId)
         return head ? headApplies(head, input.facts) : false
       })
-      .map((l): Line => ({
+      .map((l): FeeLedgerLine => ({
         headId: l.headId,
         gross: Math.max(0, Math.round(l.amount)),
         concession: 0,

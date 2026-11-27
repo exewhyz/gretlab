@@ -1,15 +1,40 @@
 "use client"
 
-import { PageTitle } from "@/features/admin/components/shell"
+import { useState } from "react"
 
-import { FeesSetup } from "./fees-setup"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 
-/** Manage › Fees. Setup now; the students' ledgers and reports come in the next slices. */
+import { Loading, PageTitle } from "@/features/admin/components/shell"
+
+import { FeeStudents } from "./fee-students"
+import { FeesSetup, useFeeSetup } from "./fees-setup"
+
+/** Manage › Fees: students (collecting, ledgers) and setup. */
 export function ManageFees({ slug }: { slug: string }) {
+  const { data, error } = useFeeSetup(slug)
+  const [tab, setTab] = useState<string | null>(null)
+  if (!data) return <Loading error={error} />
+  const first = data.can.collect || data.can.view ? "students" : "setup"
   return (
     <>
       <PageTitle>Fees</PageTitle>
-      <FeesSetup slug={slug} />
+      <Tabs value={tab ?? first} onValueChange={(v) => setTab(String(v))}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="students">Students</TabsTrigger>
+          <TabsTrigger value="setup">Setup</TabsTrigger>
+        </TabsList>
+        <TabsContent value="students">
+          <FeeStudents slug={slug} />
+        </TabsContent>
+        <TabsContent value="setup">
+          <FeesSetup slug={slug} />
+        </TabsContent>
+      </Tabs>
     </>
   )
 }
