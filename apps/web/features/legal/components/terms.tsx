@@ -85,6 +85,7 @@ export function Terms({ facts }: { facts: LegalFacts }) {
             <li>Organizations above 10,000 students, and arrangements agreed with us in writing, are priced separately; what we agreed applies.</li>
             <li>We may change prices for future periods; a period already paid for keeps its price.</li>
             <li>A referral code or coupon gives the discount it states for the payments it states, worked out when you pay. A code can be paused, expire or run out.</li>
+            <li>Fees an institution collects in {site} (Fees module) are between the institution and its students: online payments go to the institution&apos;s own Razorpay account, never through us, and the institution sets its fees, concessions, fines and refunds. We provide the records and receipts; we aren&apos;t a party to those payments.</li>
             <li>Refer and earn: when an organization you referred pays for a plan, you earn the share shown on your Refer and earn page of each payment (before GST) for the months shown there, counted from its first payment. Your own organization, or one you're a member of, doesn't count. Earnings are paid out by us by hand (UPI or bank transfer), and we may cancel earnings from payments that are refunded, reversed or made to abuse the scheme.</li>
           </List>
         </>

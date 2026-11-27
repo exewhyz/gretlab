@@ -87,6 +87,15 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               our payment provider; we never see or keep them, only the provider&apos;s
               reference for each payment.
             </Item>
+            <Item term="Fees">
+              if your institution collects its fees in {site}: your fee plans, concessions given
+              to you (with their reason), the payments made towards your fees (the amount, how it
+              was paid, a cheque or transaction reference, when, and who at the institution
+              collected it) and their receipts, kept as issued. Fees paid online go to your
+              institution&apos;s own Razorpay account: card, UPI and bank details go straight to
+              Razorpay, and we keep only its reference. The institution&apos;s staff who manage
+              fees for your classes see them, and so do your linked parents, who can also pay.
+            </Item>
             <Item term="Referrals">
               your referral code and link; which organizations were registered or paid with it,
               and where each is (waiting, active, paying); what you earned from each payment and
@@ -154,6 +163,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             <li>To send the emails you&apos;d expect: confirming your address, sign-in codes, password links, security notices, and notifications you can switch off in your notification settings.</li>
             <li>To keep accounts and assessments honest and safe: two-factor sign-in, pausing sign-in after repeated wrong passwords, checking code similarity when a teacher asks, and the exam records above, which are signals for a teacher, not proof.</li>
             <li>To bill organizations that pay for a plan: taking payments, issuing invoices with GST, and reminding those who manage billing before a period ends.</li>
+            <li>For institutions that collect fees in {site}: keeping each student&apos;s fees and receipts, taking online payments into the institution&apos;s own account, and reminding students and their parents of fees due.</li>
             <li>To fix problems and keep the service running, using error reports and logs.</li>
             <li>To show ads on public practice pages (see <a href="#cookies" className={LINK}>Cookies and ads</a>).</li>
           </List>
@@ -229,7 +239,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
             <Item term="Neon">an earlier copy of the database, in Sydney, Australia, kept until early December 2026 in case we need to move back, then deleted.</Item>
             <Item term="Google">sign-in with Google, and AdSense ads on public practice pages.</Item>
             <Item term="Our email provider">sending the emails described above.</Item>
-            <Item term="Razorpay">taking payments for organizations&apos; plans (UPI, cards and net banking), in India.</Item>
+            <Item term="Razorpay">taking payments for organizations&apos; plans, and students&apos; fees into their institution&apos;s own Razorpay account (UPI, cards and net banking), in India.</Item>
             <Item term="GitHub">looking up the commit of a repository link you hand in for a project.</Item>
             <Item term="Cloudflare">storing and serving files: images in problems and lessons (public, like the pages that show them), and the exports and import reports you download (private, reached only through a link that works for a few minutes). Stored in its Asia-Pacific region. Your images are listed for you by their file names, and only for you.</Item>
           </List>
@@ -281,6 +291,7 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
           </p>
           <List>
             <li>Invoices and payment records are kept for as long as India&apos;s tax and accounting laws require (up to eight years), even after an organization stops using {site}.</li>
+            <li>Fee receipts and payments are the institution&apos;s accounting records: a receipt is never deleted, only cancelled with a reason, and they&apos;re kept as long as the institution keeps them.</li>
             <li>Those counts of how often a network address did something are deleted after a day.</li>
             <li>Emailed sign-in codes last 10 minutes, and password and confirmation links an hour or a day; each works once.</li>
             <li>Records of emails sent are deleted after 7 days, and of emails that failed after 30.</li>

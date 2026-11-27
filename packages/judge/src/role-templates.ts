@@ -83,6 +83,7 @@ export const ROLE_TEMPLATES: Record<OrgType, RoleTemplate[]> = {
       "org.members.view", "org.members.invite", "org.members.import", "students.manage", "parents.manage", "notices.manage", "staff_attendance.mark",
     ]),
     t("librarian", "Librarian", "organization", "The library: catalog, lending and returns.", ["library.manage", "students.view"]),
+    t("accountant", "Accountant", "organization", "Fees: plans, collecting at the counter, concessions, receipts and fee reports.", ["fees.manage", "students.view"]),
     t("transport_manager", "Transport manager", "organization", "Bus routes, stops and who rides which.", ["transport.manage", "students.view", "notices.manage"]),
     t("hostel_warden", "Hostel warden", "organization", "Hostel rooms and beds, who stays where, and boarders' leave.", ["hostel.manage", "students.view", "leave.students"]),
     t("counselor", "Counselor", "organization", "Sees how students are doing (attendance, grades, reports) to support them.", [
@@ -107,6 +108,7 @@ export const ROLE_TEMPLATES: Record<OrgType, RoleTemplate[]> = {
       "admissions.manage", "students.manage", "parents.manage", "org.members.invite", "org.members.import",
     ]),
     t("librarian", "Librarian", "organization", "The library: catalog, lending and returns.", ["library.manage", "students.view"]),
+    t("accountant", "Accountant", "organization", "Fees: plans, collecting at the counter, concessions, receipts and fee reports.", ["fees.manage", "students.view"]),
     t("hostel_warden", "Hostel warden", "organization", "Hostel rooms, allotments and boarders' leave.", ["hostel.manage", "students.view", "leave.students"]),
   ],
   coaching: [
@@ -123,6 +125,7 @@ export const ROLE_TEMPLATES: Record<OrgType, RoleTemplate[]> = {
     t("test_coordinator", "Test coordinator", "organization", "Tests and contests, their marks and results.", [
       "exams.manage", "contests.manage", "students.view", "reports.view", "notices.manage",
     ]),
+    t("accountant", "Accountant", "organization", "Fees: plans, collecting at the counter, concessions, receipts and fee reports.", ["fees.manage", "students.view"]),
   ],
   cohort: [
     t("teaching_assistant", "Teaching assistant", "group", "Helps mentors: grades work, takes attendance, answers in discussions.", [

@@ -8,6 +8,18 @@ aren't listed.
 
 ## 27 November 2026
 
+### Fees
+
+- Colleges, universities and coaching institutes can collect their fees in GretLab (switch on
+  **Fees and payments** in Settings › Modules): fee heads with GST where it applies, yearly plans
+  in instalments with late fines, concessions and scholarships, collecting at the counter (cash,
+  cheque, DD, UPI, transfer) with numbered receipts, and cancelling one with a reason.
+- Students and parents see what's due, download receipts and pay online, straight into the
+  institution's own Razorpay account; reminders come before, on and after the due day.
+- Fee reports: collection by day, mode, head and collector; dues and defaulters by class;
+  concessions given; each as CSV.
+- A new suggested role, Accountant, and Fees in plans (School, College and Coaching).
+
 ### Codes at checkout
 
 - Plan and billing has an **Apply** button for a referral code or coupon: it shows the discount

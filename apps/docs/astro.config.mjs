@@ -151,6 +151,7 @@ export default defineConfig({
                 { label: "The library desk", slug: "features/campus/library-desk" },
                 { label: "Transport", slug: "features/campus/transport" },
                 { label: "Hostel", slug: "features/campus/hostel" },
+                { label: "Fees", slug: "features/campus/fees" },
               ],
             },
             {
