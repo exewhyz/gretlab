@@ -73,6 +73,7 @@ import type {
   orgSettingsSchema,
   roleSchema,
 } from "./schemas"
+import { orgSlug } from "./schemas"
 import { orgPages } from "@/lib/paths"
 import { likeTerm, paged, type Page } from "@/lib/api/paging"
 
@@ -197,6 +198,26 @@ export async function listAllOrganizations(
   })
   const items = await withMemberCounts(page.items)
   return { ...page, items, organizations: items }
+}
+
+/**
+ * Whether an address can be had, asked while it's typed (the new-organization flows): its form,
+ * then whether an organization has it. Creating checks again, so this only saves a wasted step.
+ */
+export async function addressCheck(typed: string) {
+  const parsed = orgSlug.safeParse(typed.trim().toLowerCase())
+  if (!parsed.success)
+    return {
+      free: false,
+      problem: parsed.error.issues[0]?.message ?? "Not a valid address",
+    }
+  const [taken] = await getDb()
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(eq(organizations.slug, parsed.data))
+  return taken
+    ? { free: false, problem: "That address is taken. Try another." }
+    : { free: true, problem: null }
 }
 
 export async function createOrganization(

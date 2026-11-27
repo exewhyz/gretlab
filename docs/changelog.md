@@ -10,6 +10,8 @@ aren't listed.
 
 ### Clearer pages
 
+- Creating an organization (from the dashboard or by registering a school) says whether its web
+  address is free while you type it, and waits for a free one before going on.
 - The platform overview's share of accepted submissions was always shown as 0%; it's right now.
 - Attendance bars on the school and teacher homes turn red below the 75% minimum, not below 85%.
 - The school home's recent-days chart shows its bars at once.

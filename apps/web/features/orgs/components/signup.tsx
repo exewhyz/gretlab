@@ -1,5 +1,6 @@
 "use client"
 
+import { AddressStatus, useAddressCheck } from "./address-status"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -71,6 +72,8 @@ export function SchoolSignup() {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean)
+  // With the other hooks, before any early return (the pending card returns early).
+  const address = useAddressCheck(form.slug)
   const send = useMutation({
     mutationFn: () =>
       api<ApiResult<typeof signUpOrganization>>("/schools", {
@@ -124,13 +127,19 @@ export function SchoolSignup() {
         sections.length
       : 0
   const detailsOk =
-    form.name.trim().length > 0 && /^[a-z0-9][a-z0-9-]*$/.test(form.slug)
+    form.name.trim().length > 0 &&
+    /^[a-z0-9][a-z0-9-]*$/.test(form.slug) &&
+    address.free === true
   const last = step === STEPS.length - 1
   const why =
     step === 1 && !detailsOk
       ? !form.name.trim()
         ? "Give it a name."
-        : "The address takes small letters, numbers and dashes."
+        : !/^[a-z0-9][a-z0-9-]*$/.test(form.slug)
+          ? "The address takes small letters, numbers and dashes."
+          : address.free === false
+            ? (address.problem ?? "That address can't be used.")
+            : "Checking the address…"
       : null
   return (
     <form
@@ -199,6 +208,7 @@ export function SchoolSignup() {
                 }}
               />
             </Field>
+            <AddressStatus check={address} />
           </div>
         )}
         {step === 2 && (

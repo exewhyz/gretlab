@@ -1,13 +1,15 @@
 import { MODULE_KEYS, ORG_TYPES, PERMISSION_KEYS } from "@workspace/judge"
 import { z } from "zod"
 
-const slug = z
+/** An organization's address (/orgs/<address>); also checked while it's typed (`addressCheck`). */
+export const orgSlug = z
   .string()
   .trim()
   .regex(
     /^[a-z0-9][a-z0-9-]{1,47}$/,
     "Use 2-48 lowercase letters, numbers and dashes"
   )
+const slug = orgSlug
 
 const domain = z
   .string()

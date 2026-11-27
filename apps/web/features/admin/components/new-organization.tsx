@@ -1,5 +1,9 @@
 "use client"
 
+import {
+  AddressStatus,
+  useAddressCheck,
+} from "@/features/orgs/components/address-status"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { KINDS, type OrgType } from "@workspace/judge"
 import { useState } from "react"
@@ -53,9 +57,11 @@ export function NewOrganizationSheet({
     },
     meta: { quiet: true },
   })
+  const address = useAddressCheck(form.slug)
   const detailsOk =
     form.name.trim().length > 0 &&
     /^[a-z0-9][a-z0-9-]*$/.test(form.slug) &&
+    address.free === true &&
     EMAIL.test(form.ownerEmail.trim())
   const why =
     step === 1 && !detailsOk
@@ -63,7 +69,11 @@ export function NewOrganizationSheet({
         ? "Give it a name."
         : !/^[a-z0-9][a-z0-9-]*$/.test(form.slug)
           ? "The address takes small letters, numbers and dashes."
-          : "Enter the owner's email."
+          : address.free === false
+            ? (address.problem ?? "That address can't be used.")
+            : address.free === null
+              ? "Checking the address…"
+              : "Enter the owner's email."
       : null
   const last = step === STEPS.length - 1
   return (
@@ -127,6 +137,7 @@ export function NewOrganizationSheet({
               }}
             />
           </Field>
+          <AddressStatus check={address} />
           <Field
             label="Owner's email"
             help="They're invited as its first owner and manage it after signing in."

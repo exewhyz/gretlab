@@ -88,6 +88,13 @@ await school(c, { name: "Su C3", slug: "su-c3" })
 check("at most three a day per person", (await school(c, { name: "Su C4", slug: "su-c4" })).status === 429)
 
 // ---------- the pages
+// Whether an address is free, asked while typing (GET /org-address).
+const addr = async (who, slug) => (await who(`/org-address?slug=${encodeURIComponent(slug)}`)).json
+check("a taken address says so", (await addr(b, "su-alpha"))?.free === false && /taken/.test((await addr(b, "su-alpha")).problem ?? ""))
+check("...in any case and with spaces around it", (await addr(b, "  SU-ALPHA ")).free === false)
+check("a free address is free", (await addr(b, "su-nobody-has-this")).free === true)
+check("a malformed address says why", (await addr(b, "-bad")).free === false && /letters/.test((await addr(b, "-bad")).problem ?? ""))
+check("the check needs sign-in", (await fetch(`${BASE}/api/v1/org-address?slug=su-alpha`)).status === 401)
 const browser = await chromium.launch()
 const view = async (email, width) => {
   const ctx = await browser.newContext({ viewport: { width, height: 1000 } })
@@ -105,6 +112,12 @@ await p.screenshot({ path: SHOTS + "signup-kind.png", fullPage: true })
 await p.getByRole("button", { name: "Next" }).click()
 await p.getByLabel("Name").fill("Su Gamma Public School")
 check("the address follows the name", (await p.getByLabel("Web address").inputValue()) === "su-gamma-public-school")
+await p.getByLabel("Web address").fill("su-alpha")
+await p.getByTestId("address-status").filter({ hasText: /taken/ }).waitFor({ timeout: 10000 })
+check("a taken address is said while typing, and Next waits", await p.getByRole("button", { name: "Next" }).isDisabled())
+await p.getByLabel("Web address").fill("su-gamma-public-school")
+await p.getByTestId("address-status").filter({ hasText: "Available" }).waitFor({ timeout: 10000 })
+check("...a free one says Available", await p.getByRole("button", { name: "Next" }).isEnabled())
 await p.getByRole("button", { name: "Next" }).click()
 await p.getByLabel("Last grade").fill("2")
 check("the set-up is previewed", (await p.getByTestId("signup-preview").innerText()).includes("4 sections"))
