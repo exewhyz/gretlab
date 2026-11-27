@@ -416,7 +416,7 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
   - **The problem library is not paged on the server.** It sends compact index rows and shows 100 at a time with "Show more", because its filters (collections, sources, status) all work in the browser.
   - **Sidebar groups fold.** Every group starts open; its heading folds it, and the choice is remembered per device and per navigation (`useFolded` in `components/app-frame.tsx`). A folded group still shows the page you're on.
   - **Data screens.** A list's figures go above it in one line (`Stats` in `features/admin/components/shell.tsx`), not as a row of tiles, and percentages in tables are `PercentBar`s. Used on Reports, the gradebook, marks entry and the attendance overview.
-  - **Tests.** `e2e/access-links.mjs` covers this. A crawl of the demo accounts (`pnpm --filter @workspace/db demo`) should find no 403 or 404 behind any link.
+  - **Tests.** `e2e/access-links.mjs` covers this. It also fails on any button, link, tab, menu item, checkbox, select or switch with no accessible name on the pages it opens (read from Chrome's accessibility tree, so `aria-label`, labels, `title` and `alt` all count; a planted unnamed button proves the probe works): homes, Members, a gradebook, the platform overview, the problem library and a problem page with its editor. A crawl of the demo accounts (`pnpm --filter @workspace/db demo`) should find no 403 or 404 behind any link.
 
 ## Attendance (module)
 

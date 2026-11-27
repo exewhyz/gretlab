@@ -110,6 +110,31 @@ const view = async (email) => {
   return { page, refused }
 }
 const nav = (p) => p.getByRole("navigation", { name: "Organization" })
+// Buttons and links with no accessible name (nothing a screen reader can announce), read from
+// Chrome's own accessibility tree, so names from aria-label, labels, titles and alt text all count.
+const unnamed = async (page) => {
+  const cdp = await page.context().newCDPSession(page)
+  const { nodes } = await cdp.send("Accessibility.getFullAXTree")
+  const found = []
+  for (const n of nodes) {
+    const role = n.role?.value
+    if (n.ignored || !["button", "link", "menuitem", "tab", "checkbox", "combobox", "switch"].includes(role)) continue
+    if ((n.name?.value ?? "").trim()) continue
+    let html = ""
+    if (n.backendDOMNodeId) {
+      const { object } = await cdp.send("DOM.resolveNode", { backendNodeId: n.backendDOMNodeId }).catch(() => ({}))
+      if (object?.objectId) html = (await cdp.send("Runtime.callFunctionOn", { objectId: object.objectId, functionDeclaration: "function () { return this.outerHTML.slice(0, 160) }", returnByValue: true })).result.value
+    }
+    found.push(`${role}: ${html}`)
+  }
+  await cdp.detach()
+  return found
+}
+const allNamed = async (page, where) => {
+  await page.waitForLoadState("networkidle")
+  const found = await unnamed(page)
+  check(`every button and link on ${where} has a name`, found.length === 0, found.join("\n    "))
+}
 
 {
   const { page, refused } = await view("al-teacher@example.com")
@@ -117,15 +142,18 @@ const nav = (p) => p.getByRole("navigation", { name: "Organization" })
   await nav(page).waitFor({ timeout: 30000 })
   const items = await nav(page).innerText()
   check("the class teacher's sidebar has Members but not Roles", items.includes("Members") && !items.includes("Roles"), items.replace(/\s+/g, " "))
+  await allNamed(page, "a teacher's organization home")
   await page.goto(`${BASE}${O}/manage/members`)
   await page.getByText("al-student Name").first().waitFor({ timeout: 30000 })
   check("...and their members page loads with nothing refused", refused.length === 0, refused.join())
+  await allNamed(page, "Members")
   await page.goto(`${BASE}${O}/manage/assignments`)
   await page.getByRole("link", { name: "al-school-wide" }).waitFor({ timeout: 30000 })
   check("...the school-wide assignment links to its gradebook", (await page.getByRole("link", { name: "al-school-wide" }).getAttribute("href"))?.endsWith(`/assignments/${school}/grades`))
   await page.getByRole("link", { name: "al-school-wide" }).click()
   await page.getByText("Gradebook: al-school-wide").waitFor({ timeout: 30000 })
   check("...whose gradebook has no Edit button and refuses nothing", (await page.getByRole("link", { name: "Edit", exact: true }).count()) === 0 && refused.length === 0, refused.join())
+  await allNamed(page, "a gradebook")
   await page.goto(`${BASE}${O}/manage`)
   await page.waitForURL((u) => u.pathname === O, { timeout: 30000 })
   check("the old manage overview goes to the organization's home", new URL(page.url()).pathname === O)
@@ -142,6 +170,7 @@ const nav = (p) => p.getByRole("navigation", { name: "Organization" })
   const text = await page.getByTestId("student-home").innerText()
   check("an employee's home has no attendance or timetable, and refuses nothing", !text.includes("Attendance") && !text.includes("timetable") && refused.length === 0, refused.join() + " | " + text.slice(0, 200))
   check("...and speaks of teams, not classes", text.includes("My teams") && !/\bclasses\b/.test(text))
+  await allNamed(page, "an employee's home")
   await page.context().close()
 }
 {
@@ -157,6 +186,7 @@ const nav = (p) => p.getByRole("navigation", { name: "Organization" })
   await page.goto(`${BASE}/admin`)
   await page.getByTestId("admin-overview").waitFor({ timeout: 30000 })
   check("Support's overview offers no New problem, New contest or notices", (await page.getByRole("link", { name: "New problem" }).count()) === 0 && (await page.getByRole("link", { name: "New contest" }).count()) === 0 && (await page.getByRole("link", { name: "Post a notice" }).count()) === 0)
+  await allNamed(page, "the platform overview")
   await page.context().close()
 }
 {
@@ -164,6 +194,21 @@ const nav = (p) => p.getByRole("navigation", { name: "Organization" })
   await page.goto(`${BASE}/orgs/no-such-place-al`)
   await page.getByTestId("error-view").waitFor({ timeout: 30000 })
   check("an organization that doesn't exist shows Not found", (await page.getByTestId("error-view").getAttribute("data-status")) === "404")
+  await page.context().close()
+}
+{
+  // The library and a problem with its editor: the pages with the most icon-only buttons.
+  const { page } = await view("al-student@example.com")
+  await page.goto(`${BASE}/problems`)
+  await page.getByRole("link", { name: /Simple Interest/ }).first().waitFor({ timeout: 30000 })
+  await allNamed(page, "the problem library")
+  // The probe itself: a planted button with no name must be found, or a pass means nothing.
+  await page.evaluate(() => { const b = document.createElement("button"); b.id = "al-unnamed"; b.innerHTML = "<svg width='8' height='8'></svg>"; document.body.append(b) })
+  check("the name check finds a planted unnamed button", (await unnamed(page)).some((f) => f.includes("al-unnamed")))
+  await page.evaluate(() => document.getElementById("al-unnamed")?.remove())
+  await page.getByRole("link", { name: /Simple Interest/ }).first().click()
+  await page.locator(".monaco-editor").first().waitFor({ timeout: 60000 })
+  await allNamed(page, "a problem page with its editor")
   await page.context().close()
 }
 await browser.close()
