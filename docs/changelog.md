@@ -8,6 +8,15 @@ aren't listed.
 
 ## 27 November 2026
 
+### Universities and affiliated colleges
+
+- A new kind of organization, **University** (School › Department › Program, Semesters, credit
+  grading), with its suggested roles: Vice chancellor, Registrar, Controller of examinations,
+  Dean, Affiliation office and more.
+- A college asks to affiliate under **Manage › University** by the university's address; the
+  university approves it with a college code, or refuses, under **Manage › Affiliated colleges**,
+  and either side can end it. Both are told, and every step is in both activity logs.
+
 ### The college ERP with a coding lab
 
 - GretLab now introduces itself as the college ERP with a coding lab built in, for colleges,

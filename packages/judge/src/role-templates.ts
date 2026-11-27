@@ -111,6 +111,26 @@ export const ROLE_TEMPLATES: Record<OrgType, RoleTemplate[]> = {
     t("accountant", "Accountant", "organization", "Fees: plans, collecting at the counter, concessions, receipts and fee reports.", ["fees.manage", "students.view"]),
     t("hostel_warden", "Hostel warden", "organization", "Hostel rooms, allotments and boarders' leave.", ["hostel.manage", "students.view", "leave.students"]),
   ],
+  university: [
+    t("vice_chancellor", "Vice chancellor", "organization", "Runs the university: its schools, faculty, exams and affiliated colleges. Not settings or roles.", [...LEADERSHIP, "university.manage"]),
+    t("registrar", "Registrar", "organization", "Affiliated colleges and their students' registration, and the university's own records.", [
+      "org.members.view", "students.manage", "university.colleges", "university.registrations", "university.view", "notices.manage", "reports.view",
+    ]),
+    t("controller_of_exams", "Controller of examinations", "organization", "University exams: external marks, results and publishing them, and the university's own exams.", [
+      "university.exams", "university.view", "exams.manage", "students.view", "notices.manage",
+    ]),
+    t("dean", "Dean", "group", "Leads a school: its departments, programs, courses and results.", [
+      ...TEACHING, "org.groups.edit", "subjects.manage", "timetable.manage", "exams.manage", "leave.manage", "reports.view", "events.manage", "org.outcomes.manage", "students.view",
+    ]),
+    t("affiliation_office", "Affiliation office", "organization", "Affiliated colleges, the common syllabus, and the overview of each college.", [
+      "university.colleges", "university.syllabus", "university.view", "notices.manage",
+    ]),
+    t("hod", "Head of department", "group", "Leads a department: its courses, timetable, faculty's teaching, results and leave.", [
+      ...TEACHING, "org.groups.edit", "subjects.manage", "timetable.manage", "exams.manage", "leave.manage", "reports.view", "events.manage", "org.outcomes.manage", "students.view",
+    ]),
+    t("librarian", "Librarian", "organization", "The library: catalog, lending and returns.", ["library.manage", "students.view"]),
+    t("accountant", "Accountant", "organization", "Fees: plans, collecting at the counter, concessions, receipts and fee reports.", ["fees.manage", "students.view"]),
+  ],
   coaching: [
     t("center_head", "Center head", "organization", "Runs the institute: batches, faculty, tests, admissions and reports. Not settings or roles.", LEADERSHIP),
     t("batch_coordinator", "Batch coordinator", "group", "Keeps a batch on track: timetable, register, leave, parents and notices.", [

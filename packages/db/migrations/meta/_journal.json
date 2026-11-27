@@ -764,6 +764,13 @@
       "when": 1795760579342,
       "tag": "0108_fees",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1795780400116,
+      "tag": "0109_university",
+      "breakpoints": true
     }
   ]
 }

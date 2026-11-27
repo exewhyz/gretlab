@@ -6,6 +6,7 @@ import { company } from "./company.ts"
 import { other } from "./other.ts"
 import { school } from "./school.ts"
 import type { KindDefinition } from "./types.ts"
+import { university } from "./university.ts"
 
 export type { KindDefinition, KindTerms, ModuleLevel } from "./types.ts"
 
@@ -17,6 +18,7 @@ export type { KindDefinition, KindTerms, ModuleLevel } from "./types.ts"
 export const KINDS = {
   school,
   college,
+  university,
   coaching,
   cohort,
   company,

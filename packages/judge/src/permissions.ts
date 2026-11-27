@@ -115,6 +115,12 @@ export const PERMISSIONS = {
       "Link parents to the students of the groups this applies to, and see who they are (Parent accounts module). Grant this, or the finer actions under it.",
     module: "Members",
   },
+  "university.manage": {
+    label: "Run the university's colleges",
+    description:
+      "Affiliated colleges, the common syllabus, registering their students, university exams and results, and the overview of each college (Affiliated colleges module). Grant this, or the finer actions under it.",
+    module: "University",
+  },
   "fees.manage": {
     label: "Manage fees",
     description:
@@ -507,6 +513,36 @@ export const PERMISSIONS = {
       "Approve or refuse staff leave, see everyone's balances, and set the kinds of leave and how many days a year each allows.",
     module: "Members",
     parent: "leave.manage",
+  },
+  "university.colleges": {
+    label: "Affiliate colleges",
+    description: "Approve or refuse colleges asking to affiliate, give each its college code, and end an affiliation.",
+    module: "University",
+    parent: "university.manage",
+  },
+  "university.syllabus": {
+    label: "Set the syllabus",
+    description: "Programs, semesters and their courses with credits and marks, which affiliated colleges adopt.",
+    module: "University",
+    parent: "university.manage",
+  },
+  "university.registrations": {
+    label: "Register students",
+    description: "Approve the students colleges register, and number them.",
+    module: "University",
+    parent: "university.manage",
+  },
+  "university.exams": {
+    label: "Run university exams",
+    description: "University exams for each program and semester, external marks, results and publishing them.",
+    module: "University",
+    parent: "university.manage",
+  },
+  "university.view": {
+    label: "See colleges",
+    description: "Each affiliated college's students, registrations, attendance figures, marks and results. Never their fees, parents or staff.",
+    module: "University",
+    parent: "university.manage",
   },
   "fees.setup": {
     label: "Set up fees",

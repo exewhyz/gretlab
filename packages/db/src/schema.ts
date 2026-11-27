@@ -941,6 +941,7 @@ export const judgeMachines = pgTable(
 export const orgType = pgEnum("org_type", [
   "school",
   "college",
+  "university",
   "coaching",
   "cohort",
   "company",
@@ -1239,6 +1240,52 @@ export const libraryBooks = pgTable(
     createdAt: createdAt(),
   },
   (table) => [index("library_books_org").on(table.orgId, table.title)]
+)
+
+/* ---------- Universities and affiliated colleges (packages/judge/src/university.ts) ---------- */
+
+/**
+ * A college's affiliation to a university: asked for by the college, approved with a college
+ * code or refused by the university, and ended. At most one asked-for or active per college;
+ * a code is unique within its university.
+ */
+export const orgAffiliations = pgTable(
+  "org_affiliations",
+  {
+    id: id(),
+    universityId: uuid("university_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    collegeId: uuid("college_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** requested, active, refused, withdrawn or ended. */
+    status: text("status")
+      .$type<"requested" | "active" | "refused" | "withdrawn" | "ended">()
+      .notNull()
+      .default("requested"),
+    /** The college's code at the university ("1RV"), given when approved. */
+    collegeCode: text("college_code"),
+    /** What the college wrote when asking, or the university when deciding. */
+    note: text("note").notNull().default(""),
+    requestedBy: uuid("requested_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedBy: uuid("decided_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    requestedAt: createdAt(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("org_affiliations_one_live")
+      .on(table.collegeId)
+      .where(sql`status in ('requested', 'active')`),
+    uniqueIndex("org_affiliations_code")
+      .on(table.universityId, table.collegeCode)
+      .where(sql`status = 'active'`),
+    index("org_affiliations_university").on(table.universityId, table.status),
+  ]
 )
 
 /* ---------- Fees (the finance module; rules in packages/judge/src/fees.ts) ---------- */

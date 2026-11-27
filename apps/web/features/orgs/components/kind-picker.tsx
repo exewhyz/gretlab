@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  BankIcon,
   BuildingsIcon,
   ChalkboardTeacherIcon,
   GraduationCapIcon,
@@ -21,6 +22,7 @@ import { Check } from "@/components/form"
 const ICONS: Record<OrgType, Icon> = {
   school: StudentIcon,
   college: GraduationCapIcon,
+  university: BankIcon,
   coaching: ChalkboardTeacherIcon,
   cohort: RocketLaunchIcon,
   company: BuildingsIcon,

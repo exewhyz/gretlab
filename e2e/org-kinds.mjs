@@ -24,7 +24,7 @@ const check = (name, ok, detail = "") => {
   if (!ok) failures++
 }
 const psql = (q) => execFileSync("docker", ["compose", "-f", ROOT + "docker-compose.yml", "exec", "-T", "postgres", "psql", "-U", "gretlab", "-d", DB, "-Atqc", q]).toString().trim()
-const KINDS = ["school", "college", "coaching", "cohort", "company", "community", "other"]
+const KINDS = ["school", "college", "university", "coaching", "cohort", "company", "community", "other"]
 const cleanup = () => {
   psql(`delete from organizations where slug like 'ok-%'`)
   psql(`delete from org_kind_policies`)

@@ -17,6 +17,7 @@ import { KINDS, type KindTerms, type ModuleLevel } from "./kinds/index.ts"
 export const ORG_TYPES = [
   "school",
   "college",
+  "university",
   "coaching",
   "cohort",
   "company",
@@ -128,6 +129,12 @@ export const MODULES = {
     label: "Assigned training",
     description:
       "Courses assigned to teams with due dates, renewed every few months for compliance, with who's done, overdue or expiring, and certificates that expire.",
+    ready: true,
+  },
+  affiliation: {
+    label: "Affiliated colleges",
+    description:
+      "Colleges affiliated to the university: approving them, a common syllabus, registering their students, university exams and results, shared content and an overview of each college.",
     ready: true,
   },
   finance: {

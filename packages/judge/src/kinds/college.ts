@@ -1,6 +1,6 @@
 import type { KindDefinition } from "./types.ts"
 
-/** A college or university: departments, programs and batches, semesters, faculty. */
+/** A college: departments, programs and batches, semesters, faculty. (Universities have their own kind.) */
 export const college = {
   key: "college",
   label: "College",
@@ -8,7 +8,7 @@ export const college = {
   description:
     "Departments, programs and batches, semesters, faculty and course outcomes.",
   examples:
-    "Engineering, arts and science colleges, universities and their departments.",
+    "Engineering, arts and science, management and medical colleges, including those affiliated to a university.",
   decides: [
     "Batches sit under departments and programs (CSE › B.Tech 2026), each with a faculty advisor.",
     "Teaching is by course, taught by faculty; outcomes (CO–PO) are on.",

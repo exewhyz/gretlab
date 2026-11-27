@@ -154,6 +154,14 @@ export const NOTIFICATION_EVENTS = {
     kinds: ["fee_due", "fee_paid"],
     emailByDefault: true,
   },
+  "university.affiliation": {
+    label: "Affiliation",
+    description:
+      "A college asks to affiliate to your university, or your university decides on your college's request or ends it.",
+    audience: "staff",
+    kinds: ["affiliation"],
+    emailByDefault: true,
+  },
   "leave.request": {
     label: "Leave to decide",
     description: "Someone you approve leave for asks for it.",

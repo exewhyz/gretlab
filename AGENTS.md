@@ -584,6 +584,13 @@ Same model as LeetCode and HackerRank. Keep them distinct everywhere.
 - **Reports** (`reports.ts`, Fees › Reports, scoped): collection over a range, dues and defaulters (from `orgLedgers`, in memory: fine to tens of thousands of students; make it a background job before organizations of 200,000), concessions; CSV with formulas defused.
 - Permissions "Manage fees" (`fees.manage`) with `fees.setup`, `fees.collect`, `fees.concede`, `fees.view`; the suggested role Accountant; the plan feature `fees` (module `finance`) in the School, College and Coaching presets. `e2e/fees.mjs` (a fake Razorpay knowing only the college's keys).
 
+## Universities and affiliated colleges
+
+- **The kind** (the owner's decisions, 27 November 2026; `kinds/university.ts`): School › Department › Program, Semesters, credit grading, a college's modules plus `affiliation` (on from the start). Suggested roles: Vice chancellor, Registrar, Controller of examinations, Dean, Affiliation office, HOD, Librarian, Accountant. Migration 0109 adds `university` to `org_type`.
+- **Organizations stay separate.** Each affiliated college is its own organization; `org_affiliations` links it to its university (requested → active → ended, or refused/withdrawn; rules `affiliationNext` in `packages/judge/src/university.ts`, unit-tested). One live affiliation per college and one college per code per university (partial unique indexes; a race answers 409). A college asks under Manage › University (`org.settings.manage` across the organization, step-up); the university approves with a college code (2–10 letters and digits, capitals), refuses or ends under Manage › Affiliated colleges (`university.colleges`, step-up; `university.view` only looks). Each step is logged in both organizations (`university.affiliation`) and tells the other side (`affiliation`, event `university.affiliation`). Code: `features/university/affiliation.ts`.
+- **What a university sees** (the owner's decision): academics student by student (registrations, internal and university marks, results, attendance figures), never fees, parents, hostel, transport, leave or staff details. It reaches a college **only through university endpoints** gated by `activeUniversityOf` / `activeCollegesOf` (an active affiliation), never through the college's own context. Ending an affiliation cuts access at once.
+- Still to build, in slices (plan: shared content, common syllabus, student registration, university exams and results, oversight, plans and docs). `e2e/university.mjs`.
+
 ## Leave (module)
 
 - On by default for schools and colleges. Code in `features/leave`; rules in `packages/judge/src/leave.ts`, unit-tested. The rules cover school days in a span (the timetable's days, Mon–Fri by default), half days (0.5), a request's limits (at most 90 days at once, at most 30 days after the fact), overlaps, staff leave types and balances.
@@ -1153,7 +1160,7 @@ Status is updated as items ship; anything not ticked has not been built.
 
 **Building now (the owner's decisions, 27 November 2026):** GretLab is sold as an ERP to colleges, universities and coaching institutes, with the coding lab built in.
 - [x] Fees students pay their institution (taken off hold; see Fees below): heads, yearly plans of instalments, concessions, late fines, collecting at the counter, receipts, online payment into the institution's own Razorpay, reminders, reports. Slices: the rules (`packages/judge/src/fees.ts`, unit-tested: `feeLedger`, `allocatePayment`, `receiptNumber`, `splitWithGst`, `reminderStep`), then setup (heads, plans, settings; migration 0108), the ledger and the counter with receipts, concessions, online payment, the students' and parents' page with reminders, reports, and making the `finance` module ready and sellable.
-- [ ] Universities as a kind of organization, with affiliated colleges under a university (organizations inside organizations), in a plan of their own after fees.
+- [ ] Universities as a kind of organization, with affiliated colleges (organizations inside organizations), in a plan of their own after fees. Built so far: the kind and affiliation (slices 1–2); next shared content, the common syllabus, registration, university exams and results, oversight.
 - [ ] Later: SMS and WhatsApp to students and parents.
 
 **On hold (the owner's decision, November 2026), don't start without asking:**
