@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 
+import { ConfirmButton } from "@/components/confirm"
 import { DetailSheet } from "@/components/detail-sheet"
 import { Field, FormMessage, SelectInput, TextInput } from "@/components/form"
 import { Loading, Pager, Table } from "@/features/admin/components/shell"
@@ -172,6 +173,17 @@ function PlanLedger({
   plan: PlanFees
 }) {
   const [collecting, setCollecting] = useState(false)
+  const [conceding, setConceding] = useState(false)
+  const client = useQueryClient()
+  const remove = useMutation({
+    mutationFn: (id: string) =>
+      api(`/orgs/${slug}/fees/concessions/${id}`, { method: "DELETE" }),
+    onSuccess: () =>
+      client.invalidateQueries({
+        queryKey: ["org", slug, "fees", "student", data.student.id],
+      }),
+    meta: { success: "Removed." },
+  })
   const [cancelling, setCancelling] = useState<string | null>(null)
   const l = plan.ledger
   return (
@@ -225,6 +237,59 @@ function PlanLedger({
           </tr>
         ))}
       </Table>
+      {(plan.concessions.length > 0 || data.can.concede) && (
+        <div className="grid gap-2" data-testid="concessions">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-body-sm font-medium text-ink">Concessions</h4>
+            {data.can.concede && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConceding(true)}
+              >
+                Give a concession
+              </Button>
+            )}
+          </div>
+          {plan.concessions.length === 0 ? (
+            <p className="text-caption text-body">None.</p>
+          ) : (
+            <ul className="grid gap-1">
+              {plan.concessions.map((c) => (
+                <li
+                  key={c.id}
+                  data-testid="concession"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-hairline px-3 py-2 text-body-sm"
+                >
+                  <span className="text-ink">
+                    {c.percent ? `${c.percent}%` : rupees(c.amount ?? 0)} off{" "}
+                    {c.headId
+                      ? (data.heads.find((h) => h.id === c.headId)?.name ??
+                        "a head")
+                      : "the whole plan"}
+                    <span className="ml-2 text-caption text-body">
+                      {REASONS.find(([k]) => k === c.reason)?.[1] ?? c.reason}
+                      {c.note ? ` · ${c.note}` : ""}
+                    </span>
+                  </span>
+                  {data.can.concede && (
+                    <ConfirmButton
+                      variant="ghost"
+                      size="sm"
+                      title="Remove this concession?"
+                      description="What it took off is owed again."
+                      confirmLabel="Remove"
+                      onConfirm={() => remove.mutate(c.id)}
+                    >
+                      Remove
+                    </ConfirmButton>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {plan.payments.length > 0 && (
         <div className="grid gap-2">
           <h4 className="text-body-sm font-medium text-ink">Receipts</h4>
@@ -282,6 +347,14 @@ function PlanLedger({
           </Table>
         </div>
       )}
+      {conceding && (
+        <ConcessionDialog
+          slug={slug}
+          data={data}
+          plan={plan}
+          onClose={() => setConceding(false)}
+        />
+      )}
       {collecting && (
         <CollectDialog
           slug={slug}
@@ -299,6 +372,134 @@ function PlanLedger({
         />
       )}
     </section>
+  )
+}
+
+const REASONS = [
+  ["merit", "Merit"],
+  ["scholarship", "Scholarship"],
+  ["sibling", "Sibling"],
+  ["staff_ward", "Staff ward"],
+  ["other", "Other"],
+] as const
+
+function ConcessionDialog({
+  slug,
+  data,
+  plan,
+  onClose,
+}: {
+  slug: string
+  data: Fees
+  plan: PlanFees
+  onClose: () => void
+}) {
+  const client = useQueryClient()
+  const [headId, setHeadId] = useState("")
+  const [kind, setKind] = useState<"percent" | "amount">("percent")
+  const [value, setValue] = useState("")
+  const [reason, setReason] = useState<(typeof REASONS)[number][0]>("merit")
+  const [note, setNote] = useState("")
+  const give = useMutation({
+    mutationFn: () =>
+      api(`/orgs/${slug}/fees/students/${data.student.id}/concessions`, {
+        body: {
+          planId: plan.id,
+          headId: headId || null,
+          percent: kind === "percent" ? Number(value) : null,
+          amount: kind === "amount" ? Number(value) : null,
+          reason,
+          note,
+        },
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({
+        queryKey: ["org", slug, "fees", "student", data.student.id],
+      })
+      onClose()
+    },
+    meta: { success: "Given.", quiet: true },
+  })
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Give a concession on {plan.name}</DialogTitle>
+        </DialogHeader>
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            give.mutate()
+          }}
+        >
+          <Field label="Off">
+            <SelectInput
+              value={headId}
+              onChange={(e) => setHeadId(e.target.value)}
+            >
+              <option value="">The whole plan</option>
+              {data.heads.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="As">
+              <SelectInput
+                value={kind}
+                onChange={(e) => setKind(e.target.value as typeof kind)}
+              >
+                <option value="percent">A percent</option>
+                <option value="amount">An amount (₹)</option>
+              </SelectInput>
+            </Field>
+            <Field label={kind === "percent" ? "Percent" : "Amount (₹)"}>
+              <TextInput
+                inputMode="numeric"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+              />
+            </Field>
+          </div>
+          <Field label="Reason">
+            <SelectInput
+              value={reason}
+              onChange={(e) => setReason(e.target.value as typeof reason)}
+            >
+              {REASONS.map(([k, label]) => (
+                <option key={k} value={k}>
+                  {label}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+          <Field label="Note (optional)">
+            <TextInput
+              value={note}
+              placeholder="State merit scholarship 2026"
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </Field>
+          {give.error && (
+            <FormMessage message={{ text: give.error.message, kind: "err" }} />
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={give.isPending || !(Number(value) > 0)}
+            >
+              Give concession
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 

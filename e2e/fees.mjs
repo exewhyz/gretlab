@@ -145,6 +145,22 @@ check("…and is kept sealed as issued", !psql(`select receipt from fee_payments
 check("a plan with payments can't be deleted", (await owner(`${O}/fees/plans/${plan.id}`, { method: "DELETE" })).json?.error?.code === "plan_has_payments")
 check("collecting and cancelling are in the activity log", psql(`select count(*) from audit_log where org_id='${orgId}' and action in ('fees.collect','fees.cancel')`) === "5")
 
+// ---------- concessions
+const concede = (who, h, body) => who(`${O}/fees/students/${uid(h)}/concessions`, { body: { planId: plan.id, headId: null, percent: null, amount: null, reason: "merit", note: "", ...body } })
+check("a collector without Give concessions can't give one", (await concede(teacher, "fee-s2", { headId: tuition.id, percent: 50 })).status === 403)
+check("a percent and an amount together are refused", (await concede(owner, "fee-s2", { percent: 10, amount: 100 })).status === 400)
+const half = await concede(owner, "fee-s2", { headId: tuition.id, percent: 50, reason: "scholarship", note: "State merit" })
+check("a scholarship of half the tuition is given", half.status === 200, JSON.stringify(half.json))
+const withHalf = (await fees(owner, "fee-s2")).json.plans[0]
+check("…and comes off the tuition in every term", withHalf.ledger.instalments.map((i) => i.concession).join() === "15000,15000", withHalf.ledger.instalments.map((i) => i.concession).join())
+await concede(owner, "fee-s2", { amount: 1000, reason: "sibling" })
+const withBoth = (await fees(owner, "fee-s2")).json.plans[0]
+check("an amount off the whole plan comes off what's left, oldest term first", withBoth.ledger.instalments.map((i) => i.concession).join() === "16000,15000", withBoth.ledger.instalments.map((i) => i.concession).join())
+for (const c of withBoth.concessions) await owner(`${O}/fees/concessions/${c.id}`, { method: "DELETE" })
+check("removing them puts the fees back", (await fees(owner, "fee-s2")).json.plans[0].ledger.instalments.every((i) => i.concession === 0))
+check("concessions are in the activity log", psql(`select count(*) from audit_log where org_id='${orgId}' and action='fees.concession'`) === "4")
+await concede(owner, "fee-s2", { headId: tuition.id, percent: 25, reason: "staff_ward" })
+
 // ---------- the Setup screen
 const browser = await chromium.launch()
 const errors = []
@@ -185,6 +201,7 @@ try {
   await p.getByLabel("Amount (₹)").fill("500")
   await p.getByRole("button", { name: "Collect and print receipt" }).click()
   await p.getByTestId("fee-receipt").nth(2).waitFor({ timeout: 15000 })
+  check("…with what concessions it has, and Give a concession", (await p.getByTestId("concessions").count()) === 1 && (await p.getByRole("button", { name: "Give a concession" }).count()) === 1)
   check("collecting from the page adds the receipt", psql(`select count(*) from fee_payments where student_id='${uid("fee-s1")}' and status='paid'`) === "2")
   await p.screenshot({ path: SHOTS + "fees-student.png" })
   const phone = await open("fee-o@example.com", 390)

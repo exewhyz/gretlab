@@ -68,6 +68,28 @@ export const collectSchema = z.object({
   instalments: z.array(z.string().max(40)).max(24).optional(),
 })
 
+export const concessionSchema = z
+  .object({
+    planId: z.uuid(),
+    /** One head, or none for the whole plan. */
+    headId: z.uuid().nullable(),
+    percent: z.number().int().min(1).max(100).nullable(),
+    amount: z.number().int().min(1).max(100_000_000).nullable(),
+    reason: z.enum(["merit", "scholarship", "sibling", "staff_ward", "other"]),
+    note: z.string().trim().max(300).default(""),
+  })
+  .refine((c) => (c.percent === null) !== (c.amount === null), {
+    message: "Give a percent or an amount, not both",
+  })
+
+export const CONCESSION_REASON: Record<string, string> = {
+  merit: "Merit",
+  scholarship: "Scholarship",
+  sibling: "Sibling",
+  staff_ward: "Staff ward",
+  other: "Other",
+}
+
 export const cancelSchema = z.object({
   reason: z.string().trim().min(3, "Say why it's cancelled").max(300),
 })
@@ -580,4 +602,71 @@ export async function feeReceipt(slug: string, user: User, paymentId: string) {
     status: row.status,
     cancelReason: row.cancelReason,
   }
+}
+
+/** Gives a concession on one of the student's plans (Give concessions, scoped). Logged. */
+export async function giveConcession(
+  slug: string,
+  user: User,
+  studentId: string,
+  input: z.infer<typeof concessionSchema>
+) {
+  const ctx = await orgContext(slug, user)
+  needFees(ctx)
+  const who = await student(ctx, studentId)
+  const groups = await groupsOf(ctx, studentId)
+  if (!mayFor(ctx, "fees.concede", groups))
+    throw forbidden("Giving this student concessions")
+  const data = await ledgersFor(ctx, studentId)
+  const plan = data.plans.find((p) => p.id === input.planId)
+  if (!plan) throw notFound("That plan isn't this student's.")
+  const head = input.headId
+    ? data.heads.find((h) => h.id === input.headId)
+    : null
+  if (input.headId && !head)
+    throw new ApiError(400, "bad_head", "That fee head isn't one of yours.")
+  const [row] = await getDb()
+    .insert(feeConcessions)
+    .values({
+      orgId: ctx.org.id,
+      planId: plan.id,
+      studentId,
+      headId: input.headId,
+      percent: input.percent,
+      amount: input.amount,
+      reason: input.reason,
+      note: input.note,
+      givenBy: user.id,
+    })
+    .returning({ id: feeConcessions.id })
+  const what = input.percent
+    ? `${input.percent}%`
+    : `₹${input.amount!.toLocaleString("en-IN")}`
+  await writeAudit(
+    ctx,
+    "fees.concession",
+    `Gave ${who.name ?? who.email} a concession of ${what} off ${head ? head.name : plan.name} (${CONCESSION_REASON[input.reason]})`
+  )
+  return row!
+}
+
+/** Removes a concession; what it took off is owed again. Logged. */
+export async function removeConcession(slug: string, user: User, id: string) {
+  const ctx = await orgContext(slug, user)
+  needFees(ctx)
+  const [row] = await getDb()
+    .select()
+    .from(feeConcessions)
+    .where(and(eq(feeConcessions.id, id), eq(feeConcessions.orgId, ctx.org.id)))
+  if (!row) throw notFound("No such concession.")
+  const groups = await groupsOf(ctx, row.studentId)
+  if (!mayFor(ctx, "fees.concede", groups))
+    throw forbidden("Removing this concession")
+  await getDb().delete(feeConcessions).where(eq(feeConcessions.id, id))
+  const who = await student(ctx, row.studentId)
+  await writeAudit(
+    ctx,
+    "fees.concession",
+    `Removed a concession from ${who.name ?? who.email}`
+  )
 }
