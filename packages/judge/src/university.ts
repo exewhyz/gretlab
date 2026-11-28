@@ -53,3 +53,35 @@ export function collegeCodeProblem(code: string): string | null {
     ? null
     : "A college code is 2 to 10 letters and digits."
 }
+
+/** A course in a university program's semester: how it's marked. */
+export interface SyllabusMarks {
+  /** Marked by the college (sessionals, assignments, labs). */
+  internalMax: number
+  /** Marked by the university (the end-semester exam). */
+  externalMax: number
+  /** The least in the university's exam to pass. */
+  passExternal: number
+  /** The least in all to pass. */
+  passTotal: number
+}
+
+/** Why a syllabus course's marks can't be used, or null. */
+export function syllabusCourseProblem(m: SyllabusMarks): string | null {
+  const all = [m.internalMax, m.externalMax, m.passExternal, m.passTotal]
+  if (all.some((n) => !Number.isInteger(n) || n < 0)) return "Marks are whole numbers."
+  if (m.internalMax + m.externalMax === 0) return "A course is out of more than 0 marks."
+  if (m.internalMax > 1000 || m.externalMax > 1000) return "A course is out of at most 1,000 marks."
+  if (m.passExternal > m.externalMax)
+    return "The external pass mark can't be more than the external marks."
+  if (m.passTotal > m.internalMax + m.externalMax)
+    return "The pass mark can't be more than the course's total."
+  return null
+}
+
+export const MAX_SEMESTERS = 12
+
+/** Why a semester number can't be used, or null. */
+export function semesterProblem(n: number): string | null {
+  return Number.isInteger(n) && n >= 1 && n <= MAX_SEMESTERS ? null : "A semester is 1 to 12."
+}

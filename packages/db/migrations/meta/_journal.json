@@ -771,6 +771,13 @@
       "when": 1795780400116,
       "tag": "0109_university",
       "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1795791004604,
+      "tag": "0110_syllabus",
+      "breakpoints": true
     }
   ]
 }

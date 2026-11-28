@@ -35,6 +35,7 @@ interface Subject {
   code: string
   description: string
   credits: number | null
+  fromUniversity: boolean
   classes: {
     id: string
     groupId: string
@@ -110,6 +111,14 @@ export function ManageSubjects({ slug }: { slug: string }) {
                         {s.credits} credit{s.credits === 1 ? "" : "s"}
                       </span>
                     )}
+                    {s.fromUniversity && (
+                      <span
+                        className="ml-2 rounded border border-hairline px-1.5 py-0.5 text-xs text-body"
+                        data-testid="from-university"
+                      >
+                        University
+                      </span>
+                    )}
                   </div>
                   {s.description && (
                     <div className="text-caption">{s.description}</div>
@@ -163,7 +172,7 @@ export function ManageSubjects({ slug }: { slug: string }) {
                       Edit
                     </Button>
                   )}
-                  {data.can.delete && (
+                  {data.can.delete && !s.fromUniversity && (
                     <ConfirmButton
                       size="xs"
                       variant="ghost"
@@ -252,8 +261,15 @@ function SubjectDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
+          {subject?.fromUniversity && (
+            <p className="text-body-sm text-body">
+              This course comes from your university&apos;s syllabus: its name,
+              code and credits are the university&apos;s.
+            </p>
+          )}
           <Field label="Name">
             <TextInput
+              disabled={subject?.fromUniversity}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Mathematics"
@@ -264,6 +280,7 @@ function SubjectDialog({
             help="A short code shown in timetables, like MATH."
           >
             <TextInput
+              disabled={subject?.fromUniversity}
               value={form.code}
               onChange={(e) => setForm({ ...form, code: e.target.value })}
             />
@@ -277,6 +294,7 @@ function SubjectDialog({
                 type="number"
                 min={0}
                 step="0.5"
+                disabled={subject?.fromUniversity}
                 value={form.credits}
                 onChange={(e) => setForm({ ...form, credits: e.target.value })}
               />

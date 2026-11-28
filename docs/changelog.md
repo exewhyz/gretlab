@@ -19,6 +19,10 @@ aren't listed.
 - A university shares its own problems, questions, courses and templates with its affiliated
   colleges (**Share with colleges** in its Library, Courses and Templates). Colleges find them in
   their library and pickers and can set them as work, only while they're affiliated.
+- A university sets its common syllabus (**Syllabus**: each program's semesters, their courses with
+  credits, internal and external marks and pass marks). An affiliated college puts a class on a
+  semester (**Manage › University**) and the class takes those courses, kept in step with the
+  university's names, codes and credits.
 
 ### The college ERP with a coding lab
 

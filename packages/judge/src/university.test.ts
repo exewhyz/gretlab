@@ -1,7 +1,13 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { affiliationNext, collegeCodeProblem, normalizeCollegeCode } from "./university.ts"
+import {
+  affiliationNext,
+  collegeCodeProblem,
+  normalizeCollegeCode,
+  semesterProblem,
+  syllabusCourseProblem,
+} from "./university.ts"
 
 test("an affiliation is asked for, then approved or refused, and an active one can end", () => {
   assert.deepEqual(affiliationNext(null, "request"), { ok: true, status: "requested" })
@@ -35,4 +41,34 @@ test("a college code is 2 to 10 capitals and digits", () => {
   assert.equal(collegeCodeProblem("A"), "A college code is 2 to 10 letters and digits.")
   assert.equal(collegeCodeProblem("TOO-LONG-CODE"), "A college code is 2 to 10 letters and digits.")
   assert.equal(collegeCodeProblem("R V"), "A college code is 2 to 10 letters and digits.")
+})
+
+test("a syllabus course's marks: internal and external add up, pass marks within them", () => {
+  const ok = { internalMax: 40, externalMax: 60, passExternal: 21, passTotal: 40 }
+  assert.equal(syllabusCourseProblem(ok), null)
+  assert.equal(syllabusCourseProblem({ ...ok, internalMax: 0 }), null) // a theory paper may be all external
+  assert.equal(
+    syllabusCourseProblem({ ...ok, internalMax: 0, externalMax: 0 }),
+    "A course is out of more than 0 marks."
+  )
+  assert.equal(
+    syllabusCourseProblem({ ...ok, passExternal: 61 }),
+    "The external pass mark can't be more than the external marks."
+  )
+  assert.equal(
+    syllabusCourseProblem({ ...ok, passTotal: 101 }),
+    "The pass mark can't be more than the course's total."
+  )
+  assert.equal(
+    syllabusCourseProblem({ ...ok, internalMax: 40.5 }),
+    "Marks are whole numbers."
+  )
+  assert.equal(syllabusCourseProblem({ ...ok, externalMax: 1001 }), "A course is out of at most 1,000 marks.")
+})
+
+test("a semester is 1 to 12", () => {
+  assert.equal(semesterProblem(1), null)
+  assert.equal(semesterProblem(12), null)
+  assert.equal(semesterProblem(0), "A semester is 1 to 12.")
+  assert.equal(semesterProblem(2.5), "A semester is 1 to 12.")
 })

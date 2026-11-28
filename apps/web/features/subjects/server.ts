@@ -20,6 +20,11 @@ import {
   type OrgContext,
 } from "@/features/orgs/server"
 import { ApiError, notFound } from "@/lib/api/route"
+import {
+  followUniversityCourse,
+  lockedCopies,
+  lockedCopy,
+} from "@/features/university/syllabus"
 
 /*
  * The Subjects module: an organization's list of subjects, and which classes (groups) take
@@ -110,7 +115,7 @@ export async function listSubjects(slug: string, user: User) {
     )
   }
   const db = getDb()
-  const [rows, uses] = await Promise.all([
+  const [rows, uses, locked] = await Promise.all([
     db
       .select()
       .from(subjects)
@@ -128,6 +133,7 @@ export async function listSubjects(slug: string, user: User) {
       .from(classSubjects)
       .leftJoin(users, eq(classSubjects.teacherId, users.id))
       .where(eq(classSubjects.orgId, ctx.org.id)),
+    ctx.org.type === "college" ? lockedCopies(ctx.org.id) : new Set<string>(),
   ])
   // Classes this person may put subjects on, with the groups above them to keep the tree whole.
   const choosable = ctx.groups.filter((g) =>
@@ -162,6 +168,8 @@ export async function listSubjects(slug: string, user: User) {
       code: s.code,
       description: s.description,
       credits: s.credits,
+      /** The university's course: its code, name and credits can't be changed here. */
+      fromUniversity: locked.has(s.id),
       classes: uses
         .filter((u) => u.subjectId === s.id)
         .map((u) => ({
@@ -211,7 +219,19 @@ export async function updateSubject(
 ) {
   const ctx = await context(slug, user)
   needFor(ctx, "subjects.edit", [])
-  await ownSubject(ctx, id)
+  const before = await ownSubject(ctx, id)
+  if (
+    (await lockedCopy(ctx.org.id, before)) &&
+    (input.name !== before.name ||
+      input.code !== before.code ||
+      input.credits !== before.credits)
+  ) {
+    throw new ApiError(
+      409,
+      "from_university",
+      "This course comes from your university: its code, name and credits are the university's."
+    )
+  }
   try {
     const [row] = await getDb()
       .update(subjects)
@@ -219,6 +239,8 @@ export async function updateSubject(
       .where(eq(subjects.id, id))
       .returning()
     await writeAudit(ctx, "subject.update", `Changed the subject ${input.name}`)
+    // A university's course: its affiliated colleges' copies follow.
+    if (ctx.org.type === "university") await followUniversityCourse(row!)
     return row!
   } catch (error) {
     if (duplicate(error))
@@ -235,6 +257,13 @@ export async function deleteSubject(slug: string, user: User, id: string) {
   const ctx = await context(slug, user)
   needFor(ctx, "subjects.delete", [])
   const row = await ownSubject(ctx, id)
+  if (await lockedCopy(ctx.org.id, row)) {
+    throw new ApiError(
+      409,
+      "from_university",
+      "This course comes from your university's syllabus and can't be deleted while you're affiliated."
+    )
+  }
   await getDb().delete(subjects).where(eq(subjects.id, id))
   await writeAudit(ctx, "subject.delete", `Deleted the subject ${row.name}`)
 }

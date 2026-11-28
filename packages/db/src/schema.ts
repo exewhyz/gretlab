@@ -1288,6 +1288,68 @@ export const orgAffiliations = pgTable(
   ]
 )
 
+/**
+ * A university's common syllabus: the courses of one program (a university group) in one
+ * semester, each one of the university's own subjects (code, name, credits), with how it's
+ * marked: internal marks by the college, external by the university, and the pass marks.
+ */
+export const syllabusCourses = pgTable(
+  "syllabus_courses",
+  {
+    id: id(),
+    universityId: uuid("university_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    semester: integer("semester").notNull(),
+    subjectId: uuid("subject_id")
+      .notNull()
+      .references(() => subjects.id, { onDelete: "cascade" }),
+    internalMax: integer("internal_max").notNull(),
+    externalMax: integer("external_max").notNull(),
+    passExternal: integer("pass_external").notNull(),
+    passTotal: integer("pass_total").notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("syllabus_courses_unique").on(table.programId, table.semester, table.subjectId),
+    index("syllabus_courses_university").on(table.universityId),
+  ]
+)
+
+/**
+ * A college's class that follows a university program's semester: it takes that semester's
+ * courses, as the college's own subjects linked to the university's (subjects.source_subject_id).
+ */
+export const classPrograms = pgTable(
+  "class_programs",
+  {
+    id: id(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    universityId: uuid("university_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    semester: integer("semester").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("class_programs_group").on(table.groupId),
+    index("class_programs_program").on(table.programId, table.semester),
+  ]
+)
+
 /* ---------- Fees (the finance module; rules in packages/judge/src/fees.ts) ---------- */
 
 /** What fees are for: tuition, exam, hostel… An optional GST rate is included in its amounts. */
@@ -1927,9 +1989,19 @@ export const subjects = pgTable(
     description: text("description").notNull().default(""),
     /** Credits, where the kind grades by credits (a college course: 3, 4, 1.5). */
     credits: doublePrecision("credits"),
+    /**
+     * A college's copy of its university's course (the common syllabus): code, name and
+     * credits follow the university's and the college can't change them.
+     */
+    sourceSubjectId: uuid("source_subject_id").references((): AnyPgColumn => subjects.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
   },
   (table) => [
+    uniqueIndex("subjects_source")
+      .on(table.orgId, table.sourceSubjectId)
+      .where(sql`${table.sourceSubjectId} is not null`),
     uniqueIndex("subjects_name").on(table.orgId, sql`lower(${table.name})`),
     uniqueIndex("subjects_code")
       .on(table.orgId, sql`lower(${table.code})`)
