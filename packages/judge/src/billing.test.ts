@@ -4,6 +4,7 @@ import { test } from "node:test"
 import {
   DEFAULT_PRICE_LIST,
   featureAvailable,
+  PLAN_PRESETS,
   splitChange,
   planIncludes,
   planModulePolicy,
@@ -426,4 +427,12 @@ test("a module the platform switched off for a kind isn't sold to it", () => {
 
 test("a feature needing one the kind can't have isn't offered either", () => {
   assert.equal(featureAvailable("results", "company"), false, "needs records")
+})
+
+test("affiliated colleges are sold to universities only, and the University preset with them", () => {
+  assert.equal(featureAvailable("affiliation", "university"), true)
+  assert.equal(featureAvailable("affiliation", "college"), false)
+  const preset = PLAN_PRESETS.find((p) => p.key === "university")!
+  assert.ok(preset.features.every((f) => featureAvailable(f, "university")))
+  assert.ok(!preset.features.every((f) => featureAvailable(f, "college")))
 })

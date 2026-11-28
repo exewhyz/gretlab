@@ -1,6 +1,6 @@
 ---
 title: Kinds of organization
-description: School, college, coaching institute, cohort program, company, community or other, and what choosing one decides.
+description: School, college, university, coaching institute, cohort program, company, community or other, and what choosing one decides.
 ---
 
 Every organization is one **kind**, chosen when it's created and **never changed**: not by its owner,
@@ -11,10 +11,11 @@ creating.
 
 - **Its words.** Students or Learners or Employees; Teachers or Faculty or Mentors; Classes or Batches
   or Pods. Menus, homes and messages all use them.
-- **Its group levels.** A school is Grade › Section, a college Department › Batch, a coaching
+- **Its group levels.** A school is Grade › Section, a college Department › Batch, a university
+  School › Department › Program, a coaching
   institute Course › Batch, a cohort program Cohort › Pod, a company Department › Team.
 - **How it grades.** By marks and a percentage scale (schools, coaching), by credits and grade points
-  with SGPA and CGPA (colleges), or not at all.
+  with SGPA and CGPA (colleges and universities), or not at all.
 - **Its modules.** Which can be used at all, and which start switched on.
 - **How groups work.** Whether groups run between dates (week 3 of 12), whether each group has its own
   lead, and whether members join groups themselves.
@@ -24,6 +25,10 @@ creating.
 
 - **School:** grades and sections, an academic year, term exams and report cards, with parents.
 - **College:** departments and batches, semesters, credits with SGPA and CGPA, course-wise attendance.
+  A college can affiliate to a university on GretLab.
+- **University:** schools, departments and programs, semesters and credits, plus
+  [affiliated colleges](/features/assessment/universities/): a common syllabus, student
+  registration, university exams and results, and oversight.
 - **Coaching institute:** courses and batches that run between dates, with tests.
 - **Cohort program:** cohorts and pods with mentors, weekly progress and graduation certificates.
 - **Company:** departments and teams, with assigned training that renews.

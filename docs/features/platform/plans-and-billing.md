@@ -34,7 +34,7 @@ and staff you have against what the plan allows.
 ## Changing your plan
 
 The builder lists every feature with its price a student. Start from a ready-made plan (Coding lab,
-College, School, Coaching, Company training) or tick what you need. As you choose, it shows the
+College, University, School, Coaching, Company training; only those your kind can use) or tick what you need. As you choose, it shows the
 total, the price a student, GST and what's due now.
 
 - **Volume steps** lower the price for large organizations, like tax slabs: 10% off students past

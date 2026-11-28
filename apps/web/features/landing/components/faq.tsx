@@ -36,6 +36,10 @@ const QUESTIONS: Question[] = [
   { q: "How do you catch copied code?", a: "Similarity checks compare every submission in a class or batch, still find code whose names have been changed, and show a pair side by side. Contest organizers can also play back how each solution was written, with sudden pastes pointed out." },
   { q: "Can a problem accept more than one right answer?", a: "Yes. Numbers can be accepted within a tolerance, lines in any order, spacing and case ignored, or a teacher can write a small checker program that decides, with partial marks." },
   {
+    q: "Can a university run its affiliated colleges on it?",
+    a: "Yes. The university and each college run their own GretLab, linked by affiliation. The university sets the common syllabus, registers each college's students with registration numbers, holds the end-semester exams with the colleges' internal marks, and publishes results to students' grade cards. It sees each college's academics, never its fees, parents or staff.",
+  },
+  {
     q: "Does it handle semesters and credits?",
     a: "Yes: semesters, course credits, SGPA and CGPA on a grade card, attendance by course with a minimum to sit exams, and course and program outcome (CO–PO) attainment.",
   },

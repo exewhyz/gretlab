@@ -31,6 +31,10 @@ aren't listed.
   colleges enter internal marks until the university closes them, and the university enters or
   imports the external marks. Published results (each course's grade, the semester's SGPA and the
   CGPA) show on students' report cards and in the PDF, and students and parents are told.
+- **Affiliated colleges** is a plan feature for universities, with a ready-made University plan, and
+  the docs have a page on [universities and affiliated colleges](/features/assessment/universities/).
+  The privacy policy and terms say what an affiliated college's students share with their
+  university.
 - A university's **Oversight** page shows each affiliated college at a glance (registered students,
   attendance over 90 days, the latest results' pass rate, coding lab use) and opens a college's
   registered students with the same, never their fees, parents or staff.

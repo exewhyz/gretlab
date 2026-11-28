@@ -96,6 +96,12 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
               Razorpay, and we keep only its reference. The institution&apos;s staff who manage
               fees for your classes see them, and so do your linked parents, who can also pay.
             </Item>
+            <Item term="University registration and results">
+              if your college is affiliated to a university in {site}: your registration with the
+              university (the program, your admission year, the number it gives you and who
+              approved it), your internal marks (entered by your college) and university marks
+              (entered by the university), and the results worked out from them.
+            </Item>
             <Item term="Referrals">
               your referral code and link; which organizations were registered or paid with it,
               and where each is (waiting, active, paying); what you earned from each payment and
@@ -208,6 +214,14 @@ export function PrivacyPolicy({ facts }: { facts: LegalFacts }) {
           </Item>
           <Item term="Parents and guardians">
             what their linked child can see about themselves, read only.
+          </Item>
+          <Item term="Your college's university">
+            if your college is affiliated to a university in {site}, the university&apos;s staff
+            whose role allows it see your academics: your name, your college&apos;s admission
+            number, your registration, internal and university marks and results, your attendance
+            figures, and how many graded submissions you made in the coding lab. Never your email,
+            fees, parents, hostel, transport, leave or the rest of your record, and nothing once
+            your college stops being affiliated (published results stay on your report card).
           </Item>
           <Item term="Enquiries">
             what you send through the contact form is read by the people who run {site} and look

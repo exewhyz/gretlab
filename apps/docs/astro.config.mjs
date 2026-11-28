@@ -142,6 +142,7 @@ export default defineConfig({
                 { label: "Subjects", slug: "features/assessment/subjects" },
                 { label: "Exams and report cards", slug: "features/assessment/exams-and-report-cards" },
                 { label: "Course and program outcomes", slug: "features/assessment/outcomes" },
+                { label: "Universities and affiliated colleges", slug: "features/assessment/universities" },
               ],
             },
             {
