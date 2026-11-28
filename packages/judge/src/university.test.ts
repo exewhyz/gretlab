@@ -5,6 +5,9 @@ import {
   affiliationNext,
   collegeCodeProblem,
   normalizeCollegeCode,
+  admissionYearProblem,
+  registrationNext,
+  registrationNumber,
   semesterProblem,
   syllabusCourseProblem,
 } from "./university.ts"
@@ -71,4 +74,25 @@ test("a semester is 1 to 12", () => {
   assert.equal(semesterProblem(12), null)
   assert.equal(semesterProblem(0), "A semester is 1 to 12.")
   assert.equal(semesterProblem(2.5), "A semester is 1 to 12.")
+})
+
+test("a registration number is the college code, the admission year and a 4-digit sequence", () => {
+  assert.equal(registrationNumber("FC1", 2026, 7), "FC120260007")
+  assert.equal(registrationNumber("1RV", 2025, 1234), "1RV20251234")
+  assert.equal(registrationNumber("FC1", 2026, 12345), "FC1202612345")
+})
+
+test("an admission year is a whole year from 2000 to 2100", () => {
+  assert.equal(admissionYearProblem(2026), null)
+  assert.equal(admissionYearProblem(1999), "An admission year is from 2000 to 2100.")
+  assert.equal(admissionYearProblem(2026.5), "An admission year is from 2000 to 2100.")
+})
+
+test("a registration is asked for, then approved or rejected; only a waiting one can be cancelled", () => {
+  assert.deepEqual(registrationNext("requested", "approve"), { ok: true, status: "approved" })
+  assert.deepEqual(registrationNext("requested", "reject"), { ok: true, status: "rejected" })
+  assert.deepEqual(registrationNext("requested", "cancel"), { ok: true, status: "cancelled" })
+  assert.equal(registrationNext("approved", "reject").ok, false)
+  assert.equal(registrationNext("rejected", "approve").ok, false)
+  assert.equal(registrationNext("approved", "cancel").ok, false)
 })

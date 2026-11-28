@@ -139,6 +139,7 @@ const ICONS: Record<string, Icon> = {
   colleges: BankIcon,
   university: BankIcon,
   "university-syllabus": BookOpenIcon,
+  "university-registrations": IdentificationBadgeIcon,
   transport: BusIcon,
   hostel: BedIcon,
   assignments: CodeIcon,

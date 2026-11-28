@@ -33,6 +33,7 @@ import type {
   universityColleges,
 } from "@/features/university/affiliation"
 import { ClassPrograms } from "@/features/university/components/class-programs"
+import { CollegeRegistrations } from "@/features/university/components/registrations"
 import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import { formatDate } from "@/lib/format"
@@ -183,6 +184,7 @@ export function CollegeUniversity({ slug }: { slug: string }) {
         )}
       </Card>
       {now?.status === "active" && <ClassPrograms slug={slug} />}
+      {now?.status === "active" && <CollegeRegistrations slug={slug} />}
       {data.history.length > 0 && (
         <Card>
           <h2 className="mb-3 text-title-sm text-ink">Before</h2>

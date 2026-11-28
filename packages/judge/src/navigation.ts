@@ -416,6 +416,16 @@ export const ORG_NAV: NavItem[] = [
     wholeOrg: true,
   },
   {
+    key: "university-registrations",
+    label: "Registrations",
+    path: "/registrations",
+    group: "Academics",
+    anyOf: ["university.registrations", "university.view"],
+    orgTypes: ["university"],
+    module: "affiliation",
+    wholeOrg: true,
+  },
+  {
     key: "university",
     label: "University",
     path: "/university",

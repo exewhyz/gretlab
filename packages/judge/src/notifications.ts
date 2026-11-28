@@ -157,9 +157,9 @@ export const NOTIFICATION_EVENTS = {
   "university.affiliation": {
     label: "Affiliation",
     description:
-      "A college asks to affiliate to your university, or your university decides on your college's request or ends it.",
+      "A college asks to affiliate to your university or registers students with it, or your university decides on your college's request or registrations.",
     audience: "staff",
-    kinds: ["affiliation"],
+    kinds: ["affiliation", "registration"],
     emailByDefault: true,
   },
   "leave.request": {

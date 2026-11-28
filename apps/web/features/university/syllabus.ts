@@ -87,6 +87,26 @@ function programsOf(
     .sort((a, b) => byName(a.path, b.path))
 }
 
+/** A university's programs, read by its affiliated colleges' screens (not through its context). */
+export async function universityPrograms(universityId: string) {
+  const db = getDb()
+  const [groups, [university]] = await Promise.all([
+    db
+      .select({
+        id: orgGroups.id,
+        name: orgGroups.name,
+        parentId: orgGroups.parentId,
+      })
+      .from(orgGroups)
+      .where(eq(orgGroups.orgId, universityId)),
+    db
+      .select({ levels: organizations.groupLevels })
+      .from(organizations)
+      .where(eq(organizations.id, universityId)),
+  ])
+  return programsOf(groups, university?.levels ?? [])
+}
+
 /* ---------- the university's side ---------- */
 
 /** Manage › Syllabus: the university's programs, its courses, and the syllabus of each. */
@@ -193,17 +213,15 @@ export async function saveSemester(
         )
       )
     if (input.courses.length)
-      await tx
-        .insert(syllabusCourses)
-        .values(
-          input.courses.map((c, i) => ({
-            ...c,
-            universityId: ctx.org.id,
-            programId,
-            semester,
-            position: i,
-          }))
-        )
+      await tx.insert(syllabusCourses).values(
+        input.courses.map((c, i) => ({
+          ...c,
+          universityId: ctx.org.id,
+          programId,
+          semester,
+          position: i,
+        }))
+      )
     // Every affiliated college's class on this semester gets any course new to it.
     const classes = await tx
       .select({ orgId: classPrograms.orgId, groupId: classPrograms.groupId })

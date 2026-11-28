@@ -85,3 +85,35 @@ export const MAX_SEMESTERS = 12
 export function semesterProblem(n: number): string | null {
   return Number.isInteger(n) && n >= 1 && n <= MAX_SEMESTERS ? null : "A semester is 1 to 12."
 }
+
+/** A student's registration with the university, asked for by their college. */
+export const REGISTRATION_STATUSES = ["requested", "approved", "rejected", "cancelled"] as const
+export type RegistrationStatus = (typeof REGISTRATION_STATUSES)[number]
+export type RegistrationAction = "approve" | "reject" | "cancel"
+
+const REGISTRATION_MOVES: Record<RegistrationAction, RegistrationStatus> = {
+  approve: "approved",
+  reject: "rejected",
+  cancel: "cancelled",
+}
+
+/** Where a registration goes: only a waiting one is decided or cancelled. */
+export function registrationNext(
+  from: RegistrationStatus,
+  action: RegistrationAction
+): { ok: true; status: RegistrationStatus } | { ok: false; problem: string } {
+  if (from === "requested") return { ok: true, status: REGISTRATION_MOVES[action] }
+  return { ok: false, problem: "Only a registration still waiting can be decided or cancelled." }
+}
+
+/** "FC1" + 2026 + 0007: the college code, the admission year, a sequence of at least 4 digits. */
+export function registrationNumber(collegeCode: string, year: number, sequence: number) {
+  return `${collegeCode}${year}${String(sequence).padStart(4, "0")}`
+}
+
+/** Why an admission year can't be used, or null. */
+export function admissionYearProblem(year: number): string | null {
+  return Number.isInteger(year) && year >= 2000 && year <= 2100
+    ? null
+    : "An admission year is from 2000 to 2100."
+}

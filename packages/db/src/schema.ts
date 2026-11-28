@@ -1350,6 +1350,62 @@ export const classPrograms = pgTable(
   ]
 )
 
+/**
+ * A student registered with their college's university for a program and an admission year.
+ * The college asks; the university approves (numbering it: college code, year, sequence) or
+ * rejects. One waiting or approved registration per student per university.
+ */
+export const universityRegistrations = pgTable(
+  "university_registrations",
+  {
+    id: id(),
+    universityId: uuid("university_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    collegeId: uuid("college_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    admissionYear: integer("admission_year").notNull(),
+    status: text("status").$type<"requested" | "approved" | "rejected" | "cancelled">().notNull().default("requested"),
+    /** The university's number for the student, once approved. */
+    regNo: text("reg_no"),
+    note: text("note").notNull().default(""),
+    requestedBy: uuid("requested_by").references(() => users.id, { onDelete: "set null" }),
+    decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("university_registrations_live")
+      .on(table.universityId, table.studentId)
+      .where(sql`${table.status} in ('requested', 'approved')`),
+    uniqueIndex("university_registrations_number")
+      .on(table.universityId, table.regNo)
+      .where(sql`${table.regNo} is not null`),
+    index("university_registrations_college").on(table.collegeId, table.status),
+  ]
+)
+
+/** The next registration sequence per university, college code and admission year. */
+export const universityRegCounters = pgTable(
+  "university_reg_counters",
+  {
+    universityId: uuid("university_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    collegeCode: text("college_code").notNull(),
+    admissionYear: integer("admission_year").notNull(),
+    last: integer("last").notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.universityId, table.collegeCode, table.admissionYear] })]
+)
+
 /* ---------- Fees (the finance module; rules in packages/judge/src/fees.ts) ---------- */
 
 /** What fees are for: tuition, exam, hostel… An optional GST rate is included in its amounts. */

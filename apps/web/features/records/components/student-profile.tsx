@@ -400,6 +400,24 @@ export function StudentProfile({ slug, id }: { slug: string; id: string }) {
               </dd>
               <dt className="text-muted-foreground">Admitted</dt>
               <dd>{longDate(data.admittedOn)}</dd>
+              {data.university && (
+                <>
+                  <dt className="text-muted-foreground">University</dt>
+                  <dd data-testid="university-registration">
+                    {data.university.regNo ? (
+                      <span className="font-mono text-ink">
+                        {data.university.regNo}
+                      </span>
+                    ) : (
+                      <Badge variant="outline">Registration waiting</Badge>
+                    )}
+                    <span className="block text-caption">
+                      {data.university.university} ·{" "}
+                      {data.university.admissionYear}
+                    </span>
+                  </dd>
+                </>
+              )}
             </dl>
           </CardContent>
         </Card>

@@ -1,4 +1,5 @@
 import { needRoom } from "@/features/billing/limits"
+import { registrationOf } from "@/features/university/registrations"
 import { randomUUID } from "node:crypto"
 
 import {
@@ -649,6 +650,9 @@ export async function getStudent(slug: string, user: User, id: string) {
     phone: unseal(SEAL, record.phone) ?? "",
     address: unseal(SEAL, record.address) ?? "",
     admittedOn: record.admittedOn,
+    /** The student's registration with the college's university, if any. */
+    university:
+      ctx.org.type === "college" ? await registrationOf(ctx.org.id, id) : null,
     current: year
       ? {
           year: year.name,

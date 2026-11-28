@@ -27,6 +27,12 @@ year saying which section they're in, their roll number and their status.
   never their values.
 - **Students who don't sign in** (young children) still get an account, on an address nothing can ever
   sign in to or email.
+- **Registering with a university** (an affiliated college): under **Manage › University**, register a
+  class's students, or chosen ones, for a university program and their admission year. Only students
+  with a record here are registered. The university approves each and gives it a number (the college
+  code, the year and a sequence, like FC120260001), shown on the student's record; it sees their name
+  and your admission number, never their email or the rest of the record. A registration still waiting
+  can be cancelled.
 
 ## Step by step
 

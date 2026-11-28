@@ -23,6 +23,10 @@ aren't listed.
   credits, internal and external marks and pass marks). An affiliated college puts a class on a
   semester (**Manage › University**) and the class takes those courses, kept in step with the
   university's names, codes and credits.
+- Colleges register their students with the university (a whole class at once, or chosen students)
+  for a program and an admission year; the university approves them under **Registrations** and
+  gives each a number from the college code, the year and a sequence (FC120260001). The number shows
+  on the student's record.
 
 ### The college ERP with a coding lab
 
