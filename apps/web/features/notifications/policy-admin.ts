@@ -52,6 +52,8 @@ export interface PolicyRow {
   description: string
   audience: EventDefinition["audience"]
   emailOnly: boolean
+  /** May also go by SMS and WhatsApp. */
+  messaging: boolean
   /** This level's own switches. */
   own: EventPolicy
   /** Switches the level above has off, which this one can't turn on. */
@@ -70,11 +72,14 @@ function rows(
       description: definition(event).description,
       audience: definition(event).audience,
       emailOnly: definition(event).emailOnly ?? false,
+      messaging: definition(event).messaging ?? false,
       own: levelPolicy(own, event),
       locked: {
         inApp: top ? !top.inApp : false,
         email: top ? !top.email : false,
         userChoice: top ? !top.userChoice : false,
+        sms: top ? !top.sms : false,
+        whatsapp: top ? !top.whatsapp : false,
       },
     }
   })

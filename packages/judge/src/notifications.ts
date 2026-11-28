@@ -12,6 +12,10 @@ import { z } from "zod"
  * (it may be emailed) and `userChoice` (people may turn its email off or on for
  * themselves; without it, the email goes to everyone it concerns). A switch is on only if
  * every level above has it on, so what the platform turns off an organization can't use.
+ *
+ * Events marked `messaging` also have `sms` and `whatsapp` switches. Unlike the others they're
+ * off until a level switches them on (messages cost money), so both the platform and the
+ * organization must turn one on, and the person must have opted in on a verified number.
  */
 
 export type NotificationAudience = "students" | "parents" | "staff" | "everyone"
@@ -26,6 +30,8 @@ export interface EventDefinition {
   emailByDefault: boolean
   /** Sent by email only: nothing appears in the bell. */
   emailOnly?: boolean
+  /** May also go by SMS and WhatsApp (where switched on). */
+  messaging?: boolean
 }
 
 export const NOTIFICATION_EVENTS = {
@@ -43,6 +49,7 @@ export const NOTIFICATION_EVENTS = {
     audience: "students",
     kinds: ["marks", "comment", "feedback", "project_marked", "results"],
     emailByDefault: true,
+    messaging: true,
   },
   "assignment.extension": {
     label: "More time",
@@ -57,6 +64,7 @@ export const NOTIFICATION_EVENTS = {
     audience: "students",
     kinds: ["notice"],
     emailByDefault: true,
+    messaging: true,
   },
   "class.teacher_note": {
     label: "A note from a teacher",
@@ -71,6 +79,7 @@ export const NOTIFICATION_EVENTS = {
     audience: "everyone",
     kinds: ["event_update", "event_place"],
     emailByDefault: true,
+    messaging: true,
   },
   "training.reminder": {
     label: "Training reminder",
@@ -123,6 +132,7 @@ export const NOTIFICATION_EVENTS = {
     audience: "parents",
     kinds: ["child_absent"],
     emailByDefault: true,
+    messaging: true,
   },
   "staff.assignment_published": {
     label: "A colleague published work",
@@ -145,6 +155,7 @@ export const NOTIFICATION_EVENTS = {
     audience: "everyone",
     kinds: ["admission_update"],
     emailByDefault: true,
+    messaging: true,
   },
   "fees.update": {
     label: "Fees",
@@ -153,6 +164,7 @@ export const NOTIFICATION_EVENTS = {
     audience: "everyone",
     kinds: ["fee_due", "fee_paid"],
     emailByDefault: true,
+    messaging: true,
   },
   "university.affiliation": {
     label: "Affiliation",
@@ -175,6 +187,7 @@ export const NOTIFICATION_EVENTS = {
     audience: "everyone",
     kinds: ["leave_decision"],
     emailByDefault: true,
+    messaging: true,
   },
   "staff.join_request": {
     label: "Request to join",
@@ -213,6 +226,9 @@ export interface EventPolicy {
   inApp: boolean
   email: boolean
   userChoice: boolean
+  /** Off unless switched on; only for events marked `messaging`. */
+  sms: boolean
+  whatsapp: boolean
 }
 
 /** What a level has changed from "everything on"; only the differences are stored. */
@@ -225,6 +241,8 @@ const switches = z
     inApp: z.boolean(),
     email: z.boolean(),
     userChoice: z.boolean(),
+    sms: z.boolean(),
+    whatsapp: z.boolean(),
   })
   .partial()
   .strict()
@@ -244,7 +262,7 @@ export function readOverrides(stored: unknown): PolicyOverrides {
   return parsed.success ? parsed.data : {}
 }
 
-const FIELDS = ["inApp", "email", "userChoice"] as const
+const FIELDS = ["inApp", "email", "userChoice", "sms", "whatsapp"] as const
 
 /** One level's own switches: on unless that level turned them off. */
 export function levelPolicy(
@@ -256,12 +274,21 @@ export function levelPolicy(
     inApp: own.inApp ?? true,
     email: own.email ?? true,
     userChoice: own.userChoice ?? true,
+    // Messages cost money: off until switched on.
+    sms: own.sms ?? false,
+    whatsapp: own.whatsapp ?? false,
   }
 }
 
 export interface EffectivePolicy extends EventPolicy {
   /** Switches the platform has off, which an organization therefore can't turn on. */
-  lockedByPlatform: { inApp: boolean; email: boolean; userChoice: boolean }
+  lockedByPlatform: {
+    inApp: boolean
+    email: boolean
+    userChoice: boolean
+    sms: boolean
+    whatsapp: boolean
+  }
 }
 
 /**
@@ -276,7 +303,7 @@ export function effectivePolicy(
   const top = levelPolicy(platform, event)
   const own = org
     ? levelPolicy(org, event)
-    : { inApp: true, email: true, userChoice: true }
+    : { inApp: true, email: true, userChoice: true, sms: true, whatsapp: true }
   const result = { lockedByPlatform: {} } as EffectivePolicy
   for (const field of FIELDS) {
     result[field] = top[field] && own[field]
@@ -284,6 +311,10 @@ export function effectivePolicy(
   }
   const definition: EventDefinition = NOTIFICATION_EVENTS[event]
   if (definition.emailOnly) result.inApp = false
+  if (!definition.messaging) {
+    result.sms = false
+    result.whatsapp = false
+  }
   return result
 }
 
@@ -327,6 +358,29 @@ export function deliveryFor(
     // Without the choice, the email goes to everyone it concerns.
     email:
       policy.email && (policy.userChoice ? wantsEmail(event, person) : true),
+  }
+}
+
+/** A person's messaging: the channels they opted in to on a verified number. */
+export interface PersonChannels {
+  sms: boolean
+  whatsapp: boolean
+}
+
+/**
+ * Whether one person gets an event by SMS and WhatsApp: the policy allows it, they opted in
+ * to the channel, and they haven't turned the event off for themselves.
+ */
+export function messagingFor(
+  event: NotificationEvent,
+  policy: EventPolicy,
+  channels: PersonChannels,
+  person: PersonPreferences
+) {
+  const wants = person.events[event] ?? true
+  return {
+    sms: policy.sms && channels.sms && wants,
+    whatsapp: policy.whatsapp && channels.whatsapp && wants,
   }
 }
 

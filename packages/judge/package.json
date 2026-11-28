@@ -11,6 +11,7 @@
     ".": "./src/index.ts",
     "./totp": "./src/totp.ts",
     "./integrations": "./src/integrations.ts",
+    "./twilio": "./src/twilio.ts",
     "./completion": "./src/completion.ts"
   },
   "dependencies": {

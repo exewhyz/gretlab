@@ -78,7 +78,13 @@ async function orgName(orgId: string) {
 }
 
 /** A kind this code doesn't list as an event: shown in the bell, emailed to who wants email. */
-const UNLISTED: EventPolicy = { inApp: true, email: true, userChoice: true }
+const UNLISTED: EventPolicy = {
+  inApp: true,
+  email: true,
+  userChoice: true,
+  sms: false,
+  whatsapp: false,
+}
 
 /** What one person is told. */
 interface Message {

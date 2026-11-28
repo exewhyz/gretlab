@@ -4,6 +4,8 @@ import { test } from "node:test"
 import {
   deliveryFor,
   effectivePolicy,
+  messagingFor,
+  type EventDefinition,
   eventOfKind,
   NOTIFICATION_EVENT_KEYS,
   NOTIFICATION_EVENTS,
@@ -36,6 +38,9 @@ test("with nothing changed, everything is on and nothing is locked", () => {
     inApp: false,
     email: false,
     userChoice: false,
+    // Messages are off until the platform switches them on.
+    sms: true,
+    whatsapp: true,
   })
 })
 
@@ -90,7 +95,7 @@ test("a person's choice: their main switch, then the event, then its default", (
 })
 
 test("delivery: the policy decides, the person only where they're given the choice", () => {
-  const on = { inApp: true, email: true, userChoice: true }
+  const on = { inApp: true, email: true, userChoice: true, sms: false, whatsapp: false }
   const optedOut = { emailOn: false, events: {} }
   assert.deepEqual(deliveryFor("class.notice", on, everyone), {
     inApp: true,
@@ -109,7 +114,7 @@ test("delivery: the policy decides, the person only where they're given the choi
   assert.deepEqual(
     deliveryFor(
       "class.notice",
-      { inApp: false, email: false, userChoice: false },
+      { inApp: false, email: false, userChoice: false, sms: false, whatsapp: false },
       everyone
     ),
     { inApp: false, email: false }
@@ -127,8 +132,12 @@ test("only known events and switches can be saved", () => {
     false
   )
   assert.equal(
-    policyOverridesSchema.safeParse({ "class.notice": { sms: true } }).success,
+    policyOverridesSchema.safeParse({ "class.notice": { pigeon: true } }).success,
     false
+  )
+  assert.equal(
+    policyOverridesSchema.safeParse({ "class.notice": { sms: true, whatsapp: false } }).success,
+    true
   )
   assert.deepEqual(readOverrides("garbage"), {})
   assert.deepEqual(readOverrides(null), {})
@@ -170,5 +179,41 @@ test("the weekly summary's week: the latest Monday whose 08:00 has passed, local
   assert.equal(
     weeklyDigestKey(new Date("2027-01-01T12:00:00Z"), "UTC"),
     "2026-12-28"
+  )
+})
+
+test("SMS and WhatsApp are off until both the platform and the organization switch them on", () => {
+  assert.equal(effectivePolicy("parent.absence", {}, {}).sms, false)
+  const platform = { "parent.absence": { sms: true } }
+  assert.equal(effectivePolicy("parent.absence", platform, {}).sms, false)
+  const both = effectivePolicy("parent.absence", platform, { "parent.absence": { sms: true } })
+  assert.equal(both.sms, true)
+  assert.equal(both.lockedByPlatform.sms, false)
+  assert.equal(both.whatsapp, false)
+  // The platform's own work follows the platform alone.
+  assert.equal(effectivePolicy("parent.absence", platform, null).sms, true)
+  // An organization can't turn on what the platform hasn't.
+  assert.equal(effectivePolicy("parent.absence", {}, { "parent.absence": { sms: true } }).sms, false)
+})
+
+test("only events marked for messaging can go by SMS or WhatsApp", () => {
+  const on = { "staff.weekly_digest": { sms: true, whatsapp: true } }
+  const p = effectivePolicy("staff.weekly_digest", on, on)
+  assert.equal(p.sms, false)
+  assert.equal(p.whatsapp, false)
+  assert.ok(NOTIFICATION_EVENT_KEYS.filter((e) => (NOTIFICATION_EVENTS[e] as EventDefinition).messaging).includes("fees.update"))
+})
+
+test("a person gets a message only on a channel they opted in to, for events they kept on", () => {
+  const policy = { inApp: true, email: true, userChoice: true, sms: true, whatsapp: true }
+  const prefs = { emailOn: true, events: {} }
+  assert.deepEqual(messagingFor("fees.update", policy, { sms: true, whatsapp: false }, prefs), { sms: true, whatsapp: false })
+  assert.deepEqual(
+    messagingFor("fees.update", policy, { sms: true, whatsapp: true }, { emailOn: false, events: { "fees.update": false } }),
+    { sms: false, whatsapp: false }
+  )
+  assert.deepEqual(
+    messagingFor("fees.update", { ...policy, sms: false }, { sms: true, whatsapp: true }, prefs),
+    { sms: false, whatsapp: true }
   )
 })

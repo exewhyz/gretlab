@@ -102,7 +102,7 @@ check("a notifications-only role can open and save them", (await t1(N)).status =
 check("...but can't change other organization settings", [403, 404].includes((await t1(O, { method: "PATCH", body: { description: "x" } })).status))
 check("only platform staff see the platform's", (await owner("/admin/notifications")).status === 403 && (await admin("/admin/notifications")).status === 200)
 check("an unknown event is refused", (await setOrg({ "made.up": { email: false } })).status === 400)
-check("an unknown switch is refused", (await setOrg({ "class.notice": { sms: true } })).status === 400)
+check("an unknown switch is refused", (await setOrg({ "class.notice": { pigeon: true } })).status === 400)
 check("email is set up here", (await owner(N)).json.mail === true)
 
 // ---------- defaults
