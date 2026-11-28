@@ -1,10 +1,15 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
+import { UGC_SCALE } from "./results.ts"
+
 import {
   affiliationNext,
   collegeCodeProblem,
   normalizeCollegeCode,
+  courseResult,
+  parseExternalMarks,
+  semesterResult,
   admissionYearProblem,
   registrationNext,
   registrationNumber,
@@ -95,4 +100,63 @@ test("a registration is asked for, then approved or rejected; only a waiting one
   assert.equal(registrationNext("approved", "reject").ok, false)
   assert.equal(registrationNext("rejected", "approve").ok, false)
   assert.equal(registrationNext("approved", "cancel").ok, false)
+})
+
+const course = { internalMax: 40, externalMax: 60, passExternal: 24, passTotal: 40 }
+
+test("a course's result: internal plus external, graded on the scale", () => {
+  const r = courseResult(course, { internal: 32, external: 50, absent: false }, UGC_SCALE)
+  assert.deepEqual(r, { total: 82, percent: 82, outcome: "pass", grade: "A+", points: 9 })
+})
+
+test("a course fails below the external pass mark, whatever the total", () => {
+  const r = courseResult(course, { internal: 40, external: 20, absent: false }, UGC_SCALE)
+  assert.equal(r.outcome, "fail")
+  assert.equal(r.grade, "F")
+  assert.equal(r.points, 0)
+})
+
+test("a course fails below the total pass mark", () => {
+  const r = courseResult(course, { internal: 10, external: 25, absent: false }, UGC_SCALE)
+  assert.equal(r.outcome, "fail")
+  assert.equal(r.points, 0)
+})
+
+test("an absence in the university's exam fails the course; missing marks wait", () => {
+  assert.equal(courseResult(course, { internal: 30, external: null, absent: true }, UGC_SCALE).outcome, "absent")
+  assert.equal(courseResult(course, { internal: 30, external: null, absent: true }, UGC_SCALE).points, 0)
+  assert.equal(courseResult(course, { internal: null, external: 50, absent: false }, UGC_SCALE).outcome, "pending")
+  assert.equal(courseResult(course, { internal: 30, external: null, absent: false }, UGC_SCALE).points, null)
+})
+
+test("a course with no internal marks needs only the external", () => {
+  const all = { internalMax: 0, externalMax: 100, passExternal: 40, passTotal: 40 }
+  assert.equal(courseResult(all, { internal: null, external: 55, absent: false }, UGC_SCALE).grade, "B")
+})
+
+test("a semester's result: SGPA once every course has one", () => {
+  const done = semesterResult([
+    { credits: 4, points: 9, outcome: "pass" },
+    { credits: 3, points: 0, outcome: "fail" },
+  ])
+  assert.deepEqual(done, { complete: true, sgpa: 5.14, credits: 7, earned: 4, backlogs: 1 })
+  assert.equal(semesterResult([{ credits: 4, points: null, outcome: "pending" }]).complete, false)
+})
+
+test("external marks from a CSV: registration number, course code, marks or AB", () => {
+  const parsed = parseExternalMarks(
+    "Registration number,Course code,Marks\nFC120260001,ds301,48\nFC120260002,DS301,AB\n\n"
+  )
+  assert.deepEqual(parsed, {
+    rows: [
+      { line: 2, regNo: "FC120260001", code: "DS301", marks: 48, absent: false },
+      { line: 3, regNo: "FC120260002", code: "DS301", marks: null, absent: true },
+    ],
+    problems: [],
+  })
+  const bad = parseExternalMarks("FC1,DS301,abc\nFC2,,10")
+  assert.deepEqual(bad.problems, [
+    { line: 1, problem: "Marks are a number or AB." },
+    { line: 2, problem: "Each line needs a registration number, a course code and marks." },
+  ])
 })

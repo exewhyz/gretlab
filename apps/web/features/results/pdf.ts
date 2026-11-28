@@ -11,6 +11,9 @@ import {
 } from "@/lib/pdf/document"
 
 import type { CreditCardData, ReportCardData } from "./server"
+import type { universityResultsOf } from "@/features/university/exams"
+
+type UniversityResults = Awaited<ReturnType<typeof universityResultsOf>>
 
 /*
  * Report cards as PDF: one A4 page (or more, for many subjects) per student, laid out like
@@ -32,7 +35,10 @@ const RESULT: Record<string, { label: string; color: RGB }> = {
 }
 
 export async function reportCardsPdf(
-  cards: (ReportCardData & { credits?: CreditCardData | null })[],
+  cards: (ReportCardData & {
+    credits?: CreditCardData | null
+    university?: UniversityResults | null
+  })[],
   printedOn: string,
   /** The organization's logo and colour (features/orgs/pdf-brand.ts). */
   branding: Parameters<typeof embedBrand>[1] = null
@@ -96,6 +102,50 @@ export async function reportCardsPdf(
                 color: c.points === 0 ? COLORS.danger : undefined,
               },
               c.points == null ? "–" : String(c.points),
+            ],
+          }))
+        )
+        w.gap(10)
+      }
+    }
+    // An affiliated college's published university results, semester by semester.
+    if (card.university && card.university.exams.length > 0) {
+      const u = card.university
+      w.text(
+        `University results: ${u.university}${u.regNo ? `  ·  ${u.regNo}` : ""}${u.cgpa != null ? `  ·  CGPA ${u.cgpa.toFixed(2)}` : ""}`,
+        { bold: true, size: 11 }
+      )
+      w.gap(4)
+      for (const e of u.exams) {
+        w.text(
+          `Semester ${e.semester} · ${e.name}  ·  SGPA ${e.result.sgpa == null ? "–" : e.result.sgpa.toFixed(2)}${e.result.complete ? `  ·  ${e.result.earned} of ${e.result.credits} credits${e.result.backlogs ? `  ·  ${e.result.backlogs} backlog${e.result.backlogs === 1 ? "" : "s"}` : ""}` : ""}`,
+          { size: 9.5, color: COLORS.body }
+        )
+        w.gap(2)
+        w.table(
+          [
+            { label: "Code", width: 1.4 },
+            { label: "Course", width: 4 },
+            { label: "Credits", width: 1, align: "right" },
+            { label: "Internal", width: 1.2, align: "right" },
+            { label: "External", width: 1.2, align: "right" },
+            { label: "Grade", width: 1, align: "center" },
+          ],
+          e.courses.map((c, i) => ({
+            shade: i % 2 === 1,
+            cells: [
+              c.code || "–",
+              c.name,
+              String(c.credits),
+              c.internalMax === 0
+                ? "–"
+                : `${c.internal ?? "–"}/${c.internalMax}`,
+              c.absent ? "AB" : `${c.external ?? "–"}/${c.externalMax}`,
+              {
+                text: c.grade ?? "–",
+                bold: true,
+                color: c.points === 0 ? COLORS.danger : undefined,
+              },
             ],
           }))
         )

@@ -6,6 +6,8 @@
  * its academics, never its fees, parents or staff. Pure and unit-tested.
  */
 
+import { bandFor, sgpa, sortScale, type GradeBand } from "./results.ts"
+
 export const AFFILIATION_STATUSES = [
   "requested",
   "active",
@@ -116,4 +118,91 @@ export function admissionYearProblem(year: number): string | null {
   return Number.isInteger(year) && year >= 2000 && year <= 2100
     ? null
     : "An admission year is from 2000 to 2100."
+}
+
+/* ---------- university exams and results ---------- */
+
+/** One student's marks in one course of a university exam (null: not entered yet). */
+export interface UniversityMarks {
+  internal: number | null
+  external: number | null
+  /** Absent from the university's exam. */
+  absent: boolean
+}
+
+export type CourseOutcome = "pass" | "fail" | "absent" | "pending"
+
+/**
+ * A course's result: internal plus external out of both maximums, graded on the university's
+ * scale. It passes only with the external pass mark and the total pass mark; otherwise (or
+ * absent) it takes the scale's lowest grade and 0 points, a backlog. Missing marks wait.
+ */
+export function courseResult(
+  course: SyllabusMarks,
+  marks: UniversityMarks,
+  scale: GradeBand[]
+): { total: number | null; percent: number | null; outcome: CourseOutcome; grade: string | null; points: number | null } {
+  const lowest = sortScale(scale).at(-1)!
+  if (marks.absent)
+    return { total: marks.internal ?? 0, percent: null, outcome: "absent", grade: lowest.grade, points: 0 }
+  const internal = course.internalMax === 0 ? 0 : marks.internal
+  if (internal == null || marks.external == null)
+    return { total: null, percent: null, outcome: "pending", grade: null, points: null }
+  const total = internal + marks.external
+  const percent = Math.round((total / (course.internalMax + course.externalMax)) * 10000) / 100
+  const passed = marks.external >= course.passExternal && total >= course.passTotal
+  if (!passed) return { total, percent, outcome: "fail", grade: lowest.grade, points: 0 }
+  const band = bandFor(scale, percent)
+  return { total, percent, outcome: "pass", grade: band.grade, points: band.points ?? 0 }
+}
+
+/** A semester's result once every course has one: SGPA, credits, earned, backlogs. */
+export function semesterResult(courses: { credits: number; points: number | null; outcome: CourseOutcome }[]) {
+  if (courses.length === 0 || courses.some((c) => c.outcome === "pending"))
+    return { complete: false as const, sgpa: null, credits: 0, earned: 0, backlogs: 0 }
+  const s = sgpa(courses)
+  return {
+    complete: true as const,
+    sgpa: s?.sgpa ?? null,
+    credits: s?.credits ?? 0,
+    earned: s?.earned ?? 0,
+    backlogs: s?.backlogs ?? 0,
+  }
+}
+
+/** One line of an external marks file. */
+export interface ExternalMarkRow {
+  line: number
+  regNo: string
+  code: string
+  marks: number | null
+  absent: boolean
+}
+
+/**
+ * External marks from CSV text: registration number, course code, marks (or AB for absent),
+ * one per line; a header line is skipped. Codes and numbers are matched in capitals.
+ */
+export function parseExternalMarks(text: string) {
+  const rows: ExternalMarkRow[] = []
+  const problems: { line: number; problem: string }[] = []
+  text.split(/\r?\n/).forEach((raw, i) => {
+    const line = i + 1
+    if (!raw.trim()) return
+    const cells = raw.split(",").map((c) => c.trim().replace(/^"|"$/g, ""))
+    if (line === 1 && /registration/i.test(cells[0] ?? "")) return
+    const [regNo, code, mark] = cells
+    if (!regNo || !code || !mark) {
+      problems.push({ line, problem: "Each line needs a registration number, a course code and marks." })
+      return
+    }
+    const absent = /^ab$/i.test(mark)
+    const marks = absent ? null : Number(mark)
+    if (!absent && (mark === "" || !Number.isFinite(marks))) {
+      problems.push({ line, problem: "Marks are a number or AB." })
+      return
+    }
+    rows.push({ line, regNo: regNo.toUpperCase(), code: code.toUpperCase(), marks, absent })
+  })
+  return { rows, problems }
 }

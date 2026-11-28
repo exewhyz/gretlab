@@ -14,6 +14,8 @@ import { api } from "@/lib/api/client"
 import type { ApiResult } from "@/lib/api/types"
 import type { reportCard } from "@/features/results/server"
 
+import { UniversityResults } from "@/features/university/components/university-results"
+
 import { RESULT, fmt } from "./results-parts"
 
 export type ReportCardData = ApiResult<typeof reportCard>
@@ -200,10 +202,13 @@ export function ReportCard({
             ))}
           </section>
         )}
+        {data.university && <UniversityResults data={data.university} />}
         {data.exams.length === 0 ? (
-          <p className="py-8 text-center text-body-sm text-muted-foreground">
-            No results published for {data.year.name} yet.
-          </p>
+          data.university ? null : (
+            <p className="py-8 text-center text-body-sm text-muted-foreground">
+              No results published for {data.year.name} yet.
+            </p>
+          )
         ) : (
           <ScrollX pinFirst>
             <table

@@ -34,6 +34,24 @@ a different thing). Needs Student records and Subjects switched on.
 - **Grading:** schools grade by marks on a scale (CBSE's A1–E by default); colleges by credits, with a
   grade card per semester, SGPA and a CGPA weighted by credits.
 
+## University exams (affiliated colleges)
+
+- A university sets an exam for one program's semester under **Academics › University exams**. It
+  reaches every affiliated college whose classes follow that semester: the students sitting it are
+  those with an approved university registration in such a class.
+- **Internal marks** are the college's: under **Manage › University**, open the exam and enter each
+  course's internal marks (up to its internal maximum) for the classes you enter marks for. The
+  university closes them when it's ready; after that they can't change.
+- **External marks** are the university's, typed in course by course or imported as a CSV
+  (registration number, course code, marks or AB). A file with any wrong line saves nothing and
+  says which lines.
+- **Results:** a course passes with the external pass mark and the total pass mark, and is graded on
+  the university's scale (the UGC ten-point one by default); an absence or a fail is a backlog with
+  0 points. Each semester has an SGPA, and the CGPA weighs every published semester by its credits.
+- **Publishing** asks first while marks are missing. Students and their parents are told, and the
+  report card and its PDF show **University results**. A mark changed after publishing is logged as
+  a correction. The college's own exams stay separate.
+
 ## Publishing
 
 Publishing tells each student and their parents, and locks the exam's marks, papers and remarks.

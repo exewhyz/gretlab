@@ -27,6 +27,10 @@ aren't listed.
   for a program and an admission year; the university approves them under **Registrations** and
   gives each a number from the college code, the year and a sequence (FC120260001). The number shows
   on the student's record.
+- University exams: a university sets an end-semester exam for a program's semester; affiliated
+  colleges enter internal marks until the university closes them, and the university enters or
+  imports the external marks. Published results (each course's grade, the semester's SGPA and the
+  CGPA) show on students' report cards and in the PDF, and students and parents are told.
 
 ### The college ERP with a coding lab
 

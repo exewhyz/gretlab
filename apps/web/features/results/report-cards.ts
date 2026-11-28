@@ -15,6 +15,7 @@ import {
   users,
   type User,
 } from "@workspace/db"
+import { universityResultsOf } from "@/features/university/exams"
 import {
   bandFor,
   cgpa,
@@ -430,6 +431,11 @@ export async function reportCard(
   return {
     ...card!,
     credits,
+    /** An affiliated college's published university results for the student. */
+    university:
+      ctx.org.type === "college"
+        ? await universityResultsOf(ctx.org.id, id)
+        : null,
     years: shown.map((y) => ({ id: y.id, name: y.name })),
     viewer: isSelf ? "student" : isParent ? "parent" : "staff",
   }

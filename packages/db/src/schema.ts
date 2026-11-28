@@ -1406,6 +1406,70 @@ export const universityRegCounters = pgTable(
   (table) => [primaryKey({ columns: [table.universityId, table.collegeCode, table.admissionYear] })]
 )
 
+/**
+ * A university's end-semester exam for one program and semester ("December 2026"). It reaches
+ * every affiliated college's class following that semester; colleges enter internal marks
+ * until the university closes them, the university enters external marks, then publishes.
+ */
+export const universityExams = pgTable(
+  "university_exams",
+  {
+    id: id(),
+    universityId: uuid("university_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => orgGroups.id, { onDelete: "cascade" }),
+    semester: integer("semester").notNull(),
+    name: text("name").notNull(),
+    /** "YYYY-MM-DD", optional. */
+    startsOn: text("starts_on"),
+    endsOn: text("ends_on"),
+    internalClosedAt: timestamp("internal_closed_at", { withTimezone: true }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("university_exams_name").on(
+      table.programId,
+      table.semester,
+      sql`lower(${table.name})`
+    ),
+    index("university_exams_university").on(table.universityId),
+  ]
+)
+
+/** One student's marks in one course of a university exam. */
+export const universityMarks = pgTable(
+  "university_marks",
+  {
+    examId: uuid("exam_id")
+      .notNull()
+      .references(() => universityExams.id, { onDelete: "cascade" }),
+    subjectId: uuid("subject_id")
+      .notNull()
+      .references(() => subjects.id, { onDelete: "cascade" }),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The college that entered the internal marks. */
+    collegeId: uuid("college_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    internal: doublePrecision("internal"),
+    external: doublePrecision("external"),
+    absent: boolean("absent").notNull().default(false),
+    internalBy: uuid("internal_by").references(() => users.id, { onDelete: "set null" }),
+    externalBy: uuid("external_by").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.examId, table.subjectId, table.studentId] }),
+    index("university_marks_student").on(table.studentId),
+  ]
+)
+
 /* ---------- Fees (the finance module; rules in packages/judge/src/fees.ts) ---------- */
 
 /** What fees are for: tuition, exam, hostel… An optional GST rate is included in its amounts. */
