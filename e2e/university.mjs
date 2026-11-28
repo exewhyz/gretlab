@@ -349,6 +349,31 @@ await vc(`${UX}/${ex.id}/publish`, { body: { publish: true } })
 check("another university can't open the exam", (await u2(`/orgs/uni-u2/university-exams/${ex.id}`)).status === 404)
 check("both activity logs have the exam's steps", Number(psql(`select count(*) from audit_log where org_id='${id("uni-u")}' and action in ('university.exam','university.marks')`)) >= 5 && Number(psql(`select count(*) from audit_log where org_id='${C1}' and action='university.marks'`)) >= 3)
 
+// ---------- the oversight dashboard
+const today = new Date().toISOString().slice(0, 10), yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10)
+const ts1 = psql(`insert into teaching_sessions(org_id,group_id,day,minutes,kind) values ('${C1}','${cls.id}','${today}',0,'register') returning id`).split("\n")[0]
+const ts2 = psql(`insert into teaching_sessions(org_id,group_id,day,minutes,kind,period) values ('${C1}','${cls.id}','${yesterday}',0,'register','1') returning id`).split("\n")[0]
+psql(`insert into attendance(session_id,user_id,present,status) values ('${ts1}','${R1}',true,'present'),('${ts1}','${R2}',false,'absent'),('${ts2}','${R1}',true,'late'),('${ts2}','${R2}',false,'excused')`)
+const submitted = await sr1("/submissions", { body: { kind: "submit", language: "python", entry: "main.py", files: [{ path: "main.py", content: "print(1)" }], problemSlug: base.slug } })
+check("a registered student submits in the coding lab", submitted.status === 200 || submitted.status === 201, JSON.stringify(submitted.json).slice(0, 200))
+const ov = (await vc(`${U}/oversight`)).json
+const fc = ov?.items?.find((c) => c.code === "FC1")
+check("the overview lists each affiliated college with its registered and waiting students", ov?.totals?.colleges === 1 && fc?.registered === 2 && fc.waiting === 1, JSON.stringify(ov).slice(0, 400))
+check("…attendance over the last 90 days, excused left out", fc?.attendance === 66.7, String(fc?.attendance))
+check("…the latest published results' pass rate", fc?.results?.sat === 2 && fc.results.passed === 1 && fc.results.percent === 50 && fc.results.exam === "Dec 2026", JSON.stringify(fc?.results))
+check("…and graded coding lab submissions", fc?.submissions >= 1)
+check("a college that left isn't in it", !ov.items.some((c) => c.name === "Second College"))
+check("search by college code", (await vc(`${U}/oversight?q=fc1`)).json?.items?.length === 1 && (await vc(`${U}/oversight?q=zzz`)).json?.items?.length === 0)
+check("someone who only oversees sees it", (await registrar(`${U}/oversight`)).json?.items?.length === 1)
+check("a member with neither permission doesn't", (await teacher(`${U}/oversight`)).status === 403)
+const oc = (await vc(`${U}/oversight/${C1}`)).json
+const st = (reg) => oc?.items?.find((x) => x.regNo === reg)
+check("a college's page lists its registered students with their figures", oc?.total === 2 && st("FC120260001")?.attendance === 100 && st("FC120260001").result?.sgpa === 9 && st("FC120260002")?.attendance === 0 && st("FC120260002").result?.backlogs === 1 && st("FC120260001").submissions >= 1, JSON.stringify(oc?.items))
+check("…never their email, fees or parents", !/@example\.com|fee|guardian|parent/i.test(JSON.stringify(oc)) && !/@example\.com|fee|guardian/i.test(JSON.stringify(ov)))
+check("a college that isn't affiliated now can't be opened", (await vc(`${U}/oversight/${id("uni-c2")}`)).status === 404)
+check("another university can't open this one's college", (await u2(`/orgs/uni-u2/oversight/${C1}`)).status === 404)
+check("a college has no oversight page", (await c1("/orgs/uni-c1/oversight")).status === 404)
+
 // ---------- the pages
 const browser = await chromium.launch()
 const errors = []
@@ -463,6 +488,19 @@ try {
   await rcPhone.getByTestId("university-results").waitFor({ timeout: 30000 })
   check("…on a phone, without sideways scrolling", await rcPhone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
   await rcPhone.screenshot({ path: SHOTS + "university-report-card-phone.png", fullPage: true })
+  await up.goto(`${BASE}${U}/manage/oversight`)
+  await up.getByTestId("oversight-college").first().waitFor({ timeout: 30000 })
+  check("Oversight is in the university's sidebar", (await up.getByRole("link", { name: "Oversight" }).count()) > 0)
+  await up.screenshot({ path: SHOTS + "university-oversight.png", fullPage: true })
+  await up.getByRole("link", { name: "First College" }).click()
+  await up.getByTestId("oversight-student").first().waitFor({ timeout: 30000 })
+  check("…and opens a college's students", (await up.getByTestId("oversight-student").count()) >= 2)
+  await up.screenshot({ path: SHOTS + "university-oversight-college.png", fullPage: true })
+  const ovPhone = await open("uni-vc@example.com", 390)
+  await ovPhone.goto(`${BASE}${U}/manage/oversight`)
+  await ovPhone.getByTestId("oversight-college").first().waitFor({ timeout: 30000 })
+  check("the overview on a phone, without sideways scrolling", await ovPhone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+  await ovPhone.screenshot({ path: SHOTS + "university-oversight-phone.png", fullPage: true })
   const regPhone = await open("uni-vc@example.com", 390)
   await regPhone.goto(`${BASE}${U}/manage/registrations`)
   await regPhone.getByRole("heading", { name: "Registrations" }).waitFor({ timeout: 30000 })

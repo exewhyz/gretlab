@@ -86,7 +86,7 @@ export const publishSchema = z.object({
 type Exam = typeof universityExams.$inferSelect
 
 /** The university's scale: its own (Exams settings), else the UGC ten-point one. */
-async function scaleOf(universityId: string): Promise<GradeBand[]> {
+export async function scaleOf(universityId: string): Promise<GradeBand[]> {
   const [org] = await getDb()
     .select({ settings: organizations.moduleSettings })
     .from(organizations)
@@ -95,7 +95,7 @@ async function scaleOf(universityId: string): Promise<GradeBand[]> {
 }
 
 /** The exam's courses: its program's semester in the syllabus, in order. */
-async function coursesOf(exam: Exam) {
+export async function coursesOf(exam: Exam) {
   return getDb()
     .select({
       subjectId: subjects.id,

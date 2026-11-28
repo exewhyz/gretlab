@@ -406,6 +406,16 @@ export const ORG_NAV: NavItem[] = [
     wholeOrg: true,
   },
   {
+    key: "university-oversight",
+    label: "Oversight",
+    path: "/oversight",
+    group: "Academics",
+    anyOf: ["university.view", "university.colleges"],
+    orgTypes: ["university"],
+    module: "affiliation",
+    wholeOrg: true,
+  },
+  {
     key: "university-syllabus",
     label: "Syllabus",
     path: "/syllabus",
